@@ -29,26 +29,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(
     () => localStorage.getItem("token"),
   );
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(
+    () => !!localStorage.getItem("token"),
+  );
 
   useEffect(() => {
     if (!token) {
-      setIsLoading(false);
       return;
     }
+    let cancelled = false;
     authApi
       .getMe()
       .then((res) => {
-        if (res.data.data) {
+        if (!cancelled && res.data.data) {
           setUser(res.data.data);
         }
       })
       .catch(() => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem("token");
+        if (!cancelled) {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem("token");
+        }
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const login = useCallback(async (data: LoginRequest) => {
