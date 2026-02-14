@@ -1,8 +1,8 @@
 FROM oven/bun:1.3-alpine AS frontend
 
 WORKDIR /build
-COPY web/package.json web/bun.lockb ./
-RUN bun install --frozen-lockfile
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen
 COPY web/ .
 RUN bun run build
 
