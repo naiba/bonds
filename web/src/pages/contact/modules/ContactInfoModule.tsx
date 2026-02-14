@@ -111,7 +111,7 @@ export default function ContactInfoModule({
     >
       {showForm && (
         <div style={{ marginBottom: 16 }}>
-          <Space direction="vertical" style={{ width: "100%" }}>
+          <Space orientation="vertical" style={{ width: "100%" }}>
             <Select
               value={type}
               onChange={setType}

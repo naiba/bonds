@@ -114,7 +114,7 @@ export default function ContactDetail() {
       key: "overview",
       label: t("contact.detail.tabs.overview"),
       children: (
-        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
           <Card>
             <Descriptions column={{ xs: 1, sm: 2 }}>
               <Descriptions.Item label={t("contact.detail.first_name")}>
@@ -155,7 +155,7 @@ export default function ContactDetail() {
       key: "information",
       label: t("contact.detail.tabs.information"),
       children: (
-        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
           <ContactInfoModule {...moduleProps} />
           <AddressesModule {...moduleProps} />
           <ImportantDatesModule {...moduleProps} />
@@ -167,7 +167,7 @@ export default function ContactDetail() {
       key: "activities",
       label: t("contact.detail.tabs.activities"),
       children: (
-        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
           <TasksModule {...moduleProps} />
           <CallsModule {...moduleProps} />
           <RemindersModule {...moduleProps} />
@@ -180,7 +180,7 @@ export default function ContactDetail() {
       key: "life",
       label: t("contact.detail.tabs.life"),
       children: (
-        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
           <LifeEventsModule {...moduleProps} />
           <MoodTrackingModule {...moduleProps} />
         </Space>
@@ -190,7 +190,7 @@ export default function ContactDetail() {
       key: "photos",
       label: t("contact.detail.tabs.photos_docs"),
       children: (
-        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
           <PhotosModule {...moduleProps} />
           <DocumentsModule {...moduleProps} />
         </Space>

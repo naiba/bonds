@@ -86,7 +86,7 @@ export default function Login() {
         </Form>
 
         <Divider>{t("oauth.continueWith")}</Divider>
-        <Space direction="vertical" style={{ width: "100%" }}>
+        <Space orientation="vertical" style={{ width: "100%" }}>
           <Button block icon={<GithubOutlined />} href="/api/auth/github">
             {t("oauth.github")}
           </Button>

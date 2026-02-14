@@ -97,7 +97,7 @@ export default function TwoFactor() {
 
       <Card>
         <Alert
-          message={
+          title={
             isEnabled
               ? t("twoFactor.status.enabled")
               : t("twoFactor.status.disabled")
@@ -144,7 +144,7 @@ export default function TwoFactor() {
             </Card>
 
             <Alert
-              message={t("twoFactor.recoveryCodes")}
+              title={t("twoFactor.recoveryCodes")}
               description={t("twoFactor.recoveryCodes.warning")}
               type="warning"
               showIcon

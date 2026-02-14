@@ -116,7 +116,7 @@ export default function QuickFactsModule({
     >
       {showForm && (
         <div style={{ marginBottom: 16 }}>
-          <Space direction="vertical" style={{ width: "100%" }}>
+          <Space orientation="vertical" style={{ width: "100%" }}>
             <Input placeholder={t("modules.quick_facts.label_placeholder")} value={label} onChange={(e) => setLabel(e.target.value)} />
             <Input placeholder={t("modules.quick_facts.value_placeholder")} value={value} onChange={(e) => setValue(e.target.value)} />
             <Space>

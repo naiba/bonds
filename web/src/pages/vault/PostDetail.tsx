@@ -115,7 +115,7 @@ export default function PostDetail() {
 
       {editing ? (
         <Card>
-          <Space direction="vertical" style={{ width: "100%" }} size={16}>
+          <Space orientation="vertical" style={{ width: "100%" }} size={16}>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
