@@ -1,5 +1,9 @@
 # Bonds
 
+[![Test](https://github.com/naiba/bonds/actions/workflows/test.yml/badge.svg)](https://github.com/naiba/bonds/actions/workflows/test.yml)
+[![Release](https://github.com/naiba/bonds/actions/workflows/release.yml/badge.svg)](https://github.com/naiba/bonds/actions/workflows/release.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/naiba/bonds)](https://github.com/naiba/bonds/releases)
+
 > [English](README.md)
 
 现代化的社区驱动个人关系管理器 — 受 [Monica](https://github.com/monicahq/monica) 启发，使用 **Go** 和 **React** 全新重写。
