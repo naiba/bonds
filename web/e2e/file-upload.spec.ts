@@ -44,12 +44,12 @@ test.describe('File Upload', () => {
     await setupVaultAndContact(page);
 
     // Click the Photos & Docs tab
-    const photosTab = page.getByText(/photos.*docs/i);
+    const photosTab = page.getByRole('tab', { name: /photos/i });
     if (await photosTab.isVisible()) {
       await photosTab.click();
-      // Should see upload or empty state
+      // Should see the Photos or Documents card heading in the tab content
       await expect(
-        page.getByText(/photo|document|upload|no photos/i),
+        page.getByText('Photos', { exact: true }),
       ).toBeVisible({ timeout: 5000 });
     }
   });
