@@ -1,0 +1,160 @@
+import { useState } from "react";
+import {
+  Card,
+  List,
+  Button,
+  Modal,
+  Form,
+  Input,
+  DatePicker,
+  Select,
+  InputNumber,
+  Popconfirm,
+  App,
+  Tag,
+  Empty,
+} from "antd";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  PhoneOutlined,
+} from "@ant-design/icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { callsApi } from "@/api/calls";
+import type { Call } from "@/types/modules";
+import type { APIError } from "@/types/api";
+import { useTranslation } from "react-i18next";
+import dayjs from "dayjs";
+
+const typeColor: Record<string, string> = {
+  incoming: "green",
+  outgoing: "blue",
+  missed: "red",
+};
+
+export default function CallsModule({
+  vaultId,
+  contactId,
+}: {
+  vaultId: string | number;
+  contactId: string | number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [form] = Form.useForm();
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const { t } = useTranslation();
+  const qk = ["vaults", vaultId, "contacts", contactId, "calls"];
+
+  const callTypes = [
+    { value: "incoming", label: t("modules.calls.type_incoming") },
+    { value: "outgoing", label: t("modules.calls.type_outgoing") },
+    { value: "missed", label: t("modules.calls.type_missed") },
+  ];
+
+  const { data: calls = [], isLoading } = useQuery({
+    queryKey: qk,
+    queryFn: async () => {
+      const res = await callsApi.list(vaultId, contactId);
+      return res.data.data ?? [];
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (values: {
+      called_at: dayjs.Dayjs;
+      duration?: number;
+      type: string;
+      description?: string;
+    }) => {
+      const data = {
+        called_at: values.called_at.toISOString(),
+        duration: values.duration,
+        type: values.type,
+        description: values.description,
+      };
+      return callsApi.create(vaultId, contactId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      setOpen(false);
+      form.resetFields();
+      message.success(t("modules.calls.logged"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => callsApi.delete(vaultId, contactId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("modules.calls.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  return (
+    <Card
+      title={t("modules.calls.title")}
+      extra={
+        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+          {t("modules.calls.log_call")}
+        </Button>
+      }
+    >
+      <List
+        loading={isLoading}
+        dataSource={calls}
+          locale={{ emptyText: <Empty description={t("modules.calls.no_calls")} /> }}
+        renderItem={(c: Call) => (
+          <List.Item
+            actions={[
+              <Popconfirm key="d" title={t("modules.calls.delete_confirm")} onConfirm={() => deleteMutation.mutate(c.id)}>
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>,
+            ]}
+          >
+            <List.Item.Meta
+              avatar={<PhoneOutlined style={{ fontSize: 20 }} />}
+              title={
+                <>
+                  <Tag color={typeColor[c.type] ?? "default"}>{c.type}</Tag>
+                  {dayjs(c.called_at).format("MMM D, YYYY h:mm A")}
+                </>
+              }
+              description={
+                <>
+                  {c.duration != null && <span>{c.duration} min · </span>}
+                  {c.description}
+                </>
+              }
+            />
+          </List.Item>
+        )}
+      />
+
+      <Modal
+        title={t("modules.calls.modal_title")}
+        open={open}
+        onCancel={() => { setOpen(false); form.resetFields(); }}
+        onOk={() => form.submit()}
+        confirmLoading={saveMutation.isPending}
+      >
+        <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}>
+          <Form.Item name="called_at" label={t("modules.calls.date_time")} rules={[{ required: true }]}>
+            <DatePicker showTime style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="type" label={t("modules.calls.type")} rules={[{ required: true }]}>
+            <Select options={callTypes} />
+          </Form.Item>
+          <Form.Item name="duration" label={t("modules.calls.duration")}>
+            <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="description" label={t("modules.calls.notes")}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </Card>
+  );
+}

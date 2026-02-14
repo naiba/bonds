@@ -1,0 +1,20 @@
+services:
+  bonds:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - bonds-data:/app/data
+    environment:
+      - SERVER_PORT=8080
+      - DB_DRIVER=sqlite
+      - DB_DSN=/app/data/bonds.db
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - APP_ENV=production
+      - APP_URL=http://localhost:8080
+    restart: unless-stopped
+
+volumes:
+  bonds-data:

@@ -1,0 +1,13 @@
+server/bin/
+server/server
+server/bonds.db
+server/bonds.db-wal
+server/bonds.db-shm
+server/internal/frontend/dist/*
+!server/internal/frontend/dist/.gitkeep
+.env
+.env.local
+*.log
+*.test
+.DS_Store
+monica-php
