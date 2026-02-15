@@ -13,6 +13,7 @@ import {
   Typography,
   Collapse,
   Space,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +40,7 @@ export default function LifeEventsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "timeline-events"];
 
   const { data: timelines = [], isLoading } = useQuery({
@@ -107,12 +109,13 @@ export default function LifeEventsModule({
     key: tl.id,
     label: (
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>{tl.label} — {dayjs(tl.started_at).format("MMM YYYY")}</span>
+        <span style={{ fontWeight: 500 }}>{tl.label} — <span style={{ color: token.colorTextSecondary, fontWeight: 400 }}>{dayjs(tl.started_at).format("MMM YYYY")}</span></span>
         <Space>
           <Button
-            type="link"
+            type="text"
             size="small"
             icon={<PlusOutlined />}
+            style={{ color: token.colorPrimary }}
             onClick={(e) => {
               e.stopPropagation();
               setSelectedTimeline(tl.id);
@@ -143,16 +146,17 @@ export default function LifeEventsModule({
     children: tl.life_events?.length ? (
       <Timeline
         items={tl.life_events.map((le) => ({
+          color: token.colorPrimary,
           children: (
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <strong>{le.label}</strong>
+                <strong style={{ fontWeight: 500 }}>{le.label}</strong>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {dayjs(le.happened_at).format("MMM D, YYYY")}
                 </Text>
                 {le.description && (
-                  <div style={{ marginTop: 4 }}>{le.description}</div>
+                  <div style={{ marginTop: 4, color: token.colorTextSecondary }}>{le.description}</div>
                 )}
               </div>
               <Popconfirm
@@ -177,9 +181,13 @@ export default function LifeEventsModule({
 
   return (
     <Card
-      title={t("modules.life_events.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.life_events.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setTlOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setTlOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.life_events.new_timeline")}
         </Button>
       }

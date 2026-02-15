@@ -28,6 +28,7 @@
     "vaults": "保险库",
     "settings": "设置",
     "vault": "保险库",
+    "dashboard": "仪表盘",
     "contacts": "联系人",
     "journal": "日记",
     "groups": "群组",
@@ -463,6 +464,7 @@
   },
   "settings": {
     "title": "设置",
+    "description": "管理你的账户、偏好设置和安全选项。",
     "account": {
       "title": "账户",
       "name": "姓名",
@@ -474,6 +476,7 @@
     },
     "preferences": {
       "title": "偏好设置",
+      "description": "自定义 Bonds 的显示方式和使用体验。",
       "name_order": "姓名显示顺序",
       "date_format": "日期格式",
       "timezone": "时区",
@@ -485,6 +488,7 @@
     },
     "notifications": {
       "title": "通知",
+      "description": "配置接收提醒和通知的方式与渠道。",
       "add_channel": "添加渠道",
       "no_channels": "暂无通知渠道",
       "delete_confirm": "确定删除此渠道？",
@@ -499,6 +503,7 @@
     },
     "personalize": {
       "title": "个性化",
+      "description": "自定义 Bonds 中使用的分类、类型和标签。",
       "add_item": "添加项目",
       "no_items": "暂无项目",
       "delete_confirm": "确定删除？",
@@ -519,6 +524,7 @@
     },
     "users": {
       "title": "用户",
+      "description": "查看和管理有权访问此账户的成员。",
       "col_name": "姓名",
       "col_email": "邮箱",
       "col_role": "角色",
@@ -530,6 +536,7 @@
   },
   "twoFactor": {
     "title": "双因素认证",
+    "description": "为你的账户添加额外的安全保护。",
     "enable": "启用双因素认证",
     "disable": "禁用双因素认证",
     "status": {
@@ -551,6 +558,7 @@
   },
   "invitations": {
     "title": "邀请管理",
+    "description": "邀请他人协作管理你的账户。",
     "invite": "邀请用户",
     "email": "邮箱地址",
     "permission": "权限",
@@ -566,6 +574,7 @@
   },
   "acceptInvite": {
     "title": "接受邀请",
+    "subtitle": "你已被邀请加入，请创建账户以开始使用。",
     "submit": "创建账户",
     "firstName": "名",
     "lastName": "姓",

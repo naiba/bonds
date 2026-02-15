@@ -10,6 +10,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -44,6 +45,7 @@ export default function RelationshipsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "relationships"];
 
   const { data: relationships = [], isLoading } = useQuery({
@@ -92,9 +94,13 @@ export default function RelationshipsModule({
 
   return (
     <Card
-      title={t("modules.relationships.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.relationships.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.relationships.add")}
         </Button>
       }
@@ -103,8 +109,17 @@ export default function RelationshipsModule({
         loading={isLoading}
         dataSource={relationships}
         locale={{ emptyText: <Empty description={t("modules.relationships.no_relationships")} /> }}
+        split={false}
         renderItem={(r: Relationship) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Popconfirm key="d" title={t("modules.relationships.remove_confirm")} onConfirm={() => deleteMutation.mutate(r.id)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
@@ -112,8 +127,8 @@ export default function RelationshipsModule({
             ]}
           >
             <List.Item.Meta
-              avatar={<UserOutlined style={{ fontSize: 20 }} />}
-              title={r.related_contact_name}
+              avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
+              title={<span style={{ fontWeight: 500 }}>{r.related_contact_name}</span>}
               description={<Tag color="blue">{r.relationship_type}</Tag>}
             />
           </List.Item>

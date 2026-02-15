@@ -11,6 +11,8 @@ import {
   Popconfirm,
   App,
   Tag,
+
+  theme,
 } from "antd";
 import {
   EditOutlined,
@@ -56,6 +58,7 @@ export default function ContactDetail() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data: contact, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", cId],
@@ -209,41 +212,103 @@ export default function ContactDetail() {
         {t("contact.detail.back")}
       </Button>
 
-      <Card style={{ marginBottom: 24 }}>
+      <Card
+        style={{ marginBottom: 24, overflow: "hidden" }}
+        styles={{
+          body: { padding: 0 },
+        }}
+      >
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-            gap: 16,
+            background: `linear-gradient(135deg, ${token.colorPrimaryBg} 0%, ${token.colorBgContainer} 100%)`,
+            padding: "28px 24px 20px",
           }}
         >
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <Avatar size={64} icon={<UserOutlined />} style={{ fontSize: 24, flexShrink: 0 }}>
-              {initials}
-            </Avatar>
-            <div>
-              <Title level={4} style={{ margin: 0 }}>
-                {contact.first_name} {contact.last_name}
-              </Title>
-              {contact.nickname && (
-                <Text type="secondary">&ldquo;{contact.nickname}&rdquo;</Text>
-              )}
-              <div style={{ marginTop: 4 }}>
-                {contact.is_favorite && (
-                  <Tag color="gold" icon={<StarFilled />}>
-                    {t("contact.detail.favorite")}
-                  </Tag>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              flexWrap: "wrap",
+              gap: 20,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 20,
+                alignItems: "center",
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <Avatar
+                size={80}
+                icon={<UserOutlined />}
+                style={{
+                  fontSize: 30,
+                  flexShrink: 0,
+                  backgroundColor: token.colorPrimary,
+                  boxShadow: `0 4px 12px ${token.colorPrimaryBorder}`,
+                }}
+              >
+                {initials}
+              </Avatar>
+              <div style={{ minWidth: 0 }}>
+                <Title level={3} style={{ margin: 0 }}>
+                  {contact.first_name} {contact.last_name}
+                </Title>
+                {contact.nickname && (
+                  <Text type="secondary" style={{ fontSize: 15 }}>
+                    &ldquo;{contact.nickname}&rdquo;
+                  </Text>
                 )}
-                {contact.is_archived && <Tag color="default">{t("common.archived")}</Tag>}
+                <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {contact.is_favorite && (
+                    <Tag color="gold" icon={<StarFilled />}>
+                      {t("contact.detail.favorite")}
+                    </Tag>
+                  )}
+                  {contact.is_archived && <Tag color="default">{t("common.archived")}</Tag>}
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          <Space wrap>
+        <div
+          style={{
+            padding: "12px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+            gap: 8,
+            borderTop: `1px solid ${token.colorBorderSecondary}`,
+          }}
+        >
+          <Space size={4} wrap>
+            <Button
+              icon={<EditOutlined />}
+              type="text"
+            >
+              {t("common.edit")}
+            </Button>
+            <Button
+              icon={contact.is_favorite ? <StarFilled /> : <StarOutlined />}
+              type="text"
+              onClick={() => toggleFavoriteMutation.mutate()}
+            >
+              {contact.is_favorite ? t("contact.detail.unfavorite") : t("contact.detail.favorite")}
+            </Button>
+          </Space>
+
+          <span style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: "0 4px", flexShrink: 0 }} />
+
+          <Space size={4} wrap>
             <Button
               icon={<DownloadOutlined />}
+              type="text"
               onClick={async () => {
                 try {
                   const res = await vcardApi.exportContact(vaultId, cId);
@@ -261,34 +326,41 @@ export default function ContactDetail() {
             >
               {t("vcard.export")}
             </Button>
-            <Button icon={<EditOutlined />}>{t("common.edit")}</Button>
             <Button
-              icon={
-                contact.is_favorite ? <StarFilled /> : <StarOutlined />
-              }
-              onClick={() => toggleFavoriteMutation.mutate()}
+              icon={<InboxOutlined />}
+              type="text"
             >
-              {contact.is_favorite ? t("contact.detail.unfavorite") : t("contact.detail.favorite")}
-            </Button>
-            <Button icon={<InboxOutlined />}>
               {contact.is_archived ? t("contact.detail.unarchive") : t("contact.detail.archive")}
             </Button>
-            <Popconfirm
-              title={t("contact.detail.delete_confirm")}
-              description={t("contact.detail.delete_warning")}
-              onConfirm={() => deleteMutation.mutate()}
-              okText={t("contact.detail.delete_ok")}
-              okButtonProps={{ danger: true }}
-            >
-              <Button danger icon={<DeleteOutlined />}>
-                {t("common.delete")}
-              </Button>
-            </Popconfirm>
           </Space>
+
+          <span style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: "0 4px", flexShrink: 0 }} />
+
+          <Popconfirm
+            title={t("contact.detail.delete_confirm")}
+            description={t("contact.detail.delete_warning")}
+            onConfirm={() => deleteMutation.mutate()}
+            okText={t("contact.detail.delete_ok")}
+            okButtonProps={{ danger: true }}
+          >
+            <Button danger type="text" icon={<DeleteOutlined />}>
+              {t("common.delete")}
+            </Button>
+          </Popconfirm>
         </div>
       </Card>
 
-      <Tabs items={tabItems} defaultActiveKey="overview" />
+      <Tabs
+        items={tabItems}
+        defaultActiveKey="overview"
+        style={{
+          marginTop: 4,
+        }}
+        tabBarStyle={{
+          marginBottom: 20,
+          paddingLeft: 4,
+        }}
+      />
     </div>
   );
 }

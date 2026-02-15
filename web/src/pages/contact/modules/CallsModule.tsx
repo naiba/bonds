@@ -13,6 +13,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import {
   PlusOutlined,
@@ -44,6 +45,7 @@ export default function CallsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "calls"];
 
   const callTypes = [
@@ -95,9 +97,13 @@ export default function CallsModule({
 
   return (
     <Card
-      title={t("modules.calls.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.calls.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.calls.log_call")}
         </Button>
       }
@@ -105,9 +111,18 @@ export default function CallsModule({
       <List
         loading={isLoading}
         dataSource={calls}
-          locale={{ emptyText: <Empty description={t("modules.calls.no_calls")} /> }}
+        locale={{ emptyText: <Empty description={t("modules.calls.no_calls")} /> }}
+        split={false}
         renderItem={(c: Call) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Popconfirm key="d" title={t("modules.calls.delete_confirm")} onConfirm={() => deleteMutation.mutate(c.id)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
@@ -115,18 +130,18 @@ export default function CallsModule({
             ]}
           >
             <List.Item.Meta
-              avatar={<PhoneOutlined style={{ fontSize: 20 }} />}
+              avatar={<PhoneOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
               title={
                 <>
                   <Tag color={typeColor[c.type] ?? "default"}>{c.type}</Tag>
-                  {dayjs(c.called_at).format("MMM D, YYYY h:mm A")}
+                  <span style={{ fontWeight: 400, color: token.colorTextSecondary }}>{dayjs(c.called_at).format("MMM D, YYYY h:mm A")}</span>
                 </>
               }
               description={
-                <>
+                <span style={{ color: token.colorTextTertiary }}>
                   {c.duration != null && <span>{c.duration} min · </span>}
                   {c.description}
-                </>
+                </span>
               }
             />
           </List.Item>

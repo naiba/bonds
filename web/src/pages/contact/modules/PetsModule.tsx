@@ -9,6 +9,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -31,6 +32,7 @@ export default function PetsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "pets"];
 
   const { data: pets = [], isLoading } = useQuery({
@@ -84,17 +86,26 @@ export default function PetsModule({
 
   return (
     <Card
-      title={t("modules.pets.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.pets.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
         !showForm && (
-          <Button type="link" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
             {t("modules.pets.add")}
           </Button>
         )
       }
     >
       {showForm && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: token.colorFillQuaternary,
+          borderRadius: token.borderRadius,
+        }}>
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Input
               placeholder={t("modules.pets.name_placeholder")}
@@ -112,10 +123,11 @@ export default function PetsModule({
                 onClick={() => saveMutation.mutate()}
                 loading={saveMutation.isPending}
                 disabled={!name.trim() || !category.trim()}
+                size="small"
               >
                 {editingId ? t("common.update") : t("common.save")}
               </Button>
-              <Button onClick={resetForm}>{t("common.cancel")}</Button>
+              <Button onClick={resetForm} size="small">{t("common.cancel")}</Button>
             </Space>
           </Space>
         </div>
@@ -125,8 +137,17 @@ export default function PetsModule({
         loading={isLoading}
         dataSource={pets}
         locale={{ emptyText: <Empty description={t("modules.pets.no_pets")} /> }}
+        split={false}
         renderItem={(pet: Pet) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(pet)} />,
               <Popconfirm key="d" title={t("modules.pets.delete_confirm")} onConfirm={() => deleteMutation.mutate(pet.id)}>
@@ -135,7 +156,7 @@ export default function PetsModule({
             ]}
           >
             <List.Item.Meta
-              title={pet.name}
+              title={<span style={{ fontWeight: 500 }}>{pet.name}</span>}
               description={<Tag>{pet.category}</Tag>}
             />
           </List.Item>

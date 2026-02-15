@@ -9,12 +9,14 @@ import {
   App,
   Spin,
   Empty,
+  theme,
 } from "antd";
 import {
   ArrowLeftOutlined,
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
+  FormOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { journalsApi } from "@/api/journals";
@@ -38,6 +40,7 @@ export default function PostDetail() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -104,35 +107,49 @@ export default function PostDetail() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Button
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/vaults/${vaultId}/journals/${jId}`)}
-        style={{ marginBottom: 16 }}
-      >
-        {t("vault.post_detail.back")}
-      </Button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/vaults/${vaultId}/journals/${jId}`)}
+          style={{ color: token.colorTextSecondary }}
+        />
+        <FormOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
+        <Title level={4} style={{ margin: 0, flex: 1 }}>
+          {editing ? t("common.edit") : post.title}
+        </Title>
+      </div>
 
       {editing ? (
-        <Card>
-          <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+        <Card
+          style={{
+            boxShadow: token.boxShadowTertiary,
+            borderRadius: token.borderRadiusLG,
+          }}
+        >
+          <Space direction="vertical" style={{ width: "100%" }} size={16}>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={t("vault.post_detail.post_title_placeholder")}
-              style={{ fontSize: 18, fontWeight: 600 }}
+              style={{ fontSize: 20, fontWeight: 600, padding: "8px 12px" }}
             />
 
             {sections.map((section, index) => (
               <Card
                 key={index}
                 size="small"
+                style={{
+                  borderLeft: `3px solid ${token.colorPrimary}`,
+                  background: token.colorFillQuaternary,
+                }}
                 title={
                   <Input
                     value={section.label}
                     onChange={(e) => updateSection(index, "label", e.target.value)}
                     placeholder={t("vault.post_detail.section_title_placeholder")}
                     variant="borderless"
+                    style={{ fontWeight: 600 }}
                   />
                 }
                 extra={
@@ -150,6 +167,7 @@ export default function PostDetail() {
                   onChange={(e) => updateSection(index, "body", e.target.value)}
                   rows={4}
                   placeholder={t("vault.post_detail.section_content_placeholder")}
+                  style={{ lineHeight: 1.8 }}
                 />
               </Card>
             ))}
@@ -168,22 +186,39 @@ export default function PostDetail() {
         </Card>
       ) : (
         <Card
+          style={{
+            boxShadow: token.boxShadowTertiary,
+            borderRadius: token.borderRadiusLG,
+          }}
           extra={
             <Button icon={<EditOutlined />} onClick={startEdit}>
               {t("common.edit")}
             </Button>
           }
         >
-          <Title level={4}>{post.title}</Title>
-          <Text type="secondary">{dayjs(post.written_at).format("MMMM D, YYYY")}</Text>
+          <Title level={3} style={{ marginBottom: 8 }}>{post.title}</Title>
+          <Text type="secondary" style={{ fontSize: 14 }}>
+            {dayjs(post.written_at).format("MMMM D, YYYY")}
+          </Text>
 
           {post.sections?.length ? (
             post.sections
               .sort((a: PostSection, b: PostSection) => a.position - b.position)
               .map((section: PostSection) => (
-                <div key={section.id} style={{ marginTop: 24 }}>
-                  <Title level={5}>{section.label}</Title>
-                  <Paragraph>{section.body}</Paragraph>
+                <div
+                  key={section.id}
+                  style={{
+                    marginTop: 28,
+                    paddingTop: 20,
+                    borderTop: `1px solid ${token.colorBorderSecondary}`,
+                  }}
+                >
+                  <Title level={5} style={{ color: token.colorPrimary, marginBottom: 12 }}>
+                    {section.label}
+                  </Title>
+                  <Paragraph style={{ fontSize: 15, lineHeight: 1.8, color: token.colorText }}>
+                    {section.body}
+                  </Paragraph>
                 </div>
               ))
           ) : (

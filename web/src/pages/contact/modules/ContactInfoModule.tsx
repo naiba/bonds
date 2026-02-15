@@ -10,6 +10,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -45,6 +46,7 @@ export default function ContactInfoModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "contact-info"];
 
   const { data: items = [], isLoading } = useQuery({
@@ -100,17 +102,26 @@ export default function ContactInfoModule({
 
   return (
     <Card
-      title={t("modules.contact_info.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.contact_info.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
         !showForm && (
-          <Button type="link" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
             {t("modules.contact_info.add")}
           </Button>
         )
       }
     >
       {showForm && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: token.colorFillQuaternary,
+          borderRadius: token.borderRadius,
+        }}>
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Select
               value={type}
@@ -134,10 +145,11 @@ export default function ContactInfoModule({
                 onClick={() => saveMutation.mutate()}
                 loading={saveMutation.isPending}
                 disabled={!value.trim()}
+                size="small"
               >
                 {editingId ? t("common.update") : t("common.save")}
               </Button>
-              <Button onClick={resetForm}>{t("common.cancel")}</Button>
+              <Button onClick={resetForm} size="small">{t("common.cancel")}</Button>
             </Space>
           </Space>
         </div>
@@ -147,8 +159,17 @@ export default function ContactInfoModule({
         loading={isLoading}
         dataSource={items}
         locale={{ emptyText: <Empty description={t("modules.contact_info.no_info")} /> }}
+        split={false}
         renderItem={(item: ContactInfo) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
               <Popconfirm key="d" title={t("modules.contact_info.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id)}>
@@ -158,11 +179,11 @@ export default function ContactInfoModule({
           >
             <List.Item.Meta
               title={
-                <>
+                <span style={{ fontWeight: 500 }}>
                   <Tag>{item.type}</Tag> {item.label}
-                </>
+                </span>
               }
-              description={item.value}
+              description={<span style={{ color: token.colorTextSecondary }}>{item.value}</span>}
             />
           </List.Item>
         )}

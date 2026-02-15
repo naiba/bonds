@@ -10,6 +10,7 @@ import {
   App,
   Divider,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +31,7 @@ export default function TasksModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "tasks"];
 
   const { data: tasks = [], isLoading } = useQuery({
@@ -76,6 +78,14 @@ export default function TasksModule({
   function renderItem(task: Task) {
     return (
       <List.Item
+        style={{
+          borderRadius: token.borderRadius,
+          padding: '8px 12px',
+          marginBottom: 4,
+          transition: 'background 0.2s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         actions={[
           <Popconfirm key="d" title={t("modules.tasks.delete_confirm")} onConfirm={() => deleteMutation.mutate(task.id)}>
             <Button type="text" size="small" danger icon={<DeleteOutlined />} />
@@ -85,7 +95,10 @@ export default function TasksModule({
         <Checkbox
           checked={task.is_completed}
           onChange={() => toggleMutation.mutate(task)}
-          style={{ textDecoration: task.is_completed ? "line-through" : undefined }}
+          style={{
+            textDecoration: task.is_completed ? "line-through" : undefined,
+            color: task.is_completed ? token.colorTextQuaternary : token.colorText,
+          }}
         >
           {task.label}
         </Checkbox>
@@ -95,17 +108,26 @@ export default function TasksModule({
 
   return (
     <Card
-      title={t("modules.tasks.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.tasks.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
         !adding && (
-          <Button type="link" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
             {t("modules.tasks.add")}
           </Button>
         )
       }
     >
       {adding && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: token.colorFillQuaternary,
+          borderRadius: token.borderRadius,
+        }}>
           <Space.Compact style={{ width: "100%" }}>
             <Input
               placeholder={t("modules.tasks.new_task_placeholder")}
@@ -131,15 +153,16 @@ export default function TasksModule({
         loading={isLoading}
         dataSource={pending}
         locale={{ emptyText: <Empty description={t("modules.tasks.no_pending")} /> }}
+        split={false}
         renderItem={renderItem}
       />
 
       {completed.length > 0 && (
         <>
-          <Divider orientationMargin={0} plain style={{ fontSize: 12 }}>
+          <Divider orientationMargin={0} plain style={{ fontSize: 12, color: token.colorTextQuaternary }}>
             {t("modules.tasks.completed", { count: completed.length })}
           </Divider>
-          <List dataSource={completed} renderItem={renderItem} />
+          <List dataSource={completed} split={false} renderItem={renderItem} />
         </>
       )}
     </Card>

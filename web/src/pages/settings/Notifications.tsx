@@ -14,15 +14,31 @@ import {
   Tag,
   Empty,
   Spin,
+  theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  MailOutlined,
+  SendOutlined,
+  ApiOutlined,
+} from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { settingsApi } from "@/api/settings";
 import type { NotificationChannel } from "@/types/modules";
 import type { APIError } from "@/types/api";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
+
+const channelIconMap: Record<
+  string,
+  { icon: React.ReactNode; color: string; bg: string }
+> = {
+  email: { icon: <MailOutlined />, color: "#1677ff", bg: "#e6f4ff" },
+  telegram: { icon: <SendOutlined />, color: "#0088cc", bg: "#e6f7ff" },
+  slack: { icon: <ApiOutlined />, color: "#611f69", bg: "#f3e8ff" },
+};
 
 const channelTypes = [
   { value: "email", label: "Email" },
@@ -36,6 +52,7 @@ export default function Notifications() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["settings", "notification-channels"];
 
   const { data: channels = [], isLoading } = useQuery({
@@ -86,9 +103,28 @@ export default function Notifications() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <Title level={4} style={{ margin: 0 }}>{t("settings.notifications.title")}</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <Title level={4} style={{ marginBottom: 4 }}>
+            {t("settings.notifications.title")}
+          </Title>
+          <Text type="secondary">
+            {t("settings.notifications.description")}
+          </Text>
+        </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => setOpen(true)}
+          style={{ flexShrink: 0, marginTop: 4 }}
+        >
           {t("settings.notifications.add_channel")}
         </Button>
       </div>
@@ -96,36 +132,73 @@ export default function Notifications() {
       <Card>
         <List
           dataSource={channels}
-          locale={{ emptyText: <Empty description={t("settings.notifications.no_channels")} /> }}
-          renderItem={(ch: NotificationChannel) => (
-            <List.Item
-              actions={[
-                <Switch
-                  key="toggle"
-                  checked={ch.active}
-                  onChange={() => toggleMutation.mutate(ch)}
-                  size="small"
-                />,
-                <Popconfirm
-                  key="d"
-                  title={t("settings.notifications.delete_confirm")}
-                  onConfirm={() => deleteMutation.mutate(ch.id)}
-                >
-                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                </Popconfirm>,
-              ]}
-            >
-              <List.Item.Meta
-                title={
-                  <>
-                    {ch.label} <Tag>{ch.type}</Tag>
-                    {!ch.active && <Tag color="default">{t("common.disabled")}</Tag>}
-                  </>
-                }
-                description={ch.content}
+          locale={{
+            emptyText: (
+              <Empty
+                description={t("settings.notifications.no_channels")}
               />
-            </List.Item>
-          )}
+            ),
+          }}
+          renderItem={(ch: NotificationChannel) => {
+            const iconInfo = channelIconMap[ch.type] ?? {
+              icon: <ApiOutlined />,
+              color: token.colorTextSecondary,
+              bg: token.colorBgLayout,
+            };
+            return (
+              <List.Item
+                actions={[
+                  <Switch
+                    key="toggle"
+                    checked={ch.active}
+                    onChange={() => toggleMutation.mutate(ch)}
+                  />,
+                  <Popconfirm
+                    key="d"
+                    title={t("settings.notifications.delete_confirm")}
+                    onConfirm={() => deleteMutation.mutate(ch.id)}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                    />
+                  </Popconfirm>,
+                ]}
+              >
+                <List.Item.Meta
+                  avatar={
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        background: iconInfo.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 18,
+                        color: iconInfo.color,
+                      }}
+                    >
+                      {iconInfo.icon}
+                    </div>
+                  }
+                  title={
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {ch.label}
+                      <Tag style={{ marginInlineStart: 0 }}>{ch.type}</Tag>
+                      {!ch.active && (
+                        <Tag color="default">{t("common.disabled")}</Tag>
+                      )}
+                    </span>
+                  }
+                  description={ch.content}
+                />
+              </List.Item>
+            );
+          }}
         />
       </Card>
 

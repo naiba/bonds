@@ -8,6 +8,7 @@ import {
   Popconfirm,
   App,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -54,6 +55,7 @@ export default function QuickFactsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "quick-facts"];
 
   const { data: facts = [], isLoading } = useQuery({
@@ -105,17 +107,26 @@ export default function QuickFactsModule({
 
   return (
     <Card
-      title={t("modules.quick_facts.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.quick_facts.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
         !showForm && (
-          <Button type="link" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
             {t("modules.quick_facts.add")}
           </Button>
         )
       }
     >
       {showForm && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: token.colorFillQuaternary,
+          borderRadius: token.borderRadius,
+        }}>
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Input placeholder={t("modules.quick_facts.label_placeholder")} value={label} onChange={(e) => setLabel(e.target.value)} />
             <Input placeholder={t("modules.quick_facts.value_placeholder")} value={value} onChange={(e) => setValue(e.target.value)} />
@@ -125,10 +136,11 @@ export default function QuickFactsModule({
                 onClick={() => saveMutation.mutate()}
                 loading={saveMutation.isPending}
                 disabled={!label.trim() || !value.trim()}
+                size="small"
               >
                 {editingId ? t("common.update") : t("common.save")}
               </Button>
-              <Button onClick={resetForm}>{t("common.cancel")}</Button>
+              <Button onClick={resetForm} size="small">{t("common.cancel")}</Button>
             </Space>
           </Space>
         </div>
@@ -138,8 +150,17 @@ export default function QuickFactsModule({
         loading={isLoading}
         dataSource={facts}
         locale={{ emptyText: <Empty description={t("modules.quick_facts.no_facts")} /> }}
+        split={false}
         renderItem={(fact: QuickFact) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(fact)} />,
               <Popconfirm key="d" title={t("modules.quick_facts.delete_confirm")} onConfirm={() => deleteMutation.mutate(fact.id)}>
@@ -147,7 +168,10 @@ export default function QuickFactsModule({
               </Popconfirm>,
             ]}
           >
-            <List.Item.Meta title={fact.label} description={fact.value} />
+            <List.Item.Meta
+              title={<span style={{ fontWeight: 500 }}>{fact.label}</span>}
+              description={<span style={{ color: token.colorTextSecondary }}>{fact.value}</span>}
+            />
           </List.Item>
         )}
       />

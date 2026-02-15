@@ -98,17 +98,26 @@ export default function GoalsModule({
 
   return (
     <Card
-      title={t("modules.goals.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.goals.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
         !adding && (
-          <Button type="link" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
             {t("modules.goals.add")}
           </Button>
         )
       }
     >
       {adding && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: token.colorFillQuaternary,
+          borderRadius: token.borderRadius,
+        }}>
           <Space.Compact style={{ width: "100%" }}>
             <Input
               placeholder={t("modules.goals.goal_placeholder")}
@@ -134,8 +143,17 @@ export default function GoalsModule({
         loading={isLoading}
         dataSource={goals}
         locale={{ emptyText: <Empty description={t("modules.goals.no_goals")} /> }}
+        split={false}
         renderItem={(goal: Goal) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button
                 key="view"
@@ -151,7 +169,7 @@ export default function GoalsModule({
             ]}
           >
             <List.Item.Meta
-              title={goal.name}
+              title={<span style={{ fontWeight: 500 }}>{goal.name}</span>}
               description={
                 <Tag color={goal.active ? "green" : "default"}>
                   {t("modules.goals.streaks_count", { count: goal.streaks?.length ?? 0 })}
@@ -163,7 +181,15 @@ export default function GoalsModule({
       />
 
       {selectedGoal && activeGoal && (
-        <Card size="small" title={t("modules.goals.streaks_for", { name: activeGoal.name })} style={{ marginTop: 16 }}>
+        <Card
+          size="small"
+          title={<span style={{ fontWeight: 500 }}>{t("modules.goals.streaks_for", { name: activeGoal.name })}</span>}
+          style={{
+            marginTop: 16,
+            background: token.colorFillQuaternary,
+            border: `1px solid ${token.colorBorderSecondary}`,
+          }}
+        >
           <Calendar
             fullscreen={false}
             cellRender={(date) => dateCellRender(date as Dayjs)}

@@ -6,6 +6,8 @@ import {
   Button,
   App,
   Spin,
+  Divider,
+  theme,
 } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -13,7 +15,7 @@ import { settingsApi } from "@/api/settings";
 import type { UserPreferences } from "@/types/modules";
 import type { APIError } from "@/types/api";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const dateFormats = [
   { value: "YYYY-MM-DD", label: "2026-01-15" },
@@ -52,6 +54,7 @@ export default function Preferences() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const nameOrders = [
     { value: "first_last", label: t("settings.preferences.name_first_last") },
@@ -84,11 +87,19 @@ export default function Preferences() {
     );
   }
 
+  const labelStyle: React.CSSProperties = {
+    fontWeight: 500,
+    color: token.colorText,
+  };
+
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <Title level={4} style={{ marginBottom: 24 }}>
+      <Title level={4} style={{ marginBottom: 4 }}>
         {t("settings.preferences.title")}
       </Title>
+      <Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
+        {t("settings.preferences.description")}
+      </Text>
 
       <Card>
         <Form
@@ -97,13 +108,25 @@ export default function Preferences() {
           initialValues={prefs}
           onFinish={(v) => updateMutation.mutate(v)}
         >
-          <Form.Item name="name_order" label={t("settings.preferences.name_order")}>
+          <Form.Item
+            name="name_order"
+            label={<span style={labelStyle}>{t("settings.preferences.name_order")}</span>}
+          >
             <Select options={nameOrders} />
           </Form.Item>
-          <Form.Item name="date_format" label={t("settings.preferences.date_format")}>
+          <Form.Item
+            name="date_format"
+            label={<span style={labelStyle}>{t("settings.preferences.date_format")}</span>}
+          >
             <Select options={dateFormats} />
           </Form.Item>
-          <Form.Item name="timezone" label={t("settings.preferences.timezone")}>
+
+          <Divider style={{ margin: "8px 0 24px" }} />
+
+          <Form.Item
+            name="timezone"
+            label={<span style={labelStyle}>{t("settings.preferences.timezone")}</span>}
+          >
             <Select
               showSearch
               options={timezones}
@@ -112,10 +135,16 @@ export default function Preferences() {
               }
             />
           </Form.Item>
-          <Form.Item name="locale" label={t("settings.preferences.language")}>
+          <Form.Item
+            name="locale"
+            label={<span style={labelStyle}>{t("settings.preferences.language")}</span>}
+          >
             <Select options={locales} />
           </Form.Item>
-          <Form.Item>
+
+          <Divider style={{ margin: "8px 0 24px" }} />
+
+          <Form.Item style={{ marginBottom: 0 }}>
             <Button type="primary" htmlType="submit" loading={updateMutation.isPending}>
               {t("settings.preferences.save")}
             </Button>

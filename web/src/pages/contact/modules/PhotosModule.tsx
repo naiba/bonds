@@ -1,4 +1,4 @@
-import { Card, Upload, Image, Empty, App } from "antd";
+import { Card, Upload, Image, Empty, App, theme } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import client from "@/api/client";
@@ -18,6 +18,7 @@ export default function PhotosModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "photos"];
 
   const { data: photos = [], isLoading } = useQuery({
@@ -31,7 +32,14 @@ export default function PhotosModule({
   });
 
   return (
-    <Card title={t("modules.photos.title")} loading={isLoading}>
+    <Card
+      title={<span style={{ fontWeight: 500 }}>{t("modules.photos.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
+      loading={isLoading}
+    >
       <Dragger
         name="file"
         action={`/api/vaults/${vaultId}/contacts/${contactId}/photos`}
@@ -47,26 +55,31 @@ export default function PhotosModule({
           }
         }}
         showUploadList={false}
-        style={{ marginBottom: 16 }}
+        style={{
+          marginBottom: 16,
+          borderRadius: token.borderRadius,
+          border: `1px dashed ${token.colorBorderSecondary}`,
+          background: token.colorFillQuaternary,
+        }}
       >
         <p className="ant-upload-drag-icon">
-          <InboxOutlined />
+          <InboxOutlined style={{ color: token.colorPrimary }} />
         </p>
-        <p className="ant-upload-text">{t("modules.photos.upload_text")}</p>
+        <p className="ant-upload-text" style={{ color: token.colorTextSecondary }}>{t("modules.photos.upload_text")}</p>
       </Dragger>
 
       {photos.length === 0 ? (
         <Empty description={t("modules.photos.no_photos")} />
       ) : (
         <Image.PreviewGroup>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {photos.map((photo: Photo) => (
               <Image
                 key={photo.id}
                 width={120}
                 height={120}
                 src={photo.url}
-                style={{ objectFit: "cover", borderRadius: 8 }}
+                style={{ objectFit: "cover", borderRadius: token.borderRadius }}
               />
             ))}
           </div>

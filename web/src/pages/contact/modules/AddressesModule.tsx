@@ -11,6 +11,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import {
   PlusOutlined,
@@ -37,6 +38,7 @@ export default function AddressesModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "addresses"];
 
   const { data: addresses = [], isLoading } = useQuery({
@@ -104,9 +106,13 @@ export default function AddressesModule({
 
   return (
     <Card
-      title={t("modules.addresses.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.addresses.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.addresses.add")}
         </Button>
       }
@@ -115,8 +121,17 @@ export default function AddressesModule({
         loading={isLoading}
         dataSource={addresses}
         locale={{ emptyText: <Empty description={t("modules.addresses.no_addresses")} /> }}
+        split={false}
         renderItem={(a: Address) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="map" type="text" size="small" icon={<EnvironmentOutlined />} href={mapsUrl(a)} target="_blank" />,
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(a)} />,
@@ -127,11 +142,11 @@ export default function AddressesModule({
           >
             <List.Item.Meta
               title={
-                <>
+                <span style={{ fontWeight: 500 }}>
                   {a.label} {a.is_primary && <Tag color="blue">{t("common.primary")}</Tag>}
-                </>
+                </span>
               }
-              description={formatAddress(a)}
+              description={<span style={{ color: token.colorTextSecondary }}>{formatAddress(a)}</span>}
             />
           </List.Item>
         )}

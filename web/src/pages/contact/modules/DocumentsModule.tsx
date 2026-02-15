@@ -1,4 +1,4 @@
-import { Card, List, Upload, Button, App, Empty, Tag } from "antd";
+import { Card, List, Upload, Button, App, Empty, Tag, theme } from "antd";
 import {
   InboxOutlined,
   FileOutlined,
@@ -28,6 +28,7 @@ export default function DocumentsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "documents"];
 
   const { data: documents = [], isLoading } = useQuery({
@@ -41,7 +42,14 @@ export default function DocumentsModule({
   });
 
   return (
-    <Card title={t("modules.documents.title")} loading={isLoading}>
+    <Card
+      title={<span style={{ fontWeight: 500 }}>{t("modules.documents.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
+      loading={isLoading}
+    >
       <Dragger
         name="file"
         action={`/api/vaults/${vaultId}/contacts/${contactId}/documents`}
@@ -57,19 +65,33 @@ export default function DocumentsModule({
           }
         }}
         showUploadList={false}
-        style={{ marginBottom: 16 }}
+        style={{
+          marginBottom: 16,
+          borderRadius: token.borderRadius,
+          border: `1px dashed ${token.colorBorderSecondary}`,
+          background: token.colorFillQuaternary,
+        }}
       >
         <p className="ant-upload-drag-icon">
-          <InboxOutlined />
+          <InboxOutlined style={{ color: token.colorPrimary }} />
         </p>
-        <p className="ant-upload-text">{t("modules.documents.upload_text")}</p>
+        <p className="ant-upload-text" style={{ color: token.colorTextSecondary }}>{t("modules.documents.upload_text")}</p>
       </Dragger>
 
       <List
         dataSource={documents}
         locale={{ emptyText: <Empty description={t("modules.documents.no_documents")} /> }}
+        split={false}
         renderItem={(doc: Document) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button
                 key="dl"
@@ -82,12 +104,12 @@ export default function DocumentsModule({
             ]}
           >
             <List.Item.Meta
-              avatar={<FileOutlined style={{ fontSize: 20 }} />}
-              title={doc.filename}
+              avatar={<FileOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
+              title={<span style={{ fontWeight: 500 }}>{doc.filename}</span>}
               description={
-                <>
+                <span style={{ color: token.colorTextSecondary }}>
                   <Tag>{doc.mime_type}</Tag> {formatSize(doc.size)}
-                </>
+                </span>
               }
             />
           </List.Item>

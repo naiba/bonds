@@ -12,6 +12,7 @@ import {
   Empty,
   Spin,
   Tag,
+  theme,
 } from "antd";
 import {
   PlusOutlined,
@@ -36,6 +37,7 @@ export default function GroupList() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "groups"];
 
   const { data: groups = [], isLoading } = useQuery({
@@ -77,51 +79,106 @@ export default function GroupList() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Button
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/vaults/${vaultId}`)}
-        style={{ marginBottom: 16 }}
-      >
-        {t("vault.group_list.back")}
-      </Button>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <Title level={4} style={{ margin: 0 }}>{t("vault.group_list.title")}</Title>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/vaults/${vaultId}`)}
+          style={{ color: token.colorTextSecondary }}
+        />
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: token.colorPrimaryBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <TeamOutlined style={{ fontSize: 16, color: token.colorPrimary }} />
+        </div>
+        <Title level={4} style={{ margin: 0, flex: 1 }}>{t("vault.group_list.title")}</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
           {t("vault.group_list.new_group")}
         </Button>
       </div>
 
-      <List
-        dataSource={groups}
-        locale={{ emptyText: <Empty description={t("vault.group_list.no_groups")} /> }}
-        renderItem={(group: Group) => (
-          <List.Item
-            actions={[
-              <Popconfirm
-                key="d"
-                title={t("vault.group_list.delete_confirm")}
-                onConfirm={() => deleteMutation.mutate(group.id)}
-              >
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <List.Item.Meta
-              avatar={<TeamOutlined style={{ fontSize: 20 }} />}
-              title={
-                <a onClick={() => navigate(`/vaults/${vaultId}/groups/${group.id}`)}>
-                  {group.name}
-                </a>
-              }
-              description={
-                <Tag>{t("vault.group_list.members_count", { count: group.contacts?.length ?? 0 })}</Tag>
-              }
-            />
-          </List.Item>
-        )}
-      />
+      <div
+        style={{
+          background: token.colorBgContainer,
+          borderRadius: token.borderRadiusLG,
+          boxShadow: token.boxShadowTertiary,
+          padding: "8px 0",
+        }}
+      >
+        <List
+          dataSource={groups}
+          locale={{ emptyText: <Empty description={t("vault.group_list.no_groups")} style={{ padding: 32 }} /> }}
+          renderItem={(group: Group) => (
+            <List.Item
+              style={{
+                margin: "4px 16px",
+                paddingLeft: 16,
+                borderRadius: token.borderRadius,
+                cursor: "pointer",
+              }}
+              actions={[
+                <Popconfirm
+                  key="d"
+                  title={t("vault.group_list.delete_confirm")}
+                  onConfirm={(e) => { e?.stopPropagation(); deleteMutation.mutate(group.id); }}
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popconfirm>,
+              ]}
+              onClick={() => navigate(`/vaults/${vaultId}/groups/${group.id}`)}
+            >
+              <List.Item.Meta
+                avatar={
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: "50%",
+                      background: token.colorPrimaryBg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <TeamOutlined style={{ fontSize: 18, color: token.colorPrimary }} />
+                  </div>
+                }
+                title={
+                  <span style={{ fontWeight: 600 }}>
+                    {group.name}
+                  </span>
+                }
+                description={
+                  <Tag
+                    style={{
+                      background: token.colorFillSecondary,
+                      border: "none",
+                      borderRadius: 12,
+                      fontSize: 12,
+                    }}
+                  >
+                    {t("vault.group_list.members_count", { count: group.contacts?.length ?? 0 })}
+                  </Tag>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </div>
 
       <Modal
         title={t("vault.group_list.modal_title")}

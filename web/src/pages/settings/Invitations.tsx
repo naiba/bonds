@@ -13,7 +13,7 @@ import {
   Spin,
   App,
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined, SendOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { invitationsApi } from "@/api/invitations";
@@ -22,7 +22,7 @@ import type { APIError } from "@/types/api";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function Invitations() {
   const [open, setOpen] = useState(false);
@@ -72,17 +72,33 @@ export default function Invitations() {
     }
   };
 
+  const permissionColor = (perm: number) => {
+    switch (perm) {
+      case 100: return "blue";
+      case 200: return "cyan";
+      case 300: return "default";
+      default: return "default";
+    }
+  };
+
   const columns: ColumnsType<InvitationType> = [
     {
       title: t("invitations.email"),
       dataIndex: "email",
       key: "email",
+      render: (email: string) => (
+        <Text strong>{email}</Text>
+      ),
     },
     {
       title: t("invitations.permission"),
       dataIndex: "permission",
       key: "permission",
-      render: (val: number) => permissionLabel(val),
+      render: (val: number) => (
+        <Tag color={permissionColor(val)}>
+          {permissionLabel(val)}
+        </Tag>
+      ),
     },
     {
       title: t("common.type"),
@@ -98,7 +114,9 @@ export default function Invitations() {
       title: t("common.created"),
       dataIndex: "created_at",
       key: "created_at",
-      render: (val: string) => dayjs(val).format("MMM D, YYYY"),
+      render: (val: string) => (
+        <Text type="secondary">{dayjs(val).format("MMM D, YYYY")}</Text>
+      ),
     },
     {
       title: "",
@@ -129,22 +147,28 @@ export default function Invitations() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
           marginBottom: 24,
         }}
       >
-        <Title level={4} style={{ margin: 0 }}>
-          {t("invitations.title")}
-        </Title>
+        <div>
+          <Title level={4} style={{ marginBottom: 4 }}>
+            {t("invitations.title")}
+          </Title>
+          <Text type="secondary">
+            {t("invitations.description")}
+          </Text>
+        </div>
         <Button
           type="primary"
-          icon={<PlusOutlined />}
+          icon={<SendOutlined />}
           onClick={() => setOpen(true)}
+          style={{ flexShrink: 0, marginTop: 4 }}
         >
           {t("invitations.invite")}
         </Button>

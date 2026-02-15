@@ -3,6 +3,8 @@ body {
   padding: 0;
   min-height: 100vh;
   transition: background-color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html[data-theme="dark"] body {
@@ -11,4 +13,81 @@ html[data-theme="dark"] body {
 
 #root {
   min-height: 100vh;
+}
+
+/* Smooth page transitions */
+.ant-spin-nested-loading > div > .ant-spin {
+  max-height: none;
+}
+
+/* Card hover effects */
+.ant-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+/* Clickable cards */
+.ant-card-hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+}
+
+html[data-theme="dark"] .ant-card-hoverable:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Better scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Smoother table rows */
+.ant-table-tbody > tr {
+  transition: background-color 0.15s ease;
+}
+
+/* Tag refinements */
+.ant-tag {
+  border-radius: 6px;
+}
+
+/* List items */
+.ant-list-item {
+  transition: background-color 0.15s ease;
+}
+
+/* Tabs */
+.ant-tabs-tab {
+  transition: color 0.2s ease;
+}
+
+/* Button press feedback */
+.ant-btn:active {
+  transform: scale(0.98);
+}
+
+/* Breadcrumb-like back buttons */
+.ant-btn-text {
+  transition: color 0.15s ease, background-color 0.15s ease;
 }

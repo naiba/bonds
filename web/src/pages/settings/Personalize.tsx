@@ -11,6 +11,8 @@ import {
   App,
   Empty,
   Tag,
+  Badge,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +21,7 @@ import { settingsApi } from "@/api/settings";
 import type { PersonalizeItem } from "@/types/modules";
 import type { APIError } from "@/types/api";
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const sectionKeys = [
   "genders", "pronouns", "address-types", "pet-categories",
@@ -162,22 +164,67 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
   );
 }
 
+function SectionCollapseLabel({
+  sectionKey,
+  label,
+}: {
+  sectionKey: string;
+  label: string;
+}) {
+  const { data: items = [] } = useQuery({
+    queryKey: ["settings", "personalize", sectionKey],
+    queryFn: async () => {
+      const res = await settingsApi.listPersonalizeItems(sectionKey);
+      return res.data.data ?? [];
+    },
+  });
+
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontWeight: 500 }}>{label}</span>
+      <Badge
+        count={items.length}
+        showZero
+        color="#d9d9d9"
+        style={{ color: "#666", fontSize: 11 }}
+      />
+    </span>
+  );
+}
+
 export default function Personalize() {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const collapseItems = sectionKeys.map((key) => ({
     key,
-    label: t(sectionI18nMap[key]),
+    label: (
+      <SectionCollapseLabel
+        sectionKey={key}
+        label={t(sectionI18nMap[key])}
+      />
+    ),
     children: <SectionPanel sectionKey={key} />,
   }));
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Title level={4} style={{ marginBottom: 24 }}>
+      <Title level={4} style={{ marginBottom: 4 }}>
         {t("settings.personalize.title")}
       </Title>
+      <Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
+        {t("settings.personalize.description")}
+      </Text>
 
-      <Card>
-        <Collapse items={collapseItems} />
+      <Card
+        styles={{
+          body: { padding: 0 },
+        }}
+      >
+        <Collapse
+          items={collapseItems}
+          bordered={false}
+          style={{ background: token.colorBgContainer }}
+        />
       </Card>
     </div>
   );

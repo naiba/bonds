@@ -11,6 +11,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -60,6 +61,7 @@ export default function RemindersModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "reminders"];
 
   const frequencyOptions = [
@@ -139,9 +141,13 @@ export default function RemindersModule({
 
   return (
     <Card
-      title={t("modules.reminders.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.reminders.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.reminders.add")}
         </Button>
       }
@@ -150,8 +156,17 @@ export default function RemindersModule({
         loading={isLoading}
         dataSource={reminders}
         locale={{ emptyText: <Empty description={t("modules.reminders.no_reminders")} /> }}
+        split={false}
         renderItem={(r: Reminder) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />,
               <Popconfirm key="d" title={t("modules.reminders.delete_confirm")} onConfirm={() => deleteMutation.mutate(r.id)}>
@@ -160,10 +175,10 @@ export default function RemindersModule({
             ]}
           >
             <List.Item.Meta
-              title={r.label}
+              title={<span style={{ fontWeight: 500 }}>{r.label}</span>}
               description={
                 <>
-                  {formatReminderDate(r)}{" "}
+                  <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r)}</span>{" "}
                   <Tag color={freqColor[r.type] ?? "default"}>{r.type}</Tag>
                   {r.calendar_type && r.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{r.calendar_type}</Tag>

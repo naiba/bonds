@@ -28,6 +28,7 @@
     "vaults": "Vaults",
     "settings": "Settings",
     "vault": "Vault",
+    "dashboard": "Dashboard",
     "contacts": "Contacts",
     "journal": "Journal",
     "groups": "Groups",
@@ -463,6 +464,7 @@
   },
   "settings": {
     "title": "Settings",
+    "description": "Manage your account, preferences, and security settings.",
     "account": {
       "title": "Account",
       "name": "Name",
@@ -474,6 +476,7 @@
     },
     "preferences": {
       "title": "Preferences",
+      "description": "Customize how Bonds looks and feels for you.",
       "name_order": "Name display order",
       "date_format": "Date format",
       "timezone": "Timezone",
@@ -485,6 +488,7 @@
     },
     "notifications": {
       "title": "Notifications",
+      "description": "Configure how and where you receive reminders and alerts.",
       "add_channel": "Add Channel",
       "no_channels": "No notification channels",
       "delete_confirm": "Delete this channel?",
@@ -499,6 +503,7 @@
     },
     "personalize": {
       "title": "Personalize",
+      "description": "Customize categories, types, and labels used throughout Bonds.",
       "add_item": "Add item",
       "no_items": "No items",
       "delete_confirm": "Delete?",
@@ -519,6 +524,7 @@
     },
     "users": {
       "title": "Users",
+      "description": "View and manage the people who have access to this account.",
       "col_name": "Name",
       "col_email": "Email",
       "col_role": "Role",
@@ -530,6 +536,7 @@
   },
   "twoFactor": {
     "title": "Two-Factor Authentication",
+    "description": "Add an extra layer of security to protect your account.",
     "enable": "Enable 2FA",
     "disable": "Disable 2FA",
     "status": {
@@ -551,6 +558,7 @@
   },
   "invitations": {
     "title": "Invitations",
+    "description": "Invite others to collaborate on your account.",
     "invite": "Invite User",
     "email": "Email Address",
     "permission": "Permission",
@@ -566,6 +574,7 @@
   },
   "acceptInvite": {
     "title": "Accept Invitation",
+    "subtitle": "You've been invited to join. Create your account to get started.",
     "submit": "Create Account",
     "firstName": "First Name",
     "lastName": "Last Name",

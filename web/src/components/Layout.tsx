@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   Layout as AntLayout,
-  Menu,
   Dropdown,
   Avatar,
   theme,
@@ -10,14 +8,10 @@ import {
   Tooltip,
 } from "antd";
 import {
-  SafetyCertificateOutlined,
   SettingOutlined,
   TeamOutlined,
   LogoutOutlined,
   UserOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-  BookOutlined,
   CalendarOutlined,
   FileOutlined,
   BarChartOutlined,
@@ -33,6 +27,9 @@ import {
   SunOutlined,
   MoonOutlined,
   DesktopOutlined,
+  CheckSquareOutlined,
+  DashboardOutlined,
+  RightOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/stores/auth";
@@ -41,10 +38,9 @@ import type { ThemeMode } from "@/stores/theme";
 import { useTranslation } from "react-i18next";
 import SearchBar from "@/components/SearchBar";
 
-const { Sider, Header, Content } = AntLayout;
+const { Header, Content } = AntLayout;
 
 export default function Layout() {
-  const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,134 +61,37 @@ export default function Layout() {
     system: t("theme.system"),
   };
 
-  const isInVault = location.pathname.match(/^\/vaults\/\d+/);
+  const isInVault = !!location.pathname.match(/^\/vaults\/[^/]+(\/|$)/);
 
-  const settingsMenuItems: MenuProps["items"] = [
-    {
-      key: "/settings",
-      icon: <SettingOutlined />,
-      label: t("nav.account"),
-    },
-    {
-      key: "/settings/preferences",
-      icon: <ControlOutlined />,
-      label: t("nav.preferences"),
-    },
-    {
-      key: "/settings/notifications",
-      icon: <BellOutlined />,
-      label: t("nav.notifications"),
-    },
-    {
-      key: "/settings/personalize",
-      icon: <EditOutlined />,
-      label: t("nav.personalize"),
-    },
-    {
-      key: "/settings/users",
-      icon: <UserSwitchOutlined />,
-      label: t("nav.users"),
-    },
-    {
-      key: "/settings/2fa",
-      icon: <LockOutlined />,
-      label: t("nav.twoFactor"),
-    },
-    {
-      key: "/settings/invitations",
-      icon: <MailOutlined />,
-      label: t("nav.invitations"),
-    },
-  ];
-
-  const topMenuItems: MenuProps["items"] = [
-    {
-      key: "/vaults",
-      icon: <SafetyCertificateOutlined />,
-      label: t("nav.vaults"),
-    },
-    {
-      type: "group" as const,
-      label: t("nav.settings"),
-      children: settingsMenuItems,
-    },
-  ];
-
-  const vaultMenuItems: MenuProps["items"] = vaultId
+  const vaultNavItems: { key: string; icon: React.ReactNode; label: string }[] = vaultId
     ? [
-        {
-          key: `/vaults/${vaultId}/contacts`,
-          icon: <TeamOutlined />,
-          label: t("nav.contacts"),
-        },
-        {
-          key: `/vaults/${vaultId}/journals`,
-          icon: <EditOutlined />,
-          label: t("nav.journal"),
-        },
-        {
-          key: `/vaults/${vaultId}/groups`,
-          icon: <UsergroupAddOutlined />,
-          label: t("nav.groups"),
-        },
-        {
-          key: `/vaults/${vaultId}/calendar`,
-          icon: <CalendarOutlined />,
-          label: t("nav.calendar"),
-        },
-        {
-          key: `/vaults/${vaultId}/tasks`,
-          icon: <BookOutlined />,
-          label: t("nav.tasks"),
-        },
-        {
-          key: `/vaults/${vaultId}/reports`,
-          icon: <BarChartOutlined />,
-          label: t("nav.reports"),
-        },
-        {
-          key: `/vaults/${vaultId}/files`,
-          icon: <FileOutlined />,
-          label: t("nav.files"),
-        },
-        {
-          key: `/vaults/${vaultId}/feed`,
-          icon: <UnorderedListOutlined />,
-          label: t("nav.feed"),
-        },
+        { key: `/vaults/${vaultId}`, icon: <DashboardOutlined />, label: t("nav.dashboard") },
+        { key: `/vaults/${vaultId}/contacts`, icon: <TeamOutlined />, label: t("nav.contacts") },
+        { key: `/vaults/${vaultId}/journals`, icon: <EditOutlined />, label: t("nav.journal") },
+        { key: `/vaults/${vaultId}/groups`, icon: <UsergroupAddOutlined />, label: t("nav.groups") },
+        { key: `/vaults/${vaultId}/calendar`, icon: <CalendarOutlined />, label: t("nav.calendar") },
+        { key: `/vaults/${vaultId}/tasks`, icon: <CheckSquareOutlined />, label: t("nav.tasks") },
+        { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
+        { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
+        { key: `/vaults/${vaultId}/feed`, icon: <UnorderedListOutlined />, label: t("nav.feed") },
       ]
     : [];
 
-  const menuItems = isInVault
-    ? [
-        { type: "group" as const, label: t("nav.vault"), children: vaultMenuItems },
-        { type: "divider" as const },
-        ...topMenuItems,
-      ]
-    : topMenuItems;
-
-  const selectedKey =
-    menuItems
-      .flatMap((item) => {
-        if (item && "children" in item && item.children) {
-          return item.children;
-        }
-        return [item];
-      })
-      .filter(Boolean)
-      .map((item) => (item && "key" in item ? (item.key as string) : ""))
-      .find((key) => key && location.pathname.startsWith(key)) ?? "/vaults";
+  const activeVaultKey = vaultNavItems
+    .slice()
+    .sort((a, b) => b.key.length - a.key.length)
+    .find((item) => location.pathname.startsWith(item.key))?.key ?? "";
 
   const userMenuItems: MenuProps["items"] = [
-    {
-      key: "logout",
-      icon: <LogoutOutlined />,
-      label: t("nav.logout"),
-      onClick: () => {
-        logout();
-        navigate("/login");
-      },
-    },
+    { key: "/settings", icon: <SettingOutlined />, label: t("nav.account") },
+    { key: "/settings/preferences", icon: <ControlOutlined />, label: t("nav.preferences") },
+    { key: "/settings/notifications", icon: <BellOutlined />, label: t("nav.notifications") },
+    { key: "/settings/personalize", icon: <EditOutlined />, label: t("nav.personalize") },
+    { key: "/settings/users", icon: <UserSwitchOutlined />, label: t("nav.users") },
+    { key: "/settings/2fa", icon: <LockOutlined />, label: t("nav.twoFactor") },
+    { key: "/settings/invitations", icon: <MailOutlined />, label: t("nav.invitations") },
+    { type: "divider" as const },
+    { key: "logout", icon: <LogoutOutlined />, label: t("nav.logout"), danger: true },
   ];
 
   const nextThemeMode = () => {
@@ -211,107 +110,85 @@ export default function Layout() {
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
-      <Sider
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        trigger={null}
-        breakpoint="lg"
-        collapsedWidth={64}
-        style={{
-          borderRight: `1px solid ${token.colorBorderSecondary}`,
-          background: token.colorBgContainer,
-        }}
-        width={220}
-      >
-        <div
-          style={{
-            height: 56,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: collapsed ? "center" : "flex-start",
-            padding: collapsed ? 0 : "0 20px",
-            fontWeight: 700,
-            fontSize: 18,
-            letterSpacing: "-0.02em",
-            color: token.colorText,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          }}
-        >
-          {collapsed ? "B" : "Bonds"}
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          style={{
-            border: "none",
-            background: "transparent",
-            padding: "8px 0",
-          }}
-        />
-      </Sider>
-      <AntLayout>
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Header
           style={{
             background: token.colorBgContainer,
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
+            borderBottom: isInVault ? "none" : `1px solid ${token.colorBorderSecondary}`,
             padding: "0 24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            height: 56,
-            lineHeight: "56px",
+            height: 48,
+            lineHeight: "48px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <Button
-              type="text"
-              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setCollapsed(!collapsed)}
-            />
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                cursor: "pointer",
+                userSelect: "none",
+                padding: "3px 10px",
+                borderRadius: token.borderRadius,
+                border: `1px solid ${token.colorBorderSecondary}`,
+                background: token.colorBgLayout,
+                fontSize: 13,
+              }}
+              onClick={() => navigate("/vaults")}
+            >
+              <span style={{ fontWeight: 600, color: token.colorText }}>
+                {user?.first_name} {user?.last_name}
+              </span>
+              {isInVault && vaultId && (
+                <>
+                  <RightOutlined style={{ fontSize: 10, color: token.colorTextQuaternary }} />
+                  <span style={{ color: token.colorTextSecondary }}>
+                    {t("nav.vault")}
+                  </span>
+                </>
+              )}
+            </div>
             <SearchBar />
           </div>
+
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <Tooltip title={themeModeLabels[themeMode]}>
-              <Button
-                type="text"
-                icon={themeModeIcons[themeMode]}
-                onClick={nextThemeMode}
-              />
+              <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
             </Tooltip>
-            <Tooltip
-              title={i18n.language?.startsWith("zh") ? "English" : "中文"}
+            <Tooltip title={i18n.language?.startsWith("zh") ? "English" : "中文"}>
+              <Button type="text" size="small" icon={<GlobalOutlined />} onClick={toggleLanguage} />
+            </Tooltip>
+            <Dropdown
+              menu={{
+                items: userMenuItems,
+                onClick: ({ key }) => {
+                  if (key === "logout") {
+                    logout();
+                    navigate("/login");
+                  } else {
+                    navigate(key);
+                  }
+                },
+              }}
+              placement="bottomRight"
             >
-              <Button
-                type="text"
-                icon={<GlobalOutlined />}
-                onClick={toggleLanguage}
-              />
-            </Tooltip>
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
               <div
                 style={{
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
                   marginLeft: 4,
+                  padding: "2px 4px",
+                  borderRadius: token.borderRadius,
                 }}
               >
-                <span
-                  style={{ color: token.colorTextSecondary, fontSize: 14 }}
-                >
-                  {user?.first_name} {user?.last_name}
-                </span>
                 <Avatar
-                  size={32}
+                  size={26}
                   icon={<UserOutlined />}
-                  style={{
-                    backgroundColor: token.colorPrimary,
-                    fontSize: 13,
-                  }}
+                  style={{ backgroundColor: token.colorPrimary, fontSize: 12 }}
                 >
                   {initials}
                 </Avatar>
@@ -319,17 +196,68 @@ export default function Layout() {
             </Dropdown>
           </div>
         </Header>
-        <Content
-          style={{
-            padding: 24,
-            background: token.colorBgLayout,
-            minHeight: 280,
-            overflow: "auto",
-          }}
-        >
+
+        {isInVault && vaultNavItems.length > 0 && (
+          <nav
+            style={{
+              background: token.colorBgContainer,
+              borderBottom: `1px solid ${token.colorBorderSecondary}`,
+              padding: "0 24px",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              height: 40,
+              overflowX: "auto",
+            }}
+          >
+            {vaultNavItems.map((item) => {
+              const isActive = item.key === activeVaultKey;
+              return (
+                <div
+                  key={item.key}
+                  onClick={() => navigate(item.key)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "4px 12px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: isActive ? 500 : 400,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    color: isActive ? "#fff" : token.colorText,
+                    background: isActive ? token.colorPrimary : "transparent",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.background = token.colorFillSecondary;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <span style={{ fontSize: 13 }}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </div>
+              );
+            })}
+          </nav>
+        )}
+      </div>
+
+      <Content
+        style={{
+          padding: "24px 28px",
+          background: token.colorBgLayout,
+          minHeight: 280,
+          overflow: "auto",
+        }}
+      >
+        <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <Outlet />
-        </Content>
-      </AntLayout>
+        </div>
+      </Content>
     </AntLayout>
   );
 }

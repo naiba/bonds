@@ -9,6 +9,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -30,6 +31,7 @@ export default function MoodTrackingModule({
   const [adding, setAdding] = useState(false);
   const [note, setNote] = useState("");
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const defaultParameters = [
     { label: t("modules.mood_tracking.happiness"), rating: 0 },
     { label: t("modules.mood_tracking.energy"), rating: 0 },
@@ -71,20 +73,37 @@ export default function MoodTrackingModule({
 
   return (
     <Card
-      title={t("modules.mood_tracking.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.mood_tracking.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
         !adding && (
-          <Button type="link" icon={<PlusOutlined />} onClick={() => setAdding(true)}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
             {t("modules.mood_tracking.log_mood")}
           </Button>
         )
       }
     >
       {adding && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{
+          marginBottom: 16,
+          padding: 16,
+          background: token.colorFillQuaternary,
+          borderRadius: token.borderRadius,
+        }}>
           {params.map((p, i) => (
-            <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span style={{ width: 80 }}>{p.label}</span>
+            <div key={p.label} style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 8,
+              padding: '6px 10px',
+              background: token.colorBgContainer,
+              borderRadius: token.borderRadius,
+            }}>
+              <span style={{ width: 80, fontWeight: 500, fontSize: 13, color: token.colorTextSecondary }}>{p.label}</span>
               <Rate count={5} value={p.rating} onChange={(v) => updateParam(i, v)} />
             </div>
           ))}
@@ -93,13 +112,13 @@ export default function MoodTrackingModule({
             rows={2}
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            style={{ marginBottom: 8, marginTop: 8 }}
+            style={{ marginBottom: 12, marginTop: 8 }}
           />
           <Space>
-            <Button type="primary" onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
+            <Button type="primary" size="small" onClick={() => createMutation.mutate()} loading={createMutation.isPending}>
               {t("common.save")}
             </Button>
-            <Button onClick={() => { setAdding(false); setNote(""); setParams(defaultParameters.map((p) => ({ ...p }))); }}>
+            <Button size="small" onClick={() => { setAdding(false); setNote(""); setParams(defaultParameters.map((p) => ({ ...p }))); }}>
               {t("common.cancel")}
             </Button>
           </Space>
@@ -110,10 +129,20 @@ export default function MoodTrackingModule({
         loading={isLoading}
         dataSource={moods}
         locale={{ emptyText: <Empty description={t("modules.mood_tracking.no_entries")} /> }}
+        split={false}
         renderItem={(mood: MoodTrackingEvent) => (
-          <List.Item>
+          <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
             <List.Item.Meta
-              title={dayjs(mood.rated_at).format("MMM D, YYYY h:mm A")}
+              title={<span style={{ fontWeight: 500 }}>{dayjs(mood.rated_at).format("MMM D, YYYY h:mm A")}</span>}
               description={
                 <>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
@@ -123,7 +152,7 @@ export default function MoodTrackingModule({
                       </Tag>
                     ))}
                   </div>
-                  {mood.note && <div>{mood.note}</div>}
+                  {mood.note && <div style={{ color: token.colorTextSecondary }}>{mood.note}</div>}
                 </>
               }
             />

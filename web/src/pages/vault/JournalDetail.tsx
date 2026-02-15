@@ -13,11 +13,14 @@ import {
   App,
   Empty,
   Spin,
+  theme,
 } from "antd";
 import {
   PlusOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
+  BookOutlined,
+  CalendarOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { journalsApi } from "@/api/journals";
@@ -38,6 +41,7 @@ export default function JournalDetail() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data: journal, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId],
@@ -97,19 +101,26 @@ export default function JournalDetail() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Button
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/vaults/${vaultId}/journals`)}
-        style={{ marginBottom: 16 }}
-      >
-        {t("vault.journal_detail.back")}
-      </Button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/vaults/${vaultId}/journals`)}
+          style={{ color: token.colorTextSecondary }}
+        />
+        <BookOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
+        <Title level={4} style={{ margin: 0, flex: 1 }}>{journal.name}</Title>
+      </div>
 
-      <Card style={{ marginBottom: 24 }}>
-        <Title level={4} style={{ margin: 0 }}>{journal.name}</Title>
+      <Card
+        style={{
+          marginBottom: 24,
+          borderLeft: `3px solid ${token.colorPrimary}`,
+          boxShadow: token.boxShadowTertiary,
+        }}
+      >
         {journal.description && (
-          <Text type="secondary">{journal.description}</Text>
+          <Text type="secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{journal.description}</Text>
         )}
       </Card>
 
@@ -120,32 +131,60 @@ export default function JournalDetail() {
         </Button>
       </div>
 
-      <List
-        dataSource={posts}
-        locale={{ emptyText: <Empty description={t("vault.journal_detail.no_posts")} /> }}
-        renderItem={(post: Post) => (
-          <List.Item
-            actions={[
-              <Popconfirm
-                key="d"
-                title={t("vault.journal_detail.delete_post_confirm")}
-                onConfirm={() => deletePostMutation.mutate(post.id)}
-              >
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <List.Item.Meta
-              title={
-                <a onClick={() => navigate(`/vaults/${vaultId}/journals/${jId}/posts/${post.id}`)}>
-                  {post.title}
-                </a>
-              }
-              description={dayjs(post.written_at).format("MMMM D, YYYY")}
-            />
-          </List.Item>
-        )}
-      />
+      <div
+        style={{
+          background: token.colorBgContainer,
+          borderRadius: token.borderRadiusLG,
+          boxShadow: token.boxShadowTertiary,
+          padding: "4px 0",
+        }}
+      >
+        <List
+          dataSource={posts}
+          locale={{ emptyText: <Empty description={t("vault.journal_detail.no_posts")} style={{ padding: 32 }} /> }}
+          renderItem={(post: Post) => (
+            <List.Item
+              style={{
+                margin: "4px 16px",
+                paddingLeft: 16,
+                borderRadius: token.borderRadius,
+                cursor: "pointer",
+                transition: "background 0.2s",
+              }}
+              actions={[
+                <Popconfirm
+                  key="d"
+                  title={t("vault.journal_detail.delete_post_confirm")}
+                  onConfirm={(e) => { e?.stopPropagation(); deletePostMutation.mutate(post.id); }}
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popconfirm>,
+              ]}
+              onClick={() => navigate(`/vaults/${vaultId}/journals/${jId}/posts/${post.id}`)}
+            >
+              <List.Item.Meta
+                title={
+                  <Text strong style={{ fontSize: 15 }}>
+                    {post.title}
+                  </Text>
+                }
+                description={
+                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <CalendarOutlined style={{ fontSize: 12 }} />
+                    {dayjs(post.written_at).format("MMMM D, YYYY")}
+                  </span>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </div>
 
       <Modal
         title={t("vault.journal_detail.modal_title")}

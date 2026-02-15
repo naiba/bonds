@@ -12,6 +12,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, CheckOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ export default function LoansModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "loans"];
 
   const { data: loans = [], isLoading } = useQuery({
@@ -80,9 +82,13 @@ export default function LoansModule({
 
   return (
     <Card
-      title={t("modules.loans.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.loans.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.loans.add")}
         </Button>
       }
@@ -91,8 +97,17 @@ export default function LoansModule({
         loading={isLoading}
         dataSource={loans}
         locale={{ emptyText: <Empty description={t("modules.loans.no_loans")} /> }}
+        split={false}
         renderItem={(loan: Loan) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button
                 key="settle"
@@ -110,22 +125,22 @@ export default function LoansModule({
           >
             <List.Item.Meta
               title={
-                <>
+                <span style={{ fontWeight: 500 }}>
                   {loan.name}{" "}
                   <Tag color={loan.type === "lender" ? "green" : "orange"}>{loan.type}</Tag>
                   {loan.is_settled && <Tag color="default">{t("modules.loans.settled")}</Tag>}
-                </>
+                </span>
               }
               description={
-                <>
+                <span style={{ color: token.colorTextSecondary }}>
                   {loan.amount_lent} {loan.currency}
                   {loan.description && ` — ${loan.description}`}
                   {loan.settled_at && (
-                    <span style={{ marginLeft: 8, opacity: 0.5 }}>
+                    <span style={{ marginLeft: 8, color: token.colorTextQuaternary }}>
                       {t("modules.loans.settled_at", { date: dayjs(loan.settled_at).format("MMM D, YYYY") })}
                     </span>
                   )}
-                </>
+                </span>
               }
             />
           </List.Item>

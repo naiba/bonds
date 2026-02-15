@@ -37,18 +37,45 @@ export default function Register() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: token.colorBgLayout,
+        background: `linear-gradient(145deg, ${token.colorBgLayout} 0%, ${token.colorPrimaryBg} 50%, ${token.colorBgLayout} 100%)`,
         padding: 16,
       }}
     >
       <Card
         style={{
           width: "100%",
-          maxWidth: 400,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+          maxWidth: 420,
+          border: `1px solid ${token.colorBorderSecondary}`,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)",
+          borderRadius: token.borderRadiusLG,
         }}
       >
         <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 20 }}>
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: `linear-gradient(135deg, ${token.colorPrimary}, ${token.colorPrimaryBgHover})`,
+              color: "#fff",
+              fontSize: 17,
+              fontWeight: 800,
+              flexShrink: 0,
+            }}>
+              B
+            </span>
+            <span style={{
+              fontWeight: 700,
+              fontSize: 22,
+              letterSpacing: "-0.02em",
+              color: token.colorPrimary,
+            }}>
+              Bonds
+            </span>
+          </div>
           <Title level={3} style={{ marginBottom: 4 }}>
             {t("auth.register.title")}
           </Title>

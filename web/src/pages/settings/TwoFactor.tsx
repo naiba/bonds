@@ -6,7 +6,6 @@ import {
   Input,
   Modal,
   Alert,
-  List,
   Spin,
   App,
   Space,
@@ -92,14 +91,17 @@ export default function TwoFactor() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <Title level={4} style={{ marginBottom: 24 }}>
+      <Title level={4} style={{ marginBottom: 4 }}>
         <SafetyCertificateOutlined style={{ marginRight: 8 }} />
         {t("twoFactor.title")}
       </Title>
+      <Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
+        {t("twoFactor.description")}
+      </Text>
 
       <Card>
         <Alert
-          title={
+          message={
             isEnabled
               ? t("twoFactor.status.enabled")
               : t("twoFactor.status.disabled")
@@ -107,7 +109,11 @@ export default function TwoFactor() {
           type={isEnabled ? "success" : "warning"}
           icon={isEnabled ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
           showIcon
-          style={{ marginBottom: 24 }}
+          banner
+          style={{
+            marginBottom: 24,
+            borderRadius: token.borderRadius,
+          }}
         />
 
         {!isEnabled && !setupData && (
@@ -146,24 +152,48 @@ export default function TwoFactor() {
             </Card>
 
             <Alert
-              title={t("twoFactor.recoveryCodes")}
+              message={t("twoFactor.recoveryCodes")}
               description={t("twoFactor.recoveryCodes.warning")}
               type="warning"
               showIcon
               style={{ marginBottom: 16 }}
             />
 
-            <List
-              size="small"
-              bordered
-              dataSource={setupData.recovery_codes}
-              renderItem={(code) => (
-                <List.Item>
-                  <Text code>{code}</Text>
-                </List.Item>
-              )}
-              style={{ marginBottom: 24 }}
-            />
+            <div
+              style={{
+                border: `1px solid ${token.colorBorderSecondary}`,
+                borderRadius: token.borderRadius,
+                padding: 16,
+                marginBottom: 24,
+                background: token.colorBgLayout,
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 8,
+                }}
+              >
+                {setupData.recovery_codes.map((code) => (
+                  <div
+                    key={code}
+                    style={{
+                      fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+                      fontSize: 14,
+                      padding: "6px 12px",
+                      background: token.colorBgContainer,
+                      border: `1px solid ${token.colorBorder}`,
+                      borderRadius: 4,
+                      textAlign: "center",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {code}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <Space>
               <Input

@@ -23,8 +23,38 @@ export default function ThemedApp() {
             ? antTheme.darkAlgorithm
             : antTheme.defaultAlgorithm,
         token: {
-          colorPrimary: "#4f6d7a",
-          borderRadius: 6,
+          colorPrimary: "#5b8c5a",
+          colorSuccess: "#52c41a",
+          colorInfo: "#5b8c5a",
+          borderRadius: 8,
+          fontFamily:
+            "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+          motion: true,
+        },
+        components: {
+          Card: {
+            borderRadiusLG: 12,
+          },
+          Button: {
+            borderRadius: 8,
+            controlHeight: 36,
+          },
+          Menu: {
+            itemBorderRadius: 8,
+            itemMarginInline: 8,
+          },
+          Table: {
+            borderRadiusLG: 12,
+          },
+          Modal: {
+            borderRadiusLG: 12,
+          },
+          Input: {
+            borderRadius: 8,
+          },
+          Select: {
+            borderRadius: 8,
+          },
         },
       }}
     >

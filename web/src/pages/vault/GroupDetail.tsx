@@ -11,12 +11,13 @@ import {
   Empty,
   Spin,
   Space,
+  theme,
 } from "antd";
 import {
   PlusOutlined,
   DeleteOutlined,
   ArrowLeftOutlined,
-  UserOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { groupsApi } from "@/api/groups";
@@ -38,6 +39,7 @@ export default function GroupDetail() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data: group, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "groups", gId],
@@ -98,18 +100,28 @@ export default function GroupDetail() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Button
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/vaults/${vaultId}/groups`)}
-        style={{ marginBottom: 16 }}
-      >
-        {t("vault.group_detail.back")}
-      </Button>
-
-      <Card style={{ marginBottom: 24 }}>
-        <Title level={4} style={{ margin: 0 }}>{group.name}</Title>
-      </Card>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/vaults/${vaultId}/groups`)}
+          style={{ color: token.colorTextSecondary }}
+        />
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: "50%",
+            background: token.colorPrimaryBg,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <TeamOutlined style={{ fontSize: 16, color: token.colorPrimary }} />
+        </div>
+        <Title level={4} style={{ margin: 0, flex: 1 }}>{group.name}</Title>
+      </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Title level={5} style={{ margin: 0 }}>{t("vault.group_detail.members")}</Title>
@@ -121,7 +133,15 @@ export default function GroupDetail() {
       </div>
 
       {adding && (
-        <Card size="small" style={{ marginBottom: 16 }}>
+        <Card
+          size="small"
+          style={{
+            marginBottom: 16,
+            background: token.colorPrimaryBg,
+            borderColor: token.colorPrimaryBorder,
+            boxShadow: token.boxShadowTertiary,
+          }}
+        >
           <Space style={{ width: "100%" }}>
             <Select
               showSearch
@@ -152,32 +172,74 @@ export default function GroupDetail() {
         </Card>
       )}
 
-      <List
-        dataSource={group.contacts ?? []}
-        locale={{ emptyText: <Empty description={t("vault.group_detail.no_members")} /> }}
-        renderItem={(member: GroupContact) => (
-          <List.Item
-            actions={[
-              <Popconfirm
-                key="d"
-                title={t("vault.group_detail.remove_confirm")}
-                onConfirm={() => removeMutation.mutate(member.contact_id)}
+      <div
+        style={{
+          background: token.colorBgContainer,
+          borderRadius: token.borderRadiusLG,
+          boxShadow: token.boxShadowTertiary,
+          padding: "8px 0",
+        }}
+      >
+        <List
+          dataSource={group.contacts ?? []}
+          locale={{ emptyText: <Empty description={t("vault.group_detail.no_members")} style={{ padding: 32 }} /> }}
+          renderItem={(member: GroupContact) => {
+            const initials = (member.contact_name ?? "?").charAt(0).toUpperCase();
+            return (
+              <List.Item
+                style={{
+                  margin: "4px 16px",
+                  paddingLeft: 16,
+                  borderRadius: token.borderRadius,
+                  cursor: "pointer",
+                }}
+                actions={[
+                  <Popconfirm
+                    key="d"
+                    title={t("vault.group_detail.remove_confirm")}
+                    onConfirm={(e) => { e?.stopPropagation(); removeMutation.mutate(member.contact_id); }}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </Popconfirm>,
+                ]}
+                onClick={() => navigate(`/vaults/${vaultId}/contacts/${member.contact_id}`)}
               >
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <List.Item.Meta
-              avatar={<UserOutlined style={{ fontSize: 20 }} />}
-              title={
-                <a onClick={() => navigate(`/vaults/${vaultId}/contacts/${member.contact_id}`)}>
-                  {member.contact_name}
-                </a>
-              }
-            />
-          </List.Item>
-        )}
-      />
+                <List.Item.Meta
+                  avatar={
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        background: token.colorPrimaryBg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 600,
+                        color: token.colorPrimary,
+                        fontSize: 14,
+                      }}
+                    >
+                      {initials}
+                    </div>
+                  }
+                  title={
+                    <span style={{ fontWeight: 500 }}>
+                      {member.contact_name}
+                    </span>
+                  }
+                />
+              </List.Item>
+            );
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -5,8 +5,12 @@ import {
   Button,
   Calendar,
   Badge,
+  theme,
 } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import {
+  ArrowLeftOutlined,
+  CalendarOutlined,
+} from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import client from "@/api/client";
 import type { APIResponse } from "@/types/api";
@@ -28,6 +32,7 @@ export default function VaultCalendar() {
   const vaultId = id!;
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data: dates = [] } = useQuery({
     queryKey: ["vaults", vaultId, "calendar", "dates"],
@@ -98,18 +103,24 @@ export default function VaultCalendar() {
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
-      <Button
-        type="text"
-        icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/vaults/${vaultId}`)}
-        style={{ marginBottom: 16 }}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(`/vaults/${vaultId}`)}
+          style={{ color: token.colorTextSecondary }}
+        />
+        <CalendarOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
+        <Title level={4} style={{ margin: 0 }}>{t("vault.calendar.title")}</Title>
+      </div>
+
+      <Card
+        style={{
+          boxShadow: token.boxShadowTertiary,
+          borderRadius: token.borderRadiusLG,
+          padding: 8,
+        }}
       >
-        {t("vault.calendar.back")}
-      </Button>
-
-      <Title level={4}>{t("vault.calendar.title")}</Title>
-
-      <Card>
         <Calendar cellRender={(date) => cellRender(date as Dayjs)} />
       </Card>
     </div>

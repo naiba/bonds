@@ -11,6 +11,7 @@ import {
   App,
   Tag,
   Empty,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -53,6 +54,7 @@ export default function ImportantDatesModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "important-dates"];
 
   const dateTypes = [
@@ -132,9 +134,13 @@ export default function ImportantDatesModule({
 
   return (
     <Card
-      title={t("modules.important_dates.title")}
+      title={<span style={{ fontWeight: 500 }}>{t("modules.important_dates.title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
       extra={
-        <Button type="link" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
           {t("modules.important_dates.add")}
         </Button>
       }
@@ -143,8 +149,17 @@ export default function ImportantDatesModule({
         loading={isLoading}
         dataSource={dates}
         locale={{ emptyText: <Empty description={t("modules.important_dates.no_dates")} /> }}
+        split={false}
         renderItem={(d: ImportantDate) => (
           <List.Item
+            style={{
+              borderRadius: token.borderRadius,
+              padding: '10px 12px',
+              marginBottom: 4,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(d)} />,
               <Popconfirm key="d" title={t("modules.important_dates.delete_confirm")} onConfirm={() => deleteMutation.mutate(d.id)}>
@@ -153,10 +168,10 @@ export default function ImportantDatesModule({
             ]}
           >
             <List.Item.Meta
-              title={d.label}
+              title={<span style={{ fontWeight: 500 }}>{d.label}</span>}
               description={
                 <>
-                  {formatDateDisplay(d)}{" "}
+                  <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d)}</span>{" "}
                   {d.calendar_type && d.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{d.calendar_type}</Tag>
                   )}
