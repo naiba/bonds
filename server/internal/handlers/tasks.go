@@ -21,8 +21,12 @@ func NewTaskHandler(taskService *services.TaskService) *TaskHandler {
 
 func (h *TaskHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
-	tasks, err := h.taskService.List(contactID)
+	vaultID := c.Param("vault_id")
+	tasks, err := h.taskService.List(contactID, vaultID)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_tasks")
 	}
 	return response.OK(c, tasks)
@@ -30,6 +34,7 @@ func (h *TaskHandler) List(c echo.Context) error {
 
 func (h *TaskHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	userID := middleware.GetUserID(c)
 
 	var req dto.CreateTaskRequest
@@ -40,8 +45,11 @@ func (h *TaskHandler) Create(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	task, err := h.taskService.Create(contactID, userID, req)
+	task, err := h.taskService.Create(contactID, vaultID, userID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_task")
 	}
 	return response.Created(c, task)
@@ -49,6 +57,7 @@ func (h *TaskHandler) Create(c echo.Context) error {
 
 func (h *TaskHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
@@ -62,8 +71,11 @@ func (h *TaskHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	task, err := h.taskService.Update(uint(id), contactID, req)
+	task, err := h.taskService.Update(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrTaskNotFound) {
 			return response.NotFound(c, "err.task_not_found")
 		}
@@ -74,13 +86,17 @@ func (h *TaskHandler) Update(c echo.Context) error {
 
 func (h *TaskHandler) ToggleCompleted(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
 	}
 
-	task, err := h.taskService.ToggleCompleted(uint(id), contactID)
+	task, err := h.taskService.ToggleCompleted(uint(id), contactID, vaultID)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrTaskNotFound) {
 			return response.NotFound(c, "err.task_not_found")
 		}
@@ -91,12 +107,16 @@ func (h *TaskHandler) ToggleCompleted(c echo.Context) error {
 
 func (h *TaskHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
 	}
 
-	if err := h.taskService.Delete(uint(id), contactID); err != nil {
+	if err := h.taskService.Delete(uint(id), contactID, vaultID); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrTaskNotFound) {
 			return response.NotFound(c, "err.task_not_found")
 		}

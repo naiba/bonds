@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupTaskTest(t *testing.T) (*TaskService, string, string) {
+func setupTaskTest(t *testing.T) (*TaskService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,13 +35,13 @@ func setupTaskTest(t *testing.T) (*TaskService, string, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewTaskService(db), contact.ID, resp.User.ID
+	return NewTaskService(db), contact.ID, vault.ID, resp.User.ID
 }
 
 func TestCreateTask(t *testing.T) {
-	svc, contactID, userID := setupTaskTest(t)
+	svc, contactID, vaultID, userID := setupTaskTest(t)
 
-	task, err := svc.Create(contactID, userID, dto.CreateTaskRequest{
+	task, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{
 		Label:       "Buy groceries",
 		Description: "Milk, eggs, bread",
 	})
@@ -63,18 +63,18 @@ func TestCreateTask(t *testing.T) {
 }
 
 func TestListTasks(t *testing.T) {
-	svc, contactID, userID := setupTaskTest(t)
+	svc, contactID, vaultID, userID := setupTaskTest(t)
 
-	_, err := svc.Create(contactID, userID, dto.CreateTaskRequest{Label: "Task 1"})
+	_, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 1"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, userID, dto.CreateTaskRequest{Label: "Task 2"})
+	_, err = svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 2"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	tasks, err := svc.List(contactID)
+	tasks, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -84,14 +84,14 @@ func TestListTasks(t *testing.T) {
 }
 
 func TestUpdateTask(t *testing.T) {
-	svc, contactID, userID := setupTaskTest(t)
+	svc, contactID, vaultID, userID := setupTaskTest(t)
 
-	created, err := svc.Create(contactID, userID, dto.CreateTaskRequest{Label: "Original"})
+	created, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateTaskRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateTaskRequest{
 		Label:       "Updated",
 		Description: "New description",
 	})
@@ -107,14 +107,14 @@ func TestUpdateTask(t *testing.T) {
 }
 
 func TestToggleTaskCompleted(t *testing.T) {
-	svc, contactID, userID := setupTaskTest(t)
+	svc, contactID, vaultID, userID := setupTaskTest(t)
 
-	created, err := svc.Create(contactID, userID, dto.CreateTaskRequest{Label: "Toggle me"})
+	created, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Toggle me"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	toggled, err := svc.ToggleCompleted(created.ID, contactID)
+	toggled, err := svc.ToggleCompleted(created.ID, contactID, vaultID)
 	if err != nil {
 		t.Fatalf("ToggleCompleted failed: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestToggleTaskCompleted(t *testing.T) {
 		t.Error("Expected CompletedAt to be set")
 	}
 
-	toggledBack, err := svc.ToggleCompleted(created.ID, contactID)
+	toggledBack, err := svc.ToggleCompleted(created.ID, contactID, vaultID)
 	if err != nil {
 		t.Fatalf("ToggleCompleted back failed: %v", err)
 	}
@@ -138,18 +138,18 @@ func TestToggleTaskCompleted(t *testing.T) {
 }
 
 func TestDeleteTask(t *testing.T) {
-	svc, contactID, userID := setupTaskTest(t)
+	svc, contactID, vaultID, userID := setupTaskTest(t)
 
-	created, err := svc.Create(contactID, userID, dto.CreateTaskRequest{Label: "To delete"})
+	created, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "To delete"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	tasks, err := svc.List(contactID)
+	tasks, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -159,27 +159,27 @@ func TestDeleteTask(t *testing.T) {
 }
 
 func TestDeleteTaskNotFound(t *testing.T) {
-	svc, contactID, _ := setupTaskTest(t)
+	svc, contactID, vaultID, _ := setupTaskTest(t)
 
-	err := svc.Delete(9999, contactID)
+	err := svc.Delete(9999, contactID, vaultID)
 	if err != ErrTaskNotFound {
 		t.Errorf("Expected ErrTaskNotFound, got %v", err)
 	}
 }
 
 func TestUpdateTaskNotFound(t *testing.T) {
-	svc, contactID, _ := setupTaskTest(t)
+	svc, contactID, vaultID, _ := setupTaskTest(t)
 
-	_, err := svc.Update(9999, contactID, dto.UpdateTaskRequest{Label: "nope"})
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateTaskRequest{Label: "nope"})
 	if err != ErrTaskNotFound {
 		t.Errorf("Expected ErrTaskNotFound, got %v", err)
 	}
 }
 
 func TestToggleTaskNotFound(t *testing.T) {
-	svc, contactID, _ := setupTaskTest(t)
+	svc, contactID, vaultID, _ := setupTaskTest(t)
 
-	_, err := svc.ToggleCompleted(9999, contactID)
+	_, err := svc.ToggleCompleted(9999, contactID, vaultID)
 	if err != ErrTaskNotFound {
 		t.Errorf("Expected ErrTaskNotFound, got %v", err)
 	}

@@ -24,7 +24,10 @@ func (s *TaskService) SetFeedRecorder(fr *FeedRecorder) {
 	s.feedRecorder = fr
 }
 
-func (s *TaskService) List(contactID string) ([]dto.TaskResponse, error) {
+func (s *TaskService) List(contactID, vaultID string) ([]dto.TaskResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var tasks []models.ContactTask
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&tasks).Error; err != nil {
 		return nil, err
@@ -36,7 +39,10 @@ func (s *TaskService) List(contactID string) ([]dto.TaskResponse, error) {
 	return result, nil
 }
 
-func (s *TaskService) Create(contactID, authorID string, req dto.CreateTaskRequest) (*dto.TaskResponse, error) {
+func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.CreateTaskRequest) (*dto.TaskResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	task := models.ContactTask{
 		ContactID:   contactID,
 		AuthorID:    strPtrOrNil(authorID),
@@ -58,7 +64,10 @@ func (s *TaskService) Create(contactID, authorID string, req dto.CreateTaskReque
 	return &resp, nil
 }
 
-func (s *TaskService) Update(id uint, contactID string, req dto.UpdateTaskRequest) (*dto.TaskResponse, error) {
+func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateTaskRequest) (*dto.TaskResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var task models.ContactTask
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&task).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -76,7 +85,10 @@ func (s *TaskService) Update(id uint, contactID string, req dto.UpdateTaskReques
 	return &resp, nil
 }
 
-func (s *TaskService) ToggleCompleted(id uint, contactID string) (*dto.TaskResponse, error) {
+func (s *TaskService) ToggleCompleted(id uint, contactID, vaultID string) (*dto.TaskResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var task models.ContactTask
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&task).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -104,7 +116,10 @@ func (s *TaskService) ToggleCompleted(id uint, contactID string) (*dto.TaskRespo
 	return &resp, nil
 }
 
-func (s *TaskService) Delete(id uint, contactID string) error {
+func (s *TaskService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactTask{})
 	if result.Error != nil {
 		return result.Error
