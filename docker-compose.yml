@@ -1,8 +1,6 @@
 services:
   bonds:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/naiba/bonds:latest
     ports:
       - "8080:8080"
     volumes:

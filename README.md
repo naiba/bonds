@@ -45,21 +45,20 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 ### Option 1: Docker (Recommended)
 
 ```bash
-git clone https://github.com/naiba/bonds.git
-cd bonds
+# Download docker-compose.yml
+curl -O https://raw.githubusercontent.com/naiba/bonds/main/docker-compose.yml
+
+# Start the service
 docker compose up -d
 ```
 
 Open **http://localhost:8080** and create your account.
 
-To persist data and customize settings:
+To customize settings, edit `docker-compose.yml`:
 
 ```yaml
-# docker-compose.yml — environment section
 environment:
   - JWT_SECRET=your-secret-key-here   # ⚠️ Change this!
-  - SERVER_PORT=8080
-  - DB_DSN=/app/data/bonds.db
 ```
 
 ### Option 2: Pre-built Binary

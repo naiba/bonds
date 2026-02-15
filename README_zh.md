@@ -45,9 +45,8 @@ Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由�
 ### 方式一：Docker（推荐）
 
 ```bash
-# 克隆项目
-git clone https://github.com/naiba/bonds.git
-cd bonds
+# 下载 docker-compose.yml
+curl -O https://raw.githubusercontent.com/naiba/bonds/main/docker-compose.yml
 
 # 启动
 docker compose up -d
@@ -55,14 +54,11 @@ docker compose up -d
 
 打开 **http://localhost:8080**，注册账号即可使用。
 
-自定义配置：
+自定义配置，编辑 `docker-compose.yml`：
 
 ```yaml
-# docker-compose.yml — environment 部分
 environment:
-  - JWT_SECRET=你的密钥         # ⚠️ 生产环境务必修改！
-  - SERVER_PORT=8080
-  - DB_DSN=/app/data/bonds.db
+  - JWT_SECRET=你的密钥         # ⚠️ Change this!
 ```
 
 ### 方式二：下载预编译版本

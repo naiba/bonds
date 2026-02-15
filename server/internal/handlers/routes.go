@@ -9,6 +9,7 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/search"
 	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -137,6 +138,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	e.Use(middleware.CORS())
 
 	api := e.Group("/api")
+
+	api.GET("/announcement", func(c echo.Context) error {
+		return response.OK(c, map[string]string{"content": cfg.Announcement})
+	})
 
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)

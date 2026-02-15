@@ -19,17 +19,18 @@ func splitAndTrim(s, sep string) []string {
 }
 
 type Config struct {
-	Server    ServerConfig
-	Database  DatabaseConfig
-	JWT       JWTConfig
-	App       AppConfig
-	SMTP      SMTPConfig
-	Storage   StorageConfig
-	OAuth     OAuthConfig
-	WebAuthn  WebAuthnConfig
-	Telegram  TelegramConfig
-	Geocoding GeocodingConfig
-	Bleve     BleveConfig
+	Server       ServerConfig
+	Database     DatabaseConfig
+	JWT          JWTConfig
+	App          AppConfig
+	SMTP         SMTPConfig
+	Storage      StorageConfig
+	OAuth        OAuthConfig
+	WebAuthn     WebAuthnConfig
+	Telegram     TelegramConfig
+	Geocoding    GeocodingConfig
+	Bleve        BleveConfig
+	Announcement string
 }
 
 type ServerConfig struct {
@@ -155,6 +156,7 @@ func Load() *Config {
 		Bleve: BleveConfig{
 			IndexPath: getEnv("BLEVE_INDEX_PATH", "data/bonds.bleve"),
 		},
+		Announcement: getEnv("ANNOUNCEMENT", ""),
 	}
 }
 

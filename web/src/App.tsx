@@ -1,8 +1,9 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Spin } from "antd";
+import { Alert, Spin } from "antd";
 import { AuthProvider, ProtectedRoute } from "@/stores/auth";
 import Layout from "@/components/Layout";
+import client from "@/api/client";
 
 // Auth pages
 const Login = lazy(() => import("@/pages/auth/Login"));
@@ -57,9 +58,27 @@ function PageLoader() {
 }
 
 export default function App() {
+  const [announcement, setAnnouncement] = useState("");
+
+  useEffect(() => {
+    client
+      .get<{ data: { content: string } }>("/announcement")
+      .then((res) => setAnnouncement(res.data.data?.content ?? ""))
+      .catch(() => {});
+  }, []);
+
   return (
     <BrowserRouter>
       <AuthProvider>
+        {announcement && (
+          <Alert
+            message={announcement}
+            type="warning"
+            banner
+            closable
+            style={{ borderRadius: 0 }}
+          />
+        )}
         <Suspense fallback={<PageLoader />}>
           <Routes>
           <Route path="/login" element={<Login />} />
