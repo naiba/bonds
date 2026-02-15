@@ -18,6 +18,17 @@ func NewLifeMetricHandler(svc *services.LifeMetricService) *LifeMetricHandler {
 	return &LifeMetricHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List life metrics
+//	@Description	Return all life metrics for a vault
+//	@Tags			life-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.LifeMetricResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/lifeMetrics [get]
 func (h *LifeMetricHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	metrics, err := h.svc.List(vaultID)
@@ -27,6 +38,20 @@ func (h *LifeMetricHandler) List(c echo.Context) error {
 	return response.OK(c, metrics)
 }
 
+// Create godoc
+//
+//	@Summary		Create a life metric
+//	@Description	Create a new life metric in a vault
+//	@Tags			life-metrics
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			request		body		dto.CreateLifeMetricRequest		true	"Create life metric request"
+//	@Success		201			{object}	response.APIResponse{data=dto.LifeMetricResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/lifeMetrics [post]
 func (h *LifeMetricHandler) Create(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateLifeMetricRequest
@@ -43,6 +68,22 @@ func (h *LifeMetricHandler) Create(c echo.Context) error {
 	return response.Created(c, metric)
 }
 
+// Update godoc
+//
+//	@Summary		Update a life metric
+//	@Description	Update a life metric by ID
+//	@Tags			life-metrics
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			id			path		integer							true	"Life Metric ID"
+//	@Param			request		body		dto.UpdateLifeMetricRequest		true	"Update life metric request"
+//	@Success		200			{object}	response.APIResponse{data=dto.LifeMetricResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/lifeMetrics/{id} [put]
 func (h *LifeMetricHandler) Update(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -66,6 +107,20 @@ func (h *LifeMetricHandler) Update(c echo.Context) error {
 	return response.OK(c, metric)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a life metric
+//	@Description	Delete a life metric by ID
+//	@Tags			life-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Life Metric ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/lifeMetrics/{id} [delete]
 func (h *LifeMetricHandler) Delete(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -81,6 +136,22 @@ func (h *LifeMetricHandler) Delete(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// AddContact godoc
+//
+//	@Summary		Add contact to life metric
+//	@Description	Associate a contact with a life metric
+//	@Tags			life-metrics
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string								true	"Vault ID"
+//	@Param			id			path		integer								true	"Life Metric ID"
+//	@Param			request		body		dto.AddLifeMetricContactRequest		true	"Add contact request"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/lifeMetrics/{id}/contacts [post]
 func (h *LifeMetricHandler) AddContact(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

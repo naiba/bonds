@@ -5,10 +5,13 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
+
+var _ dto.AuthResponse
 
 type WebAuthnHandler struct {
 	webauthnService *services.WebAuthnService
@@ -19,6 +22,17 @@ func NewWebAuthnHandler(webauthnService *services.WebAuthnService, authService *
 	return &WebAuthnHandler{webauthnService: webauthnService, authService: authService}
 }
 
+// BeginRegistration godoc
+//
+//	@Summary		Begin WebAuthn registration
+//	@Description	Start WebAuthn credential registration ceremony
+//	@Tags			webauthn
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/webauthn/register/begin [post]
 func (h *WebAuthnHandler) BeginRegistration(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -33,6 +47,19 @@ func (h *WebAuthnHandler) BeginRegistration(c echo.Context) error {
 	return response.OK(c, options)
 }
 
+// FinishRegistration godoc
+//
+//	@Summary		Finish WebAuthn registration
+//	@Description	Complete WebAuthn credential registration ceremony
+//	@Tags			webauthn
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		201	{object}	response.APIResponse
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/webauthn/register/finish [post]
 func (h *WebAuthnHandler) FinishRegistration(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -49,6 +76,19 @@ func (h *WebAuthnHandler) FinishRegistration(c echo.Context) error {
 	return response.Created(c, map[string]string{"status": "ok"})
 }
 
+// BeginLogin godoc
+//
+//	@Summary		Begin WebAuthn login
+//	@Description	Start WebAuthn login ceremony
+//	@Tags			webauthn
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	response.APIResponse
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		422	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/auth/webauthn/login/begin [post]
 func (h *WebAuthnHandler) BeginLogin(c echo.Context) error {
 	var req struct {
 		Email string `json:"email" validate:"required,email"`
@@ -74,6 +114,20 @@ func (h *WebAuthnHandler) BeginLogin(c echo.Context) error {
 	return response.OK(c, options)
 }
 
+// FinishLogin godoc
+//
+//	@Summary		Finish WebAuthn login
+//	@Description	Complete WebAuthn login ceremony and return JWT
+//	@Tags			webauthn
+//	@Accept			json
+//	@Produce		json
+//	@Param			email	query	string	false	"User email"
+//	@Success		200		{object}	response.APIResponse{data=dto.AuthResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/auth/webauthn/login/finish [post]
 func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
 	var req struct {
 		Email string `json:"email"`
@@ -110,6 +164,17 @@ func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
 	return response.OK(c, authResp)
 }
 
+// ListCredentials godoc
+//
+//	@Summary		List WebAuthn credentials
+//	@Description	Return all WebAuthn credentials for the current user
+//	@Tags			webauthn
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=[]dto.WebAuthnCredentialResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/webauthn/credentials [get]
 func (h *WebAuthnHandler) ListCredentials(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -124,6 +189,19 @@ func (h *WebAuthnHandler) ListCredentials(c echo.Context) error {
 	return response.OK(c, creds)
 }
 
+// DeleteCredential godoc
+//
+//	@Summary		Delete a WebAuthn credential
+//	@Description	Delete a WebAuthn credential by ID
+//	@Tags			webauthn
+//	@Security		BearerAuth
+//	@Param			id	path	integer	true	"Credential ID"
+//	@Success		204	"No Content"
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/webauthn/credentials/{id} [delete]
 func (h *WebAuthnHandler) DeleteCredential(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {

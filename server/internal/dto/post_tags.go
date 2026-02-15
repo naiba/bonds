@@ -1,16 +1,16 @@
 package dto
 
 type AddPostTagRequest struct {
-	TagID uint   `json:"tag_id"`
-	Name  string `json:"name"`
+	TagID uint   `json:"tag_id" example:"1"`
+	Name  string `json:"name" example:"Travel"`
 }
 
 type UpdatePostTagRequest struct {
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name" validate:"required" example:"Travel"`
 }
 
 type PostTagResponse struct {
-	ID   uint   `json:"id"`
-	Name string `json:"name"`
-	Slug string `json:"slug"`
+	ID   uint   `json:"id" example:"1"`
+	Name string `json:"name" example:"Travel"`
+	Slug string `json:"slug" example:"travel"`
 }

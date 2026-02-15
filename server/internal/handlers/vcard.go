@@ -7,8 +7,11 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
 )
+
+var _ dto.VCardImportResponse
 
 type VCardHandler struct {
 	vcardService *services.VCardService
@@ -18,6 +21,19 @@ func NewVCardHandler(vcardService *services.VCardService) *VCardHandler {
 	return &VCardHandler{vcardService: vcardService}
 }
 
+// ExportContact godoc
+//
+//	@Summary		Export contact as vCard
+//	@Description	Export a single contact as vCard 4.0 format
+//	@Tags			vcard
+//	@Produce		octet-stream
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{file}		file
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/vcard [get]
 func (h *VCardHandler) ExportContact(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	contactID := c.Param("contact_id")
@@ -35,6 +51,17 @@ func (h *VCardHandler) ExportContact(c echo.Context) error {
 	return c.Blob(http.StatusOK, "text/vcard", data)
 }
 
+// ExportVault godoc
+//
+//	@Summary		Export all contacts as vCard
+//	@Description	Export all contacts in a vault as vCard 4.0 format
+//	@Tags			vcard
+//	@Produce		octet-stream
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{file}		file
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/export [get]
 func (h *VCardHandler) ExportVault(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 
@@ -48,6 +75,20 @@ func (h *VCardHandler) ExportVault(c echo.Context) error {
 	return c.Blob(http.StatusOK, "text/vcard", data)
 }
 
+// ImportVCard godoc
+//
+//	@Summary		Import contacts from vCard
+//	@Description	Import contacts from a .vcf file
+//	@Tags			vcard
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			file		formData	file	true	"vCard file (.vcf)"
+//	@Success		201			{object}	response.APIResponse{data=dto.VCardImportResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/import [post]
 func (h *VCardHandler) ImportVCard(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	userID := middleware.GetUserID(c)

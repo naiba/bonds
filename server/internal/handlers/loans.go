@@ -18,6 +18,20 @@ func NewLoanHandler(loanService *services.LoanService) *LoanHandler {
 	return &LoanHandler{loanService: loanService}
 }
 
+// List godoc
+//
+//	@Summary		List loans for a contact
+//	@Description	Return all loans belonging to a contact
+//	@Tags			loans
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.LoanResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/loans [get]
 func (h *LoanHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -31,6 +45,24 @@ func (h *LoanHandler) List(c echo.Context) error {
 	return response.OK(c, loans)
 }
 
+// Create godoc
+//
+//	@Summary		Create a loan
+//	@Description	Create a new loan for a contact
+//	@Tags			loans
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			request		body		dto.CreateLoanRequest	true	"Loan details"
+//	@Success		201			{object}	response.APIResponse{data=dto.LoanResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/loans [post]
 func (h *LoanHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -53,6 +85,25 @@ func (h *LoanHandler) Create(c echo.Context) error {
 	return response.Created(c, loan)
 }
 
+// Update godoc
+//
+//	@Summary		Update a loan
+//	@Description	Update an existing loan
+//	@Tags			loans
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			id			path		integer					true	"Loan ID"
+//	@Param			request		body		dto.UpdateLoanRequest	true	"Loan details"
+//	@Success		200			{object}	response.APIResponse{data=dto.LoanResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/loans/{id} [put]
 func (h *LoanHandler) Update(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -78,6 +129,22 @@ func (h *LoanHandler) Update(c echo.Context) error {
 	return response.OK(c, loan)
 }
 
+// ToggleSettled godoc
+//
+//	@Summary		Toggle loan settled status
+//	@Description	Toggle whether a loan is settled or not
+//	@Tags			loans
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Loan ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.LoanResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/loans/{id}/toggle [put]
 func (h *LoanHandler) ToggleSettled(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -95,6 +162,22 @@ func (h *LoanHandler) ToggleSettled(c echo.Context) error {
 	return response.OK(c, loan)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a loan
+//	@Description	Delete a loan
+//	@Tags			loans
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Loan ID"
+//	@Success		204			{object}	nil
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/loans/{id} [delete]
 func (h *LoanHandler) Delete(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

@@ -19,10 +19,27 @@ import (
 	appMiddleware "github.com/naiba/bonds/internal/middleware"
 )
 
+//	@title			Bonds API
+//	@version		1.0
+//	@description	Personal relationship manager RESTful API.
+
+//	@contact.name	Bonds Team
+//	@contact.url	https://github.com/naiba/bonds
+
+//	@license.name	AGPL-3.0
+//	@license.url	https://www.gnu.org/licenses/agpl-3.0.html
+
+//	@BasePath	/api
+
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				JWT Bearer token. Format: "Bearer {token}"
+
 func main() {
 	cfg := config.Load()
 
-	db, err := database.Connect(&cfg.Database)
+	db, err := database.Connect(&cfg.Database, cfg.Debug)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -37,7 +54,9 @@ func main() {
 	e := echo.New()
 	e.HideBanner = true
 
-	e.Use(echoMiddleware.Logger())
+	if cfg.Debug {
+		e.Use(echoMiddleware.Logger())
+	}
 	e.Use(echoMiddleware.Recover())
 	e.Use(appMiddleware.Locale())
 

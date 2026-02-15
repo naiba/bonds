@@ -18,6 +18,17 @@ func NewGroupHandler(groupService *services.GroupService) *GroupHandler {
 	return &GroupHandler{groupService: groupService}
 }
 
+// List godoc
+//
+//	@Summary		List groups
+//	@Description	Return all groups for a vault
+//	@Tags			groups
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.GroupResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/groups [get]
 func (h *GroupHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	groups, err := h.groupService.List(vaultID)
@@ -27,6 +38,20 @@ func (h *GroupHandler) List(c echo.Context) error {
 	return response.OK(c, groups)
 }
 
+// Get godoc
+//
+//	@Summary		Get a group
+//	@Description	Return a single group by ID
+//	@Tags			groups
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			id			path		integer	true	"Group ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.GroupResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/groups/{id} [get]
 func (h *GroupHandler) Get(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -43,6 +68,21 @@ func (h *GroupHandler) Get(c echo.Context) error {
 	return response.OK(c, group)
 }
 
+// AddContactToGroup godoc
+//
+//	@Summary		Add contact to group
+//	@Description	Add a contact to a group
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			contact_id	path		string						true	"Contact ID"
+//	@Param			request		body		dto.AddContactToGroupRequest	true	"Add contact to group request"
+//	@Success		201			{object}	response.APIResponse
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/groups [post]
 func (h *GroupHandler) AddContactToGroup(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	var req dto.AddContactToGroupRequest
@@ -55,6 +95,20 @@ func (h *GroupHandler) AddContactToGroup(c echo.Context) error {
 	return response.Created(c, map[string]string{"status": "ok"})
 }
 
+// RemoveContactFromGroup godoc
+//
+//	@Summary		Remove contact from group
+//	@Description	Remove a contact from a group
+//	@Tags			groups
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Param			id			path	integer	true	"Group ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/groups/{id} [delete]
 func (h *GroupHandler) RemoveContactFromGroup(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -67,6 +121,22 @@ func (h *GroupHandler) RemoveContactFromGroup(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// Update godoc
+//
+//	@Summary		Update a group
+//	@Description	Update a group by ID
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			id			path		integer					true	"Group ID"
+//	@Param			request		body		dto.UpdateGroupRequest	true	"Update group request"
+//	@Success		200			{object}	response.APIResponse{data=dto.GroupResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/groups/{id} [put]
 func (h *GroupHandler) Update(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -90,6 +160,20 @@ func (h *GroupHandler) Update(c echo.Context) error {
 	return response.OK(c, group)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a group
+//	@Description	Delete a group by ID
+//	@Tags			groups
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Group ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/groups/{id} [delete]
 func (h *GroupHandler) Delete(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

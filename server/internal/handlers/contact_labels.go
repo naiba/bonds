@@ -18,6 +18,20 @@ func NewContactLabelHandler(contactLabelService *services.ContactLabelService) *
 	return &ContactLabelHandler{contactLabelService: contactLabelService}
 }
 
+// List godoc
+//
+//	@Summary		List contact labels
+//	@Description	Return all labels assigned to a contact
+//	@Tags			contact-labels
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ContactLabelResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/labels [get]
 func (h *ContactLabelHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -32,6 +46,24 @@ func (h *ContactLabelHandler) List(c echo.Context) error {
 	return response.OK(c, labels)
 }
 
+// Add godoc
+//
+//	@Summary		Add a label to a contact
+//	@Description	Assign a label to a contact
+//	@Tags			contact-labels
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			contact_id	path		string						true	"Contact ID"
+//	@Param			request		body		dto.AddContactLabelRequest	true	"Label details"
+//	@Success		201			{object}	response.APIResponse{data=dto.ContactLabelResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/labels [post]
 func (h *ContactLabelHandler) Add(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -57,6 +89,25 @@ func (h *ContactLabelHandler) Add(c echo.Context) error {
 	return response.Created(c, label)
 }
 
+// Update godoc
+//
+//	@Summary		Update a contact label
+//	@Description	Update a label assignment on a contact
+//	@Tags			contact-labels
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			contact_id	path		string							true	"Contact ID"
+//	@Param			id			path		integer							true	"Contact Label ID"
+//	@Param			request		body		dto.UpdateContactLabelRequest	true	"Label details"
+//	@Success		200			{object}	response.APIResponse{data=dto.ContactLabelResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/labels/{id} [put]
 func (h *ContactLabelHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -89,6 +140,21 @@ func (h *ContactLabelHandler) Update(c echo.Context) error {
 	return response.OK(c, label)
 }
 
+// Remove godoc
+//
+//	@Summary		Remove a label from a contact
+//	@Description	Remove a label assignment from a contact
+//	@Tags			contact-labels
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Param			id			path	integer	true	"Contact Label ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/labels/{id} [delete]
 func (h *ContactLabelHandler) Remove(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

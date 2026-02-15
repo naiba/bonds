@@ -10,6 +10,23 @@ import (
 	"github.com/naiba/bonds/pkg/response"
 )
 
+// GetMapImage godoc
+//
+//	@Summary		Get map image for an address
+//	@Description	Redirect to a static map image URL for the given address
+//	@Tags			addresses
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Address ID"
+//	@Param			width		path		integer	true	"Image width"
+//	@Param			height		path		integer	true	"Image height"
+//	@Success		307			{object}	nil
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/addresses/{id}/image/{width}/{height} [get]
 func (h *AddressHandler) GetMapImage(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	contactID := c.Param("contact_id")

@@ -18,6 +18,20 @@ func NewContactInformationHandler(contactInformationService *services.ContactInf
 	return &ContactInformationHandler{contactInformationService: contactInformationService}
 }
 
+// List godoc
+//
+//	@Summary		List contact information
+//	@Description	Return all contact information entries for a contact
+//	@Tags			contact-information
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ContactInformationResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/contactInformation [get]
 func (h *ContactInformationHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -31,6 +45,24 @@ func (h *ContactInformationHandler) List(c echo.Context) error {
 	return response.OK(c, items)
 }
 
+// Create godoc
+//
+//	@Summary		Create contact information
+//	@Description	Create a new contact information entry for a contact
+//	@Tags			contact-information
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			contact_id	path		string									true	"Contact ID"
+//	@Param			request		body		dto.CreateContactInformationRequest		true	"Contact information details"
+//	@Success		201			{object}	response.APIResponse{data=dto.ContactInformationResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/contactInformation [post]
 func (h *ContactInformationHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -53,6 +85,25 @@ func (h *ContactInformationHandler) Create(c echo.Context) error {
 	return response.Created(c, item)
 }
 
+// Update godoc
+//
+//	@Summary		Update contact information
+//	@Description	Update an existing contact information entry
+//	@Tags			contact-information
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			contact_id	path		string									true	"Contact ID"
+//	@Param			id			path		integer									true	"Contact Information ID"
+//	@Param			request		body		dto.UpdateContactInformationRequest		true	"Contact information details"
+//	@Success		200			{object}	response.APIResponse{data=dto.ContactInformationResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/contactInformation/{id} [put]
 func (h *ContactInformationHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -82,6 +133,22 @@ func (h *ContactInformationHandler) Update(c echo.Context) error {
 	return response.OK(c, item)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete contact information
+//	@Description	Delete a contact information entry
+//	@Tags			contact-information
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Contact Information ID"
+//	@Success		204			{object}	nil
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/contactInformation/{id} [delete]
 func (h *ContactInformationHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

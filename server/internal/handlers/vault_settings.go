@@ -44,6 +44,19 @@ func NewVaultSettingsHandler(
 	}
 }
 
+// Get godoc
+//
+//	@Summary		Get vault settings
+//	@Description	Return settings for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultSettingsResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings [get]
 func (h *VaultSettingsHandler) Get(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	settings, err := h.settingsService.Get(vaultID)
@@ -56,6 +69,23 @@ func (h *VaultSettingsHandler) Get(c echo.Context) error {
 	return response.OK(c, settings)
 }
 
+// Update godoc
+//
+//	@Summary		Update vault settings
+//	@Description	Update name and description for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string								true	"Vault ID"
+//	@Param			request		body		dto.UpdateVaultSettingsRequest	true	"Settings"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultSettingsResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings [put]
 func (h *VaultSettingsHandler) Update(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.UpdateVaultSettingsRequest
@@ -75,6 +105,21 @@ func (h *VaultSettingsHandler) Update(c echo.Context) error {
 	return response.OK(c, settings)
 }
 
+// UpdateVisibility godoc
+//
+//	@Summary		Update tab visibility
+//	@Description	Update tab visibility settings for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string								true	"Vault ID"
+//	@Param			request		body		dto.UpdateTabVisibilityRequest	true	"Visibility settings"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultSettingsResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/visibility [put]
 func (h *VaultSettingsHandler) UpdateVisibility(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.UpdateTabVisibilityRequest
@@ -88,6 +133,21 @@ func (h *VaultSettingsHandler) UpdateVisibility(c echo.Context) error {
 	return response.OK(c, settings)
 }
 
+// UpdateTemplate godoc
+//
+//	@Summary		Update default template
+//	@Description	Update the default template for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string								true	"Vault ID"
+//	@Param			request		body		dto.UpdateDefaultTemplateRequest	true	"Template ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultSettingsResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/template [put]
 func (h *VaultSettingsHandler) UpdateTemplate(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.UpdateDefaultTemplateRequest
@@ -101,6 +161,18 @@ func (h *VaultSettingsHandler) UpdateTemplate(c echo.Context) error {
 	return response.OK(c, settings)
 }
 
+// ListUsers godoc
+//
+//	@Summary		List vault users
+//	@Description	Return all users with access to a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultUserResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/users [get]
 func (h *VaultSettingsHandler) ListUsers(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	users, err := h.usersService.List(vaultID)
@@ -110,6 +182,23 @@ func (h *VaultSettingsHandler) ListUsers(c echo.Context) error {
 	return response.OK(c, users)
 }
 
+// AddUser godoc
+//
+//	@Summary		Add a user to a vault
+//	@Description	Add a user to a vault by email
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			request		body		dto.AddVaultUserRequest	true	"User details"
+//	@Success		201			{object}	response.APIResponse{data=dto.VaultUserResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/users [post]
 func (h *VaultSettingsHandler) AddUser(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.AddVaultUserRequest
@@ -132,6 +221,24 @@ func (h *VaultSettingsHandler) AddUser(c echo.Context) error {
 	return response.Created(c, user)
 }
 
+// UpdateUserPermission godoc
+//
+//	@Summary		Update vault user permission
+//	@Description	Update a user's permission level in a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string								true	"Vault ID"
+//	@Param			id			path		integer								true	"Vault User ID"
+//	@Param			request		body		dto.UpdateVaultUserPermRequest	true	"Permission"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultUserResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/users/{id} [put]
 func (h *VaultSettingsHandler) UpdateUserPermission(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -155,6 +262,20 @@ func (h *VaultSettingsHandler) UpdateUserPermission(c echo.Context) error {
 	return response.OK(c, user)
 }
 
+// RemoveUser godoc
+//
+//	@Summary		Remove a user from a vault
+//	@Description	Remove a user's access to a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Vault User ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/users/{id} [delete]
 func (h *VaultSettingsHandler) RemoveUser(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	userID := middleware.GetUserID(c)
@@ -174,6 +295,18 @@ func (h *VaultSettingsHandler) RemoveUser(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListLabels godoc
+//
+//	@Summary		List vault labels
+//	@Description	Return all labels for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.LabelResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/labels [get]
 func (h *VaultSettingsHandler) ListLabels(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	labels, err := h.labelService.List(vaultID)
@@ -183,6 +316,22 @@ func (h *VaultSettingsHandler) ListLabels(c echo.Context) error {
 	return response.OK(c, labels)
 }
 
+// CreateLabel godoc
+//
+//	@Summary		Create a vault label
+//	@Description	Create a new label for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			request		body		dto.CreateLabelRequest	true	"Label details"
+//	@Success		201			{object}	response.APIResponse{data=dto.LabelResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/labels [post]
 func (h *VaultSettingsHandler) CreateLabel(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateLabelRequest
@@ -199,6 +348,24 @@ func (h *VaultSettingsHandler) CreateLabel(c echo.Context) error {
 	return response.Created(c, label)
 }
 
+// UpdateLabel godoc
+//
+//	@Summary		Update a vault label
+//	@Description	Update an existing vault label
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			id			path		integer						true	"Label ID"
+//	@Param			request		body		dto.UpdateLabelRequest	true	"Label details"
+//	@Success		200			{object}	response.APIResponse{data=dto.LabelResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/labels/{id} [put]
 func (h *VaultSettingsHandler) UpdateLabel(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -222,6 +389,19 @@ func (h *VaultSettingsHandler) UpdateLabel(c echo.Context) error {
 	return response.OK(c, label)
 }
 
+// DeleteLabel godoc
+//
+//	@Summary		Delete a vault label
+//	@Description	Delete a label from a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Label ID"
+//	@Success		204			"No Content"
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/labels/{id} [delete]
 func (h *VaultSettingsHandler) DeleteLabel(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -237,6 +417,18 @@ func (h *VaultSettingsHandler) DeleteLabel(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListTags godoc
+//
+//	@Summary		List vault tags
+//	@Description	Return all tags for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.TagResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/tags [get]
 func (h *VaultSettingsHandler) ListTags(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	tags, err := h.tagService.List(vaultID)
@@ -246,6 +438,22 @@ func (h *VaultSettingsHandler) ListTags(c echo.Context) error {
 	return response.OK(c, tags)
 }
 
+// CreateTag godoc
+//
+//	@Summary		Create a vault tag
+//	@Description	Create a new tag for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			request		body		dto.CreateTagRequest	true	"Tag details"
+//	@Success		201			{object}	response.APIResponse{data=dto.TagResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/tags [post]
 func (h *VaultSettingsHandler) CreateTag(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateTagRequest
@@ -262,6 +470,24 @@ func (h *VaultSettingsHandler) CreateTag(c echo.Context) error {
 	return response.Created(c, tag)
 }
 
+// UpdateTag godoc
+//
+//	@Summary		Update a vault tag
+//	@Description	Update an existing vault tag
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			id			path		integer					true	"Tag ID"
+//	@Param			request		body		dto.UpdateTagRequest	true	"Tag details"
+//	@Success		200			{object}	response.APIResponse{data=dto.TagResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/tags/{id} [put]
 func (h *VaultSettingsHandler) UpdateTag(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -285,6 +511,19 @@ func (h *VaultSettingsHandler) UpdateTag(c echo.Context) error {
 	return response.OK(c, tag)
 }
 
+// DeleteTag godoc
+//
+//	@Summary		Delete a vault tag
+//	@Description	Delete a tag from a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Tag ID"
+//	@Success		204			"No Content"
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/tags/{id} [delete]
 func (h *VaultSettingsHandler) DeleteTag(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -300,6 +539,18 @@ func (h *VaultSettingsHandler) DeleteTag(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListDateTypes godoc
+//
+//	@Summary		List important date types
+//	@Description	Return all important date types for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ImportantDateTypeResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/dateTypes [get]
 func (h *VaultSettingsHandler) ListDateTypes(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	types, err := h.dateTypeService.List(vaultID)
@@ -309,6 +560,22 @@ func (h *VaultSettingsHandler) ListDateTypes(c echo.Context) error {
 	return response.OK(c, types)
 }
 
+// CreateDateType godoc
+//
+//	@Summary		Create an important date type
+//	@Description	Create a new important date type for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			request		body		dto.CreateImportantDateTypeRequest	true	"Date type details"
+//	@Success		201			{object}	response.APIResponse{data=dto.ImportantDateTypeResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/dateTypes [post]
 func (h *VaultSettingsHandler) CreateDateType(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateImportantDateTypeRequest
@@ -325,6 +592,24 @@ func (h *VaultSettingsHandler) CreateDateType(c echo.Context) error {
 	return response.Created(c, dt)
 }
 
+// UpdateDateType godoc
+//
+//	@Summary		Update an important date type
+//	@Description	Update an existing important date type
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			id			path		integer									true	"Date Type ID"
+//	@Param			request		body		dto.UpdateImportantDateTypeRequest	true	"Date type details"
+//	@Success		200			{object}	response.APIResponse{data=dto.ImportantDateTypeResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/dateTypes/{id} [put]
 func (h *VaultSettingsHandler) UpdateDateType(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -348,6 +633,20 @@ func (h *VaultSettingsHandler) UpdateDateType(c echo.Context) error {
 	return response.OK(c, dt)
 }
 
+// DeleteDateType godoc
+//
+//	@Summary		Delete an important date type
+//	@Description	Delete an important date type from a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Date Type ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/dateTypes/{id} [delete]
 func (h *VaultSettingsHandler) DeleteDateType(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -366,6 +665,18 @@ func (h *VaultSettingsHandler) DeleteDateType(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListMoodParams godoc
+//
+//	@Summary		List mood tracking parameters
+//	@Description	Return all mood tracking parameters for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.MoodTrackingParameterResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/moodParams [get]
 func (h *VaultSettingsHandler) ListMoodParams(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	params, err := h.moodService.List(vaultID)
@@ -375,6 +686,22 @@ func (h *VaultSettingsHandler) ListMoodParams(c echo.Context) error {
 	return response.OK(c, params)
 }
 
+// CreateMoodParam godoc
+//
+//	@Summary		Create a mood tracking parameter
+//	@Description	Create a new mood tracking parameter for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string										true	"Vault ID"
+//	@Param			request		body		dto.CreateMoodTrackingParameterRequest	true	"Parameter details"
+//	@Success		201			{object}	response.APIResponse{data=dto.MoodTrackingParameterResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/moodParams [post]
 func (h *VaultSettingsHandler) CreateMoodParam(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateMoodTrackingParameterRequest
@@ -391,6 +718,24 @@ func (h *VaultSettingsHandler) CreateMoodParam(c echo.Context) error {
 	return response.Created(c, param)
 }
 
+// UpdateMoodParam godoc
+//
+//	@Summary		Update a mood tracking parameter
+//	@Description	Update an existing mood tracking parameter
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string										true	"Vault ID"
+//	@Param			id			path		integer										true	"Parameter ID"
+//	@Param			request		body		dto.UpdateMoodTrackingParameterRequest	true	"Parameter details"
+//	@Success		200			{object}	response.APIResponse{data=dto.MoodTrackingParameterResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/moodParams/{id} [put]
 func (h *VaultSettingsHandler) UpdateMoodParam(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -414,6 +759,23 @@ func (h *VaultSettingsHandler) UpdateMoodParam(c echo.Context) error {
 	return response.OK(c, param)
 }
 
+// UpdateMoodParamOrder godoc
+//
+//	@Summary		Update mood parameter position
+//	@Description	Update the position of a mood tracking parameter
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			id			path		integer						true	"Parameter ID"
+//	@Param			request		body		dto.UpdatePositionRequest	true	"Position"
+//	@Success		200			{object}	response.APIResponse{data=dto.MoodTrackingParameterResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/moodParams/{id}/position [post]
 func (h *VaultSettingsHandler) UpdateMoodParamOrder(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -434,6 +796,19 @@ func (h *VaultSettingsHandler) UpdateMoodParamOrder(c echo.Context) error {
 	return response.OK(c, param)
 }
 
+// DeleteMoodParam godoc
+//
+//	@Summary		Delete a mood tracking parameter
+//	@Description	Delete a mood tracking parameter from a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Parameter ID"
+//	@Success		204			"No Content"
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/moodParams/{id} [delete]
 func (h *VaultSettingsHandler) DeleteMoodParam(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -449,6 +824,18 @@ func (h *VaultSettingsHandler) DeleteMoodParam(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListLifeEventCategories godoc
+//
+//	@Summary		List life event categories
+//	@Description	Return all life event categories for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.LifeEventCategoryResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories [get]
 func (h *VaultSettingsHandler) ListLifeEventCategories(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	cats, err := h.lifeEventSvc.ListCategories(vaultID)
@@ -458,6 +845,22 @@ func (h *VaultSettingsHandler) ListLifeEventCategories(c echo.Context) error {
 	return response.OK(c, cats)
 }
 
+// CreateLifeEventCategory godoc
+//
+//	@Summary		Create a life event category
+//	@Description	Create a new life event category for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			request		body		dto.CreateLifeEventCategoryRequest	true	"Category details"
+//	@Success		201			{object}	response.APIResponse{data=dto.LifeEventCategoryResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories [post]
 func (h *VaultSettingsHandler) CreateLifeEventCategory(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateLifeEventCategoryRequest
@@ -474,6 +877,24 @@ func (h *VaultSettingsHandler) CreateLifeEventCategory(c echo.Context) error {
 	return response.Created(c, cat)
 }
 
+// UpdateLifeEventCategory godoc
+//
+//	@Summary		Update a life event category
+//	@Description	Update an existing life event category
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			id			path		integer									true	"Category ID"
+//	@Param			request		body		dto.UpdateLifeEventCategoryRequest	true	"Category details"
+//	@Success		200			{object}	response.APIResponse{data=dto.LifeEventCategoryResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{id} [put]
 func (h *VaultSettingsHandler) UpdateLifeEventCategory(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -497,6 +918,23 @@ func (h *VaultSettingsHandler) UpdateLifeEventCategory(c echo.Context) error {
 	return response.OK(c, cat)
 }
 
+// UpdateLifeEventCategoryOrder godoc
+//
+//	@Summary		Update life event category position
+//	@Description	Update the position of a life event category
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			id			path		integer						true	"Category ID"
+//	@Param			request		body		dto.UpdatePositionRequest	true	"Position"
+//	@Success		200			{object}	response.APIResponse{data=dto.LifeEventCategoryResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{id}/position [post]
 func (h *VaultSettingsHandler) UpdateLifeEventCategoryOrder(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -517,6 +955,20 @@ func (h *VaultSettingsHandler) UpdateLifeEventCategoryOrder(c echo.Context) erro
 	return response.OK(c, cat)
 }
 
+// DeleteLifeEventCategory godoc
+//
+//	@Summary		Delete a life event category
+//	@Description	Delete a life event category from a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Category ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{id} [delete]
 func (h *VaultSettingsHandler) DeleteLifeEventCategory(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -535,6 +987,24 @@ func (h *VaultSettingsHandler) DeleteLifeEventCategory(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// CreateLifeEventType godoc
+//
+//	@Summary		Create a life event type
+//	@Description	Create a new life event type under a category
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id		path		string							true	"Vault ID"
+//	@Param			categoryId	path		integer							true	"Category ID"
+//	@Param			request			body		dto.CreateLifeEventTypeRequest	true	"Type details"
+//	@Success		201				{object}	response.APIResponse{data=dto.LifeEventTypeResponse}
+//	@Failure		400				{object}	response.APIResponse
+//	@Failure		401				{object}	response.APIResponse
+//	@Failure		404				{object}	response.APIResponse
+//	@Failure		422				{object}	response.APIResponse
+//	@Failure		500				{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{categoryId}/types [post]
 func (h *VaultSettingsHandler) CreateLifeEventType(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	categoryID, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)
@@ -558,6 +1028,25 @@ func (h *VaultSettingsHandler) CreateLifeEventType(c echo.Context) error {
 	return response.Created(c, lt)
 }
 
+// UpdateLifeEventType godoc
+//
+//	@Summary		Update a life event type
+//	@Description	Update an existing life event type
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id		path		string							true	"Vault ID"
+//	@Param			categoryId	path		integer							true	"Category ID"
+//	@Param			typeId		path		integer							true	"Type ID"
+//	@Param			request			body		dto.UpdateLifeEventTypeRequest	true	"Type details"
+//	@Success		200				{object}	response.APIResponse{data=dto.LifeEventTypeResponse}
+//	@Failure		400				{object}	response.APIResponse
+//	@Failure		401				{object}	response.APIResponse
+//	@Failure		404				{object}	response.APIResponse
+//	@Failure		422				{object}	response.APIResponse
+//	@Failure		500				{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{categoryId}/types/{typeId} [put]
 func (h *VaultSettingsHandler) UpdateLifeEventType(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	categoryID, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)
@@ -588,6 +1077,24 @@ func (h *VaultSettingsHandler) UpdateLifeEventType(c echo.Context) error {
 	return response.OK(c, lt)
 }
 
+// UpdateLifeEventTypeOrder godoc
+//
+//	@Summary		Update life event type position
+//	@Description	Update the position of a life event type
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id		path		string						true	"Vault ID"
+//	@Param			categoryId	path		integer						true	"Category ID"
+//	@Param			typeId		path		integer						true	"Type ID"
+//	@Param			request			body		dto.UpdatePositionRequest	true	"Position"
+//	@Success		200				{object}	response.APIResponse{data=dto.LifeEventTypeResponse}
+//	@Failure		400				{object}	response.APIResponse
+//	@Failure		401				{object}	response.APIResponse
+//	@Failure		404				{object}	response.APIResponse
+//	@Failure		500				{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{categoryId}/types/{typeId}/position [post]
 func (h *VaultSettingsHandler) UpdateLifeEventTypeOrder(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	categoryID, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)
@@ -615,6 +1122,21 @@ func (h *VaultSettingsHandler) UpdateLifeEventTypeOrder(c echo.Context) error {
 	return response.OK(c, lt)
 }
 
+// DeleteLifeEventType godoc
+//
+//	@Summary		Delete a life event type
+//	@Description	Delete a life event type from a category
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id		path	string	true	"Vault ID"
+//	@Param			categoryId	path	integer	true	"Category ID"
+//	@Param			typeId		path	integer	true	"Type ID"
+//	@Success		204				"No Content"
+//	@Failure		400				{object}	response.APIResponse
+//	@Failure		401				{object}	response.APIResponse
+//	@Failure		404				{object}	response.APIResponse
+//	@Failure		500				{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{categoryId}/types/{typeId} [delete]
 func (h *VaultSettingsHandler) DeleteLifeEventType(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	categoryID, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)
@@ -640,6 +1162,18 @@ func (h *VaultSettingsHandler) DeleteLifeEventType(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListQuickFactTemplates godoc
+//
+//	@Summary		List quick fact templates
+//	@Description	Return all quick fact templates for a vault
+//	@Tags			vault-settings
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.QuickFactTemplateResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/quickFactTemplates [get]
 func (h *VaultSettingsHandler) ListQuickFactTemplates(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	tpls, err := h.quickFactSvc.List(vaultID)
@@ -649,6 +1183,22 @@ func (h *VaultSettingsHandler) ListQuickFactTemplates(c echo.Context) error {
 	return response.OK(c, tpls)
 }
 
+// CreateQuickFactTemplate godoc
+//
+//	@Summary		Create a quick fact template
+//	@Description	Create a new quick fact template for a vault
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			request		body		dto.CreateQuickFactTemplateRequest	true	"Template details"
+//	@Success		201			{object}	response.APIResponse{data=dto.QuickFactTemplateResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/quickFactTemplates [post]
 func (h *VaultSettingsHandler) CreateQuickFactTemplate(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	var req dto.CreateQuickFactTemplateRequest
@@ -665,6 +1215,24 @@ func (h *VaultSettingsHandler) CreateQuickFactTemplate(c echo.Context) error {
 	return response.Created(c, tpl)
 }
 
+// UpdateQuickFactTemplate godoc
+//
+//	@Summary		Update a quick fact template
+//	@Description	Update an existing quick fact template
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string									true	"Vault ID"
+//	@Param			id			path		integer									true	"Template ID"
+//	@Param			request		body		dto.UpdateQuickFactTemplateRequest	true	"Template details"
+//	@Success		200			{object}	response.APIResponse{data=dto.QuickFactTemplateResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/quickFactTemplates/{id} [put]
 func (h *VaultSettingsHandler) UpdateQuickFactTemplate(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -688,6 +1256,23 @@ func (h *VaultSettingsHandler) UpdateQuickFactTemplate(c echo.Context) error {
 	return response.OK(c, tpl)
 }
 
+// UpdateQuickFactTemplateOrder godoc
+//
+//	@Summary		Update quick fact template position
+//	@Description	Update the position of a quick fact template
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			id			path		integer						true	"Template ID"
+//	@Param			request		body		dto.UpdatePositionRequest	true	"Position"
+//	@Success		200			{object}	response.APIResponse{data=dto.QuickFactTemplateResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/quickFactTemplates/{id}/position [post]
 func (h *VaultSettingsHandler) UpdateQuickFactTemplateOrder(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -708,6 +1293,19 @@ func (h *VaultSettingsHandler) UpdateQuickFactTemplateOrder(c echo.Context) erro
 	return response.OK(c, tpl)
 }
 
+// DeleteQuickFactTemplate godoc
+//
+//	@Summary		Delete a quick fact template
+//	@Description	Delete a quick fact template from a vault
+//	@Tags			vault-settings
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Template ID"
+//	@Success		204			"No Content"
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/quickFactTemplates/{id} [delete]
 func (h *VaultSettingsHandler) DeleteQuickFactTemplate(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

@@ -18,6 +18,21 @@ func NewQuickFactHandler(quickFactService *services.QuickFactService) *QuickFact
 	return &QuickFactHandler{quickFactService: quickFactService}
 }
 
+// List godoc
+//
+//	@Summary		List quick facts
+//	@Description	Return all quick facts for a contact template
+//	@Tags			quick-facts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			templateId	path		integer	true	"Template ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.QuickFactResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts/{templateId} [get]
 func (h *QuickFactHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -35,6 +50,23 @@ func (h *QuickFactHandler) List(c echo.Context) error {
 	return response.OK(c, facts)
 }
 
+// Create godoc
+//
+//	@Summary		Create a quick fact
+//	@Description	Create a new quick fact for a contact template
+//	@Tags			quick-facts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			contact_id	path		string						true	"Contact ID"
+//	@Param			templateId	path		integer						true	"Template ID"
+//	@Param			request		body		dto.CreateQuickFactRequest	true	"Create quick fact request"
+//	@Success		201			{object}	response.APIResponse{data=dto.QuickFactResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts/{templateId} [post]
 func (h *QuickFactHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -59,6 +91,24 @@ func (h *QuickFactHandler) Create(c echo.Context) error {
 	return response.Created(c, fact)
 }
 
+// Update godoc
+//
+//	@Summary		Update a quick fact
+//	@Description	Update a quick fact by ID
+//	@Tags			quick-facts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			contact_id	path		string						true	"Contact ID"
+//	@Param			templateId	path		integer						true	"Template ID"
+//	@Param			id			path		integer						true	"Quick Fact ID"
+//	@Param			request		body		dto.UpdateQuickFactRequest	true	"Update quick fact request"
+//	@Success		200			{object}	response.APIResponse{data=dto.QuickFactResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts/{templateId}/{id} [put]
 func (h *QuickFactHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -86,6 +136,22 @@ func (h *QuickFactHandler) Update(c echo.Context) error {
 	return response.OK(c, fact)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a quick fact
+//	@Description	Delete a quick fact by ID
+//	@Tags			quick-facts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Param			templateId	path	integer	true	"Template ID"
+//	@Param			id			path	integer	true	"Quick Fact ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts/{templateId}/{id} [delete]
 func (h *QuickFactHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

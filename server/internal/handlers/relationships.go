@@ -18,6 +18,20 @@ func NewRelationshipHandler(relationshipService *services.RelationshipService) *
 	return &RelationshipHandler{relationshipService: relationshipService}
 }
 
+// List godoc
+//
+//	@Summary		List relationships for a contact
+//	@Description	Return all relationships belonging to a contact
+//	@Tags			relationships
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.RelationshipResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/relationships [get]
 func (h *RelationshipHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -31,6 +45,24 @@ func (h *RelationshipHandler) List(c echo.Context) error {
 	return response.OK(c, relationships)
 }
 
+// Create godoc
+//
+//	@Summary		Create a relationship
+//	@Description	Create a new relationship for a contact
+//	@Tags			relationships
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			contact_id	path		string							true	"Contact ID"
+//	@Param			request		body		dto.CreateRelationshipRequest	true	"Relationship details"
+//	@Success		201			{object}	response.APIResponse{data=dto.RelationshipResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/relationships [post]
 func (h *RelationshipHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -53,6 +85,25 @@ func (h *RelationshipHandler) Create(c echo.Context) error {
 	return response.Created(c, relationship)
 }
 
+// Update godoc
+//
+//	@Summary		Update a relationship
+//	@Description	Update an existing relationship
+//	@Tags			relationships
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			contact_id	path		string							true	"Contact ID"
+//	@Param			id			path		integer							true	"Relationship ID"
+//	@Param			request		body		dto.UpdateRelationshipRequest	true	"Relationship details"
+//	@Success		200			{object}	response.APIResponse{data=dto.RelationshipResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/relationships/{id} [put]
 func (h *RelationshipHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -82,6 +133,22 @@ func (h *RelationshipHandler) Update(c echo.Context) error {
 	return response.OK(c, relationship)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a relationship
+//	@Description	Delete a relationship from a contact
+//	@Tags			relationships
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Relationship ID"
+//	@Success		204			{object}	nil
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/relationships/{id} [delete]
 func (h *RelationshipHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

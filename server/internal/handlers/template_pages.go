@@ -19,6 +19,20 @@ func NewTemplatePageHandler(svc *services.TemplatePageService) *TemplatePageHand
 	return &TemplatePageHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List template pages
+//	@Description	Return all pages for a template
+//	@Tags			template-pages
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		integer	true	"Template ID"
+//	@Success		200	{object}	response.APIResponse{data=[]dto.TemplatePageResponse}
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages [get]
 func (h *TemplatePageHandler) List(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	templateID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -35,6 +49,23 @@ func (h *TemplatePageHandler) List(c echo.Context) error {
 	return response.OK(c, pages)
 }
 
+// Create godoc
+//
+//	@Summary		Create a template page
+//	@Description	Create a new page for a template
+//	@Tags			template-pages
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		integer						true	"Template ID"
+//	@Param			request	body		dto.CreateTemplatePageRequest	true	"Page details"
+//	@Success		201		{object}	response.APIResponse{data=dto.TemplatePageResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages [post]
 func (h *TemplatePageHandler) Create(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	templateID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -58,6 +89,21 @@ func (h *TemplatePageHandler) Create(c echo.Context) error {
 	return response.Created(c, page)
 }
 
+// Get godoc
+//
+//	@Summary		Get a template page
+//	@Description	Return a template page by ID
+//	@Tags			template-pages
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		integer	true	"Template ID"
+//	@Param			pageId	path		integer	true	"Page ID"
+//	@Success		200		{object}	response.APIResponse{data=dto.TemplatePageResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId} [get]
 func (h *TemplatePageHandler) Get(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -74,6 +120,24 @@ func (h *TemplatePageHandler) Get(c echo.Context) error {
 	return response.OK(c, page)
 }
 
+// Update godoc
+//
+//	@Summary		Update a template page
+//	@Description	Update an existing template page
+//	@Tags			template-pages
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		integer						true	"Template ID"
+//	@Param			pageId	path		integer						true	"Page ID"
+//	@Param			request	body		dto.UpdateTemplatePageRequest	true	"Page details"
+//	@Success		200		{object}	response.APIResponse{data=dto.TemplatePageResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId} [put]
 func (h *TemplatePageHandler) Update(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -97,6 +161,20 @@ func (h *TemplatePageHandler) Update(c echo.Context) error {
 	return response.OK(c, page)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a template page
+//	@Description	Delete a template page by ID
+//	@Tags			template-pages
+//	@Security		BearerAuth
+//	@Param			id		path	integer	true	"Template ID"
+//	@Param			pageId	path	integer	true	"Page ID"
+//	@Success		204		"No Content"
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId} [delete]
 func (h *TemplatePageHandler) Delete(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -115,6 +193,22 @@ func (h *TemplatePageHandler) Delete(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// UpdatePosition godoc
+//
+//	@Summary		Update template page position
+//	@Description	Update the position of a template page
+//	@Tags			template-pages
+//	@Accept			json
+//	@Security		BearerAuth
+//	@Param			id		path	integer						true	"Template ID"
+//	@Param			pageId	path	integer						true	"Page ID"
+//	@Param			request	body	dto.UpdatePositionRequest	true	"Position"
+//	@Success		204		"No Content"
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId}/position [post]
 func (h *TemplatePageHandler) UpdatePosition(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -134,6 +228,21 @@ func (h *TemplatePageHandler) UpdatePosition(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ListModules godoc
+//
+//	@Summary		List modules for a template page
+//	@Description	Return all modules assigned to a template page
+//	@Tags			template-pages
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		integer	true	"Template ID"
+//	@Param			pageId	path		integer	true	"Page ID"
+//	@Success		200		{object}	response.APIResponse{data=[]dto.TemplatePageModuleResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId}/modules [get]
 func (h *TemplatePageHandler) ListModules(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -150,6 +259,24 @@ func (h *TemplatePageHandler) ListModules(c echo.Context) error {
 	return response.OK(c, modules)
 }
 
+// AddModule godoc
+//
+//	@Summary		Add a module to a template page
+//	@Description	Add a module to a template page
+//	@Tags			template-pages
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		integer						true	"Template ID"
+//	@Param			pageId	path		integer						true	"Page ID"
+//	@Param			request	body		dto.AddModuleToPageRequest	true	"Module details"
+//	@Success		201		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId}/modules [post]
 func (h *TemplatePageHandler) AddModule(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -172,6 +299,21 @@ func (h *TemplatePageHandler) AddModule(c echo.Context) error {
 	return response.Created(c, nil)
 }
 
+// RemoveModule godoc
+//
+//	@Summary		Remove a module from a template page
+//	@Description	Remove a module from a template page
+//	@Tags			template-pages
+//	@Security		BearerAuth
+//	@Param			id			path	integer	true	"Template ID"
+//	@Param			pageId		path	integer	true	"Page ID"
+//	@Param			moduleId	path	integer	true	"Module ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId}/modules/{moduleId} [delete]
 func (h *TemplatePageHandler) RemoveModule(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)
@@ -191,6 +333,23 @@ func (h *TemplatePageHandler) RemoveModule(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// UpdateModulePosition godoc
+//
+//	@Summary		Update module position in a template page
+//	@Description	Update the position of a module within a template page
+//	@Tags			template-pages
+//	@Accept			json
+//	@Security		BearerAuth
+//	@Param			id			path	integer						true	"Template ID"
+//	@Param			pageId		path	integer						true	"Page ID"
+//	@Param			moduleId	path	integer						true	"Module ID"
+//	@Param			request		body	dto.UpdatePositionRequest	true	"Position"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/settings/personalize/templates/{id}/pages/{pageId}/modules/{moduleId}/position [post]
 func (h *TemplatePageHandler) UpdateModulePosition(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	pageID, err := strconv.ParseUint(c.Param("pageId"), 10, 64)

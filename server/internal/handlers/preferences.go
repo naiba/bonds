@@ -16,6 +16,17 @@ func NewPreferenceHandler(preferenceService *services.PreferenceService) *Prefer
 	return &PreferenceHandler{preferenceService: preferenceService}
 }
 
+// Get godoc
+//
+//	@Summary		Get user preferences
+//	@Description	Return the current user's preferences
+//	@Tags			preferences
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=dto.PreferencesResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/preferences [get]
 func (h *PreferenceHandler) Get(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	prefs, err := h.preferenceService.Get(userID)
@@ -25,6 +36,20 @@ func (h *PreferenceHandler) Get(c echo.Context) error {
 	return response.OK(c, prefs)
 }
 
+// UpdateAll godoc
+//
+//	@Summary		Update all preferences
+//	@Description	Update all user preferences at once
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdatePreferencesRequest	true	"Preferences"
+//	@Success		200		{object}	response.APIResponse{data=dto.PreferencesResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences [put]
 func (h *PreferenceHandler) UpdateAll(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdatePreferencesRequest
@@ -38,6 +63,21 @@ func (h *PreferenceHandler) UpdateAll(c echo.Context) error {
 	return response.OK(c, prefs)
 }
 
+// UpdateNameOrder godoc
+//
+//	@Summary		Update name order preference
+//	@Description	Update the display name order preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateNameOrderRequest	true	"Name order"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/name [post]
 func (h *PreferenceHandler) UpdateNameOrder(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateNameOrderRequest
@@ -53,6 +93,21 @@ func (h *PreferenceHandler) UpdateNameOrder(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateDateFormat godoc
+//
+//	@Summary		Update date format preference
+//	@Description	Update the date format preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateDateFormatRequest	true	"Date format"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/date [post]
 func (h *PreferenceHandler) UpdateDateFormat(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateDateFormatRequest
@@ -68,6 +123,21 @@ func (h *PreferenceHandler) UpdateDateFormat(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateTimezone godoc
+//
+//	@Summary		Update timezone preference
+//	@Description	Update the timezone preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateTimezoneRequest	true	"Timezone"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/timezone [post]
 func (h *PreferenceHandler) UpdateTimezone(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateTimezoneRequest
@@ -83,6 +153,21 @@ func (h *PreferenceHandler) UpdateTimezone(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateLocale godoc
+//
+//	@Summary		Update locale preference
+//	@Description	Update the locale preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateLocaleRequest	true	"Locale"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/locale [post]
 func (h *PreferenceHandler) UpdateLocale(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateLocaleRequest
@@ -98,6 +183,21 @@ func (h *PreferenceHandler) UpdateLocale(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateNumberFormat godoc
+//
+//	@Summary		Update number format preference
+//	@Description	Update the number format preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateNumberFormatRequest	true	"Number format"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/number [post]
 func (h *PreferenceHandler) UpdateNumberFormat(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateNumberFormatRequest
@@ -113,6 +213,21 @@ func (h *PreferenceHandler) UpdateNumberFormat(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateDistanceFormat godoc
+//
+//	@Summary		Update distance format preference
+//	@Description	Update the distance format preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateDistanceFormatRequest	true	"Distance format"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/distance [post]
 func (h *PreferenceHandler) UpdateDistanceFormat(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateDistanceFormatRequest
@@ -128,6 +243,21 @@ func (h *PreferenceHandler) UpdateDistanceFormat(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateMapsPreference godoc
+//
+//	@Summary		Update maps preference
+//	@Description	Update the default map site preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateMapsPreferenceRequest	true	"Maps preference"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/maps [post]
 func (h *PreferenceHandler) UpdateMapsPreference(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateMapsPreferenceRequest
@@ -143,6 +273,20 @@ func (h *PreferenceHandler) UpdateMapsPreference(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// UpdateHelpShown godoc
+//
+//	@Summary		Update help shown preference
+//	@Description	Update the help shown preference
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.UpdateHelpShownRequest	true	"Help shown"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/preferences/help [post]
 func (h *PreferenceHandler) UpdateHelpShown(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	var req dto.UpdateHelpShownRequest

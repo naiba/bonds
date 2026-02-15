@@ -16,6 +16,21 @@ func NewSearchHandler(searchService *services.SearchService) *SearchHandler {
 	return &SearchHandler{searchService: searchService}
 }
 
+// Search godoc
+//
+//	@Summary		Search contacts and notes
+//	@Description	Full-text search across contacts and notes in a vault
+//	@Tags			search
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			q			query		string	true	"Search query"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/search [get]
 func (h *SearchHandler) Search(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	query := c.QueryParam("q")

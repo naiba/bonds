@@ -3,14 +3,14 @@ package dto
 import "time"
 
 type VaultTaskResponse struct {
-	ID          uint       `json:"id"`
-	ContactID   string     `json:"contact_id"`
-	AuthorName  string     `json:"author_name"`
-	Label       string     `json:"label"`
-	Description string     `json:"description"`
-	Completed   bool       `json:"completed"`
-	CompletedAt *time.Time `json:"completed_at"`
-	DueAt       *time.Time `json:"due_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          uint       `json:"id" example:"1"`
+	ContactID   string     `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AuthorName  string     `json:"author_name" example:"John Doe"`
+	Label       string     `json:"label" example:"Buy birthday gift"`
+	Description string     `json:"description" example:"Get a nice book from the bookstore"`
+	Completed   bool       `json:"completed" example:"false"`
+	CompletedAt *time.Time `json:"completed_at" example:"2026-01-15T10:30:00Z"`
+	DueAt       *time.Time `json:"due_at" example:"2026-01-15T10:30:00Z"`
+	CreatedAt   time.Time  `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt   time.Time  `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }

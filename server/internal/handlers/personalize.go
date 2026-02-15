@@ -19,6 +19,19 @@ func NewPersonalizeHandler(personalizeService *services.PersonalizeService) *Per
 	return &PersonalizeHandler{personalizeService: personalizeService}
 }
 
+// List godoc
+//
+//	@Summary		List personalize entities
+//	@Description	Return all entities of the given type for the account
+//	@Tags			personalize
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			entity	path		string	true	"Entity type"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/{entity} [get]
 func (h *PersonalizeHandler) List(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	entity := c.Param("entity")
@@ -48,6 +61,22 @@ func (h *PersonalizeHandler) List(c echo.Context) error {
 	return response.OK(c, items)
 }
 
+// Create godoc
+//
+//	@Summary		Create a personalize entity
+//	@Description	Create a new entity of the given type
+//	@Tags			personalize
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			entity	path		string							true	"Entity type"
+//	@Param			request	body		dto.PersonalizeEntityRequest		true	"Entity details"
+//	@Success		201		{object}	response.APIResponse{data=dto.PersonalizeEntityResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/{entity} [post]
 func (h *PersonalizeHandler) Create(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	entity := c.Param("entity")
@@ -65,6 +94,23 @@ func (h *PersonalizeHandler) Create(c echo.Context) error {
 	return response.Created(c, item)
 }
 
+// Update godoc
+//
+//	@Summary		Update a personalize entity
+//	@Description	Update an existing entity of the given type
+//	@Tags			personalize
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			entity	path		string							true	"Entity type"
+//	@Param			id		path		integer							true	"Entity ID"
+//	@Param			request	body		dto.PersonalizeEntityRequest		true	"Entity details"
+//	@Success		200		{object}	response.APIResponse{data=dto.PersonalizeEntityResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/{entity}/{id} [put]
 func (h *PersonalizeHandler) Update(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	entity := c.Param("entity")
@@ -89,6 +135,20 @@ func (h *PersonalizeHandler) Update(c echo.Context) error {
 	return response.OK(c, item)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a personalize entity
+//	@Description	Delete an entity of the given type
+//	@Tags			personalize
+//	@Security		BearerAuth
+//	@Param			entity	path	string	true	"Entity type"
+//	@Param			id		path	integer	true	"Entity ID"
+//	@Success		204		"No Content"
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/{entity}/{id} [delete]
 func (h *PersonalizeHandler) Delete(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	entity := c.Param("entity")

@@ -23,6 +23,13 @@ jobs:
         working-directory: ./server
         run: go mod download
 
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Generate Swagger docs
+        working-directory: ./server
+        run: swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+
       - name: Vet
         working-directory: ./server
         run: go vet ./...

@@ -18,6 +18,18 @@ func NewTwoFactorHandler(twoFactorService *services.TwoFactorService) *TwoFactor
 	return &TwoFactorHandler{twoFactorService: twoFactorService}
 }
 
+// Enable godoc
+//
+//	@Summary		Enable two-factor authentication
+//	@Description	Generate TOTP secret and recovery codes for 2FA setup
+//	@Tags			two-factor
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=dto.TwoFactorSetupResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/2fa/enable [post]
 func (h *TwoFactorHandler) Enable(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -35,6 +47,21 @@ func (h *TwoFactorHandler) Enable(c echo.Context) error {
 	return response.OK(c, result)
 }
 
+// Confirm godoc
+//
+//	@Summary		Confirm two-factor authentication
+//	@Description	Confirm 2FA setup by verifying a TOTP code
+//	@Tags			two-factor
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.TwoFactorVerifyRequest	true	"TOTP code"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/2fa/confirm [post]
 func (h *TwoFactorHandler) Confirm(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -63,6 +90,21 @@ func (h *TwoFactorHandler) Confirm(c echo.Context) error {
 	return response.OK(c, map[string]bool{"confirmed": true})
 }
 
+// Disable godoc
+//
+//	@Summary		Disable two-factor authentication
+//	@Description	Disable 2FA by verifying a TOTP code
+//	@Tags			two-factor
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.TwoFactorVerifyRequest	true	"TOTP code"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/2fa/disable [post]
 func (h *TwoFactorHandler) Disable(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -91,6 +133,18 @@ func (h *TwoFactorHandler) Disable(c echo.Context) error {
 	return response.OK(c, map[string]bool{"disabled": true})
 }
 
+// Status godoc
+//
+//	@Summary		Get two-factor authentication status
+//	@Description	Check if 2FA is enabled for the current user
+//	@Tags			two-factor
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=dto.TwoFactorStatusResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/2fa/status [get]
 func (h *TwoFactorHandler) Status(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {

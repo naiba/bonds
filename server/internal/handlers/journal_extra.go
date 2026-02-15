@@ -10,6 +10,20 @@ import (
 	"github.com/naiba/bonds/pkg/response"
 )
 
+// GetPhotos godoc
+//
+//	@Summary		Get journal photos
+//	@Description	Return all photos for a journal
+//	@Tags			journals
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			id			path		integer	true	"Journal ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{id}/photos [get]
 func (h *JournalHandler) GetPhotos(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -26,6 +40,21 @@ func (h *JournalHandler) GetPhotos(c echo.Context) error {
 	return response.OK(c, photos)
 }
 
+// GetByYear godoc
+//
+//	@Summary		Get journal posts by year
+//	@Description	Return all posts for a journal filtered by year
+//	@Tags			journals
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			id			path		integer	true	"Journal ID"
+//	@Param			year		path		integer	true	"Year"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.PostResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{id}/years/{year} [get]
 func (h *JournalHandler) GetByYear(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -46,6 +75,23 @@ func (h *JournalHandler) GetByYear(c echo.Context) error {
 	return response.OK(c, posts)
 }
 
+// SetSlice godoc
+//
+//	@Summary		Set post slice of life
+//	@Description	Assign a post to a slice of life
+//	@Tags			posts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			journal_id	path		integer						true	"Journal ID"
+//	@Param			id			path		integer						true	"Post ID"
+//	@Param			request		body		dto.UpdatePostSliceRequest	true	"Set slice request"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/slices [put]
 func (h *PostHandler) SetSlice(c echo.Context) error {
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
 	if err != nil {
@@ -68,6 +114,21 @@ func (h *PostHandler) SetSlice(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// ClearSlice godoc
+//
+//	@Summary		Clear post slice of life
+//	@Description	Remove a post from its slice of life
+//	@Tags			posts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Post ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/slices [delete]
 func (h *PostHandler) ClearSlice(c echo.Context) error {
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
 	if err != nil {

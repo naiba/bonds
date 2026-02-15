@@ -18,6 +18,23 @@ func NewPostTagHandler(svc *services.PostTagService) *PostTagHandler {
 	return &PostTagHandler{svc: svc}
 }
 
+// Add godoc
+//
+//	@Summary		Add a tag to a post
+//	@Description	Add or create a tag and attach it to a post
+//	@Tags			post-tags
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			journal_id	path		integer					true	"Journal ID"
+//	@Param			id			path		integer					true	"Post ID"
+//	@Param			request		body		dto.AddPostTagRequest	true	"Add post tag request"
+//	@Success		201			{object}	response.APIResponse{data=dto.PostTagResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/tags [post]
 func (h *PostTagHandler) Add(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
@@ -45,6 +62,24 @@ func (h *PostTagHandler) Add(c echo.Context) error {
 	return response.Created(c, tag)
 }
 
+// Update godoc
+//
+//	@Summary		Update a post tag
+//	@Description	Update a tag on a post
+//	@Tags			post-tags
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			journal_id	path		integer						true	"Journal ID"
+//	@Param			id			path		integer						true	"Post ID"
+//	@Param			tagId		path		integer						true	"Tag ID"
+//	@Param			request		body		dto.UpdatePostTagRequest		true	"Update post tag request"
+//	@Success		200			{object}	response.APIResponse{data=dto.PostTagResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/tags/{tagId} [put]
 func (h *PostTagHandler) Update(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
@@ -79,6 +114,22 @@ func (h *PostTagHandler) Update(c echo.Context) error {
 	return response.OK(c, tag)
 }
 
+// Remove godoc
+//
+//	@Summary		Remove a tag from a post
+//	@Description	Remove a tag from a post
+//	@Tags			post-tags
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Post ID"
+//	@Param			tagId		path	integer	true	"Tag ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/tags/{tagId} [delete]
 func (h *PostTagHandler) Remove(c echo.Context) error {
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
 	if err != nil {

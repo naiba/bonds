@@ -9,9 +9,12 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/avatar"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
 )
+
+var _ dto.VaultFileResponse
 
 type AvatarHandler struct {
 	db               *gorm.DB
@@ -22,6 +25,18 @@ func NewAvatarHandler(db *gorm.DB, vaultFileService *services.VaultFileService) 
 	return &AvatarHandler{db: db, vaultFileService: vaultFileService}
 }
 
+// GetAvatar godoc
+//
+//	@Summary		Get contact avatar
+//	@Description	Return contact avatar image or generated initials
+//	@Tags			contacts
+//	@Produce		png
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{file}		file
+//	@Failure		404			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/avatar [get]
 func (h *AvatarHandler) GetAvatar(c echo.Context) error {
 	contactID := c.Param("contact_id")
 
@@ -44,6 +59,22 @@ func (h *AvatarHandler) GetAvatar(c echo.Context) error {
 	return c.Blob(http.StatusOK, "image/png", pngData)
 }
 
+// UpdateAvatar godoc
+//
+//	@Summary		Update contact avatar
+//	@Description	Upload a new avatar image for a contact
+//	@Tags			contacts
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			file		formData	file	true	"Avatar image file"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultFileResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/avatar [put]
 func (h *AvatarHandler) UpdateAvatar(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -82,6 +113,19 @@ func (h *AvatarHandler) UpdateAvatar(c echo.Context) error {
 	return response.OK(c, file)
 }
 
+// DeleteAvatar godoc
+//
+//	@Summary		Delete contact avatar
+//	@Description	Remove the avatar from a contact
+//	@Tags			contacts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Success		204			"No Content"
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/avatar [delete]
 func (h *AvatarHandler) DeleteAvatar(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

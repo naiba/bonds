@@ -1,28 +1,28 @@
 package dto
 
 type AddressReportItem struct {
-	Country  string `json:"country"`
-	Province string `json:"province"`
-	City     string `json:"city"`
-	Count    int    `json:"count"`
+	Country  string `json:"country" example:"US"`
+	Province string `json:"province" example:"California"`
+	City     string `json:"city" example:"San Francisco"`
+	Count    int    `json:"count" example:"10"`
 }
 
 type ImportantDateReportItem struct {
-	ContactID     string `json:"contact_id"`
-	FirstName     string `json:"first_name"`
-	LastName      string `json:"last_name"`
-	Label         string `json:"label"`
-	Day           *int   `json:"day"`
-	Month         *int   `json:"month"`
-	Year          *int   `json:"year"`
-	CalendarType  string `json:"calendar_type"`
-	OriginalDay   *int   `json:"original_day"`
-	OriginalMonth *int   `json:"original_month"`
-	OriginalYear  *int   `json:"original_year"`
+	ContactID     string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstName     string `json:"first_name" example:"John"`
+	LastName      string `json:"last_name" example:"Doe"`
+	Label         string `json:"label" example:"Birthday"`
+	Day           *int   `json:"day" example:"15"`
+	Month         *int   `json:"month" example:"6"`
+	Year          *int   `json:"year" example:"1990"`
+	CalendarType  string `json:"calendar_type" example:"gregorian"`
+	OriginalDay   *int   `json:"original_day" example:"15"`
+	OriginalMonth *int   `json:"original_month" example:"6"`
+	OriginalYear  *int   `json:"original_year" example:"1990"`
 }
 
 type MoodReportItem struct {
-	ParameterLabel string `json:"parameter_label"`
-	HexColor       string `json:"hex_color"`
-	Count          int    `json:"count"`
+	ParameterLabel string `json:"parameter_label" example:"Awesome"`
+	HexColor       string `json:"hex_color" example:"#3B82F6"`
+	Count          int    `json:"count" example:"10"`
 }

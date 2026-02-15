@@ -4,6 +4,8 @@ import (
 	"log"
 
 	"github.com/labstack/echo/v4"
+	echoSwagger "github.com/swaggo/echo-swagger"
+
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
@@ -11,6 +13,8 @@ import (
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
+
+	_ "github.com/naiba/bonds/docs"
 )
 
 func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
@@ -199,6 +203,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
 
 	e.Use(middleware.CORS())
+
+	if cfg.Debug {
+		e.GET("/swagger/*", echoSwagger.WrapHandler)
+	}
 
 	api := e.Group("/api")
 

@@ -19,6 +19,20 @@ func NewNoteHandler(noteService *services.NoteService) *NoteHandler {
 	return &NoteHandler{noteService: noteService}
 }
 
+// List godoc
+//
+//	@Summary		List notes
+//	@Description	Return all notes for a contact
+//	@Tags			notes
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.NoteResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/notes [get]
 func (h *NoteHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -32,6 +46,24 @@ func (h *NoteHandler) List(c echo.Context) error {
 	return response.OK(c, notes)
 }
 
+// Create godoc
+//
+//	@Summary		Create a note
+//	@Description	Create a new note for a contact
+//	@Tags			notes
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			request		body		dto.CreateNoteRequest	true	"Note details"
+//	@Success		201			{object}	response.APIResponse{data=dto.NoteResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/notes [post]
 func (h *NoteHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -55,6 +87,25 @@ func (h *NoteHandler) Create(c echo.Context) error {
 	return response.Created(c, note)
 }
 
+// Update godoc
+//
+//	@Summary		Update a note
+//	@Description	Update an existing note
+//	@Tags			notes
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			id			path		integer					true	"Note ID"
+//	@Param			request		body		dto.UpdateNoteRequest	true	"Note details"
+//	@Success		200			{object}	response.APIResponse{data=dto.NoteResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/notes/{id} [put]
 func (h *NoteHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -84,6 +135,22 @@ func (h *NoteHandler) Update(c echo.Context) error {
 	return response.OK(c, note)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a note
+//	@Description	Permanently delete a note
+//	@Tags			notes
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Param			id			path	integer	true	"Note ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/notes/{id} [delete]
 func (h *NoteHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

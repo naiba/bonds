@@ -18,6 +18,20 @@ func NewReminderHandler(reminderService *services.ReminderService) *ReminderHand
 	return &ReminderHandler{reminderService: reminderService}
 }
 
+// List godoc
+//
+//	@Summary		List reminders
+//	@Description	Return all reminders for a contact
+//	@Tags			reminders
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ReminderResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/reminders [get]
 func (h *ReminderHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -31,6 +45,24 @@ func (h *ReminderHandler) List(c echo.Context) error {
 	return response.OK(c, reminders)
 }
 
+// Create godoc
+//
+//	@Summary		Create a reminder
+//	@Description	Create a new reminder for a contact
+//	@Tags			reminders
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			contact_id	path		string						true	"Contact ID"
+//	@Param			request		body		dto.CreateReminderRequest	true	"Reminder details"
+//	@Success		201			{object}	response.APIResponse{data=dto.ReminderResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/reminders [post]
 func (h *ReminderHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -53,6 +85,25 @@ func (h *ReminderHandler) Create(c echo.Context) error {
 	return response.Created(c, reminder)
 }
 
+// Update godoc
+//
+//	@Summary		Update a reminder
+//	@Description	Update an existing reminder
+//	@Tags			reminders
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			contact_id	path		string						true	"Contact ID"
+//	@Param			id			path		integer						true	"Reminder ID"
+//	@Param			request		body		dto.UpdateReminderRequest	true	"Reminder details"
+//	@Success		200			{object}	response.APIResponse{data=dto.ReminderResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/reminders/{id} [put]
 func (h *ReminderHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -82,6 +133,22 @@ func (h *ReminderHandler) Update(c echo.Context) error {
 	return response.OK(c, reminder)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a reminder
+//	@Description	Permanently delete a reminder
+//	@Tags			reminders
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Param			id			path	integer	true	"Reminder ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/reminders/{id} [delete]
 func (h *ReminderHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

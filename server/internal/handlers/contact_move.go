@@ -18,6 +18,24 @@ func NewContactMoveHandler(contactMoveService *services.ContactMoveService) *Con
 	return &ContactMoveHandler{contactMoveService: contactMoveService}
 }
 
+// Move godoc
+//
+//	@Summary		Move a contact to another vault
+//	@Description	Move a contact from one vault to another
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Source Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			request		body		dto.MoveContactRequest	true	"Move details"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/move [post]
 func (h *ContactMoveHandler) Move(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

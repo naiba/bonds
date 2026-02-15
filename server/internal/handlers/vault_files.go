@@ -9,8 +9,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
 )
+
+var _ dto.VaultFileResponse
 
 var allowedMimeTypes = map[string]bool{
 	"image/jpeg":         true,
@@ -33,6 +36,17 @@ func NewVaultFileHandler(vaultFileService *services.VaultFileService) *VaultFile
 	return &VaultFileHandler{vaultFileService: vaultFileService}
 }
 
+// List godoc
+//
+//	@Summary		List vault files
+//	@Description	Return all files for a vault
+//	@Tags			files
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files [get]
 func (h *VaultFileHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	files, err := h.vaultFileService.List(vaultID)
@@ -42,6 +56,20 @@ func (h *VaultFileHandler) List(c echo.Context) error {
 	return response.OK(c, files)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a vault file
+//	@Description	Delete a file by ID
+//	@Tags			files
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"File ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files/{id} [delete]
 func (h *VaultFileHandler) Delete(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -57,6 +85,22 @@ func (h *VaultFileHandler) Delete(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// Upload godoc
+//
+//	@Summary		Upload a file
+//	@Description	Upload a file to a vault
+//	@Tags			files
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			file		formData	file	true	"File to upload"
+//	@Param			contact_id	formData	string	false	"Contact ID"
+//	@Param			file_type	formData	string	false	"File type (document/photo)"
+//	@Success		201			{object}	response.APIResponse{data=dto.VaultFileResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files [post]
 func (h *VaultFileHandler) Upload(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	contactID := c.FormValue("contact_id")
@@ -68,6 +112,21 @@ func (h *VaultFileHandler) Upload(c echo.Context) error {
 	return h.handleUpload(c, vaultID, contactID, fileType)
 }
 
+// UploadContactFile godoc
+//
+//	@Summary		Upload a contact file
+//	@Description	Upload a photo or document for a contact
+//	@Tags			files
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			file		formData	file	true	"File to upload"
+//	@Success		201			{object}	response.APIResponse{data=dto.VaultFileResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/photos [post]
 func (h *VaultFileHandler) UploadContactFile(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	contactID := c.Param("contact_id")
@@ -111,6 +170,20 @@ func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, file
 	return response.Created(c, result)
 }
 
+// Serve godoc
+//
+//	@Summary		Download a file
+//	@Description	Download a file as attachment
+//	@Tags			files
+//	@Produce		octet-stream
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			id			path		integer	true	"File ID"
+//	@Success		200			{file}		file
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files/{id}/download [get]
 func (h *VaultFileHandler) Serve(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

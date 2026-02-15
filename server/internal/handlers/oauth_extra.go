@@ -9,6 +9,17 @@ import (
 	"github.com/naiba/bonds/pkg/response"
 )
 
+// ListProviders godoc
+//
+//	@Summary		List linked OAuth providers
+//	@Description	Return all linked OAuth providers for the current user
+//	@Tags			oauth
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/oauth [get]
 func (h *OAuthHandler) ListProviders(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	providers, err := h.oauthService.ListProviders(userID)
@@ -18,6 +29,18 @@ func (h *OAuthHandler) ListProviders(c echo.Context) error {
 	return response.OK(c, providers)
 }
 
+// UnlinkProvider godoc
+//
+//	@Summary		Unlink an OAuth provider
+//	@Description	Unlink an OAuth provider from the current user
+//	@Tags			oauth
+//	@Security		BearerAuth
+//	@Param			driver	path	string	true	"OAuth driver name"
+//	@Success		204		"No Content"
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/oauth/{driver} [delete]
 func (h *OAuthHandler) UnlinkProvider(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	driver := c.Param("driver")

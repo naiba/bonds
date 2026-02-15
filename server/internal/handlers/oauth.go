@@ -28,6 +28,15 @@ func NewOAuthHandler(oauthService *services.OAuthService, appURL string, jwtSecr
 	return &OAuthHandler{oauthService: oauthService, appURL: appURL}
 }
 
+// BeginAuth godoc
+//
+//	@Summary		Begin OAuth authentication
+//	@Description	Redirect to OAuth provider for authentication
+//	@Tags			oauth
+//	@Param			provider	path	string	true	"OAuth provider name"
+//	@Success		307			"Redirect to OAuth provider"
+//	@Failure		404			{object}	response.APIResponse
+//	@Router			/auth/{provider} [get]
 func (h *OAuthHandler) BeginAuth(c echo.Context) error {
 	provider := c.Param("provider")
 
@@ -45,6 +54,14 @@ func (h *OAuthHandler) BeginAuth(c echo.Context) error {
 	return nil
 }
 
+// Callback godoc
+//
+//	@Summary		OAuth callback
+//	@Description	Handle OAuth callback and redirect with JWT token
+//	@Tags			oauth
+//	@Param			provider	path	string	true	"OAuth provider name"
+//	@Success		307			"Redirect to frontend with token"
+//	@Router			/auth/{provider}/callback [get]
 func (h *OAuthHandler) Callback(c echo.Context) error {
 	provider := c.Param("provider")
 

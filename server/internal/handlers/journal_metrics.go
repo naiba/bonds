@@ -18,6 +18,20 @@ func NewJournalMetricHandler(svc *services.JournalMetricService) *JournalMetricH
 	return &JournalMetricHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List journal metrics
+//	@Description	Return all metrics for a journal
+//	@Tags			journal-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			journal_id	path		integer	true	"Journal ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.JournalMetricResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/metrics [get]
 func (h *JournalMetricHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
@@ -34,6 +48,22 @@ func (h *JournalMetricHandler) List(c echo.Context) error {
 	return response.OK(c, metrics)
 }
 
+// Create godoc
+//
+//	@Summary		Create a journal metric
+//	@Description	Create a new metric for a journal
+//	@Tags			journal-metrics
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			journal_id	path		integer							true	"Journal ID"
+//	@Param			request		body		dto.CreateJournalMetricRequest	true	"Create journal metric request"
+//	@Success		201			{object}	response.APIResponse{data=dto.JournalMetricResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/metrics [post]
 func (h *JournalMetricHandler) Create(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
@@ -57,6 +87,21 @@ func (h *JournalMetricHandler) Create(c echo.Context) error {
 	return response.Created(c, metric)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a journal metric
+//	@Description	Delete a journal metric by ID
+//	@Tags			journal-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Metric ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/metrics/{id} [delete]
 func (h *JournalMetricHandler) Delete(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)

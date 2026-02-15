@@ -18,6 +18,20 @@ func NewAuthHandler(authService *services.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
+// Register godoc
+//
+//	@Summary		Register a new user
+//	@Description	Create a new account with email and password
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.RegisterRequest	true	"Registration details"
+//	@Success		201		{object}	response.APIResponse{data=dto.AuthResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		409		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/auth/register [post]
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req dto.RegisterRequest
 	if err := c.Bind(&req); err != nil {
@@ -38,6 +52,20 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	return response.Created(c, result)
 }
 
+// Login godoc
+//
+//	@Summary		Log in
+//	@Description	Authenticate with email and password
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.LoginRequest	true	"Login credentials"
+//	@Success		200		{object}	response.APIResponse{data=dto.AuthResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/auth/login [post]
 func (h *AuthHandler) Login(c echo.Context) error {
 	var req dto.LoginRequest
 	if err := c.Bind(&req); err != nil {
@@ -58,6 +86,17 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	return response.OK(c, result)
 }
 
+// Refresh godoc
+//
+//	@Summary		Refresh JWT token
+//	@Description	Obtain a new JWT token using the current valid token
+//	@Tags			auth
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=dto.AuthResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/auth/refresh [post]
 func (h *AuthHandler) Refresh(c echo.Context) error {
 	claims := middleware.GetClaims(c)
 	if claims == nil {
@@ -75,6 +114,18 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 	return response.OK(c, result)
 }
 
+// Me godoc
+//
+//	@Summary		Get current user
+//	@Description	Return the authenticated user's profile
+//	@Tags			auth
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=dto.UserResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/auth/me [get]
 func (h *AuthHandler) Me(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	if userID == "" {

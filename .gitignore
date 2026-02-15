@@ -12,6 +12,7 @@ server/internal/frontend/dist/*
 *.log
 *.test
 .DS_Store
+server/docs/
 web/playwright-report/
 .opencode/
 monica-php

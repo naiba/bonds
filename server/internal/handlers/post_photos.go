@@ -8,8 +8,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
 )
+
+var _ dto.VaultFileResponse
 
 type PostPhotoHandler struct {
 	vaultFileService *services.VaultFileService
@@ -19,6 +22,20 @@ func NewPostPhotoHandler(vaultFileService *services.VaultFileService) *PostPhoto
 	return &PostPhotoHandler{vaultFileService: vaultFileService}
 }
 
+// List godoc
+//
+//	@Summary		List post photos
+//	@Description	Return all photos for a post
+//	@Tags			post-photos
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			journal_id	path		integer	true	"Journal ID"
+//	@Param			id			path		integer	true	"Post ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/photos [get]
 func (h *PostPhotoHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	postID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -32,6 +49,22 @@ func (h *PostPhotoHandler) List(c echo.Context) error {
 	return response.OK(c, files)
 }
 
+// Upload godoc
+//
+//	@Summary		Upload a post photo
+//	@Description	Upload a photo to a post
+//	@Tags			post-photos
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			journal_id	path		integer	true	"Journal ID"
+//	@Param			id			path		integer	true	"Post ID"
+//	@Param			file		formData	file	true	"Photo file"
+//	@Success		201			{object}	response.APIResponse{data=dto.VaultFileResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/photos [post]
 func (h *PostPhotoHandler) Upload(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	postID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -68,6 +101,22 @@ func (h *PostPhotoHandler) Upload(c echo.Context) error {
 	return response.Created(c, result)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a post photo
+//	@Description	Delete a photo from a post
+//	@Tags			post-photos
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Post ID"
+//	@Param			photoId		path	integer	true	"Photo ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/photos/{photoId} [delete]
 func (h *PostPhotoHandler) Delete(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	postID, err := strconv.ParseUint(c.Param("id"), 10, 64)

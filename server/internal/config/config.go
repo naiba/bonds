@@ -19,6 +19,7 @@ func splitAndTrim(s, sep string) []string {
 }
 
 type Config struct {
+	Debug        bool
 	Server       ServerConfig
 	Database     DatabaseConfig
 	JWT          JWTConfig
@@ -106,6 +107,7 @@ func Load() *Config {
 	}
 
 	return &Config{
+		Debug: getEnvBool("DEBUG", false),
 		Server: ServerConfig{
 			Port: getEnv("SERVER_PORT", "8080"),
 			Host: getEnv("SERVER_HOST", "0.0.0.0"),
@@ -171,6 +173,16 @@ func getEnvInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			return i
+		}
+	}
+	return fallback
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	if v := os.Getenv(key); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err == nil {
+			return b
 		}
 	}
 	return fallback

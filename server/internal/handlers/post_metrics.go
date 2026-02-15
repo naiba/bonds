@@ -18,6 +18,23 @@ func NewPostMetricHandler(svc *services.PostMetricService) *PostMetricHandler {
 	return &PostMetricHandler{svc: svc}
 }
 
+// Create godoc
+//
+//	@Summary		Create a post metric
+//	@Description	Add a metric value to a post
+//	@Tags			post-metrics
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			journal_id	path		integer							true	"Journal ID"
+//	@Param			id			path		integer							true	"Post ID"
+//	@Param			request		body		dto.CreatePostMetricRequest		true	"Create post metric request"
+//	@Success		201			{object}	response.APIResponse{data=dto.PostMetricResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/metrics [post]
 func (h *PostMetricHandler) Create(c echo.Context) error {
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
 	if err != nil {
@@ -44,6 +61,22 @@ func (h *PostMetricHandler) Create(c echo.Context) error {
 	return response.Created(c, metric)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a post metric
+//	@Description	Remove a metric value from a post
+//	@Tags			post-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Post ID"
+//	@Param			metricId	path	integer	true	"Post Metric ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/metrics/{metricId} [delete]
 func (h *PostMetricHandler) Delete(c echo.Context) error {
 	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
 	if err != nil {

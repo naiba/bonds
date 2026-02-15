@@ -19,6 +19,17 @@ func NewInvitationHandler(invitationService *services.InvitationService) *Invita
 	return &InvitationHandler{invitationService: invitationService}
 }
 
+// List godoc
+//
+//	@Summary		List invitations
+//	@Description	Return all invitations for the account
+//	@Tags			invitations
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=[]dto.InvitationResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/invitations [get]
 func (h *InvitationHandler) List(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	invitations, err := h.invitationService.List(accountID)
@@ -28,6 +39,21 @@ func (h *InvitationHandler) List(c echo.Context) error {
 	return response.OK(c, invitations)
 }
 
+// Create godoc
+//
+//	@Summary		Create an invitation
+//	@Description	Create a new invitation and send it via email
+//	@Tags			invitations
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			request	body		dto.CreateInvitationRequest	true	"Invitation details"
+//	@Success		201		{object}	response.APIResponse{data=dto.InvitationResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/invitations [post]
 func (h *InvitationHandler) Create(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	userID := middleware.GetUserID(c)
@@ -50,6 +76,19 @@ func (h *InvitationHandler) Create(c echo.Context) error {
 	return response.Created(c, invitation)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete an invitation
+//	@Description	Delete an invitation by ID
+//	@Tags			invitations
+//	@Security		BearerAuth
+//	@Param			id	path	integer	true	"Invitation ID"
+//	@Success		204	"No Content"
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/invitations/{id} [delete]
 func (h *InvitationHandler) Delete(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -66,6 +105,20 @@ func (h *InvitationHandler) Delete(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+// Accept godoc
+//
+//	@Summary		Accept an invitation
+//	@Description	Accept an invitation and create a new user account
+//	@Tags			invitations
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.AcceptInvitationRequest	true	"Acceptance details"
+//	@Success		200		{object}	response.APIResponse{data=dto.InvitationResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/invitations/accept [post]
 func (h *InvitationHandler) Accept(c echo.Context) error {
 	var req dto.AcceptInvitationRequest
 	if err := c.Bind(&req); err != nil {

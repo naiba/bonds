@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
+func Connect(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
 	var dialector gorm.Dialector
 
 	switch cfg.Driver {
@@ -20,7 +20,10 @@ func Connect(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
 	}
 
-	logLevel := logger.Warn
+	logLevel := logger.Silent
+	if debug {
+		logLevel = logger.Info
+	}
 	usePrepareStmt := cfg.Driver != "sqlite"
 	db, err := gorm.Open(dialector, &gorm.Config{
 		Logger:                                   logger.Default.LogMode(logLevel),

@@ -16,6 +16,18 @@ func NewTelegramWebhookHandler(webhookService *services.TelegramWebhookService) 
 	return &TelegramWebhookHandler{webhookService: webhookService}
 }
 
+// HandleWebhook godoc
+//
+//	@Summary		Handle Telegram webhook
+//	@Description	Process incoming Telegram webhook updates
+//	@Tags			telegram
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	response.APIResponse
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/telegram/webhook [post]
 func (h *TelegramWebhookHandler) HandleWebhook(c echo.Context) error {
 	var update services.TelegramUpdate
 	if err := c.Bind(&update); err != nil {

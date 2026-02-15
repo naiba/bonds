@@ -18,6 +18,20 @@ func NewGoalHandler(goalService *services.GoalService) *GoalHandler {
 	return &GoalHandler{goalService: goalService}
 }
 
+// List godoc
+//
+//	@Summary		List goals for a contact
+//	@Description	Return all goals belonging to a contact
+//	@Tags			goals
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.GoalResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/goals [get]
 func (h *GoalHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -31,6 +45,24 @@ func (h *GoalHandler) List(c echo.Context) error {
 	return response.OK(c, goals)
 }
 
+// Create godoc
+//
+//	@Summary		Create a goal
+//	@Description	Create a new goal for a contact
+//	@Tags			goals
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			request		body		dto.CreateGoalRequest	true	"Goal details"
+//	@Success		201			{object}	response.APIResponse{data=dto.GoalResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/goals [post]
 func (h *GoalHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -51,6 +83,22 @@ func (h *GoalHandler) Create(c echo.Context) error {
 	return response.Created(c, goal)
 }
 
+// Get godoc
+//
+//	@Summary		Get a goal
+//	@Description	Get a specific goal by ID
+//	@Tags			goals
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Goal ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.GoalResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/goals/{id} [get]
 func (h *GoalHandler) Get(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -71,6 +119,25 @@ func (h *GoalHandler) Get(c echo.Context) error {
 	return response.OK(c, goal)
 }
 
+// Update godoc
+//
+//	@Summary		Update a goal
+//	@Description	Update an existing goal
+//	@Tags			goals
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			id			path		integer					true	"Goal ID"
+//	@Param			request		body		dto.UpdateGoalRequest	true	"Goal details"
+//	@Success		200			{object}	response.APIResponse{data=dto.GoalResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/goals/{id} [put]
 func (h *GoalHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -98,6 +165,24 @@ func (h *GoalHandler) Update(c echo.Context) error {
 	return response.OK(c, goal)
 }
 
+// AddStreak godoc
+//
+//	@Summary		Add a streak to a goal
+//	@Description	Record a new streak entry for a goal
+//	@Tags			goals
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			contact_id	path		string					true	"Contact ID"
+//	@Param			id			path		integer					true	"Goal ID"
+//	@Param			request		body		dto.AddStreakRequest		true	"Streak details"
+//	@Success		200			{object}	response.APIResponse{data=dto.GoalResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/goals/{id}/streaks [put]
 func (h *GoalHandler) AddStreak(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
@@ -122,6 +207,22 @@ func (h *GoalHandler) AddStreak(c echo.Context) error {
 	return response.OK(c, goal)
 }
 
+// Delete godoc
+//
+//	@Summary		Delete a goal
+//	@Description	Delete a goal from a contact
+//	@Tags			goals
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			id			path		integer	true	"Goal ID"
+//	@Success		204			{object}	nil
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/goals/{id} [delete]
 func (h *GoalHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

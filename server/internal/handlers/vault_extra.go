@@ -19,6 +19,18 @@ func NewVaultReminderHandler(svc *services.VaultReminderService) *VaultReminderH
 	return &VaultReminderHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List vault reminders
+//	@Description	Return all reminders for a vault
+//	@Tags			reminders
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/reminders [get]
 func (h *VaultReminderHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	reminders, err := h.svc.List(vaultID)
@@ -28,6 +40,20 @@ func (h *VaultReminderHandler) List(c echo.Context) error {
 	return response.OK(c, reminders)
 }
 
+// GetMonth godoc
+//
+//	@Summary		Get calendar month
+//	@Description	Return calendar data for a specific month
+//	@Tags			calendar
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			year		path		integer	true	"Year"
+//	@Param			month		path		integer	true	"Month"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/calendar/years/{year}/months/{month} [get]
 func (h *CalendarHandler) GetMonth(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	year, err := strconv.Atoi(c.Param("year"))
@@ -45,6 +71,21 @@ func (h *CalendarHandler) GetMonth(c echo.Context) error {
 	return response.OK(c, calendar)
 }
 
+// GetDay godoc
+//
+//	@Summary		Get calendar day
+//	@Description	Return calendar data for a specific day
+//	@Tags			calendar
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			year		path		integer	true	"Year"
+//	@Param			month		path		integer	true	"Month"
+//	@Param			day			path		integer	true	"Day"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/calendar/years/{year}/months/{month}/days/{day} [get]
 func (h *CalendarHandler) GetDay(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	year, err := strconv.Atoi(c.Param("year"))
@@ -66,6 +107,16 @@ func (h *CalendarHandler) GetDay(c echo.Context) error {
 	return response.OK(c, calendar)
 }
 
+// Index godoc
+//
+//	@Summary		List available reports
+//	@Description	Return the list of available report types
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ReportIndexItem}
+//	@Router			/vaults/{vault_id}/reports [get]
 func (h *ReportHandler) Index(c echo.Context) error {
 	reports := []dto.ReportIndexItem{
 		{Key: "addresses", Name: "Addresses"},
@@ -75,6 +126,18 @@ func (h *ReportHandler) Index(c echo.Context) error {
 	return response.OK(c, reports)
 }
 
+// AddressesByCity godoc
+//
+//	@Summary		Get addresses by city
+//	@Description	Return contacts with addresses in a specific city
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			city		path		string	true	"City name"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.AddressContactItem}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/reports/addresses/city/{city} [get]
 func (h *ReportHandler) AddressesByCity(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	city := c.Param("city")
@@ -85,6 +148,18 @@ func (h *ReportHandler) AddressesByCity(c echo.Context) error {
 	return response.OK(c, data)
 }
 
+// AddressesByCountry godoc
+//
+//	@Summary		Get addresses by country
+//	@Description	Return contacts with addresses in a specific country
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			country		path		string	true	"Country code"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.AddressContactItem}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/reports/addresses/country/{country} [get]
 func (h *ReportHandler) AddressesByCountry(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	country := c.Param("country")
@@ -95,6 +170,17 @@ func (h *ReportHandler) AddressesByCountry(c echo.Context) error {
 	return response.OK(c, data)
 }
 
+// ListPhotos godoc
+//
+//	@Summary		List vault photos
+//	@Description	Return all photo files for a vault
+//	@Tags			files
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files/photos [get]
 func (h *VaultFileHandler) ListPhotos(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	files, err := h.vaultFileService.ListByType(vaultID, "photo")
@@ -104,6 +190,17 @@ func (h *VaultFileHandler) ListPhotos(c echo.Context) error {
 	return response.OK(c, files)
 }
 
+// ListDocuments godoc
+//
+//	@Summary		List vault documents
+//	@Description	Return all document files for a vault
+//	@Tags			files
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files/documents [get]
 func (h *VaultFileHandler) ListDocuments(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	files, err := h.vaultFileService.ListByType(vaultID, "document")
@@ -113,6 +210,17 @@ func (h *VaultFileHandler) ListDocuments(c echo.Context) error {
 	return response.OK(c, files)
 }
 
+// ListAvatars godoc
+//
+//	@Summary		List vault avatars
+//	@Description	Return all avatar files for a vault
+//	@Tags			files
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/files/avatars [get]
 func (h *VaultFileHandler) ListAvatars(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	files, err := h.vaultFileService.ListByType(vaultID, "avatar")
@@ -148,6 +256,18 @@ func NewMostConsultedHandler(svc *services.MostConsultedService) *MostConsultedH
 	return &MostConsultedHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List most consulted contacts
+//	@Description	Return most consulted contacts for the current user in a vault
+//	@Tags			search
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/search/mostConsulted [get]
 func (h *MostConsultedHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	userID := middleware.GetUserID(c)
@@ -158,6 +278,22 @@ func (h *MostConsultedHandler) List(c echo.Context) error {
 	return response.OK(c, data)
 }
 
+// UpdatePosition godoc
+//
+//	@Summary		Update personalize entity position
+//	@Description	Update the position of a personalize entity
+//	@Tags			personalize
+//	@Accept			json
+//	@Security		BearerAuth
+//	@Param			entity	path	string					true	"Entity type"
+//	@Param			id		path	integer					true	"Entity ID"
+//	@Param			request	body	dto.UpdatePositionRequest	true	"Position"
+//	@Success		204		"No Content"
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/personalize/{entity}/{id}/position [post]
 func (h *PersonalizeHandler) UpdatePosition(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	entity := c.Param("entity")

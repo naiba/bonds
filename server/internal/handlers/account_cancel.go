@@ -18,6 +18,21 @@ func NewAccountCancelHandler(svc *services.AccountCancelService) *AccountCancelH
 	return &AccountCancelHandler{accountCancelService: svc}
 }
 
+// Cancel godoc
+//
+//	@Summary		Cancel account
+//	@Description	Permanently delete the account after password verification
+//	@Tags			account
+//	@Accept			json
+//	@Security		BearerAuth
+//	@Param			request	body	dto.CancelAccountRequest	true	"Password confirmation"
+//	@Success		204		"No Content"
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/settings/account [delete]
 func (h *AccountCancelHandler) Cancel(c echo.Context) error {
 	userID := middleware.GetUserID(c)
 	accountID := middleware.GetAccountID(c)

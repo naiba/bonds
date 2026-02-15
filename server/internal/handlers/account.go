@@ -16,6 +16,17 @@ func NewAccountHandler(db *gorm.DB) *AccountHandler {
 	return &AccountHandler{db: db}
 }
 
+// GetAccount godoc
+//
+//	@Summary		Get current account
+//	@Description	Return the current user's account details
+//	@Tags			account
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Router			/account [get]
 func (h *AccountHandler) GetAccount(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	if accountID == "" {
