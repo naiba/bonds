@@ -19,7 +19,10 @@ func NewGoalService(db *gorm.DB) *GoalService {
 	return &GoalService{db: db}
 }
 
-func (s *GoalService) List(contactID string) ([]dto.GoalResponse, error) {
+func (s *GoalService) List(contactID, vaultID string) ([]dto.GoalResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var goals []models.Goal
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&goals).Error; err != nil {
 		return nil, err
@@ -31,7 +34,10 @@ func (s *GoalService) List(contactID string) ([]dto.GoalResponse, error) {
 	return result, nil
 }
 
-func (s *GoalService) Create(contactID string, req dto.CreateGoalRequest) (*dto.GoalResponse, error) {
+func (s *GoalService) Create(contactID, vaultID string, req dto.CreateGoalRequest) (*dto.GoalResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	goal := models.Goal{
 		ContactID: contactID,
 		Name:      req.Name,
@@ -43,11 +49,14 @@ func (s *GoalService) Create(contactID string, req dto.CreateGoalRequest) (*dto.
 	return &resp, nil
 }
 
-func (s *GoalService) Get(id uint) (*dto.GoalResponse, error) {
+func (s *GoalService) Get(id uint, contactID, vaultID string) (*dto.GoalResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var goal models.Goal
 	if err := s.db.Preload("Streaks", func(db *gorm.DB) *gorm.DB {
 		return db.Order("happened_at DESC")
-	}).First(&goal, id).Error; err != nil {
+	}).Where("id = ? AND contact_id = ?", id, contactID).First(&goal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGoalNotFound
 		}
@@ -57,9 +66,12 @@ func (s *GoalService) Get(id uint) (*dto.GoalResponse, error) {
 	return &resp, nil
 }
 
-func (s *GoalService) Update(id uint, req dto.UpdateGoalRequest) (*dto.GoalResponse, error) {
+func (s *GoalService) Update(id uint, contactID, vaultID string, req dto.UpdateGoalRequest) (*dto.GoalResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var goal models.Goal
-	if err := s.db.First(&goal, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&goal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGoalNotFound
 		}
@@ -76,9 +88,12 @@ func (s *GoalService) Update(id uint, req dto.UpdateGoalRequest) (*dto.GoalRespo
 	return &resp, nil
 }
 
-func (s *GoalService) AddStreak(goalID uint, req dto.AddStreakRequest) (*dto.GoalResponse, error) {
+func (s *GoalService) AddStreak(goalID uint, contactID, vaultID string, req dto.AddStreakRequest) (*dto.GoalResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var goal models.Goal
-	if err := s.db.First(&goal, goalID).Error; err != nil {
+	if err := s.db.Where("id = ? AND contact_id = ?", goalID, contactID).First(&goal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGoalNotFound
 		}
@@ -95,12 +110,15 @@ func (s *GoalService) AddStreak(goalID uint, req dto.AddStreakRequest) (*dto.Goa
 	if err := s.db.Create(&streak).Error; err != nil {
 		return nil, err
 	}
-	return s.Get(goalID)
+	return s.Get(goalID, contactID, vaultID)
 }
 
-func (s *GoalService) Delete(id uint) error {
+func (s *GoalService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	var goal models.Goal
-	if err := s.db.First(&goal, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&goal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrGoalNotFound
 		}

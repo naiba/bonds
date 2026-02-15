@@ -20,8 +20,12 @@ func NewGoalHandler(goalService *services.GoalService) *GoalHandler {
 
 func (h *GoalHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
-	goals, err := h.goalService.List(contactID)
+	vaultID := c.Param("vault_id")
+	goals, err := h.goalService.List(contactID, vaultID)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_goals")
 	}
 	return response.OK(c, goals)
@@ -29,6 +33,7 @@ func (h *GoalHandler) List(c echo.Context) error {
 
 func (h *GoalHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	var req dto.CreateGoalRequest
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
@@ -36,20 +41,28 @@ func (h *GoalHandler) Create(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	goal, err := h.goalService.Create(contactID, req)
+	goal, err := h.goalService.Create(contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_goal")
 	}
 	return response.Created(c, goal)
 }
 
 func (h *GoalHandler) Get(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_goal_id", nil)
 	}
-	goal, err := h.goalService.Get(uint(id))
+	goal, err := h.goalService.Get(uint(id), contactID, vaultID)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrGoalNotFound) {
 			return response.NotFound(c, "err.goal_not_found")
 		}
@@ -59,6 +72,8 @@ func (h *GoalHandler) Get(c echo.Context) error {
 }
 
 func (h *GoalHandler) Update(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_goal_id", nil)
@@ -70,8 +85,11 @@ func (h *GoalHandler) Update(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	goal, err := h.goalService.Update(uint(id), req)
+	goal, err := h.goalService.Update(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrGoalNotFound) {
 			return response.NotFound(c, "err.goal_not_found")
 		}
@@ -81,6 +99,8 @@ func (h *GoalHandler) Update(c echo.Context) error {
 }
 
 func (h *GoalHandler) AddStreak(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_goal_id", nil)
@@ -89,8 +109,11 @@ func (h *GoalHandler) AddStreak(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	goal, err := h.goalService.AddStreak(uint(id), req)
+	goal, err := h.goalService.AddStreak(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrGoalNotFound) {
 			return response.NotFound(c, "err.goal_not_found")
 		}
@@ -100,11 +123,16 @@ func (h *GoalHandler) AddStreak(c echo.Context) error {
 }
 
 func (h *GoalHandler) Delete(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_goal_id", nil)
 	}
-	if err := h.goalService.Delete(uint(id)); err != nil {
+	if err := h.goalService.Delete(uint(id), contactID, vaultID); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrGoalNotFound) {
 			return response.NotFound(c, "err.goal_not_found")
 		}

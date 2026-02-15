@@ -8,7 +8,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupGoalTest(t *testing.T) (*GoalService, string) {
+func setupGoalTest(t *testing.T) (*GoalService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -36,13 +36,13 @@ func setupGoalTest(t *testing.T) (*GoalService, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewGoalService(db), contact.ID
+	return NewGoalService(db), contact.ID, vault.ID
 }
 
 func TestCreateGoal(t *testing.T) {
-	svc, contactID := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	goal, err := svc.Create(contactID, dto.CreateGoalRequest{
+	goal, err := svc.Create(contactID, vaultID, dto.CreateGoalRequest{
 		Name: "Learn Go",
 	})
 	if err != nil {
@@ -63,18 +63,18 @@ func TestCreateGoal(t *testing.T) {
 }
 
 func TestListGoals(t *testing.T) {
-	svc, contactID := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	_, err := svc.Create(contactID, dto.CreateGoalRequest{Name: "Goal 1"})
+	_, err := svc.Create(contactID, vaultID, dto.CreateGoalRequest{Name: "Goal 1"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreateGoalRequest{Name: "Goal 2"})
+	_, err = svc.Create(contactID, vaultID, dto.CreateGoalRequest{Name: "Goal 2"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	goals, err := svc.List(contactID)
+	goals, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -84,14 +84,14 @@ func TestListGoals(t *testing.T) {
 }
 
 func TestGetGoal(t *testing.T) {
-	svc, contactID := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateGoalRequest{Name: "Get Goal"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateGoalRequest{Name: "Get Goal"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	got, err := svc.Get(created.ID)
+	got, err := svc.Get(created.ID, contactID, vaultID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -104,15 +104,15 @@ func TestGetGoal(t *testing.T) {
 }
 
 func TestUpdateGoal(t *testing.T) {
-	svc, contactID := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateGoalRequest{Name: "Original"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateGoalRequest{Name: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	active := true
-	updated, err := svc.Update(created.ID, dto.UpdateGoalRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateGoalRequest{
 		Name:   "Updated",
 		Active: &active,
 	})
@@ -128,15 +128,15 @@ func TestUpdateGoal(t *testing.T) {
 }
 
 func TestAddStreak(t *testing.T) {
-	svc, contactID := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateGoalRequest{Name: "Streak Goal"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateGoalRequest{Name: "Streak Goal"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	happenedAt := time.Now()
-	got, err := svc.AddStreak(created.ID, dto.AddStreakRequest{HappenedAt: happenedAt})
+	got, err := svc.AddStreak(created.ID, contactID, vaultID, dto.AddStreakRequest{HappenedAt: happenedAt})
 	if err != nil {
 		t.Fatalf("AddStreak failed: %v", err)
 	}
@@ -149,18 +149,18 @@ func TestAddStreak(t *testing.T) {
 }
 
 func TestDeleteGoal(t *testing.T) {
-	svc, contactID := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateGoalRequest{Name: "To delete"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateGoalRequest{Name: "To delete"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	goals, err := svc.List(contactID)
+	goals, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -170,9 +170,9 @@ func TestDeleteGoal(t *testing.T) {
 }
 
 func TestDeleteGoalNotFound(t *testing.T) {
-	svc, _ := setupGoalTest(t)
+	svc, contactID, vaultID := setupGoalTest(t)
 
-	err := svc.Delete(9999)
+	err := svc.Delete(9999, contactID, vaultID)
 	if err != ErrGoalNotFound {
 		t.Errorf("Expected ErrGoalNotFound, got %v", err)
 	}
