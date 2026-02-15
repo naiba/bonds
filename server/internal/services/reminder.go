@@ -26,7 +26,10 @@ func (s *ReminderService) SetFeedRecorder(fr *FeedRecorder) {
 	s.feedRecorder = fr
 }
 
-func (s *ReminderService) List(contactID string) ([]dto.ReminderResponse, error) {
+func (s *ReminderService) List(contactID, vaultID string) ([]dto.ReminderResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var reminders []models.ContactReminder
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&reminders).Error; err != nil {
 		return nil, err
@@ -38,7 +41,10 @@ func (s *ReminderService) List(contactID string) ([]dto.ReminderResponse, error)
 	return result, nil
 }
 
-func (s *ReminderService) Create(contactID string, req dto.CreateReminderRequest) (*dto.ReminderResponse, error) {
+func (s *ReminderService) Create(contactID, vaultID string, req dto.CreateReminderRequest) (*dto.ReminderResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	reminder := models.ContactReminder{
 		ContactID:       contactID,
 		Label:           req.Label,
@@ -66,7 +72,10 @@ func (s *ReminderService) Create(contactID string, req dto.CreateReminderRequest
 	return &resp, nil
 }
 
-func (s *ReminderService) Update(id uint, contactID string, req dto.UpdateReminderRequest) (*dto.ReminderResponse, error) {
+func (s *ReminderService) Update(id uint, contactID, vaultID string, req dto.UpdateReminderRequest) (*dto.ReminderResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var reminder models.ContactReminder
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&reminder).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -90,7 +99,10 @@ func (s *ReminderService) Update(id uint, contactID string, req dto.UpdateRemind
 	return &resp, nil
 }
 
-func (s *ReminderService) Delete(id uint, contactID string) error {
+func (s *ReminderService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	var reminder models.ContactReminder
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&reminder).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

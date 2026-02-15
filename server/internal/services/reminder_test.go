@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupReminderTest(t *testing.T) (*ReminderService, string) {
+func setupReminderTest(t *testing.T) (*ReminderService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,7 +35,7 @@ func setupReminderTest(t *testing.T) (*ReminderService, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewReminderService(db), contact.ID
+	return NewReminderService(db), contact.ID, vault.ID
 }
 
 func intPtr(v int) *int {
@@ -43,9 +43,9 @@ func intPtr(v int) *int {
 }
 
 func TestCreateReminder(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	reminder, err := svc.Create(contactID, dto.CreateReminderRequest{
+	reminder, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
 		Label: "Birthday",
 		Day:   intPtr(15),
 		Month: intPtr(6),
@@ -70,18 +70,18 @@ func TestCreateReminder(t *testing.T) {
 }
 
 func TestListReminders(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	_, err := svc.Create(contactID, dto.CreateReminderRequest{Label: "Reminder 1", Type: "one_time"})
+	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Reminder 1", Type: "one_time"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreateReminderRequest{Label: "Reminder 2", Type: "recurring"})
+	_, err = svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Reminder 2", Type: "recurring"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	reminders, err := svc.List(contactID)
+	reminders, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -91,14 +91,14 @@ func TestListReminders(t *testing.T) {
 }
 
 func TestUpdateReminder(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateReminderRequest{Label: "Original", Type: "one_time"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Original", Type: "one_time"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateReminderRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
 		Label: "Updated",
 		Day:   intPtr(25),
 		Month: intPtr(12),
@@ -116,18 +116,18 @@ func TestUpdateReminder(t *testing.T) {
 }
 
 func TestDeleteReminder(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateReminderRequest{Label: "To delete", Type: "one_time"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "To delete", Type: "one_time"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	reminders, err := svc.List(contactID)
+	reminders, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -137,23 +137,23 @@ func TestDeleteReminder(t *testing.T) {
 }
 
 func TestReminderNotFound(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	_, err := svc.Update(9999, contactID, dto.UpdateReminderRequest{Label: "nope", Type: "one_time"})
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateReminderRequest{Label: "nope", Type: "one_time"})
 	if err != ErrReminderNotFound {
 		t.Errorf("Expected ErrReminderNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999, contactID)
+	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrReminderNotFound {
 		t.Errorf("Expected ErrReminderNotFound, got %v", err)
 	}
 }
 
 func TestCreateReminderLunar(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	reminder, err := svc.Create(contactID, dto.CreateReminderRequest{
+	reminder, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
 		Label:         "Lunar Birthday",
 		Type:          "recurring_year",
 		CalendarType:  "lunar",
@@ -182,9 +182,9 @@ func TestCreateReminderLunar(t *testing.T) {
 }
 
 func TestCreateReminderDefaultGregorian(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	reminder, err := svc.Create(contactID, dto.CreateReminderRequest{
+	reminder, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
 		Label: "Regular Reminder",
 		Day:   intPtr(25),
 		Month: intPtr(12),
@@ -203,9 +203,9 @@ func TestCreateReminderDefaultGregorian(t *testing.T) {
 }
 
 func TestUpdateReminderToLunar(t *testing.T) {
-	svc, contactID := setupReminderTest(t)
+	svc, contactID, vaultID := setupReminderTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateReminderRequest{
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
 		Label: "Original",
 		Type:  "one_time",
 		Day:   intPtr(1),
@@ -216,7 +216,7 @@ func TestUpdateReminderToLunar(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateReminderRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
 		Label:         "Lunar Update",
 		Type:          "recurring_year",
 		CalendarType:  "lunar",
