@@ -110,6 +110,43 @@ func (h *LifeEventHandler) DeleteTimelineEvent(c echo.Context) error {
 	return response.NoContent(c)
 }
 
+func (h *LifeEventHandler) ToggleTimelineEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_timeline_event_id", nil)
+	}
+	if err := h.lifeEventService.ToggleTimelineEvent(uint(id), vaultID); err != nil {
+		if errors.Is(err, services.ErrTimelineEventNotFound) {
+			return response.NotFound(c, "err.timeline_event_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_toggle_timeline_event")
+	}
+	return response.NoContent(c)
+}
+
+func (h *LifeEventHandler) ToggleLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_timeline_event_id", nil)
+	}
+	lifeEventID, err := strconv.ParseUint(c.Param("lifeEventId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_life_event_id", nil)
+	}
+	if err := h.lifeEventService.ToggleLifeEvent(uint(id), uint(lifeEventID), vaultID); err != nil {
+		if errors.Is(err, services.ErrTimelineEventNotFound) {
+			return response.NotFound(c, "err.timeline_event_not_found")
+		}
+		if errors.Is(err, services.ErrLifeEventNotFound) {
+			return response.NotFound(c, "err.life_event_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_toggle_life_event")
+	}
+	return response.NoContent(c)
+}
+
 func (h *LifeEventHandler) DeleteLifeEvent(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

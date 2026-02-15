@@ -74,3 +74,53 @@ func (h *NotificationHandler) Delete(c echo.Context) error {
 	}
 	return response.NoContent(c)
 }
+
+func (h *NotificationHandler) Verify(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_channel_id", nil)
+	}
+	token := c.Param("token")
+	if err := h.notificationService.Verify(uint(id), userID, token); err != nil {
+		if errors.Is(err, services.ErrNotificationChannelNotFound) {
+			return response.NotFound(c, "err.notification_channel_not_found")
+		}
+		if errors.Is(err, services.ErrInvalidVerificationToken) {
+			return response.BadRequest(c, "err.invalid_verification_token", nil)
+		}
+		return response.InternalError(c, "err.failed_to_verify_notification")
+	}
+	return response.OK(c, map[string]string{"status": "verified"})
+}
+
+func (h *NotificationHandler) SendTest(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_channel_id", nil)
+	}
+	if err := h.notificationService.SendTest(uint(id), userID); err != nil {
+		if errors.Is(err, services.ErrNotificationChannelNotFound) {
+			return response.NotFound(c, "err.notification_channel_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_send_test")
+	}
+	return response.OK(c, map[string]string{"status": "sent"})
+}
+
+func (h *NotificationHandler) ListLogs(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_channel_id", nil)
+	}
+	logs, err := h.notificationService.ListLogs(uint(id), userID)
+	if err != nil {
+		if errors.Is(err, services.ErrNotificationChannelNotFound) {
+			return response.NotFound(c, "err.notification_channel_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_logs")
+	}
+	return response.OK(c, logs)
+}

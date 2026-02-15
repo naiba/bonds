@@ -3,10 +3,14 @@ package dto
 import "time"
 
 type PreferencesResponse struct {
-	NameOrder  string `json:"name_order"`
-	DateFormat string `json:"date_format"`
-	Timezone   string `json:"timezone"`
-	Locale     string `json:"locale"`
+	NameOrder      string `json:"name_order"`
+	DateFormat     string `json:"date_format"`
+	Timezone       string `json:"timezone"`
+	Locale         string `json:"locale"`
+	NumberFormat   string `json:"number_format"`
+	DistanceFormat string `json:"distance_format"`
+	DefaultMapSite string `json:"default_map_site"`
+	HelpShown      bool   `json:"help_shown"`
 }
 
 type UpdateNameOrderRequest struct {
@@ -26,10 +30,14 @@ type UpdateLocaleRequest struct {
 }
 
 type UpdatePreferencesRequest struct {
-	NameOrder  string `json:"name_order"`
-	DateFormat string `json:"date_format"`
-	Timezone   string `json:"timezone"`
-	Locale     string `json:"locale"`
+	NameOrder      string `json:"name_order"`
+	DateFormat     string `json:"date_format"`
+	Timezone       string `json:"timezone"`
+	Locale         string `json:"locale"`
+	NumberFormat   string `json:"number_format"`
+	DistanceFormat string `json:"distance_format"`
+	DefaultMapSite string `json:"default_map_site"`
+	HelpShown      *bool  `json:"help_shown"`
 }
 
 type CreateNotificationChannelRequest struct {

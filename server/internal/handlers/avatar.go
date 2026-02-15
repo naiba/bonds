@@ -44,6 +44,61 @@ func (h *AvatarHandler) GetAvatar(c echo.Context) error {
 	return c.Blob(http.StatusOK, "image/png", pngData)
 }
 
+func (h *AvatarHandler) UpdateAvatar(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+
+	var contact models.Contact
+	if err := h.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		return response.NotFound(c, "err.contact_not_found")
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return response.BadRequest(c, "err.file_required", nil)
+	}
+
+	mimeType := fileHeader.Header.Get("Content-Type")
+	if mimeType != "image/jpeg" && mimeType != "image/png" && mimeType != "image/gif" && mimeType != "image/webp" {
+		return response.BadRequest(c, "err.file_type_not_allowed", nil)
+	}
+
+	src, err := fileHeader.Open()
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_read_file")
+	}
+	defer src.Close()
+
+	file, err := h.vaultFileService.Upload(vaultID, contactID, "avatar", fileHeader.Filename, mimeType, fileHeader.Size, src)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_upload_file")
+	}
+
+	contact.FileID = &file.ID
+	if err := h.db.Save(&contact).Error; err != nil {
+		return response.InternalError(c, "err.failed_to_update_avatar")
+	}
+
+	return response.OK(c, file)
+}
+
+func (h *AvatarHandler) DeleteAvatar(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+
+	var contact models.Contact
+	if err := h.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		return response.NotFound(c, "err.contact_not_found")
+	}
+
+	contact.FileID = nil
+	if err := h.db.Save(&contact).Error; err != nil {
+		return response.InternalError(c, "err.failed_to_delete_avatar")
+	}
+
+	return response.NoContent(c)
+}
+
 func buildContactName(c *models.Contact) string {
 	var parts []string
 	if c.FirstName != nil && *c.FirstName != "" {

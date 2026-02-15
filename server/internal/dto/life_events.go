@@ -54,6 +54,7 @@ type LifeEventResponse struct {
 	TimelineEventID   uint      `json:"timeline_event_id"`
 	LifeEventTypeID   uint      `json:"life_event_type_id"`
 	HappenedAt        time.Time `json:"happened_at"`
+	Collapsed         bool      `json:"collapsed"`
 	Summary           string    `json:"summary"`
 	Description       string    `json:"description"`
 	Costs             *int      `json:"costs"`

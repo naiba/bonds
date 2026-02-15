@@ -196,6 +196,38 @@ func (s *LifeEventService) DeleteLifeEvent(timelineEventID, lifeEventID uint, va
 	return s.db.Delete(&le).Error
 }
 
+func (s *LifeEventService) ToggleTimelineEvent(id uint, vaultID string) error {
+	var te models.TimelineEvent
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&te).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTimelineEventNotFound
+		}
+		return err
+	}
+	te.Collapsed = !te.Collapsed
+	return s.db.Save(&te).Error
+}
+
+func (s *LifeEventService) ToggleLifeEvent(timelineEventID, lifeEventID uint, vaultID string) error {
+	var te models.TimelineEvent
+	if err := s.db.Where("id = ? AND vault_id = ?", timelineEventID, vaultID).First(&te).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTimelineEventNotFound
+		}
+		return err
+	}
+
+	var le models.LifeEvent
+	if err := s.db.Where("id = ? AND timeline_event_id = ?", lifeEventID, timelineEventID).First(&le).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrLifeEventNotFound
+		}
+		return err
+	}
+	le.Collapsed = !le.Collapsed
+	return s.db.Save(&le).Error
+}
+
 func toTimelineEventResponse(e *models.TimelineEvent) dto.TimelineEventResponse {
 	resp := dto.TimelineEventResponse{
 		ID:        e.ID,
@@ -222,6 +254,7 @@ func toLifeEventResponse(le *models.LifeEvent) dto.LifeEventResponse {
 		TimelineEventID:   le.TimelineEventID,
 		LifeEventTypeID:   le.LifeEventTypeID,
 		HappenedAt:        le.HappenedAt,
+		Collapsed:         le.Collapsed,
 		Summary:           ptrToStr(le.Summary),
 		Description:       ptrToStr(le.Description),
 		Costs:             le.Costs,

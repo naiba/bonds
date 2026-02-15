@@ -29,10 +29,14 @@ func (s *PreferenceService) Get(userID string) (*dto.PreferencesResponse, error)
 		tz = *user.Timezone
 	}
 	return &dto.PreferencesResponse{
-		NameOrder:  user.NameOrder,
-		DateFormat: user.DateFormat,
-		Timezone:   tz,
-		Locale:     user.Locale,
+		NameOrder:      user.NameOrder,
+		DateFormat:     user.DateFormat,
+		Timezone:       tz,
+		Locale:         user.Locale,
+		NumberFormat:   user.NumberFormat,
+		DistanceFormat: user.DistanceFormat,
+		DefaultMapSite: user.DefaultMapSite,
+		HelpShown:      user.HelpShown,
 	}, nil
 }
 
@@ -52,6 +56,22 @@ func (s *PreferenceService) UpdateLocale(userID string, req dto.UpdateLocaleRequ
 	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("locale", req.Locale).Error
 }
 
+func (s *PreferenceService) UpdateNumberFormat(userID string, req dto.UpdateNumberFormatRequest) error {
+	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("number_format", req.NumberFormat).Error
+}
+
+func (s *PreferenceService) UpdateDistanceFormat(userID string, req dto.UpdateDistanceFormatRequest) error {
+	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("distance_format", req.DistanceFormat).Error
+}
+
+func (s *PreferenceService) UpdateMapsPreference(userID string, req dto.UpdateMapsPreferenceRequest) error {
+	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("default_map_site", req.DefaultMapSite).Error
+}
+
+func (s *PreferenceService) UpdateHelpShown(userID string, req dto.UpdateHelpShownRequest) error {
+	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("help_shown", req.HelpShown).Error
+}
+
 func (s *PreferenceService) UpdateAll(userID string, req dto.UpdatePreferencesRequest) (*dto.PreferencesResponse, error) {
 	updates := map[string]interface{}{}
 	if req.NameOrder != "" {
@@ -65,6 +85,18 @@ func (s *PreferenceService) UpdateAll(userID string, req dto.UpdatePreferencesRe
 	}
 	if req.Locale != "" {
 		updates["locale"] = req.Locale
+	}
+	if req.NumberFormat != "" {
+		updates["number_format"] = req.NumberFormat
+	}
+	if req.DistanceFormat != "" {
+		updates["distance_format"] = req.DistanceFormat
+	}
+	if req.DefaultMapSite != "" {
+		updates["default_map_site"] = req.DefaultMapSite
+	}
+	if req.HelpShown != nil {
+		updates["help_shown"] = *req.HelpShown
 	}
 	if len(updates) == 0 {
 		return s.Get(userID)

@@ -26,6 +26,15 @@ func (h *CompanyHandler) List(c echo.Context) error {
 	return response.OK(c, companies)
 }
 
+func (h *CompanyHandler) ListForContact(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	companies, err := h.companyService.List(vaultID)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_list_companies")
+	}
+	return response.OK(c, companies)
+}
+
 func (h *CompanyHandler) Get(c echo.Context) error {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

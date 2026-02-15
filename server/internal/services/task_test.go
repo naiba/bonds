@@ -176,3 +176,53 @@ func TestTaskNotFound(t *testing.T) {
 		t.Errorf("ToggleCompleted: expected ErrTaskNotFound, got %v", err)
 	}
 }
+
+func TestListCompletedTasks(t *testing.T) {
+	svc, contactID, vaultID, userID := setupTaskTest(t)
+
+	task1, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 1"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	_, err = svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 2"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	task3, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 3"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	_, err = svc.ToggleCompleted(task1.ID, contactID, vaultID)
+	if err != nil {
+		t.Fatalf("ToggleCompleted failed: %v", err)
+	}
+	_, err = svc.ToggleCompleted(task3.ID, contactID, vaultID)
+	if err != nil {
+		t.Fatalf("ToggleCompleted failed: %v", err)
+	}
+
+	completed, err := svc.ListCompleted(contactID, vaultID)
+	if err != nil {
+		t.Fatalf("ListCompleted failed: %v", err)
+	}
+	if len(completed) != 2 {
+		t.Fatalf("Expected 2 completed tasks, got %d", len(completed))
+	}
+	for _, task := range completed {
+		if !task.Completed {
+			t.Errorf("Expected task %d to be completed", task.ID)
+		}
+		if task.CompletedAt == nil {
+			t.Errorf("Expected task %d to have CompletedAt set", task.ID)
+		}
+	}
+
+	allTasks, err := svc.List(contactID, vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(allTasks) != 3 {
+		t.Errorf("Expected 3 total tasks, got %d", len(allTasks))
+	}
+}

@@ -16,6 +16,18 @@ func NewFeedHandler(feedService *services.FeedService) *FeedHandler {
 	return &FeedHandler{feedService: feedService}
 }
 
+func (h *FeedHandler) GetContactFeed(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+
+	items, meta, err := h.feedService.ListContactFeed(contactID, page, perPage)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_get_feed")
+	}
+	return response.Paginated(c, items, meta)
+}
+
 func (h *FeedHandler) Get(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	page, _ := strconv.Atoi(c.QueryParam("page"))

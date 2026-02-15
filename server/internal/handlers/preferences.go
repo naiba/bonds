@@ -97,3 +97,60 @@ func (h *PreferenceHandler) UpdateLocale(c echo.Context) error {
 	}
 	return response.OK(c, map[string]string{"status": "ok"})
 }
+
+func (h *PreferenceHandler) UpdateNumberFormat(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	var req dto.UpdateNumberFormatRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+	if err := h.preferenceService.UpdateNumberFormat(userID, req); err != nil {
+		return response.InternalError(c, "err.failed_to_update_number_format")
+	}
+	return response.OK(c, map[string]string{"status": "ok"})
+}
+
+func (h *PreferenceHandler) UpdateDistanceFormat(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	var req dto.UpdateDistanceFormatRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+	if err := h.preferenceService.UpdateDistanceFormat(userID, req); err != nil {
+		return response.InternalError(c, "err.failed_to_update_distance_format")
+	}
+	return response.OK(c, map[string]string{"status": "ok"})
+}
+
+func (h *PreferenceHandler) UpdateMapsPreference(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	var req dto.UpdateMapsPreferenceRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+	if err := h.preferenceService.UpdateMapsPreference(userID, req); err != nil {
+		return response.InternalError(c, "err.failed_to_update_maps_preference")
+	}
+	return response.OK(c, map[string]string{"status": "ok"})
+}
+
+func (h *PreferenceHandler) UpdateHelpShown(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	var req dto.UpdateHelpShownRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := h.preferenceService.UpdateHelpShown(userID, req); err != nil {
+		return response.InternalError(c, "err.failed_to_update_help_shown")
+	}
+	return response.OK(c, map[string]string{"status": "ok"})
+}

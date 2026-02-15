@@ -32,6 +32,19 @@ func (h *TaskHandler) List(c echo.Context) error {
 	return response.OK(c, tasks)
 }
 
+func (h *TaskHandler) ListCompleted(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	tasks, err := h.taskService.ListCompleted(contactID, vaultID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_tasks")
+	}
+	return response.OK(c, tasks)
+}
+
 func (h *TaskHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")

@@ -39,6 +39,21 @@ func (s *TaskService) List(contactID, vaultID string) ([]dto.TaskResponse, error
 	return result, nil
 }
 
+func (s *TaskService) ListCompleted(contactID, vaultID string) ([]dto.TaskResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
+	var tasks []models.ContactTask
+	if err := s.db.Where("contact_id = ? AND completed = ?", contactID, true).Order("completed_at DESC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	result := make([]dto.TaskResponse, len(tasks))
+	for i, t := range tasks {
+		result[i] = toTaskResponse(&t)
+	}
+	return result, nil
+}
+
 func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.CreateTaskRequest) (*dto.TaskResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err

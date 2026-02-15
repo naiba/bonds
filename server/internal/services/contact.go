@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -254,6 +255,107 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 
 	resp := toContactResponse(&contact, cvu.IsFavorite)
 	return &resp, nil
+}
+
+func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uint, page, perPage int) ([]dto.ContactResponse, response.Meta, error) {
+	query := s.db.Where("vault_id = ? AND id IN (SELECT contact_id FROM contact_label WHERE label_id = ?)", vaultID, labelID)
+
+	var total int64
+	if err := query.Model(&models.Contact{}).Count(&total).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 15
+	}
+	offset := (page - 1) * perPage
+
+	var contacts []models.Contact
+	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&contacts).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	contactIDs := make([]string, len(contacts))
+	for i, c := range contacts {
+		contactIDs[i] = c.ID
+	}
+
+	favoriteMap := make(map[string]bool)
+	if len(contactIDs) > 0 {
+		var cvus []models.ContactVaultUser
+		s.db.Where("contact_id IN ? AND user_id = ?", contactIDs, userID).Find(&cvus)
+		for _, cvu := range cvus {
+			favoriteMap[cvu.ContactID] = cvu.IsFavorite
+		}
+	}
+
+	result := make([]dto.ContactResponse, len(contacts))
+	for i, c := range contacts {
+		result[i] = toContactResponse(&c, favoriteMap[c.ID])
+	}
+
+	meta := response.Meta{
+		Page:       page,
+		PerPage:    perPage,
+		Total:      total,
+		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
+	}
+
+	return result, meta, nil
+}
+
+func (s *ContactService) QuickSearch(vaultID, term string) ([]dto.ContactSearchItem, error) {
+	if term == "" {
+		return []dto.ContactSearchItem{}, nil
+	}
+
+	likeTerm := "%" + term + "%"
+	var contacts []models.Contact
+	if err := s.db.Where("vault_id = ?", vaultID).
+		Where(
+			s.db.Where("first_name LIKE ?", likeTerm).
+				Or("last_name LIKE ?", likeTerm).
+				Or("nickname LIKE ?", likeTerm).
+				Or("maiden_name LIKE ?", likeTerm).
+				Or("middle_name LIKE ?", likeTerm),
+		).
+		Order("first_name ASC, last_name ASC").
+		Limit(5).
+		Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.ContactSearchItem, len(contacts))
+	for i, c := range contacts {
+		result[i] = dto.ContactSearchItem{
+			ID:   c.ID,
+			Name: buildContactDisplayName(&c),
+		}
+	}
+	return result, nil
+}
+
+func buildContactDisplayName(c *models.Contact) string {
+	parts := make([]string, 0, 5)
+	if c.FirstName != nil && *c.FirstName != "" {
+		parts = append(parts, *c.FirstName)
+	}
+	if c.LastName != nil && *c.LastName != "" {
+		parts = append(parts, *c.LastName)
+	}
+	if c.Nickname != nil && *c.Nickname != "" {
+		parts = append(parts, *c.Nickname)
+	}
+	if c.MaidenName != nil && *c.MaidenName != "" {
+		parts = append(parts, *c.MaidenName)
+	}
+	if c.MiddleName != nil && *c.MiddleName != "" {
+		parts = append(parts, *c.MiddleName)
+	}
+	return strings.Join(parts, " ")
 }
 
 // validateContactBelongsToVault checks that a contact exists and belongs to the given vault.

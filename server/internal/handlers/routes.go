@@ -51,6 +51,36 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	personalizeService := services.NewPersonalizeService(db)
 	twoFactorService := services.NewTwoFactorService(db)
 	vcardService := services.NewVCardService(db)
+	contactLabelService := services.NewContactLabelService(db)
+	contactReligionService := services.NewContactReligionService(db)
+	contactJobService := services.NewContactJobService(db)
+	contactMoveService := services.NewContactMoveService(db)
+	contactTemplateService := services.NewContactTemplateService(db)
+	contactSortService := services.NewContactSortService(db)
+	journalMetricService := services.NewJournalMetricService(db)
+	postMetricService := services.NewPostMetricService(db)
+	postTagService := services.NewPostTagService(db)
+	sliceOfLifeService := services.NewSliceOfLifeService(db)
+	lifeMetricService := services.NewLifeMetricService(db)
+	vaultReminderService := services.NewVaultReminderService(db)
+	mostConsultedService := services.NewMostConsultedService(db)
+	postTemplateSectionService := services.NewPostTemplateSectionService(db)
+	groupTypeRoleService := services.NewGroupTypeRoleService(db)
+	relationshipTypeService := services.NewRelationshipTypeService(db)
+	callReasonService := services.NewCallReasonService(db)
+	vaultSettingsService := services.NewVaultSettingsService(db)
+	vaultUsersService := services.NewVaultUsersService(db)
+	vaultLabelService := services.NewVaultLabelService(db)
+	vaultTagService := services.NewVaultTagService(db)
+	vaultDateTypeService := services.NewVaultImportantDateTypeService(db)
+	vaultMoodParamService := services.NewVaultMoodParamService(db)
+	vaultLifeEventSettingsService := services.NewVaultLifeEventService(db)
+	vaultQuickFactTplService := services.NewVaultQuickFactTemplateService(db)
+	userManagementService := services.NewUserManagementService(db)
+	accountCancelService := services.NewAccountCancelService(db)
+	storageInfoService := services.NewStorageInfoService(db)
+	currencyService := services.NewCurrencyService(db)
+	templatePageService := services.NewTemplatePageService(db)
 
 	mailer, mErr := services.NewSMTPMailer(&cfg.SMTP)
 	if mErr != nil {
@@ -98,6 +128,12 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	contactService.SetSearchService(searchService)
 	noteService.SetSearchService(searchService)
 
+	postPhotoHandler := NewPostPhotoHandler(vaultFileService)
+	contactPhotoHandler := NewContactPhotoHandler(vaultFileService)
+	contactDocumentHandler := NewContactDocumentHandler(vaultFileService)
+
+	telegramWebhookService := services.NewTelegramWebhookService(db)
+
 	authHandler := NewAuthHandler(authService)
 	accountHandler := NewAccountHandler(db)
 	vaultHandler := NewVaultHandler(vaultService)
@@ -134,6 +170,33 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	oauthHandler := NewOAuthHandler(oauthService, cfg.App.URL, cfg.JWT.Secret)
 	vcardHandler := NewVCardHandler(vcardService)
 	invitationHandler := NewInvitationHandler(invitationService)
+	contactLabelHandler := NewContactLabelHandler(contactLabelService)
+	contactReligionHandler := NewContactReligionHandler(contactReligionService)
+	contactJobHandler := NewContactJobHandler(contactJobService)
+	contactMoveHandler := NewContactMoveHandler(contactMoveService)
+	contactTemplateHandler := NewContactTemplateHandler(contactTemplateService)
+	contactSortHandler := NewContactSortHandler(contactSortService)
+	journalMetricHandler := NewJournalMetricHandler(journalMetricService)
+	postMetricHandler := NewPostMetricHandler(postMetricService)
+	postTagHandler := NewPostTagHandler(postTagService)
+	sliceOfLifeHandler := NewSliceOfLifeHandler(sliceOfLifeService)
+	lifeMetricHandler := NewLifeMetricHandler(lifeMetricService)
+	vaultReminderHandler := NewVaultReminderHandler(vaultReminderService)
+	mostConsultedHandler := NewMostConsultedHandler(mostConsultedService)
+	postTemplateSectionHandler := NewPostTemplateSectionHandler(postTemplateSectionService)
+	groupTypeRoleHandler := NewGroupTypeRoleHandler(groupTypeRoleService)
+	relationshipTypeHandler := NewRelationshipTypeHandler(relationshipTypeService)
+	callReasonHandler := NewCallReasonHandler(callReasonService)
+	vaultSettingsHandler := NewVaultSettingsHandler(
+		vaultSettingsService, vaultUsersService, vaultLabelService, vaultTagService,
+		vaultDateTypeService, vaultMoodParamService, vaultLifeEventSettingsService, vaultQuickFactTplService,
+	)
+	userManagementHandler := NewUserManagementHandler(userManagementService)
+	accountCancelHandler := NewAccountCancelHandler(accountCancelService)
+	storageInfoHandler := NewStorageInfoHandler(storageInfoService)
+	currencyHandler := NewCurrencyHandler(currencyService)
+	templatePageHandler := NewTemplatePageHandler(templatePageService)
+	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
 
 	e.Use(middleware.CORS())
 
@@ -142,6 +205,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	api.GET("/announcement", func(c echo.Context) error {
 		return response.OK(c, map[string]string{"content": cfg.Announcement})
 	})
+
+	if cfg.Telegram.BotToken != "" {
+		api.POST("/telegram/webhook", telegramWebhookHandler.HandleWebhook)
+	}
 
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)
@@ -176,6 +243,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 
 	contacts := protected.Group("/vaults/:vault_id/contacts", VaultPermissionMiddleware(vaultService, models.PermissionViewer))
 	contacts.GET("", contactHandler.List)
+	contacts.GET("/labels/:labelId", contactHandler.ListByLabel)
 	contacts.POST("", contactHandler.Create, requireEditor)
 	contacts.GET("/:id", contactHandler.Get)
 	contacts.PUT("/:id", contactHandler.Update, requireEditor)
@@ -184,9 +252,22 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	contacts.PUT("/:id/favorite", contactHandler.ToggleFavorite)
 	contacts.GET("/export", vcardHandler.ExportVault)
 	contacts.POST("/import", vcardHandler.ImportVCard, requireEditor)
+	contacts.PUT("/sort", contactSortHandler.UpdateSort, requireEditor)
 
 	contactSub := protected.Group("/vaults/:vault_id/contacts/:contact_id", VaultPermissionMiddleware(vaultService, models.PermissionViewer))
 	contactSub.GET("/vcard", vcardHandler.ExportContact)
+	contactSub.GET("/labels", contactLabelHandler.List)
+	contactSub.POST("/labels", contactLabelHandler.Add, requireEditor)
+	contactSub.PUT("/labels/:id", contactLabelHandler.Update, requireEditor)
+	contactSub.DELETE("/labels/:id", contactLabelHandler.Remove, requireEditor)
+	contactSub.PUT("/religion", contactReligionHandler.Update, requireEditor)
+	contactSub.PUT("/jobInformation", contactJobHandler.Update, requireEditor)
+	contactSub.DELETE("/jobInformation", contactJobHandler.Delete, requireEditor)
+	contactSub.GET("/feed", feedHandler.GetContactFeed)
+	contactSub.POST("/move", contactMoveHandler.Move, requireEditor)
+	contactSub.PUT("/template", contactTemplateHandler.Update, requireEditor)
+	contactSub.PUT("/avatar", avatarHandler.UpdateAvatar, requireEditor)
+	contactSub.DELETE("/avatar", avatarHandler.DeleteAvatar, requireEditor)
 
 	notes := contactSub.Group("/notes")
 	notes.GET("", noteHandler.List)
@@ -208,6 +289,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 
 	tasks := contactSub.Group("/tasks")
 	tasks.GET("", taskHandler.List)
+	tasks.GET("/completed", taskHandler.ListCompleted)
 	tasks.POST("", taskHandler.Create, requireEditor)
 	tasks.PUT("/:id", taskHandler.Update, requireEditor)
 	tasks.PUT("/:id/toggle", taskHandler.ToggleCompleted, requireEditor)
@@ -224,6 +306,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	addresses.POST("", addressHandler.Create, requireEditor)
 	addresses.PUT("/:id", addressHandler.Update, requireEditor)
 	addresses.DELETE("/:id", addressHandler.Delete, requireEditor)
+	addresses.GET("/:id/image/:width/:height", addressHandler.GetMapImage)
 
 	contactInfo := contactSub.Group("/contactInformation")
 	contactInfo.GET("", contactInformationHandler.List)
@@ -263,6 +346,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	timelineRoutes.POST("", lifeEventHandler.CreateTimelineEvent, requireEditor)
 	timelineRoutes.POST("/:id/lifeEvents", lifeEventHandler.AddLifeEvent, requireEditor)
 	timelineRoutes.PUT("/:id/lifeEvents/:lifeEventId", lifeEventHandler.UpdateLifeEvent, requireEditor)
+	timelineRoutes.PUT("/:id/toggle", lifeEventHandler.ToggleTimelineEvent, requireEditor)
+	timelineRoutes.PUT("/:id/lifeEvents/:lifeEventId/toggle", lifeEventHandler.ToggleLifeEvent, requireEditor)
 	timelineRoutes.DELETE("/:id", lifeEventHandler.DeleteTimelineEvent, requireEditor)
 	timelineRoutes.DELETE("/:id/lifeEvents/:lifeEventId", lifeEventHandler.DeleteLifeEvent, requireEditor)
 
@@ -271,8 +356,15 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	moodRoutes.GET("", moodTrackingHandler.List)
 
 	contactSub.POST("/photos", vaultFileHandler.UploadContactFile, requireEditor)
+	contactSub.GET("/photos", contactPhotoHandler.List)
+	contactSub.GET("/photos/:photoId", contactPhotoHandler.Get)
+	contactSub.DELETE("/photos/:photoId", contactPhotoHandler.Delete, requireEditor)
 	contactSub.POST("/documents", vaultFileHandler.UploadContactFile, requireEditor)
+	contactSub.GET("/documents", contactDocumentHandler.List)
+	contactSub.DELETE("/documents/:id", contactDocumentHandler.Delete, requireEditor)
 	contactSub.GET("/avatar", avatarHandler.GetAvatar)
+	contactSub.GET("/companies/list", companyHandler.ListForContact)
+	contactSub.PUT("/quickFacts/toggle", quickFactHandler.Toggle, requireEditor)
 
 	quickFactRoutes := contactSub.Group("/quickFacts")
 	quickFactRoutes.GET("/:templateId", quickFactHandler.List)
@@ -296,12 +388,39 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	journalRoutes.PUT("/:id", journalHandler.Update, requireEditor)
 	journalRoutes.DELETE("/:id", journalHandler.Delete, requireEditor)
 
+	journalRoutes.GET("/:id/photos", journalHandler.GetPhotos)
+	journalRoutes.GET("/:id/years/:year", journalHandler.GetByYear)
+
+	journalMetricRoutes := vaultScoped.Group("/journals/:journal_id/metrics")
+	journalMetricRoutes.GET("", journalMetricHandler.List)
+	journalMetricRoutes.POST("", journalMetricHandler.Create, requireEditor)
+	journalMetricRoutes.DELETE("/:id", journalMetricHandler.Delete, requireEditor)
+
+	sliceRoutes := vaultScoped.Group("/journals/:journal_id/slices")
+	sliceRoutes.GET("", sliceOfLifeHandler.List)
+	sliceRoutes.POST("", sliceOfLifeHandler.Create, requireEditor)
+	sliceRoutes.GET("/:id", sliceOfLifeHandler.Get)
+	sliceRoutes.PUT("/:id", sliceOfLifeHandler.Update, requireEditor)
+	sliceRoutes.DELETE("/:id", sliceOfLifeHandler.Delete, requireEditor)
+	sliceRoutes.PUT("/:id/cover", sliceOfLifeHandler.UpdateCover, requireEditor)
+	sliceRoutes.DELETE("/:id/cover", sliceOfLifeHandler.RemoveCover, requireEditor)
+
 	postRoutes := vaultScoped.Group("/journals/:journal_id/posts")
 	postRoutes.GET("", postHandler.List)
 	postRoutes.POST("", postHandler.Create, requireEditor)
 	postRoutes.GET("/:id", postHandler.Get)
 	postRoutes.PUT("/:id", postHandler.Update, requireEditor)
 	postRoutes.DELETE("/:id", postHandler.Delete, requireEditor)
+	postRoutes.POST("/:id/metrics", postMetricHandler.Create, requireEditor)
+	postRoutes.DELETE("/:id/metrics/:metricId", postMetricHandler.Delete, requireEditor)
+	postRoutes.POST("/:id/tags", postTagHandler.Add, requireEditor)
+	postRoutes.PUT("/:id/tags/:tagId", postTagHandler.Update, requireEditor)
+	postRoutes.DELETE("/:id/tags/:tagId", postTagHandler.Remove, requireEditor)
+	postRoutes.PUT("/:id/slices", postHandler.SetSlice, requireEditor)
+	postRoutes.DELETE("/:id/slices", postHandler.ClearSlice, requireEditor)
+	postRoutes.GET("/:id/photos", postPhotoHandler.List)
+	postRoutes.POST("/:id/photos", postPhotoHandler.Upload, requireEditor)
+	postRoutes.DELETE("/:id/photos/:photoId", postPhotoHandler.Delete, requireEditor)
 
 	vaultScoped.GET("/tasks", vaultTaskHandler.List)
 
@@ -313,14 +432,35 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	vaultScoped.GET("/companies", companyHandler.List)
 	vaultScoped.GET("/companies/:id", companyHandler.Get)
 
-	vaultScoped.GET("/calendar", calendarHandler.Get)
+	vaultScoped.GET("/files/photos", vaultFileHandler.ListPhotos)
+	vaultScoped.GET("/files/documents", vaultFileHandler.ListDocuments)
+	vaultScoped.GET("/files/avatars", vaultFileHandler.ListAvatars)
 
+	vaultScoped.GET("/calendar", calendarHandler.Get)
+	vaultScoped.GET("/calendar/years/:year/months/:month", calendarHandler.GetMonth)
+	vaultScoped.GET("/calendar/years/:year/months/:month/days/:day", calendarHandler.GetDay)
+
+	vaultScoped.GET("/reports", reportHandler.Index)
 	vaultScoped.GET("/reports/addresses", reportHandler.Addresses)
+	vaultScoped.GET("/reports/addresses/city/:city", reportHandler.AddressesByCity)
+	vaultScoped.GET("/reports/addresses/country/:country", reportHandler.AddressesByCountry)
 	vaultScoped.GET("/reports/importantDates", reportHandler.ImportantDates)
 	vaultScoped.GET("/reports/moodTrackingEvents", reportHandler.MoodTrackingEvents)
 
+	vaultScoped.GET("/reminders", vaultReminderHandler.List)
+
+	vaultScoped.GET("/lifeMetrics", lifeMetricHandler.List)
+	vaultScoped.POST("/lifeMetrics", lifeMetricHandler.Create, requireEditor)
+	vaultScoped.PUT("/lifeMetrics/:id", lifeMetricHandler.Update, requireEditor)
+	vaultScoped.DELETE("/lifeMetrics/:id", lifeMetricHandler.Delete, requireEditor)
+	vaultScoped.POST("/lifeMetrics/:id/contacts", lifeMetricHandler.AddContact, requireEditor)
+
+	vaultScoped.PUT("/defaultTab", vaultHandler.UpdateDefaultTab, requireEditor)
+
 	vaultScoped.GET("/feed", feedHandler.Get)
 	vaultScoped.GET("/search", searchHandler.Search)
+	vaultScoped.GET("/search/mostConsulted", mostConsultedHandler.List)
+	vaultScoped.POST("/search/contacts", contactHandler.QuickSearch)
 
 	settingsGroup := protected.Group("/settings")
 
@@ -331,18 +471,60 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	prefsGroup.POST("/date", preferenceHandler.UpdateDateFormat)
 	prefsGroup.POST("/timezone", preferenceHandler.UpdateTimezone)
 	prefsGroup.POST("/locale", preferenceHandler.UpdateLocale)
+	prefsGroup.POST("/number", preferenceHandler.UpdateNumberFormat)
+	prefsGroup.POST("/distance", preferenceHandler.UpdateDistanceFormat)
+	prefsGroup.POST("/maps", preferenceHandler.UpdateMapsPreference)
+	prefsGroup.POST("/help", preferenceHandler.UpdateHelpShown)
 
 	notifGroup := settingsGroup.Group("/notifications")
 	notifGroup.GET("", notificationHandler.List)
 	notifGroup.POST("", notificationHandler.Create)
 	notifGroup.PUT("/:id/toggle", notificationHandler.Toggle)
 	notifGroup.DELETE("/:id", notificationHandler.Delete)
+	notifGroup.GET("/:id/verify/:token", notificationHandler.Verify)
+	notifGroup.POST("/:id/test", notificationHandler.SendTest)
+	notifGroup.GET("/:id/logs", notificationHandler.ListLogs)
 
 	personalizeGroup := settingsGroup.Group("/personalize", authMiddleware.RequireAdmin)
 	personalizeGroup.GET("/:entity", personalizeHandler.List)
 	personalizeGroup.POST("/:entity", personalizeHandler.Create)
 	personalizeGroup.PUT("/:entity/:id", personalizeHandler.Update)
 	personalizeGroup.DELETE("/:entity/:id", personalizeHandler.Delete)
+	personalizeGroup.POST("/:entity/:id/position", personalizeHandler.UpdatePosition)
+
+	ptSectionGroup := personalizeGroup.Group("/post-templates/:id/sections")
+	ptSectionGroup.POST("", postTemplateSectionHandler.Create)
+	ptSectionGroup.PUT("/:sectionId", postTemplateSectionHandler.Update)
+	ptSectionGroup.DELETE("/:sectionId", postTemplateSectionHandler.Delete)
+	ptSectionGroup.POST("/:sectionId/position", postTemplateSectionHandler.UpdatePosition)
+
+	gtRoleGroup := personalizeGroup.Group("/group-types/:id/roles")
+	gtRoleGroup.POST("", groupTypeRoleHandler.Create)
+	gtRoleGroup.PUT("/:roleId", groupTypeRoleHandler.Update)
+	gtRoleGroup.DELETE("/:roleId", groupTypeRoleHandler.Delete)
+	gtRoleGroup.POST("/:roleId/position", groupTypeRoleHandler.UpdatePosition)
+
+	rtTypeGroup := personalizeGroup.Group("/relationship-types/:id/types")
+	rtTypeGroup.POST("", relationshipTypeHandler.Create)
+	rtTypeGroup.PUT("/:typeId", relationshipTypeHandler.Update)
+	rtTypeGroup.DELETE("/:typeId", relationshipTypeHandler.Delete)
+
+	crGroup := personalizeGroup.Group("/call-reasons/:id/reasons")
+	crGroup.POST("", callReasonHandler.Create)
+	crGroup.PUT("/:reasonId", callReasonHandler.Update)
+	crGroup.DELETE("/:reasonId", callReasonHandler.Delete)
+
+	tpGroup := personalizeGroup.Group("/templates/:id/pages")
+	tpGroup.GET("", templatePageHandler.List)
+	tpGroup.POST("", templatePageHandler.Create)
+	tpGroup.GET("/:pageId", templatePageHandler.Get)
+	tpGroup.PUT("/:pageId", templatePageHandler.Update)
+	tpGroup.DELETE("/:pageId", templatePageHandler.Delete)
+	tpGroup.POST("/:pageId/position", templatePageHandler.UpdatePosition)
+	tpGroup.GET("/:pageId/modules", templatePageHandler.ListModules)
+	tpGroup.POST("/:pageId/modules", templatePageHandler.AddModule)
+	tpGroup.DELETE("/:pageId/modules/:moduleId", templatePageHandler.RemoveModule)
+	tpGroup.POST("/:pageId/modules/:moduleId/position", templatePageHandler.UpdateModulePosition)
 
 	if webauthnService != nil {
 		webauthnHandler := NewWebAuthnHandler(webauthnService, authService)
@@ -363,4 +545,68 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	twoFactorGroup.POST("/confirm", twoFactorHandler.Confirm)
 	twoFactorGroup.POST("/disable", twoFactorHandler.Disable)
 	twoFactorGroup.GET("/status", twoFactorHandler.Status)
+
+	usersGroup := settingsGroup.Group("/users", authMiddleware.RequireAdmin)
+	usersGroup.GET("", userManagementHandler.List)
+	usersGroup.POST("", userManagementHandler.Create)
+	usersGroup.GET("/:id", userManagementHandler.Get)
+	usersGroup.PUT("/:id", userManagementHandler.Update)
+	usersGroup.DELETE("/:id", userManagementHandler.Delete)
+
+	oauthGroup := settingsGroup.Group("/oauth")
+	oauthGroup.GET("", oauthHandler.ListProviders)
+	oauthGroup.DELETE("/:driver", oauthHandler.UnlinkProvider)
+
+	settingsGroup.DELETE("/account", accountCancelHandler.Cancel, authMiddleware.RequireAdmin)
+	settingsGroup.GET("/storage", storageInfoHandler.Get)
+
+	protected.GET("/currencies", currencyHandler.List)
+
+	vaultSettings := vaultScoped.Group("/settings", VaultPermissionMiddleware(vaultService, models.PermissionManager))
+	vaultSettings.GET("", vaultSettingsHandler.Get)
+	vaultSettings.PUT("", vaultSettingsHandler.Update)
+	vaultSettings.PUT("/template", vaultSettingsHandler.UpdateTemplate)
+	vaultSettings.PUT("/visibility", vaultSettingsHandler.UpdateVisibility)
+
+	vaultSettings.GET("/users", vaultSettingsHandler.ListUsers)
+	vaultSettings.POST("/users", vaultSettingsHandler.AddUser)
+	vaultSettings.PUT("/users/:id", vaultSettingsHandler.UpdateUserPermission)
+	vaultSettings.DELETE("/users/:id", vaultSettingsHandler.RemoveUser)
+
+	vaultSettings.GET("/labels", vaultSettingsHandler.ListLabels)
+	vaultSettings.POST("/labels", vaultSettingsHandler.CreateLabel)
+	vaultSettings.PUT("/labels/:id", vaultSettingsHandler.UpdateLabel)
+	vaultSettings.DELETE("/labels/:id", vaultSettingsHandler.DeleteLabel)
+
+	vaultSettings.GET("/tags", vaultSettingsHandler.ListTags)
+	vaultSettings.POST("/tags", vaultSettingsHandler.CreateTag)
+	vaultSettings.PUT("/tags/:id", vaultSettingsHandler.UpdateTag)
+	vaultSettings.DELETE("/tags/:id", vaultSettingsHandler.DeleteTag)
+
+	vaultSettings.GET("/contactImportantDateTypes", vaultSettingsHandler.ListDateTypes)
+	vaultSettings.POST("/contactImportantDateTypes", vaultSettingsHandler.CreateDateType)
+	vaultSettings.PUT("/contactImportantDateTypes/:id", vaultSettingsHandler.UpdateDateType)
+	vaultSettings.DELETE("/contactImportantDateTypes/:id", vaultSettingsHandler.DeleteDateType)
+
+	vaultSettings.GET("/moodTrackingParameters", vaultSettingsHandler.ListMoodParams)
+	vaultSettings.POST("/moodTrackingParameters", vaultSettingsHandler.CreateMoodParam)
+	vaultSettings.PUT("/moodTrackingParameters/:id", vaultSettingsHandler.UpdateMoodParam)
+	vaultSettings.PUT("/moodTrackingParameters/:id/order", vaultSettingsHandler.UpdateMoodParamOrder)
+	vaultSettings.DELETE("/moodTrackingParameters/:id", vaultSettingsHandler.DeleteMoodParam)
+
+	vaultSettings.GET("/lifeEventCategories", vaultSettingsHandler.ListLifeEventCategories)
+	vaultSettings.POST("/lifeEventCategories", vaultSettingsHandler.CreateLifeEventCategory)
+	vaultSettings.PUT("/lifeEventCategories/:id", vaultSettingsHandler.UpdateLifeEventCategory)
+	vaultSettings.POST("/lifeEventCategories/:id/order", vaultSettingsHandler.UpdateLifeEventCategoryOrder)
+	vaultSettings.DELETE("/lifeEventCategories/:id", vaultSettingsHandler.DeleteLifeEventCategory)
+	vaultSettings.POST("/lifeEventCategories/:categoryId/lifeEventTypes", vaultSettingsHandler.CreateLifeEventType)
+	vaultSettings.PUT("/lifeEventCategories/:categoryId/lifeEventTypes/:typeId", vaultSettingsHandler.UpdateLifeEventType)
+	vaultSettings.POST("/lifeEventCategories/:categoryId/lifeEventTypes/:typeId/order", vaultSettingsHandler.UpdateLifeEventTypeOrder)
+	vaultSettings.DELETE("/lifeEventCategories/:categoryId/lifeEventTypes/:typeId", vaultSettingsHandler.DeleteLifeEventType)
+
+	vaultSettings.GET("/quickFactTemplates", vaultSettingsHandler.ListQuickFactTemplates)
+	vaultSettings.POST("/quickFactTemplates", vaultSettingsHandler.CreateQuickFactTemplate)
+	vaultSettings.PUT("/quickFactTemplates/:id", vaultSettingsHandler.UpdateQuickFactTemplate)
+	vaultSettings.PUT("/quickFactTemplates/:id/order", vaultSettingsHandler.UpdateQuickFactTemplateOrder)
+	vaultSettings.DELETE("/quickFactTemplates/:id", vaultSettingsHandler.DeleteQuickFactTemplate)
 }

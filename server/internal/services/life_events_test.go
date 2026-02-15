@@ -232,3 +232,94 @@ func TestTimelineEventNotFound(t *testing.T) {
 		t.Errorf("Expected ErrTimelineEventNotFound, got %v", err)
 	}
 }
+
+func TestToggleTimelineEvent(t *testing.T) {
+	svc, contactID, vaultID := setupLifeEventTest(t)
+
+	te, err := svc.CreateTimelineEvent(contactID, vaultID, dto.CreateTimelineEventRequest{
+		StartedAt: time.Now(),
+		Label:     "Toggle Test",
+	})
+	if err != nil {
+		t.Fatalf("CreateTimelineEvent failed: %v", err)
+	}
+
+	initialCollapsed := te.Collapsed
+
+	if err := svc.ToggleTimelineEvent(te.ID, vaultID); err != nil {
+		t.Fatalf("ToggleTimelineEvent failed: %v", err)
+	}
+
+	events, _, err := svc.ListTimelineEvents(contactID, vaultID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListTimelineEvents failed: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("Expected 1 event, got %d", len(events))
+	}
+	if events[0].Collapsed == initialCollapsed {
+		t.Error("Expected collapsed to be toggled")
+	}
+}
+
+func TestToggleTimelineEventNotFound(t *testing.T) {
+	svc, _, vaultID := setupLifeEventTest(t)
+
+	err := svc.ToggleTimelineEvent(9999, vaultID)
+	if err != ErrTimelineEventNotFound {
+		t.Errorf("Expected ErrTimelineEventNotFound, got %v", err)
+	}
+}
+
+func TestToggleLifeEvent(t *testing.T) {
+	svc, contactID, vaultID := setupLifeEventTest(t)
+
+	te, err := svc.CreateTimelineEvent(contactID, vaultID, dto.CreateTimelineEventRequest{
+		StartedAt: time.Now(),
+		Label:     "Timeline",
+	})
+	if err != nil {
+		t.Fatalf("CreateTimelineEvent failed: %v", err)
+	}
+
+	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: 1,
+		HappenedAt:      time.Now(),
+		Summary:         "Toggle life event",
+	})
+	if err != nil {
+		t.Fatalf("AddLifeEvent failed: %v", err)
+	}
+
+	if err := svc.ToggleLifeEvent(te.ID, le.ID, vaultID); err != nil {
+		t.Fatalf("ToggleLifeEvent failed: %v", err)
+	}
+
+	events, _, err := svc.ListTimelineEvents(contactID, vaultID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListTimelineEvents failed: %v", err)
+	}
+	if len(events) == 0 || len(events[0].LifeEvents) == 0 {
+		t.Fatal("Expected at least 1 event with 1 life event")
+	}
+	if !events[0].LifeEvents[0].Collapsed {
+		t.Error("Expected life event collapsed to be true after toggle")
+	}
+}
+
+func TestToggleLifeEventNotFound(t *testing.T) {
+	svc, contactID, vaultID := setupLifeEventTest(t)
+
+	te, err := svc.CreateTimelineEvent(contactID, vaultID, dto.CreateTimelineEventRequest{
+		StartedAt: time.Now(),
+		Label:     "Timeline",
+	})
+	if err != nil {
+		t.Fatalf("CreateTimelineEvent failed: %v", err)
+	}
+
+	err = svc.ToggleLifeEvent(te.ID, 9999, vaultID)
+	if err != ErrLifeEventNotFound {
+		t.Errorf("Expected ErrLifeEventNotFound, got %v", err)
+	}
+}

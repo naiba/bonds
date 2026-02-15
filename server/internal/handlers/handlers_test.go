@@ -1805,3 +1805,625 @@ func TestInvitationAccept_InvalidToken(t *testing.T) {
 		t.Fatal("expected success=false")
 	}
 }
+
+// ==================== Contact Photo Delete ====================
+
+func TestContactPhotoDelete_Success(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "photo-del@example.com")
+	vault := ts.createTestVault(t, token, "Photo Del Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "PhotoDel")
+
+	pngData := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("x", 100))
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos",
+		token, "file", "test.png", "image/png", pngData)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload photo failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var fileData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &fileData); err != nil {
+		t.Fatalf("failed to parse file data: %v", err)
+	}
+	photoID := fmt.Sprintf("%.0f", fileData["id"].(float64))
+
+	rec = ts.doRequest(http.MethodDelete,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos/"+photoID, "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestContactPhotoDelete_NotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "photo-del-nf@example.com")
+	vault := ts.createTestVault(t, token, "Photo Del NF Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "PhotoDelNF")
+
+	rec := ts.doRequest(http.MethodDelete,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos/9999", "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== Contact Document List & Delete ====================
+
+func TestContactDocumentList(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "doc-list@example.com")
+	vault := ts.createTestVault(t, token, "Doc List Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "DocList")
+
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/documents", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+}
+
+func TestContactDocumentDelete_Success(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "doc-del@example.com")
+	vault := ts.createTestVault(t, token, "Doc Del Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "DocDel")
+
+	pdfData := []byte("%PDF-1.4 test content")
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/documents",
+		token, "file", "test.pdf", "application/pdf", pdfData)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload document failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var fileData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &fileData); err != nil {
+		t.Fatalf("failed to parse file data: %v", err)
+	}
+	docID := fmt.Sprintf("%.0f", fileData["id"].(float64))
+
+	rec = ts.doRequest(http.MethodDelete,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/documents/"+docID, "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestContactDocumentDelete_NotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "doc-del-nf@example.com")
+	vault := ts.createTestVault(t, token, "Doc Del NF Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "DocDelNF")
+
+	rec := ts.doRequest(http.MethodDelete,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/documents/9999", "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== Contact Label Update ====================
+
+func TestContactLabelUpdate_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "label-update@example.com")
+	vault := ts.createTestVault(t, token, "Label Update Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "LabelUpdate")
+
+	labelRec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/settings/labels",
+		`{"name":"Label1","bg_color":"bg-blue-200","text_color":"text-blue-700"}`, token)
+	if labelRec.Code != http.StatusCreated {
+		t.Fatalf("create label failed: status=%d body=%s", labelRec.Code, labelRec.Body.String())
+	}
+	labelResp := parseResponse(t, labelRec)
+	var label1 map[string]interface{}
+	if err := json.Unmarshal(labelResp.Data, &label1); err != nil {
+		t.Fatalf("failed to parse label data: %v", err)
+	}
+	label1ID := fmt.Sprintf("%.0f", label1["id"].(float64))
+
+	labelRec2 := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/settings/labels",
+		`{"name":"Label2","bg_color":"bg-red-200","text_color":"text-red-700"}`, token)
+	if labelRec2.Code != http.StatusCreated {
+		t.Fatalf("create label2 failed: status=%d body=%s", labelRec2.Code, labelRec2.Body.String())
+	}
+	labelResp2 := parseResponse(t, labelRec2)
+	var label2 map[string]interface{}
+	if err := json.Unmarshal(labelResp2.Data, &label2); err != nil {
+		t.Fatalf("failed to parse label2 data: %v", err)
+	}
+	label2ID := fmt.Sprintf("%.0f", label2["id"].(float64))
+
+	addRec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/labels",
+		`{"label_id":`+label1ID+`}`, token)
+	if addRec.Code != http.StatusCreated {
+		t.Fatalf("add label failed: status=%d body=%s", addRec.Code, addRec.Body.String())
+	}
+	addResp := parseResponse(t, addRec)
+	var addedLabel map[string]interface{}
+	if err := json.Unmarshal(addResp.Data, &addedLabel); err != nil {
+		t.Fatalf("failed to parse added label data: %v", err)
+	}
+	pivotID := fmt.Sprintf("%.0f", addedLabel["id"].(float64))
+
+	updateRec := ts.doRequest(http.MethodPut,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/labels/"+pivotID,
+		`{"label_id":`+label2ID+`}`, token)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	updateResp := parseResponse(t, updateRec)
+	if !updateResp.Success {
+		t.Fatal("expected success=true")
+	}
+}
+
+func TestContactLabelUpdate_NotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "label-upd-nf@example.com")
+	vault := ts.createTestVault(t, token, "Label Upd NF Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "LabelUpdNF")
+
+	rec := ts.doRequest(http.MethodPut,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/labels/9999",
+		`{"label_id":1}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== Contact Companies List ====================
+
+func TestContactCompaniesList(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "companies-list@example.com")
+	vault := ts.createTestVault(t, token, "Companies List Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "CompList")
+
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/companies/list", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+}
+
+// ==================== Telegram Webhook ====================
+
+func TestTelegramWebhook_InvalidBody(t *testing.T) {
+	ts := setupTestServerWithTelegram(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/telegram/webhook",
+		`{"message":null}`, "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTelegramWebhook_NonStartMessage(t *testing.T) {
+	ts := setupTestServerWithTelegram(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/telegram/webhook",
+		`{"message":{"chat":{"id":123},"text":"hello"}}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTelegramWebhook_InvalidToken(t *testing.T) {
+	ts := setupTestServerWithTelegram(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/telegram/webhook",
+		`{"message":{"chat":{"id":123},"text":"/start invalid-token"}}`, "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func setupTestServerWithTelegram(t *testing.T) *testServer {
+	t.Helper()
+	db := testutil.SetupTestDB(t)
+	cfg := &config.Config{
+		Server:   config.ServerConfig{Port: "8080", Host: "localhost"},
+		Database: config.DatabaseConfig{Driver: "sqlite", DSN: ":memory:"},
+		JWT: config.JWTConfig{
+			Secret:     "test-secret-key",
+			ExpiryHrs:  24,
+			RefreshHrs: 168,
+		},
+		App:      config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
+		Telegram: config.TelegramConfig{BotToken: "test-bot-token"},
+	}
+	e := echo.New()
+	handlers.RegisterRoutes(e, db, cfg)
+	return &testServer{e: e, db: db, cfg: cfg}
+}
+
+// ==================== Contact List By Label ====================
+
+func TestContactListByLabel_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+	vault := ts.createTestVault(t, token, "Test Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+
+	ts.db.Exec("INSERT INTO labels (vault_id, name, slug, bg_color, text_color) VALUES (?, 'Family', 'family', 'bg-zinc-200', 'text-zinc-700')", vault.ID)
+	var labelID uint
+	ts.db.Raw("SELECT id FROM labels WHERE vault_id = ? AND name = 'Family'", vault.ID).Scan(&labelID)
+	ts.db.Exec("INSERT INTO contact_label (label_id, contact_id) VALUES (?, ?)", labelID, contact.ID)
+
+	rec := ts.doRequest(http.MethodGet, fmt.Sprintf("/api/vaults/%s/contacts/labels/%d", vault.ID, labelID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var contacts []contactData
+	if err := json.Unmarshal(resp.Data, &contacts); err != nil {
+		t.Fatalf("failed to parse contacts: %v", err)
+	}
+	if len(contacts) != 1 {
+		t.Fatalf("expected 1 contact, got %d", len(contacts))
+	}
+	if contacts[0].ID != contact.ID {
+		t.Errorf("expected contact ID %s, got %s", contact.ID, contacts[0].ID)
+	}
+}
+
+func TestContactListByLabel_NoResults(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+	vault := ts.createTestVault(t, token, "Test Vault")
+
+	ts.db.Exec("INSERT INTO labels (vault_id, name, slug, bg_color, text_color) VALUES (?, 'Empty', 'empty', 'bg-zinc-200', 'text-zinc-700')", vault.ID)
+	var labelID uint
+	ts.db.Raw("SELECT id FROM labels WHERE vault_id = ? AND name = 'Empty'", vault.ID).Scan(&labelID)
+
+	rec := ts.doRequest(http.MethodGet, fmt.Sprintf("/api/vaults/%s/contacts/labels/%d", vault.ID, labelID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var contacts []contactData
+	if err := json.Unmarshal(resp.Data, &contacts); err != nil {
+		t.Fatalf("failed to parse contacts: %v", err)
+	}
+	if len(contacts) != 0 {
+		t.Fatalf("expected 0 contacts, got %d", len(contacts))
+	}
+}
+
+// ==================== RelationshipType Sub-resource CRUD ====================
+
+func TestRelationshipType_Create(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var groupTypeID uint
+	ts.db.Raw("SELECT id FROM relationship_group_types LIMIT 1").Scan(&groupTypeID)
+	if groupTypeID == 0 {
+		t.Fatal("no seeded relationship group type found")
+	}
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/relationship-types/%d/types", groupTypeID),
+		`{"name":"Mentor","name_reverse_relationship":"Mentee"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+}
+
+func TestRelationshipType_Update(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var groupTypeID uint
+	ts.db.Raw("SELECT id FROM relationship_group_types LIMIT 1").Scan(&groupTypeID)
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/relationship-types/%d/types", groupTypeID),
+		`{"name":"Mentor","name_reverse_relationship":"Mentee"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var created struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &created)
+
+	rec = ts.doRequest(http.MethodPut,
+		fmt.Sprintf("/api/settings/personalize/relationship-types/%d/types/%d", groupTypeID, created.ID),
+		`{"name":"Coach","name_reverse_relationship":"Coachee"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRelationshipType_Delete(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var groupTypeID uint
+	ts.db.Raw("SELECT id FROM relationship_group_types LIMIT 1").Scan(&groupTypeID)
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/relationship-types/%d/types", groupTypeID),
+		`{"name":"Mentor","name_reverse_relationship":"Mentee"}`, token)
+	resp := parseResponse(t, rec)
+	var created struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &created)
+
+	rec = ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/settings/personalize/relationship-types/%d/types/%d", groupTypeID, created.ID),
+		"", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRelationshipType_DeleteUndeletable(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var groupTypeID, typeID uint
+	ts.db.Raw("SELECT relationship_group_type_id, id FROM relationship_types WHERE can_be_deleted = false LIMIT 1").Row().Scan(&groupTypeID, &typeID)
+	if typeID == 0 {
+		t.Skip("no undeletable relationship type found in seed data")
+	}
+
+	rec := ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/settings/personalize/relationship-types/%d/types/%d", groupTypeID, typeID),
+		"", token)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRelationshipType_GroupNotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	rec := ts.doRequest(http.MethodPost,
+		"/api/settings/personalize/relationship-types/99999/types",
+		`{"name":"Mentor","name_reverse_relationship":"Mentee"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== CallReason Sub-resource CRUD ====================
+
+func TestCallReason_Create(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var callReasonTypeID uint
+	ts.db.Raw("SELECT id FROM call_reason_types LIMIT 1").Scan(&callReasonTypeID)
+	if callReasonTypeID == 0 {
+		t.Fatal("no seeded call reason type found")
+	}
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/call-reasons/%d/reasons", callReasonTypeID),
+		`{"label":"Follow-up call"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+}
+
+func TestCallReason_Update(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var callReasonTypeID uint
+	ts.db.Raw("SELECT id FROM call_reason_types LIMIT 1").Scan(&callReasonTypeID)
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/call-reasons/%d/reasons", callReasonTypeID),
+		`{"label":"Follow-up call"}`, token)
+	resp := parseResponse(t, rec)
+	var created struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &created)
+
+	rec = ts.doRequest(http.MethodPut,
+		fmt.Sprintf("/api/settings/personalize/call-reasons/%d/reasons/%d", callReasonTypeID, created.ID),
+		`{"label":"Check-in call"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCallReason_Delete(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	var callReasonTypeID uint
+	ts.db.Raw("SELECT id FROM call_reason_types LIMIT 1").Scan(&callReasonTypeID)
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/call-reasons/%d/reasons", callReasonTypeID),
+		`{"label":"Follow-up call"}`, token)
+	resp := parseResponse(t, rec)
+	var created struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &created)
+
+	rec = ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/settings/personalize/call-reasons/%d/reasons/%d", callReasonTypeID, created.ID),
+		"", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCallReason_TypeNotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "test@example.com")
+
+	rec := ts.doRequest(http.MethodPost,
+		"/api/settings/personalize/call-reasons/99999/reasons",
+		`{"label":"Test"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestContactQuickSearch_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "search-test@example.com")
+	vault := ts.createTestVault(t, token, "Search Vault")
+	ts.createTestContact(t, token, vault.ID, "Alice")
+	ts.createTestContact(t, token, vault.ID, "Bob")
+	ts.createTestContact(t, token, vault.ID, "Charlie")
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/search/contacts", vault.ID),
+		`{"search_term":"Alice"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var results []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Data, &results); err != nil {
+		t.Fatalf("failed to parse search results: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].ID == "" {
+		t.Error("expected non-empty ID")
+	}
+
+	rec = ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/search/contacts", vault.ID),
+		`{"search_term":"Doe"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	json.Unmarshal(resp.Data, &results)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results for 'Doe' (all have last_name Doe), got %d", len(results))
+	}
+}
+
+func TestContactQuickSearch_EmptyTerm(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "search-empty@example.com")
+	vault := ts.createTestVault(t, token, "Search Vault 2")
+
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/search/contacts", vault.ID),
+		`{"search_term":""}`, token)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for empty search_term, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTaskListCompleted_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "task-completed@example.com")
+	vault := ts.createTestVault(t, token, "Task Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "TaskContact")
+
+	basePath := fmt.Sprintf("/api/vaults/%s/contacts/%s/tasks", vault.ID, contact.ID)
+
+	rec := ts.doRequest(http.MethodPost, basePath, `{"label":"Task 1"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create task 1 failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var task1 struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &task1)
+
+	rec = ts.doRequest(http.MethodPost, basePath, `{"label":"Task 2"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create task 2 failed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPost, basePath, `{"label":"Task 3"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create task 3 failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var task3 struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &task3)
+
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d/toggle", basePath, task1.ID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("toggle task 1 failed: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d/toggle", basePath, task3.ID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("toggle task 3 failed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, basePath+"/completed", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list completed tasks failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var completed []struct {
+		ID        uint   `json:"id"`
+		Label     string `json:"label"`
+		Completed bool   `json:"completed"`
+	}
+	if err := json.Unmarshal(resp.Data, &completed); err != nil {
+		t.Fatalf("failed to parse completed tasks: %v", err)
+	}
+	if len(completed) != 2 {
+		t.Fatalf("expected 2 completed tasks, got %d", len(completed))
+	}
+	for _, task := range completed {
+		if !task.Completed {
+			t.Errorf("expected task %d to be completed", task.ID)
+		}
+	}
+
+	rec = ts.doRequest(http.MethodGet, basePath, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list all tasks failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var allTasks []struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &allTasks)
+	if len(allTasks) != 3 {
+		t.Fatalf("expected 3 total tasks, got %d", len(allTasks))
+	}
+}

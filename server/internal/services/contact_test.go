@@ -237,3 +237,61 @@ func TestContactNotFound(t *testing.T) {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 }
+
+func TestQuickSearch(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Alice", LastName: "Johnson"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	_, err = svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Bob", LastName: "Smith"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	_, err = svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Charlie", LastName: "Johnson"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	results, err := svc.QuickSearch(vaultID, "Johnson")
+	if err != nil {
+		t.Fatalf("QuickSearch failed: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("Expected 2 results, got %d", len(results))
+	}
+	if results[0].ID == "" {
+		t.Error("Expected non-empty ID")
+	}
+	if results[0].Name == "" {
+		t.Error("Expected non-empty Name")
+	}
+
+	results, err = svc.QuickSearch(vaultID, "Bob")
+	if err != nil {
+		t.Fatalf("QuickSearch failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("Expected 1 result, got %d", len(results))
+	}
+	if results[0].Name != "Bob Smith" {
+		t.Errorf("Expected name 'Bob Smith', got '%s'", results[0].Name)
+	}
+
+	results, err = svc.QuickSearch(vaultID, "nonexistent")
+	if err != nil {
+		t.Fatalf("QuickSearch failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results, got %d", len(results))
+	}
+
+	results, err = svc.QuickSearch(vaultID, "")
+	if err != nil {
+		t.Fatalf("QuickSearch with empty term failed: %v", err)
+	}
+	if len(results) != 0 {
+		t.Errorf("Expected 0 results for empty term, got %d", len(results))
+	}
+}
