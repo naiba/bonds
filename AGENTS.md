@@ -30,6 +30,7 @@ make test-server / make test-web / make test-e2e
 make build                                # 后端 + 前端分别构建
 make build-all                            # 构建内嵌前端的单二进制文件
 make dev                                  # 开发模式同时启动前后端
+make swagger                              # 生成 Swagger 文档（swag init）
 make setup                                # 安装依赖（go mod download + bun install）
 ```
 
@@ -333,7 +334,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 | API 路由 | ~143 |
 | React 页面组件 | 43 |
 | 前端 API 客户端 | 23 |
-| i18n 翻译键 | ~478（en + zh 各一份） |
+| i18n 翻译键 | ~576（en + zh 各一份） |
 
 ### 测试数量明细
 
@@ -347,9 +348,9 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 | Go Avatar 测试 | 1 | 7 |
 | Go Calendar 测试 | 1 | 13 |
 | **Go 后端总计** | **48** | **~378** |
-| React Vitest | 21 | 88 |
-| Playwright E2E | 7 | — |
-| **全部总计** | **76** | **466+** |
+| React Vitest | 22 | 78 |
+| Playwright E2E | 9 | 41 |
+| **全部总计** | **79** | **497+** |
 
 ## 已知坑和注意事项
 
@@ -396,6 +397,52 @@ defer cleanup()
 - `maxChannelFails = 10` — 通知渠道失败次数达到 10 后自动禁用（`active = false`）。
 - 重复提醒调度下一次时，基于**当前 scheduled_at** 计算而非当前时间，防止漂移。
 
+### Swagger / OpenAPI
+
+- `server/docs/` 在 `.gitignore` 中，**不纳入版本控制**。
+- Go 代码中 `routes.go` 有 `_ "github.com/naiba/bonds/docs"` 空导入，构建前**必须先运行** `swag init`。
+- 本地开发：`cd server && swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal`（或 `make swagger`）
+- CI（`.github/workflows/test.yml`）在 `go vet` / `go build` 之前执行 `swag init`，否则构建失败。
+- Dockerfile 同样在 `go build` 前执行 `swag init`（行 20）。
+- 安装 swag：`go install github.com/swaggo/swag/cmd/swag@latest`
+- Swagger UI 仅在 `DEBUG=true` 时注册（`/swagger/index.html`），生产环境不暴露。
+- 使用 `echo-swagger` **v1.4.1**（对应 Echo v4）。v1.5.0+ 依赖 Echo v5，不兼容。
+- **swag 类型解析陷阱**：handler 文件中的 `@Success ... dto.XxxResponse` 注解要求该文件能解析到 `dto` 包。如果 handler 的 Go 代码本身不 import `dto`（如 `currencies.go`、`vault_files.go`），swag 会报 `cannot find type definition`。解决方法：在文件中添加 `import "github.com/naiba/bonds/internal/dto"` + `var _ dto.XxxResponse`（类型锚点，防止 unused import 编译错误）。当前已有此模式的文件：`currencies.go`、`storage_info.go`、`user_management_extra.go`、`webauthn.go`、`avatar.go`、`calendar.go`、`companies.go`、`contact_photos.go`、`feed.go`、`post_photos.go`、`reports.go`、`vault_files.go`、`vault_tasks.go`、`vcard.go`。
+- 全局注解（`@title`、`@BasePath`、`@securityDefinitions`）在 `cmd/server/main.go` 的 `func main()` 上方。
+- 当前统计：194 paths、286 operations、184 definitions。
+
+### 前端 i18n 注意事项
+
+- 翻译文件为嵌套 JSON 结构（`src/locales/en.json`、`zh.json`），使用点号路径访问（如 `t("vault.companies.title")`）。
+- 新增页面**必须同时**在 en.json 和 zh.json 中添加对应翻译键，否则 UI 上会显示原始键路径。
+- Vitest 单元测试中 i18n 会被真实加载（非 mock），因此测试断言应匹配**翻译后的文本**（如 `"Vault Settings"`），而非键路径（如 `"vault_settings.title"`）。
+- 可用脚本检查缺失键：`grep -rhoE 't\("[^"]+"\)' src/pages/ src/components/` 提取所有使用的键，与 en.json 的扁平化键集合做差集。
+
+### 前端新增依赖必须加入 package.json
+
+- 本地 `node_modules` 可能有全局或其他项目安装的包，本地测试通过但 CI 失败。
+- 新引入第三方包时**必须** `bun add <package>` 确保写入 `package.json` 和 `bun.lock`。
+- 已踩坑的包：`filesize`、`@simplewebauthn/browser` — 本地存在但未加入 `package.json`，导致 CI 构建失败。
+
+### Playwright E2E 测试经验
+
+- Ant Design 组件在 Playwright strict mode 下容易因多个元素匹配而失败（如 `.ant-card` 匹配多个卡片、`getByText` 在导航栏和内容区同时匹配）。解决：使用 `.first()`、`getByRole('table').getByText(...)` 等更精确的选择器。
+- 联系人创建后会自动跳转到详情页，测试中应先 `await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/)` 等待导航完成，再断言页面内容。
+- `calendar.spec.ts` 的 lunar reminder 测试存在 Ant Design 下拉遮挡问题（"四月" 选项遮挡 frequency 选择器），属于已知 flaky test。
+
+### 项目规模（供参考）
+
+| 维度 | 数量 |
+|------|------|
+| Go Model 文件 | 49 |
+| Go Handler 文件 | 64（含 swag 注解） |
+| Go Service 文件 | 44 |
+| Go DTO 文件 | 43（含 example 标签） |
+| API 路由（Swagger 统计） | 194 paths / 286 operations |
+| React 页面组件 | 43 |
+| 前端 API 客户端 | 23 |
+| i18n 翻译键 | ~576（en + zh 各一份） |
+
 ## 关键依赖版本
 
 ### Go 后端（go 1.25.2）
@@ -416,6 +463,8 @@ defer cleanup()
 | `jordan-wright/email` | v4.0.1 | SMTP 发送 |
 | `golang-jwt/jwt/v5` | v5.3.1 | JWT |
 | `golang.org/x/crypto` | v0.48.0 | bcrypt 等 |
+| `swaggo/swag` | v1.16.6 | Swagger 文档生成 |
+| `swaggo/echo-swagger` | v1.4.1 | Swagger UI 中间件（必须 v1.4.x，v1.5+ 依赖 Echo v5） |
 | `6tail/lunar-go` | v1.4.6 | 农历转换 |
 
 ### React 前端
@@ -432,11 +481,14 @@ defer cleanup()
 | `vitest` | ^4.0.18 | 测试框架 |
 | `@playwright/test` | ^1.58.2 | E2E 测试 |
 | `typescript` | ~5.9.3 | 类型系统 |
+| `filesize` | ^11.0.13 | 文件大小格式化 |
+| `@simplewebauthn/browser` | ^13.2.2 | WebAuthn 客户端 |
 
 ## 环境变量完整列表
 
 参见 `server/.env.example`，包含所有可配置项及默认值。分组：
 
+- **Debug**：`DEBUG`（默认 `false`）— 启用 Echo 请求日志、GORM SQL 日志、Swagger UI
 - **Core**：`SERVER_PORT`、`DB_DSN`、`JWT_SECRET`、`APP_ENV`、`APP_URL`
 - **SMTP**：`SMTP_HOST`、`SMTP_PORT`、`SMTP_USERNAME`、`SMTP_PASSWORD`、`SMTP_FROM`
 - **Storage**：`STORAGE_UPLOAD_DIR`（默认 `uploads`）、`STORAGE_MAX_SIZE`（默认 10MB）
