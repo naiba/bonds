@@ -20,8 +20,12 @@ func NewContactInformationHandler(contactInformationService *services.ContactInf
 
 func (h *ContactInformationHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
-	items, err := h.contactInformationService.List(contactID)
+	vaultID := c.Param("vault_id")
+	items, err := h.contactInformationService.List(contactID, vaultID)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_contact_information")
 	}
 	return response.OK(c, items)
@@ -29,6 +33,7 @@ func (h *ContactInformationHandler) List(c echo.Context) error {
 
 func (h *ContactInformationHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 
 	var req dto.CreateContactInformationRequest
 	if err := c.Bind(&req); err != nil {
@@ -38,8 +43,11 @@ func (h *ContactInformationHandler) Create(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	item, err := h.contactInformationService.Create(contactID, req)
+	item, err := h.contactInformationService.Create(contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_contact_information")
 	}
 	return response.Created(c, item)
@@ -47,6 +55,7 @@ func (h *ContactInformationHandler) Create(c echo.Context) error {
 
 func (h *ContactInformationHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_contact_information_id", nil)
@@ -60,8 +69,11 @@ func (h *ContactInformationHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	item, err := h.contactInformationService.Update(uint(id), contactID, req)
+	item, err := h.contactInformationService.Update(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrContactInformationNotFound) {
 			return response.NotFound(c, "err.contact_information_not_found")
 		}
@@ -72,12 +84,16 @@ func (h *ContactInformationHandler) Update(c echo.Context) error {
 
 func (h *ContactInformationHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_contact_information_id", nil)
 	}
 
-	if err := h.contactInformationService.Delete(uint(id), contactID); err != nil {
+	if err := h.contactInformationService.Delete(uint(id), contactID, vaultID); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrContactInformationNotFound) {
 			return response.NotFound(c, "err.contact_information_not_found")
 		}

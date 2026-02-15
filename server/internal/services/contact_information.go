@@ -18,7 +18,10 @@ func NewContactInformationService(db *gorm.DB) *ContactInformationService {
 	return &ContactInformationService{db: db}
 }
 
-func (s *ContactInformationService) List(contactID string) ([]dto.ContactInformationResponse, error) {
+func (s *ContactInformationService) List(contactID, vaultID string) ([]dto.ContactInformationResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var items []models.ContactInformation
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&items).Error; err != nil {
 		return nil, err
@@ -30,7 +33,10 @@ func (s *ContactInformationService) List(contactID string) ([]dto.ContactInforma
 	return result, nil
 }
 
-func (s *ContactInformationService) Create(contactID string, req dto.CreateContactInformationRequest) (*dto.ContactInformationResponse, error) {
+func (s *ContactInformationService) Create(contactID, vaultID string, req dto.CreateContactInformationRequest) (*dto.ContactInformationResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	pref := true
 	if req.Pref != nil {
 		pref = *req.Pref
@@ -49,7 +55,10 @@ func (s *ContactInformationService) Create(contactID string, req dto.CreateConta
 	return &resp, nil
 }
 
-func (s *ContactInformationService) Update(id uint, contactID string, req dto.UpdateContactInformationRequest) (*dto.ContactInformationResponse, error) {
+func (s *ContactInformationService) Update(id uint, contactID, vaultID string, req dto.UpdateContactInformationRequest) (*dto.ContactInformationResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var item models.ContactInformation
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&item).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -70,7 +79,10 @@ func (s *ContactInformationService) Update(id uint, contactID string, req dto.Up
 	return &resp, nil
 }
 
-func (s *ContactInformationService) Delete(id uint, contactID string) error {
+func (s *ContactInformationService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactInformation{})
 	if result.Error != nil {
 		return result.Error

@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupContactInformationTest(t *testing.T) (*ContactInformationService, string) {
+func setupContactInformationTest(t *testing.T) (*ContactInformationService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,13 +35,13 @@ func setupContactInformationTest(t *testing.T) (*ContactInformationService, stri
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewContactInformationService(db), contact.ID
+	return NewContactInformationService(db), contact.ID, vault.ID
 }
 
 func TestCreateContactInformation(t *testing.T) {
-	svc, contactID := setupContactInformationTest(t)
+	svc, contactID, vaultID := setupContactInformationTest(t)
 
-	info, err := svc.Create(contactID, dto.CreateContactInformationRequest{
+	info, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
 		TypeID: 1,
 		Data:   "john@example.com",
 		Kind:   "personal",
@@ -70,9 +70,9 @@ func TestCreateContactInformation(t *testing.T) {
 }
 
 func TestCreateContactInformationWithKind(t *testing.T) {
-	svc, contactID := setupContactInformationTest(t)
+	svc, contactID, vaultID := setupContactInformationTest(t)
 
-	info, err := svc.Create(contactID, dto.CreateContactInformationRequest{
+	info, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
 		TypeID: 1,
 		Data:   "john@work.com",
 		Kind:   "work",
@@ -89,18 +89,18 @@ func TestCreateContactInformationWithKind(t *testing.T) {
 }
 
 func TestListContactInformation(t *testing.T) {
-	svc, contactID := setupContactInformationTest(t)
+	svc, contactID, vaultID := setupContactInformationTest(t)
 
-	_, err := svc.Create(contactID, dto.CreateContactInformationRequest{TypeID: 1, Data: "email@test.com"})
+	_, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{TypeID: 1, Data: "email@test.com"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreateContactInformationRequest{TypeID: 2, Data: "+1234567890"})
+	_, err = svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{TypeID: 2, Data: "+1234567890"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	items, err := svc.List(contactID)
+	items, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -110,9 +110,9 @@ func TestListContactInformation(t *testing.T) {
 }
 
 func TestUpdateContactInformation(t *testing.T) {
-	svc, contactID := setupContactInformationTest(t)
+	svc, contactID, vaultID := setupContactInformationTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateContactInformationRequest{
+	created, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
 		TypeID: 1,
 		Data:   "old@example.com",
 		Kind:   "personal",
@@ -122,7 +122,7 @@ func TestUpdateContactInformation(t *testing.T) {
 	}
 
 	pref := false
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateContactInformationRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateContactInformationRequest{
 		TypeID: 2,
 		Data:   "new@example.com",
 		Kind:   "work",
@@ -146,9 +146,9 @@ func TestUpdateContactInformation(t *testing.T) {
 }
 
 func TestDeleteContactInformation(t *testing.T) {
-	svc, contactID := setupContactInformationTest(t)
+	svc, contactID, vaultID := setupContactInformationTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateContactInformationRequest{
+	created, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
 		TypeID: 1,
 		Data:   "to-delete@example.com",
 	})
@@ -156,11 +156,11 @@ func TestDeleteContactInformation(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	items, err := svc.List(contactID)
+	items, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -170,9 +170,9 @@ func TestDeleteContactInformation(t *testing.T) {
 }
 
 func TestDeleteContactInformationNotFound(t *testing.T) {
-	svc, contactID := setupContactInformationTest(t)
+	svc, contactID, vaultID := setupContactInformationTest(t)
 
-	err := svc.Delete(9999, contactID)
+	err := svc.Delete(9999, contactID, vaultID)
 	if err != ErrContactInformationNotFound {
 		t.Errorf("Expected ErrContactInformationNotFound, got %v", err)
 	}
