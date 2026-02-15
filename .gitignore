@@ -4,6 +4,7 @@ server/bonds.db
 server/bonds.db-wal
 server/bonds.db-shm
 server/data/
+server/uploads/
 server/internal/frontend/dist/*
 !server/internal/frontend/dist/.gitkeep
 .env
