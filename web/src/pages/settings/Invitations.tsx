@@ -61,11 +61,11 @@ export default function Invitations() {
 
   const permissionLabel = (perm: number) => {
     switch (perm) {
-      case 1:
+      case 100:
         return t("invitations.permission.manager");
-      case 2:
+      case 200:
         return t("invitations.permission.editor");
-      case 3:
+      case 300:
         return t("invitations.permission.viewer");
       default:
         return String(perm);
@@ -189,15 +189,15 @@ export default function Invitations() {
             <Select
               options={[
                 {
-                  value: 1,
+                  value: 100,
                   label: t("invitations.permission.manager"),
                 },
                 {
-                  value: 2,
+                  value: 200,
                   label: t("invitations.permission.editor"),
                 },
                 {
-                  value: 3,
+                  value: 300,
                   label: t("invitations.permission.viewer"),
                 },
               ]}
