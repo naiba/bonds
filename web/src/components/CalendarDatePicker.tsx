@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { DatePicker, Select, Segmented, Typography, Space } from "antd";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -30,21 +30,10 @@ export default function CalendarDatePicker({
   const { t } = useTranslation();
   const now = dayjs();
 
-  const [calendarType, setCalendarType] = useState<CalendarType>(
-    value?.calendarType ?? "gregorian"
-  );
-  const [year, setYear] = useState(value?.year ?? now.year());
-  const [month, setMonth] = useState(value?.month ?? now.month() + 1);
-  const [day, setDay] = useState(value?.day ?? now.date());
-
-  useEffect(() => {
-    if (value) {
-      setCalendarType(value.calendarType);
-      setYear(value.year);
-      setMonth(value.month);
-      setDay(value.day);
-    }
-  }, [value]);
+  const calendarType = value?.calendarType ?? "gregorian";
+  const year = value?.year ?? now.year();
+  const month = value?.month ?? (now.month() + 1);
+  const day = value?.day ?? now.date();
 
   const system = getCalendarSystem(calendarType);
   const months = useMemo(() => system.getMonths(year), [system, year]);
@@ -78,40 +67,29 @@ export default function CalendarDatePicker({
 
   function handleTypeChange(val: string | number) {
     const newType = val as CalendarType;
-    setCalendarType(newType);
     const newSystem = getCalendarSystem(newType);
     const converted = newSystem.fromGregorian(
       getCalendarSystem(calendarType).toGregorian({ day, month, year })
     );
-    setYear(converted.year);
-    setMonth(converted.month);
-    setDay(converted.day);
     emit(newType, converted.year, converted.month, converted.day);
   }
 
   function handleGregorianChange(d: Dayjs | null) {
     if (!d) return;
-    setYear(d.year());
-    setMonth(d.month() + 1);
-    setDay(d.date());
     emit("gregorian", d.year(), d.month() + 1, d.date());
   }
 
   function handleYearChange(y: number) {
-    setYear(y);
     const maxM = system.getMonths(y);
     const validMonth = maxM.some((mo) => mo.value === month) ? month : maxM[0]?.value ?? 1;
-    setMonth(validMonth);
     emit(calendarType, y, validMonth, day);
   }
 
   function handleMonthChange(m: number) {
-    setMonth(m);
     emit(calendarType, year, m, day);
   }
 
   function handleDayChange(d: number) {
-    setDay(d);
     emit(calendarType, year, month, d);
   }
 

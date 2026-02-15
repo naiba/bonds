@@ -31,10 +31,6 @@ test.describe('Calendar System', () => {
   test('should show calendar type switcher in important dates modal', async ({ page }) => {
     await setupContactPage(page);
 
-    const addButton = page.locator('button').filter({ hasText: /add/i }).filter({
-      has: page.locator('[aria-label="plus"]')
-    }).first();
-
     const importantDatesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
     await importantDatesCard.getByRole('button', { name: /add/i }).click();
 
