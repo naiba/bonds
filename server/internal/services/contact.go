@@ -256,6 +256,16 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 	return &resp, nil
 }
 
+// validateContactBelongsToVault checks that a contact exists and belongs to the given vault.
+// Returns ErrContactNotFound if the contact does not exist or belongs to a different vault.
+func validateContactBelongsToVault(db *gorm.DB, contactID, vaultID string) error {
+	var contact models.Contact
+	if err := db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		return ErrContactNotFound
+	}
+	return nil
+}
+
 func strPtrOrNil(s string) *string {
 	if s == "" {
 		return nil
