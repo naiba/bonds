@@ -8,7 +8,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupMoodTrackingTest(t *testing.T) (*MoodTrackingService, string) {
+func setupMoodTrackingTest(t *testing.T) (*MoodTrackingService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -36,15 +36,15 @@ func setupMoodTrackingTest(t *testing.T) (*MoodTrackingService, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewMoodTrackingService(db), contact.ID
+	return NewMoodTrackingService(db), contact.ID, vault.ID
 }
 
 func TestCreateMoodTrackingEvent(t *testing.T) {
-	svc, contactID := setupMoodTrackingTest(t)
+	svc, contactID, vaultID := setupMoodTrackingTest(t)
 
 	hoursSlept := 8
 	ratedAt := time.Now()
-	event, err := svc.Create(contactID, dto.CreateMoodTrackingEventRequest{
+	event, err := svc.Create(contactID, vaultID, dto.CreateMoodTrackingEventRequest{
 		MoodTrackingParameterID: 1,
 		RatedAt:                 ratedAt,
 		Note:                    "Feeling great",
@@ -71,10 +71,10 @@ func TestCreateMoodTrackingEvent(t *testing.T) {
 }
 
 func TestListMoodTrackingEvents(t *testing.T) {
-	svc, contactID := setupMoodTrackingTest(t)
+	svc, contactID, vaultID := setupMoodTrackingTest(t)
 
 	ratedAt := time.Now()
-	_, err := svc.Create(contactID, dto.CreateMoodTrackingEventRequest{
+	_, err := svc.Create(contactID, vaultID, dto.CreateMoodTrackingEventRequest{
 		MoodTrackingParameterID: 1,
 		RatedAt:                 ratedAt,
 		Note:                    "Event 1",
@@ -82,7 +82,7 @@ func TestListMoodTrackingEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreateMoodTrackingEventRequest{
+	_, err = svc.Create(contactID, vaultID, dto.CreateMoodTrackingEventRequest{
 		MoodTrackingParameterID: 1,
 		RatedAt:                 ratedAt,
 		Note:                    "Event 2",
@@ -91,7 +91,7 @@ func TestListMoodTrackingEvents(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	events, err := svc.List(contactID)
+	events, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -101,10 +101,10 @@ func TestListMoodTrackingEvents(t *testing.T) {
 }
 
 func TestCreateMoodTrackingEventWithoutNote(t *testing.T) {
-	svc, contactID := setupMoodTrackingTest(t)
+	svc, contactID, vaultID := setupMoodTrackingTest(t)
 
 	ratedAt := time.Now()
-	event, err := svc.Create(contactID, dto.CreateMoodTrackingEventRequest{
+	event, err := svc.Create(contactID, vaultID, dto.CreateMoodTrackingEventRequest{
 		MoodTrackingParameterID: 2,
 		RatedAt:                 ratedAt,
 	})
@@ -120,11 +120,11 @@ func TestCreateMoodTrackingEventWithoutNote(t *testing.T) {
 }
 
 func TestCreateMoodTrackingEventFieldValues(t *testing.T) {
-	svc, contactID := setupMoodTrackingTest(t)
+	svc, contactID, vaultID := setupMoodTrackingTest(t)
 
 	hoursSlept := 6
 	ratedAt := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
-	event, err := svc.Create(contactID, dto.CreateMoodTrackingEventRequest{
+	event, err := svc.Create(contactID, vaultID, dto.CreateMoodTrackingEventRequest{
 		MoodTrackingParameterID: 3,
 		RatedAt:                 ratedAt,
 		Note:                    "Tired",
@@ -142,9 +142,9 @@ func TestCreateMoodTrackingEventFieldValues(t *testing.T) {
 }
 
 func TestListMoodTrackingEventsEmpty(t *testing.T) {
-	svc, contactID := setupMoodTrackingTest(t)
+	svc, contactID, vaultID := setupMoodTrackingTest(t)
 
-	events, err := svc.List(contactID)
+	events, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}

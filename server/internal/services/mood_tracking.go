@@ -14,7 +14,10 @@ func NewMoodTrackingService(db *gorm.DB) *MoodTrackingService {
 	return &MoodTrackingService{db: db}
 }
 
-func (s *MoodTrackingService) Create(contactID string, req dto.CreateMoodTrackingEventRequest) (*dto.MoodTrackingEventResponse, error) {
+func (s *MoodTrackingService) Create(contactID, vaultID string, req dto.CreateMoodTrackingEventRequest) (*dto.MoodTrackingEventResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	event := models.MoodTrackingEvent{
 		ContactID:               contactID,
 		MoodTrackingParameterID: req.MoodTrackingParameterID,
@@ -29,7 +32,10 @@ func (s *MoodTrackingService) Create(contactID string, req dto.CreateMoodTrackin
 	return &resp, nil
 }
 
-func (s *MoodTrackingService) List(contactID string) ([]dto.MoodTrackingEventResponse, error) {
+func (s *MoodTrackingService) List(contactID, vaultID string) ([]dto.MoodTrackingEventResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var events []models.MoodTrackingEvent
 	if err := s.db.Where("contact_id = ?", contactID).Order("rated_at DESC").Find(&events).Error; err != nil {
 		return nil, err
