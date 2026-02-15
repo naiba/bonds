@@ -54,9 +54,10 @@ func (h *ContactHandler) Create(c echo.Context) error {
 
 func (h *ContactHandler) Get(c echo.Context) error {
 	contactID := c.Param("id")
+	vaultID := c.Param("vault_id")
 	userID := middleware.GetUserID(c)
 
-	contact, err := h.contactService.GetContact(contactID, userID)
+	contact, err := h.contactService.GetContact(contactID, userID, vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -68,6 +69,7 @@ func (h *ContactHandler) Get(c echo.Context) error {
 
 func (h *ContactHandler) Update(c echo.Context) error {
 	contactID := c.Param("id")
+	vaultID := c.Param("vault_id")
 
 	var req dto.UpdateContactRequest
 	if err := c.Bind(&req); err != nil {
@@ -77,7 +79,7 @@ func (h *ContactHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	contact, err := h.contactService.UpdateContact(contactID, req)
+	contact, err := h.contactService.UpdateContact(contactID, vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -89,7 +91,8 @@ func (h *ContactHandler) Update(c echo.Context) error {
 
 func (h *ContactHandler) Delete(c echo.Context) error {
 	contactID := c.Param("id")
-	if err := h.contactService.DeleteContact(contactID); err != nil {
+	vaultID := c.Param("vault_id")
+	if err := h.contactService.DeleteContact(contactID, vaultID); err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
@@ -100,7 +103,8 @@ func (h *ContactHandler) Delete(c echo.Context) error {
 
 func (h *ContactHandler) ToggleArchive(c echo.Context) error {
 	contactID := c.Param("id")
-	contact, err := h.contactService.ToggleArchive(contactID)
+	vaultID := c.Param("vault_id")
+	contact, err := h.contactService.ToggleArchive(contactID, vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")

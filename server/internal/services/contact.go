@@ -129,9 +129,9 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	return &resp, nil
 }
 
-func (s *ContactService) GetContact(contactID, userID string) (*dto.ContactResponse, error) {
+func (s *ContactService) GetContact(contactID, userID, vaultID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}
@@ -149,9 +149,9 @@ func (s *ContactService) GetContact(contactID, userID string) (*dto.ContactRespo
 	return &resp, nil
 }
 
-func (s *ContactService) UpdateContact(contactID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
+func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}
@@ -181,9 +181,9 @@ func (s *ContactService) UpdateContact(contactID string, req dto.UpdateContactRe
 	return &resp, nil
 }
 
-func (s *ContactService) DeleteContact(contactID string) error {
+func (s *ContactService) DeleteContact(contactID, vaultID string) error {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrContactNotFound
 		}
@@ -204,9 +204,9 @@ func (s *ContactService) DeleteContact(contactID string) error {
 	return nil
 }
 
-func (s *ContactService) ToggleArchive(contactID string) (*dto.ContactResponse, error) {
+func (s *ContactService) ToggleArchive(contactID, vaultID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}
@@ -224,7 +224,7 @@ func (s *ContactService) ToggleArchive(contactID string) (*dto.ContactResponse, 
 
 func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}

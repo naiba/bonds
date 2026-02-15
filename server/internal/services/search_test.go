@@ -114,7 +114,7 @@ func TestSearchService_DeleteContact(t *testing.T) {
 		t.Fatal("Expected at least 1 result for 'Charlie' before deletion")
 	}
 
-	if err := contactSvc.DeleteContact(contact.ID); err != nil {
+	if err := contactSvc.DeleteContact(contact.ID, vault.ID); err != nil {
 		t.Fatalf("DeleteContact failed: %v", err)
 	}
 

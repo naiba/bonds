@@ -92,7 +92,7 @@ func TestGetContact(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	got, err := svc.GetContact(created.ID, userID)
+	got, err := svc.GetContact(created.ID, userID, vaultID)
 	if err != nil {
 		t.Fatalf("GetContact failed: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestUpdateContact(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	updated, err := svc.UpdateContact(created.ID, dto.UpdateContactRequest{
+	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
 		FirstName: "Updated",
 		LastName:  "Name",
 	})
@@ -135,7 +135,7 @@ func TestDeleteContact(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	if err := svc.DeleteContact(created.ID); err != nil {
+	if err := svc.DeleteContact(created.ID, vaultID); err != nil {
 		t.Fatalf("DeleteContact failed: %v", err)
 	}
 
@@ -156,7 +156,7 @@ func TestToggleArchive(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	toggled, err := svc.ToggleArchive(created.ID)
+	toggled, err := svc.ToggleArchive(created.ID, vaultID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestToggleArchive(t *testing.T) {
 		t.Error("Expected contact to be archived after toggle")
 	}
 
-	toggledBack, err := svc.ToggleArchive(created.ID)
+	toggledBack, err := svc.ToggleArchive(created.ID, vaultID)
 	if err != nil {
 		t.Fatalf("ToggleArchive back failed: %v", err)
 	}
@@ -232,22 +232,22 @@ func TestToggleFavorite(t *testing.T) {
 func TestContactNotFound(t *testing.T) {
 	svc, _, _, _ := setupContactTest(t)
 
-	_, err := svc.GetContact("nonexistent-id", "some-user")
+	_, err := svc.GetContact("nonexistent-id", "some-user", "some-vault")
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 
-	_, err = svc.UpdateContact("nonexistent-id", dto.UpdateContactRequest{FirstName: "nope"})
+	_, err = svc.UpdateContact("nonexistent-id", "some-vault", dto.UpdateContactRequest{FirstName: "nope"})
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 
-	err = svc.DeleteContact("nonexistent-id")
+	err = svc.DeleteContact("nonexistent-id", "some-vault")
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 
-	_, err = svc.ToggleArchive("nonexistent-id")
+	_, err = svc.ToggleArchive("nonexistent-id", "some-vault")
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
