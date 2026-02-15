@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Typography, App } from "antd";
+import { Card, Form, Input, Button, Typography, App, theme } from "antd";
 import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
@@ -15,6 +15,7 @@ export default function Register() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   async function onFinish(values: RegisterRequest) {
     setLoading(true);
@@ -36,7 +37,7 @@ export default function Register() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f5f5f5",
+        background: token.colorBgLayout,
         padding: 16,
       }}
     >

@@ -2,6 +2,11 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  transition: background-color 0.3s ease;
+}
+
+html[data-theme="dark"] body {
+  background-color: #141414;
 }
 
 #root {

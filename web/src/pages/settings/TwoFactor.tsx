@@ -10,6 +10,7 @@ import {
   Spin,
   App,
   Space,
+  theme,
 } from "antd";
 import {
   SafetyCertificateOutlined,
@@ -34,6 +35,7 @@ export default function TwoFactor() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["settings", "2fa", "status"];
 
   const { data: status, isLoading } = useQuery({
@@ -135,7 +137,7 @@ export default function TwoFactor() {
 
             <Card
               size="small"
-              style={{ marginBottom: 16, background: "#fafafa" }}
+              style={{ marginBottom: 16, background: token.colorBgLayout }}
             >
               <Text strong>{t("twoFactor.secretKey")}: </Text>
               <Text code copyable>

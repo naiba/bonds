@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
+import { ThemeProvider } from "@/stores/theme";
 import Layout from "@/components/Layout";
 
 vi.mock("@/stores/auth", () => ({
@@ -26,13 +27,15 @@ vi.mock("@/stores/auth", () => ({
 
 function renderLayout() {
   return render(
-    <ConfigProvider>
-      <AntApp>
-        <MemoryRouter>
-          <Layout />
-        </MemoryRouter>
-      </AntApp>
-    </ConfigProvider>,
+    <ThemeProvider>
+      <ConfigProvider>
+        <AntApp>
+          <MemoryRouter>
+            <Layout />
+          </MemoryRouter>
+        </AntApp>
+      </ConfigProvider>
+    </ThemeProvider>,
   );
 }
 

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Card, Button, Typography, Spin, Empty, Row, Col, App } from "antd";
+import { Card, Button, Typography, Spin, Empty, Row, Col, App, theme } from "antd";
 import { PlusOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { vaultsApi } from "@/api/vaults";
@@ -12,6 +12,7 @@ export default function VaultList() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data, isLoading } = useQuery({
     queryKey: ["vaults"],
@@ -59,7 +60,7 @@ export default function VaultList() {
       {vaults.length === 0 ? (
         <Card>
           <Empty
-            image={<SafetyCertificateOutlined style={{ fontSize: 48, color: "#d9d9d9" }} />}
+            image={<SafetyCertificateOutlined style={{ fontSize: 48, color: token.colorTextQuaternary }} />}
             description={
               <div>
                 <Text strong>{t("vault.list.no_vaults")}</Text>

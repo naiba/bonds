@@ -10,6 +10,7 @@ import {
   Tag,
   Empty,
   Calendar,
+  theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ export default function GoalsModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "goals"];
 
   const { data: goals = [], isLoading } = useQuery({
@@ -85,7 +87,7 @@ export default function GoalsModule({
             width: 8,
             height: 8,
             borderRadius: "50%",
-            background: "#52c41a",
+            background: token.colorSuccess,
             margin: "0 auto",
           }}
         />

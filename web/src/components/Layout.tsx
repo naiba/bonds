@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
-import { Layout as AntLayout, Menu, Dropdown, Avatar, theme, Button } from "antd";
+import {
+  Layout as AntLayout,
+  Menu,
+  Dropdown,
+  Avatar,
+  theme,
+  Button,
+  Tooltip,
+} from "antd";
 import {
   SafetyCertificateOutlined,
   SettingOutlined,
@@ -22,9 +30,14 @@ import {
   GlobalOutlined,
   LockOutlined,
   MailOutlined,
+  SunOutlined,
+  MoonOutlined,
+  DesktopOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/stores/auth";
+import { useTheme } from "@/stores/theme";
+import type { ThemeMode } from "@/stores/theme";
 import { useTranslation } from "react-i18next";
 import SearchBar from "@/components/SearchBar";
 
@@ -38,6 +51,19 @@ export default function Layout() {
   const { id: vaultId } = useParams();
   const { token } = theme.useToken();
   const { t, i18n } = useTranslation();
+  const { themeMode, setThemeMode } = useTheme();
+
+  const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
+  const themeModeIcons: Record<ThemeMode, React.ReactNode> = {
+    light: <SunOutlined />,
+    dark: <MoonOutlined />,
+    system: <DesktopOutlined />,
+  };
+  const themeModeLabels: Record<ThemeMode, string> = {
+    light: t("theme.light"),
+    dark: t("theme.dark"),
+    system: t("theme.system"),
+  };
 
   const isInVault = location.pathname.match(/^\/vaults\/\d+/);
 
@@ -159,16 +185,6 @@ export default function Layout() {
 
   const userMenuItems: MenuProps["items"] = [
     {
-      key: "language",
-      icon: <GlobalOutlined />,
-      label: i18n.language?.startsWith("zh") ? "English" : "中文",
-      onClick: () => {
-        const next = i18n.language?.startsWith("zh") ? "en" : "zh";
-        i18n.changeLanguage(next);
-      },
-    },
-    { type: "divider" as const },
-    {
       key: "logout",
       icon: <LogoutOutlined />,
       label: t("nav.logout"),
@@ -178,6 +194,16 @@ export default function Layout() {
       },
     },
   ];
+
+  const nextThemeMode = () => {
+    const idx = themeModeOrder.indexOf(themeMode);
+    setThemeMode(themeModeOrder[(idx + 1) % themeModeOrder.length]);
+  };
+
+  const toggleLanguage = () => {
+    const next = i18n.language?.startsWith("zh") ? "en" : "zh";
+    i18n.changeLanguage(next);
+  };
 
   const initials = user
     ? `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase()
@@ -247,30 +273,51 @@ export default function Layout() {
             />
             <SearchBar />
           </div>
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <div
-              style={{
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <Tooltip title={themeModeLabels[themeMode]}>
+              <Button
+                type="text"
+                icon={themeModeIcons[themeMode]}
+                onClick={nextThemeMode}
+              />
+            </Tooltip>
+            <Tooltip
+              title={i18n.language?.startsWith("zh") ? "English" : "中文"}
             >
-              <span style={{ color: token.colorTextSecondary, fontSize: 14 }}>
-                {user?.first_name} {user?.last_name}
-              </span>
-              <Avatar
-                size={32}
-                icon={<UserOutlined />}
+              <Button
+                type="text"
+                icon={<GlobalOutlined />}
+                onClick={toggleLanguage}
+              />
+            </Tooltip>
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+              <div
                 style={{
-                  backgroundColor: token.colorPrimary,
-                  fontSize: 13,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginLeft: 4,
                 }}
               >
-                {initials}
-              </Avatar>
-            </div>
-          </Dropdown>
+                <span
+                  style={{ color: token.colorTextSecondary, fontSize: 14 }}
+                >
+                  {user?.first_name} {user?.last_name}
+                </span>
+                <Avatar
+                  size={32}
+                  icon={<UserOutlined />}
+                  style={{
+                    backgroundColor: token.colorPrimary,
+                    fontSize: 13,
+                  }}
+                >
+                  {initials}
+                </Avatar>
+              </div>
+            </Dropdown>
+          </div>
         </Header>
         <Content
           style={{

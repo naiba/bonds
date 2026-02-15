@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Typography, App } from "antd";
+import { Card, Form, Input, Button, Typography, App, theme } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { invitationsApi } from "@/api/invitations";
@@ -14,6 +14,7 @@ export default function AcceptInvite() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token: themeToken } = theme.useToken();
   const token = searchParams.get("token") ?? "";
 
   async function onFinish(values: {
@@ -41,7 +42,7 @@ export default function AcceptInvite() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f5f5f5",
+        background: themeToken.colorBgLayout,
         padding: 16,
       }}
     >

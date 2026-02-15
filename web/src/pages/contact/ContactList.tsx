@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Table, Button, Typography, Input, Tag, Space, App, Upload } from "antd";
+import { Table, Button, Typography, Input, Tag, Space, App, Upload, theme } from "antd";
 import {
   PlusOutlined,
   SearchOutlined,
@@ -25,6 +25,7 @@ export default function ContactList() {
   const [search, setSearch] = useState("");
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts"],
@@ -57,7 +58,7 @@ export default function ContactList() {
           <span>
             {record.first_name} {record.last_name}
           </span>
-          {record.is_favorite && <StarFilled style={{ color: "#faad14" }} />}
+          {record.is_favorite && <StarFilled style={{ color: token.colorWarning }} />}
         </Space>
       ),
       sorter: (a, b) => a.first_name.localeCompare(b.first_name),

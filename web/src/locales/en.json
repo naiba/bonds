@@ -588,5 +588,10 @@
     "year": "Year",
     "month": "Month",
     "day": "Day"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
   }
 }

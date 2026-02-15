@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Card, Form, Input, Button, Typography, App, Divider, Space } from "antd";
+import { Card, Form, Input, Button, Typography, App, Divider, Space, theme } from "antd";
 import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,7 @@ export default function Login() {
   const location = useLocation();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const from = (location.state as { from?: { pathname: string } })?.from
     ?.pathname ?? "/vaults";
@@ -40,7 +41,7 @@ export default function Login() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#f5f5f5",
+        background: token.colorBgLayout,
         padding: 16,
       }}
     >

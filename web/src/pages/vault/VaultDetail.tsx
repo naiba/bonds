@@ -1,5 +1,5 @@
 import { useParams, useNavigate, Outlet } from "react-router-dom";
-import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions } from "antd";
+import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme } from "antd";
 import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { vaultsApi } from "@/api/vaults";
@@ -14,6 +14,7 @@ export default function VaultDetail() {
   const navigate = useNavigate();
   const vaultId = id!;
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data: vault, isLoading: vaultLoading } = useQuery({
     queryKey: ["vaults", vaultId],
@@ -90,9 +91,9 @@ export default function VaultDetail() {
             {recentContacts.length === 0 ? (
               <div style={{ textAlign: "center", padding: 24 }}>
                 <TeamOutlined
-                  style={{ fontSize: 32, color: "#d9d9d9", marginBottom: 8 }}
+                  style={{ fontSize: 32, color: token.colorTextQuaternary, marginBottom: 8 }}
                 />
-                <div style={{ color: "#999" }}>{t("vault.detail.no_contacts")}</div>
+                <div style={{ color: token.colorTextSecondary }}>{t("vault.detail.no_contacts")}</div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -118,7 +119,7 @@ export default function VaultDetail() {
                       <span>
                         {contact.first_name} {contact.last_name}
                       </span>
-                      <span style={{ color: "#999", fontSize: 12 }}>
+                      <span style={{ color: token.colorTextSecondary, fontSize: 12 }}>
                         {dayjs(contact.updated_at).format("MMM D")}
                       </span>
                     </div>
