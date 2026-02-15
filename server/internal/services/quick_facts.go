@@ -18,7 +18,10 @@ func NewQuickFactService(db *gorm.DB) *QuickFactService {
 	return &QuickFactService{db: db}
 }
 
-func (s *QuickFactService) List(contactID string, templateID uint) ([]dto.QuickFactResponse, error) {
+func (s *QuickFactService) List(contactID, vaultID string, templateID uint) ([]dto.QuickFactResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var facts []models.QuickFact
 	if err := s.db.Where("contact_id = ? AND vault_quick_facts_template_id = ?", contactID, templateID).
 		Order("created_at DESC").Find(&facts).Error; err != nil {
@@ -31,7 +34,10 @@ func (s *QuickFactService) List(contactID string, templateID uint) ([]dto.QuickF
 	return result, nil
 }
 
-func (s *QuickFactService) Create(contactID string, templateID uint, req dto.CreateQuickFactRequest) (*dto.QuickFactResponse, error) {
+func (s *QuickFactService) Create(contactID, vaultID string, templateID uint, req dto.CreateQuickFactRequest) (*dto.QuickFactResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	fact := models.QuickFact{
 		VaultQuickFactsTemplateID: templateID,
 		ContactID:                 contactID,
@@ -44,7 +50,10 @@ func (s *QuickFactService) Create(contactID string, templateID uint, req dto.Cre
 	return &resp, nil
 }
 
-func (s *QuickFactService) Update(id uint, req dto.UpdateQuickFactRequest) (*dto.QuickFactResponse, error) {
+func (s *QuickFactService) Update(id uint, contactID, vaultID string, req dto.UpdateQuickFactRequest) (*dto.QuickFactResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var fact models.QuickFact
 	if err := s.db.First(&fact, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,7 +69,10 @@ func (s *QuickFactService) Update(id uint, req dto.UpdateQuickFactRequest) (*dto
 	return &resp, nil
 }
 
-func (s *QuickFactService) Delete(id uint) error {
+func (s *QuickFactService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	var fact models.QuickFact
 	if err := s.db.First(&fact, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

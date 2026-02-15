@@ -20,12 +20,16 @@ func NewQuickFactHandler(quickFactService *services.QuickFactService) *QuickFact
 
 func (h *QuickFactHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	templateID, err := strconv.ParseUint(c.Param("templateId"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_template_id", nil)
 	}
-	facts, err := h.quickFactService.List(contactID, uint(templateID))
+	facts, err := h.quickFactService.List(contactID, vaultID, uint(templateID))
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_quick_facts")
 	}
 	return response.OK(c, facts)
@@ -33,6 +37,7 @@ func (h *QuickFactHandler) List(c echo.Context) error {
 
 func (h *QuickFactHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	templateID, err := strconv.ParseUint(c.Param("templateId"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_template_id", nil)
@@ -44,14 +49,19 @@ func (h *QuickFactHandler) Create(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	fact, err := h.quickFactService.Create(contactID, uint(templateID), req)
+	fact, err := h.quickFactService.Create(contactID, vaultID, uint(templateID), req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_quick_fact")
 	}
 	return response.Created(c, fact)
 }
 
 func (h *QuickFactHandler) Update(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_quick_fact_id", nil)
@@ -63,8 +73,11 @@ func (h *QuickFactHandler) Update(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	fact, err := h.quickFactService.Update(uint(id), req)
+	fact, err := h.quickFactService.Update(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrQuickFactNotFound) {
 			return response.NotFound(c, "err.quick_fact_not_found")
 		}
@@ -74,11 +87,16 @@ func (h *QuickFactHandler) Update(c echo.Context) error {
 }
 
 func (h *QuickFactHandler) Delete(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_quick_fact_id", nil)
 	}
-	if err := h.quickFactService.Delete(uint(id)); err != nil {
+	if err := h.quickFactService.Delete(uint(id), contactID, vaultID); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrQuickFactNotFound) {
 			return response.NotFound(c, "err.quick_fact_not_found")
 		}

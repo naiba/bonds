@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupQuickFactTest(t *testing.T) (*QuickFactService, string) {
+func setupQuickFactTest(t *testing.T) (*QuickFactService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,13 +35,13 @@ func setupQuickFactTest(t *testing.T) (*QuickFactService, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewQuickFactService(db), contact.ID
+	return NewQuickFactService(db), contact.ID, vault.ID
 }
 
 func TestCreateQuickFact(t *testing.T) {
-	svc, contactID := setupQuickFactTest(t)
+	svc, contactID, vaultID := setupQuickFactTest(t)
 
-	fact, err := svc.Create(contactID, 1, dto.CreateQuickFactRequest{
+	fact, err := svc.Create(contactID, vaultID, 1, dto.CreateQuickFactRequest{
 		Content: "Loves coffee",
 	})
 	if err != nil {
@@ -62,18 +62,18 @@ func TestCreateQuickFact(t *testing.T) {
 }
 
 func TestListQuickFacts(t *testing.T) {
-	svc, contactID := setupQuickFactTest(t)
+	svc, contactID, vaultID := setupQuickFactTest(t)
 
-	_, err := svc.Create(contactID, 1, dto.CreateQuickFactRequest{Content: "Fact 1"})
+	_, err := svc.Create(contactID, vaultID, 1, dto.CreateQuickFactRequest{Content: "Fact 1"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, 1, dto.CreateQuickFactRequest{Content: "Fact 2"})
+	_, err = svc.Create(contactID, vaultID, 1, dto.CreateQuickFactRequest{Content: "Fact 2"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	facts, err := svc.List(contactID, 1)
+	facts, err := svc.List(contactID, vaultID, 1)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -83,14 +83,14 @@ func TestListQuickFacts(t *testing.T) {
 }
 
 func TestUpdateQuickFact(t *testing.T) {
-	svc, contactID := setupQuickFactTest(t)
+	svc, contactID, vaultID := setupQuickFactTest(t)
 
-	created, err := svc.Create(contactID, 1, dto.CreateQuickFactRequest{Content: "Original"})
+	created, err := svc.Create(contactID, vaultID, 1, dto.CreateQuickFactRequest{Content: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, dto.UpdateQuickFactRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateQuickFactRequest{
 		Content: "Updated content",
 	})
 	if err != nil {
@@ -102,18 +102,18 @@ func TestUpdateQuickFact(t *testing.T) {
 }
 
 func TestDeleteQuickFact(t *testing.T) {
-	svc, contactID := setupQuickFactTest(t)
+	svc, contactID, vaultID := setupQuickFactTest(t)
 
-	created, err := svc.Create(contactID, 1, dto.CreateQuickFactRequest{Content: "To delete"})
+	created, err := svc.Create(contactID, vaultID, 1, dto.CreateQuickFactRequest{Content: "To delete"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	facts, err := svc.List(contactID, 1)
+	facts, err := svc.List(contactID, vaultID, 1)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -123,9 +123,9 @@ func TestDeleteQuickFact(t *testing.T) {
 }
 
 func TestDeleteQuickFactNotFound(t *testing.T) {
-	svc, _ := setupQuickFactTest(t)
+	svc, contactID, vaultID := setupQuickFactTest(t)
 
-	err := svc.Delete(9999)
+	err := svc.Delete(9999, contactID, vaultID)
 	if err != ErrQuickFactNotFound {
 		t.Errorf("Expected ErrQuickFactNotFound, got %v", err)
 	}
