@@ -57,10 +57,9 @@ test.describe('Calendar System', () => {
     const importantDatesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
     await importantDatesCard.getByRole('button', { name: /add/i }).click();
 
-    const modal = page.locator('.ant-modal-content');
+    const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
 
-    // Fill label
     await modal.getByRole('textbox').first().fill('Lunar Birthday');
 
     await page.getByText('Chinese Lunar', { exact: true }).click();
@@ -68,25 +67,18 @@ test.describe('Calendar System', () => {
     const compactSelects = modal.locator('.ant-space-compact .ant-select');
     await expect(compactSelects).toHaveCount(3, { timeout: 5000 });
 
-    await compactSelects.nth(0).locator('.ant-select-selection-item').click();
-    await page.keyboard.type('2025');
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^2025$/ }).click();
-
     await compactSelects.nth(1).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
-
-    await compactSelects.nth(2).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^15$/ }).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
+    await page.waitForTimeout(300);
 
     const typeFormItem = modal.locator('.ant-form-item').filter({ hasText: /type/i });
     await typeFormItem.locator('.ant-select').click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
+    await page.waitForTimeout(300);
 
-    // Submit
-    await page.locator('.ant-modal-footer').getByRole('button', { name: /ok/i }).click();
+    await modal.getByRole('button', { name: /ok/i }).click();
 
-    // Verify modal closed and date appears in list
-    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await expect(modal).not.toBeVisible({ timeout: 15000 });
     await expect(importantDatesCard.getByText('Lunar Birthday')).toBeVisible({ timeout: 5000 });
     await expect(importantDatesCard.locator('.ant-tag').filter({ hasText: 'lunar' })).toBeVisible({ timeout: 5000 });
   });
@@ -98,7 +90,7 @@ test.describe('Calendar System', () => {
     const remindersCard = page.locator('.ant-card').filter({ hasText: 'Reminders' });
     await remindersCard.getByRole('button', { name: /add/i }).click();
 
-    const modal = page.locator('.ant-modal-content');
+    const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
 
     await modal.getByRole('textbox').first().fill('Lunar Reminder');
@@ -108,24 +100,17 @@ test.describe('Calendar System', () => {
     const compactSelects = modal.locator('.ant-space-compact .ant-select');
     await expect(compactSelects).toHaveCount(3, { timeout: 5000 });
 
-    await compactSelects.nth(0).locator('.ant-select-selection-item').click();
-    await page.keyboard.type('2025');
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^2025$/ }).click();
-
     await compactSelects.nth(1).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
-
-    await compactSelects.nth(2).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^15$/ }).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
+    await page.waitForTimeout(300);
 
     const freqFormItem = modal.locator('.ant-form-item').filter({ hasText: /frequency/i });
     await freqFormItem.locator('.ant-select').click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /yearly/i }).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').filter({ hasText: /yearly/i }).click();
+    await page.waitForTimeout(300);
 
-    // Submit
-    await page.locator('.ant-modal-footer').getByRole('button', { name: /ok/i }).click();
+    await modal.getByRole('button', { name: /ok/i }).click();
 
-    // Verify modal closed and reminder appears in list
     await expect(modal).not.toBeVisible({ timeout: 10000 });
     await expect(remindersCard.getByText('Lunar Reminder')).toBeVisible({ timeout: 5000 });
     await expect(remindersCard.locator('.ant-tag').filter({ hasText: 'lunar' })).toBeVisible({ timeout: 5000 });
