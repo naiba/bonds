@@ -18,7 +18,10 @@ func NewPetService(db *gorm.DB) *PetService {
 	return &PetService{db: db}
 }
 
-func (s *PetService) List(contactID string) ([]dto.PetResponse, error) {
+func (s *PetService) List(contactID, vaultID string) ([]dto.PetResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var pets []models.Pet
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&pets).Error; err != nil {
 		return nil, err
@@ -30,7 +33,10 @@ func (s *PetService) List(contactID string) ([]dto.PetResponse, error) {
 	return result, nil
 }
 
-func (s *PetService) Create(contactID string, req dto.CreatePetRequest) (*dto.PetResponse, error) {
+func (s *PetService) Create(contactID, vaultID string, req dto.CreatePetRequest) (*dto.PetResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	pet := models.Pet{
 		ContactID:     contactID,
 		PetCategoryID: req.PetCategoryID,
@@ -43,7 +49,10 @@ func (s *PetService) Create(contactID string, req dto.CreatePetRequest) (*dto.Pe
 	return &resp, nil
 }
 
-func (s *PetService) Update(id uint, contactID string, req dto.UpdatePetRequest) (*dto.PetResponse, error) {
+func (s *PetService) Update(id uint, contactID, vaultID string, req dto.UpdatePetRequest) (*dto.PetResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var pet models.Pet
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&pet).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -60,7 +69,10 @@ func (s *PetService) Update(id uint, contactID string, req dto.UpdatePetRequest)
 	return &resp, nil
 }
 
-func (s *PetService) Delete(id uint, contactID string) error {
+func (s *PetService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.Pet{})
 	if result.Error != nil {
 		return result.Error

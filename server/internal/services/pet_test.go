@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupPetTest(t *testing.T) (*PetService, string) {
+func setupPetTest(t *testing.T) (*PetService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,13 +35,13 @@ func setupPetTest(t *testing.T) (*PetService, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewPetService(db), contact.ID
+	return NewPetService(db), contact.ID, vault.ID
 }
 
 func TestCreatePet(t *testing.T) {
-	svc, contactID := setupPetTest(t)
+	svc, contactID, vaultID := setupPetTest(t)
 
-	pet, err := svc.Create(contactID, dto.CreatePetRequest{
+	pet, err := svc.Create(contactID, vaultID, dto.CreatePetRequest{
 		PetCategoryID: 1,
 		Name:          "Buddy",
 	})
@@ -63,18 +63,18 @@ func TestCreatePet(t *testing.T) {
 }
 
 func TestListPets(t *testing.T) {
-	svc, contactID := setupPetTest(t)
+	svc, contactID, vaultID := setupPetTest(t)
 
-	_, err := svc.Create(contactID, dto.CreatePetRequest{PetCategoryID: 1, Name: "Pet 1"})
+	_, err := svc.Create(contactID, vaultID, dto.CreatePetRequest{PetCategoryID: 1, Name: "Pet 1"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreatePetRequest{PetCategoryID: 2, Name: "Pet 2"})
+	_, err = svc.Create(contactID, vaultID, dto.CreatePetRequest{PetCategoryID: 2, Name: "Pet 2"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	pets, err := svc.List(contactID)
+	pets, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -84,14 +84,14 @@ func TestListPets(t *testing.T) {
 }
 
 func TestUpdatePet(t *testing.T) {
-	svc, contactID := setupPetTest(t)
+	svc, contactID, vaultID := setupPetTest(t)
 
-	created, err := svc.Create(contactID, dto.CreatePetRequest{PetCategoryID: 1, Name: "Original"})
+	created, err := svc.Create(contactID, vaultID, dto.CreatePetRequest{PetCategoryID: 1, Name: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdatePetRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdatePetRequest{
 		PetCategoryID: 2,
 		Name:          "Updated",
 	})
@@ -107,18 +107,18 @@ func TestUpdatePet(t *testing.T) {
 }
 
 func TestDeletePet(t *testing.T) {
-	svc, contactID := setupPetTest(t)
+	svc, contactID, vaultID := setupPetTest(t)
 
-	created, err := svc.Create(contactID, dto.CreatePetRequest{PetCategoryID: 1, Name: "To delete"})
+	created, err := svc.Create(contactID, vaultID, dto.CreatePetRequest{PetCategoryID: 1, Name: "To delete"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	pets, err := svc.List(contactID)
+	pets, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -128,14 +128,14 @@ func TestDeletePet(t *testing.T) {
 }
 
 func TestPetNotFound(t *testing.T) {
-	svc, contactID := setupPetTest(t)
+	svc, contactID, vaultID := setupPetTest(t)
 
-	_, err := svc.Update(9999, contactID, dto.UpdatePetRequest{PetCategoryID: 1, Name: "nope"})
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdatePetRequest{PetCategoryID: 1, Name: "nope"})
 	if err != ErrPetNotFound {
 		t.Errorf("Expected ErrPetNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999, contactID)
+	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrPetNotFound {
 		t.Errorf("Expected ErrPetNotFound, got %v", err)
 	}
