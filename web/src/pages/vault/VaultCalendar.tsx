@@ -33,7 +33,7 @@ export default function VaultCalendar() {
     queryKey: ["vaults", vaultId, "calendar", "dates"],
     queryFn: async () => {
       const res = await client.get<APIResponse<ImportantDate[]>>(
-        `/vaults/${vaultId}/important-dates`,
+        `/vaults/${vaultId}/dates`,
       );
       return res.data.data ?? [];
     },

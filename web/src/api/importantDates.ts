@@ -5,7 +5,7 @@ import type { ImportantDate, CreateImportantDateRequest } from "@/types/modules"
 export const importantDatesApi = {
   list(vaultId: string | number, contactId: string | number) {
     return client.get<APIResponse<ImportantDate[]>>(
-      `/vaults/${vaultId}/contacts/${contactId}/important-dates`,
+      `/vaults/${vaultId}/contacts/${contactId}/dates`,
     );
   },
 
@@ -15,7 +15,7 @@ export const importantDatesApi = {
     data: CreateImportantDateRequest,
   ) {
     return client.post<APIResponse<ImportantDate>>(
-      `/vaults/${vaultId}/contacts/${contactId}/important-dates`,
+      `/vaults/${vaultId}/contacts/${contactId}/dates`,
       data,
     );
   },
@@ -27,14 +27,14 @@ export const importantDatesApi = {
     data: CreateImportantDateRequest,
   ) {
     return client.put<APIResponse<ImportantDate>>(
-      `/vaults/${vaultId}/contacts/${contactId}/important-dates/${dateId}`,
+      `/vaults/${vaultId}/contacts/${contactId}/dates/${dateId}`,
       data,
     );
   },
 
   delete(vaultId: string | number, contactId: string | number, dateId: number) {
     return client.delete(
-      `/vaults/${vaultId}/contacts/${contactId}/important-dates/${dateId}`,
+      `/vaults/${vaultId}/contacts/${contactId}/dates/${dateId}`,
     );
   },
 };
