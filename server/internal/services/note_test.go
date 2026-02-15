@@ -74,7 +74,7 @@ func TestListNotes(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	notes, err := svc.List(contactID)
+	notes, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestUpdateNote(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateNoteRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateNoteRequest{
 		Title: "Updated Title",
 		Body:  "Updated body",
 	})
@@ -114,11 +114,11 @@ func TestDeleteNote(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	notes, err := svc.List(contactID)
+	notes, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -128,18 +128,18 @@ func TestDeleteNote(t *testing.T) {
 }
 
 func TestDeleteNoteNotFound(t *testing.T) {
-	svc, contactID, _, _ := setupNoteTest(t)
+	svc, contactID, vaultID, _ := setupNoteTest(t)
 
-	err := svc.Delete(9999, contactID)
+	err := svc.Delete(9999, contactID, vaultID)
 	if err != ErrNoteNotFound {
 		t.Errorf("Expected ErrNoteNotFound, got %v", err)
 	}
 }
 
 func TestUpdateNoteNotFound(t *testing.T) {
-	svc, contactID, _, _ := setupNoteTest(t)
+	svc, contactID, vaultID, _ := setupNoteTest(t)
 
-	_, err := svc.Update(9999, contactID, dto.UpdateNoteRequest{Body: "nope"})
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateNoteRequest{Body: "nope"})
 	if err != ErrNoteNotFound {
 		t.Errorf("Expected ErrNoteNotFound, got %v", err)
 	}

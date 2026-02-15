@@ -28,7 +28,10 @@ func (s *NoteService) SetSearchService(ss *SearchService) {
 	s.searchService = ss
 }
 
-func (s *NoteService) List(contactID string) ([]dto.NoteResponse, error) {
+func (s *NoteService) List(contactID, vaultID string) ([]dto.NoteResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var notes []models.Note
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&notes).Error; err != nil {
 		return nil, err
@@ -41,6 +44,9 @@ func (s *NoteService) List(contactID string) ([]dto.NoteResponse, error) {
 }
 
 func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.CreateNoteRequest) (*dto.NoteResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	note := models.Note{
 		ContactID: contactID,
 		VaultID:   vaultID,
@@ -65,7 +71,10 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 	return &resp, nil
 }
 
-func (s *NoteService) Update(id uint, contactID string, req dto.UpdateNoteRequest) (*dto.NoteResponse, error) {
+func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateNoteRequest) (*dto.NoteResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var note models.Note
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&note).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -92,7 +101,10 @@ func (s *NoteService) Update(id uint, contactID string, req dto.UpdateNoteReques
 	return &resp, nil
 }
 
-func (s *NoteService) Delete(id uint, contactID string) error {
+func (s *NoteService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.Note{})
 	if result.Error != nil {
 		return result.Error
