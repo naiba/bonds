@@ -8,7 +8,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupCallTest(t *testing.T) (*CallService, string, string) {
+func setupCallTest(t *testing.T) (*CallService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -36,14 +36,14 @@ func setupCallTest(t *testing.T) (*CallService, string, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewCallService(db), contact.ID, resp.User.ID
+	return NewCallService(db), contact.ID, vault.ID, resp.User.ID
 }
 
 func TestCreateCall(t *testing.T) {
-	svc, contactID, userID := setupCallTest(t)
+	svc, contactID, vaultID, userID := setupCallTest(t)
 
 	calledAt := time.Now()
-	call, err := svc.Create(contactID, userID, dto.CreateCallRequest{
+	call, err := svc.Create(contactID, vaultID, userID, dto.CreateCallRequest{
 		CalledAt:     calledAt,
 		Type:         "phone",
 		WhoInitiated: "me",
@@ -73,19 +73,19 @@ func TestCreateCall(t *testing.T) {
 }
 
 func TestListCalls(t *testing.T) {
-	svc, contactID, userID := setupCallTest(t)
+	svc, contactID, vaultID, userID := setupCallTest(t)
 
 	calledAt := time.Now()
-	_, err := svc.Create(contactID, userID, dto.CreateCallRequest{CalledAt: calledAt, Type: "phone", WhoInitiated: "me"})
+	_, err := svc.Create(contactID, vaultID, userID, dto.CreateCallRequest{CalledAt: calledAt, Type: "phone", WhoInitiated: "me"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, userID, dto.CreateCallRequest{CalledAt: calledAt, Type: "video", WhoInitiated: "them"})
+	_, err = svc.Create(contactID, vaultID, userID, dto.CreateCallRequest{CalledAt: calledAt, Type: "video", WhoInitiated: "them"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	calls, meta, err := svc.List(contactID, 1, 15)
+	calls, meta, err := svc.List(contactID, vaultID, 1, 15)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -98,10 +98,10 @@ func TestListCalls(t *testing.T) {
 }
 
 func TestUpdateCall(t *testing.T) {
-	svc, contactID, userID := setupCallTest(t)
+	svc, contactID, vaultID, userID := setupCallTest(t)
 
 	calledAt := time.Now()
-	created, err := svc.Create(contactID, userID, dto.CreateCallRequest{
+	created, err := svc.Create(contactID, vaultID, userID, dto.CreateCallRequest{
 		CalledAt:     calledAt,
 		Type:         "phone",
 		WhoInitiated: "me",
@@ -112,7 +112,7 @@ func TestUpdateCall(t *testing.T) {
 
 	newCalledAt := time.Now()
 	answered := false
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateCallRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateCallRequest{
 		CalledAt:     newCalledAt,
 		Type:         "video",
 		WhoInitiated: "them",
@@ -134,10 +134,10 @@ func TestUpdateCall(t *testing.T) {
 }
 
 func TestDeleteCall(t *testing.T) {
-	svc, contactID, userID := setupCallTest(t)
+	svc, contactID, vaultID, userID := setupCallTest(t)
 
 	calledAt := time.Now()
-	created, err := svc.Create(contactID, userID, dto.CreateCallRequest{
+	created, err := svc.Create(contactID, vaultID, userID, dto.CreateCallRequest{
 		CalledAt:     calledAt,
 		Type:         "phone",
 		WhoInitiated: "me",
@@ -146,11 +146,11 @@ func TestDeleteCall(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	calls, _, err := svc.List(contactID, 1, 15)
+	calls, _, err := svc.List(contactID, vaultID, 1, 15)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -160,10 +160,10 @@ func TestDeleteCall(t *testing.T) {
 }
 
 func TestCallNotFound(t *testing.T) {
-	svc, contactID, _ := setupCallTest(t)
+	svc, contactID, vaultID, _ := setupCallTest(t)
 
 	calledAt := time.Now()
-	_, err := svc.Update(9999, contactID, dto.UpdateCallRequest{
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateCallRequest{
 		CalledAt:     calledAt,
 		Type:         "phone",
 		WhoInitiated: "me",
@@ -172,7 +172,7 @@ func TestCallNotFound(t *testing.T) {
 		t.Errorf("Expected ErrCallNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999, contactID)
+	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrCallNotFound {
 		t.Errorf("Expected ErrCallNotFound, got %v", err)
 	}

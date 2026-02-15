@@ -25,7 +25,10 @@ func (s *CallService) SetFeedRecorder(fr *FeedRecorder) {
 	s.feedRecorder = fr
 }
 
-func (s *CallService) List(contactID string, page, perPage int) ([]dto.CallResponse, response.Meta, error) {
+func (s *CallService) List(contactID, vaultID string, page, perPage int) ([]dto.CallResponse, response.Meta, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, response.Meta{}, err
+	}
 	query := s.db.Where("contact_id = ?", contactID)
 
 	var total int64
@@ -61,7 +64,10 @@ func (s *CallService) List(contactID string, page, perPage int) ([]dto.CallRespo
 	return result, meta, nil
 }
 
-func (s *CallService) Create(contactID, authorID string, req dto.CreateCallRequest) (*dto.CallResponse, error) {
+func (s *CallService) Create(contactID, vaultID, authorID string, req dto.CreateCallRequest) (*dto.CallResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	answered := true
 	if req.Answered != nil {
 		answered = *req.Answered
@@ -91,7 +97,10 @@ func (s *CallService) Create(contactID, authorID string, req dto.CreateCallReque
 	return &resp, nil
 }
 
-func (s *CallService) Update(id uint, contactID string, req dto.UpdateCallRequest) (*dto.CallResponse, error) {
+func (s *CallService) Update(id uint, contactID, vaultID string, req dto.UpdateCallRequest) (*dto.CallResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var call models.Call
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&call).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -115,7 +124,10 @@ func (s *CallService) Update(id uint, contactID string, req dto.UpdateCallReques
 	return &resp, nil
 }
 
-func (s *CallService) Delete(id uint, contactID string) error {
+func (s *CallService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.Call{})
 	if result.Error != nil {
 		return result.Error

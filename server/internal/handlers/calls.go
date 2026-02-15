@@ -21,11 +21,15 @@ func NewCallHandler(callService *services.CallService) *CallHandler {
 
 func (h *CallHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 
-	calls, meta, err := h.callService.List(contactID, page, perPage)
+	calls, meta, err := h.callService.List(contactID, vaultID, page, perPage)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_calls")
 	}
 	return response.Paginated(c, calls, meta)
@@ -33,6 +37,7 @@ func (h *CallHandler) List(c echo.Context) error {
 
 func (h *CallHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	userID := middleware.GetUserID(c)
 
 	var req dto.CreateCallRequest
@@ -43,8 +48,11 @@ func (h *CallHandler) Create(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	call, err := h.callService.Create(contactID, userID, req)
+	call, err := h.callService.Create(contactID, vaultID, userID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_call")
 	}
 	return response.Created(c, call)
@@ -52,6 +60,7 @@ func (h *CallHandler) Create(c echo.Context) error {
 
 func (h *CallHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_call_id", nil)
@@ -65,8 +74,11 @@ func (h *CallHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	call, err := h.callService.Update(uint(id), contactID, req)
+	call, err := h.callService.Update(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrCallNotFound) {
 			return response.NotFound(c, "err.call_not_found")
 		}
@@ -77,12 +89,16 @@ func (h *CallHandler) Update(c echo.Context) error {
 
 func (h *CallHandler) Delete(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_call_id", nil)
 	}
 
-	if err := h.callService.Delete(uint(id), contactID); err != nil {
+	if err := h.callService.Delete(uint(id), contactID, vaultID); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		if errors.Is(err, services.ErrCallNotFound) {
 			return response.NotFound(c, "err.call_not_found")
 		}
