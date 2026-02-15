@@ -25,6 +25,9 @@ func (s *LoanService) SetFeedRecorder(fr *FeedRecorder) {
 }
 
 func (s *LoanService) List(contactID, vaultID string) ([]dto.LoanResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var loanIDs []uint
 	if err := s.db.Model(&models.ContactLoan{}).
 		Where("loaner_id = ? OR loanee_id = ?", contactID, contactID).
@@ -49,6 +52,9 @@ func (s *LoanService) List(contactID, vaultID string) ([]dto.LoanResponse, error
 }
 
 func (s *LoanService) Create(contactID, vaultID string, req dto.CreateLoanRequest) (*dto.LoanResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	loan := models.Loan{
 		VaultID:     vaultID,
 		Name:        req.Name,

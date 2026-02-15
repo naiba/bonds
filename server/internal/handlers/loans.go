@@ -23,6 +23,9 @@ func (h *LoanHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	loans, err := h.loanService.List(contactID, vaultID)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_loans")
 	}
 	return response.OK(c, loans)
@@ -42,6 +45,9 @@ func (h *LoanHandler) Create(c echo.Context) error {
 
 	loan, err := h.loanService.Create(contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_loan")
 	}
 	return response.Created(c, loan)
