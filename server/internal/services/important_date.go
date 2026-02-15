@@ -18,7 +18,10 @@ func NewImportantDateService(db *gorm.DB) *ImportantDateService {
 	return &ImportantDateService{db: db}
 }
 
-func (s *ImportantDateService) List(contactID string) ([]dto.ImportantDateResponse, error) {
+func (s *ImportantDateService) List(contactID, vaultID string) ([]dto.ImportantDateResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var dates []models.ContactImportantDate
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&dates).Error; err != nil {
 		return nil, err
@@ -30,7 +33,10 @@ func (s *ImportantDateService) List(contactID string) ([]dto.ImportantDateRespon
 	return result, nil
 }
 
-func (s *ImportantDateService) Create(contactID string, req dto.CreateImportantDateRequest) (*dto.ImportantDateResponse, error) {
+func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateImportantDateRequest) (*dto.ImportantDateResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	date := models.ContactImportantDate{
 		ContactID:                  contactID,
 		Label:                      req.Label,
@@ -49,7 +55,10 @@ func (s *ImportantDateService) Create(contactID string, req dto.CreateImportantD
 	return &resp, nil
 }
 
-func (s *ImportantDateService) Update(id uint, contactID string, req dto.UpdateImportantDateRequest) (*dto.ImportantDateResponse, error) {
+func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dto.UpdateImportantDateRequest) (*dto.ImportantDateResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var date models.ContactImportantDate
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&date).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -72,7 +81,10 @@ func (s *ImportantDateService) Update(id uint, contactID string, req dto.UpdateI
 	return &resp, nil
 }
 
-func (s *ImportantDateService) Delete(id uint, contactID string) error {
+func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactImportantDate{})
 	if result.Error != nil {
 		return result.Error

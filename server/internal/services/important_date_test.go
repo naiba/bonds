@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupImportantDateTest(t *testing.T) (*ImportantDateService, string) {
+func setupImportantDateTest(t *testing.T) (*ImportantDateService, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,16 +35,16 @@ func setupImportantDateTest(t *testing.T) (*ImportantDateService, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewImportantDateService(db), contact.ID
+	return NewImportantDateService(db), contact.ID, vault.ID
 }
 
 func TestCreateImportantDate(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
 	day := 15
 	month := 6
 	year := 1990
-	date, err := svc.Create(contactID, dto.CreateImportantDateRequest{
+	date, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{
 		Label: "Birthday",
 		Day:   &day,
 		Month: &month,
@@ -74,18 +74,18 @@ func TestCreateImportantDate(t *testing.T) {
 }
 
 func TestListImportantDates(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
-	_, err := svc.Create(contactID, dto.CreateImportantDateRequest{Label: "Birthday"})
+	_, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Birthday"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreateImportantDateRequest{Label: "Anniversary"})
+	_, err = svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Anniversary"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	dates, err := svc.List(contactID)
+	dates, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -95,16 +95,16 @@ func TestListImportantDates(t *testing.T) {
 }
 
 func TestUpdateImportantDate(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateImportantDateRequest{Label: "Original"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	day := 25
 	month := 12
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateImportantDateRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateImportantDateRequest{
 		Label: "Updated",
 		Day:   &day,
 		Month: &month,
@@ -124,18 +124,18 @@ func TestUpdateImportantDate(t *testing.T) {
 }
 
 func TestDeleteImportantDate(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateImportantDateRequest{Label: "To delete"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "To delete"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	dates, err := svc.List(contactID)
+	dates, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -145,21 +145,21 @@ func TestDeleteImportantDate(t *testing.T) {
 }
 
 func TestDeleteImportantDateNotFound(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
-	err := svc.Delete(9999, contactID)
+	err := svc.Delete(9999, contactID, vaultID)
 	if err != ErrImportantDateNotFound {
 		t.Errorf("Expected ErrImportantDateNotFound, got %v", err)
 	}
 }
 
 func TestCreateImportantDateLunar(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
 	origDay := 15
 	origMonth := 1
 	origYear := 2025
-	date, err := svc.Create(contactID, dto.CreateImportantDateRequest{
+	date, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{
 		Label:         "Lunar New Year",
 		CalendarType:  "lunar",
 		OriginalDay:   &origDay,
@@ -196,12 +196,12 @@ func TestCreateImportantDateLunar(t *testing.T) {
 }
 
 func TestCreateImportantDateGregorianDefault(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
 	day := 25
 	month := 12
 	year := 2025
-	date, err := svc.Create(contactID, dto.CreateImportantDateRequest{
+	date, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{
 		Label: "Christmas",
 		Day:   &day,
 		Month: &month,
@@ -219,9 +219,9 @@ func TestCreateImportantDateGregorianDefault(t *testing.T) {
 }
 
 func TestUpdateImportantDateLunar(t *testing.T) {
-	svc, contactID := setupImportantDateTest(t)
+	svc, contactID, vaultID := setupImportantDateTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateImportantDateRequest{Label: "Original"})
+	created, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestUpdateImportantDateLunar(t *testing.T) {
 	origDay := 8
 	origMonth := 8
 	origYear := 2025
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateImportantDateRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateImportantDateRequest{
 		Label:         "Mid-Autumn",
 		CalendarType:  "lunar",
 		OriginalDay:   &origDay,
