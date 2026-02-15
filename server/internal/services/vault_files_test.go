@@ -103,7 +103,7 @@ func TestVaultFileListWithFiles(t *testing.T) {
 func TestVaultFileDelete(t *testing.T) {
 	svc, vaultID, file := setupVaultFileTest(t)
 
-	if err := svc.Delete(file.ID); err != nil {
+	if err := svc.Delete(file.ID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -117,9 +117,9 @@ func TestVaultFileDelete(t *testing.T) {
 }
 
 func TestVaultFileDeleteNotFound(t *testing.T) {
-	svc, _, _ := setupVaultFileTest(t)
+	svc, vaultID, _ := setupVaultFileTest(t)
 
-	err := svc.Delete(9999)
+	err := svc.Delete(9999, vaultID)
 	if err != ErrFileNotFound {
 		t.Errorf("Expected ErrFileNotFound, got %v", err)
 	}
@@ -220,7 +220,7 @@ func TestGetFile(t *testing.T) {
 		t.Fatalf("Upload failed: %v", err)
 	}
 
-	got, err := svc.Get(uploaded.ID)
+	got, err := svc.Get(uploaded.ID, vaultID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -233,9 +233,9 @@ func TestGetFile(t *testing.T) {
 }
 
 func TestGetFileNotFound(t *testing.T) {
-	svc, _, _ := setupVaultFileTest(t)
+	svc, vaultID, _ := setupVaultFileTest(t)
 
-	_, err := svc.Get(9999)
+	_, err := svc.Get(9999, vaultID)
 	if err != ErrFileNotFound {
 		t.Errorf("Expected ErrFileNotFound, got %v", err)
 	}
@@ -257,7 +257,7 @@ func TestDeleteFileRemovesDisk(t *testing.T) {
 		t.Fatal("File should exist on disk before delete")
 	}
 
-	if err := svc.Delete(uploaded.ID); err != nil {
+	if err := svc.Delete(uploaded.ID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -265,7 +265,7 @@ func TestDeleteFileRemovesDisk(t *testing.T) {
 		t.Error("File should be removed from disk after delete")
 	}
 
-	_, err = svc.Get(uploaded.ID)
+	_, err = svc.Get(uploaded.ID, vaultID)
 	if err != ErrFileNotFound {
 		t.Errorf("Expected ErrFileNotFound after delete, got %v", err)
 	}

@@ -40,9 +40,9 @@ func (s *VaultFileService) List(vaultID string) ([]dto.VaultFileResponse, error)
 	return result, nil
 }
 
-func (s *VaultFileService) Get(id uint) (*dto.VaultFileResponse, error) {
+func (s *VaultFileService) Get(id uint, vaultID string) (*dto.VaultFileResponse, error) {
 	var file models.File
-	if err := s.db.First(&file, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&file).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrFileNotFound
 		}
@@ -95,9 +95,9 @@ func (s *VaultFileService) Upload(vaultID string, contactID string, fileType str
 	return &resp, nil
 }
 
-func (s *VaultFileService) Delete(id uint) error {
+func (s *VaultFileService) Delete(id uint, vaultID string) error {
 	var file models.File
-	if err := s.db.First(&file, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&file).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrFileNotFound
 		}

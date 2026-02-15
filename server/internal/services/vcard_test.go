@@ -44,9 +44,9 @@ func setupVCardTest(t *testing.T) (*VCardService, string, string, string) {
 }
 
 func TestExportContact(t *testing.T) {
-	svc, contactID, _, _ := setupVCardTest(t)
+	svc, contactID, vaultID, _ := setupVCardTest(t)
 
-	data, err := svc.ExportContact(contactID)
+	data, err := svc.ExportContact(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("ExportContact failed: %v", err)
 	}
@@ -70,9 +70,9 @@ func TestExportContact(t *testing.T) {
 }
 
 func TestExportContactNotFound(t *testing.T) {
-	svc, _, _, _ := setupVCardTest(t)
+	svc, _, vaultID, _ := setupVCardTest(t)
 
-	_, err := svc.ExportContact("nonexistent-id")
+	_, err := svc.ExportContact("nonexistent-id", vaultID)
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}

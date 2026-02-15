@@ -47,11 +47,15 @@ func (h *PostHandler) Create(c echo.Context) error {
 }
 
 func (h *PostHandler) Get(c echo.Context) error {
+	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_journal_id", nil)
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_post_id", nil)
 	}
-	post, err := h.postService.Get(uint(id))
+	post, err := h.postService.Get(uint(id), uint(journalID))
 	if err != nil {
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
@@ -62,6 +66,10 @@ func (h *PostHandler) Get(c echo.Context) error {
 }
 
 func (h *PostHandler) Update(c echo.Context) error {
+	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_journal_id", nil)
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_post_id", nil)
@@ -70,7 +78,7 @@ func (h *PostHandler) Update(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	post, err := h.postService.Update(uint(id), req)
+	post, err := h.postService.Update(uint(id), uint(journalID), req)
 	if err != nil {
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
@@ -81,11 +89,15 @@ func (h *PostHandler) Update(c echo.Context) error {
 }
 
 func (h *PostHandler) Delete(c echo.Context) error {
+	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_journal_id", nil)
+	}
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_post_id", nil)
 	}
-	if err := h.postService.Delete(uint(id)); err != nil {
+	if err := h.postService.Delete(uint(id), uint(journalID)); err != nil {
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}

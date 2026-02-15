@@ -19,9 +19,10 @@ func NewVCardHandler(vcardService *services.VCardService) *VCardHandler {
 }
 
 func (h *VCardHandler) ExportContact(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	contactID := c.Param("contact_id")
 
-	data, err := h.vcardService.ExportContact(contactID)
+	data, err := h.vcardService.ExportContact(contactID, vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")

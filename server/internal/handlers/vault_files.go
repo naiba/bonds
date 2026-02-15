@@ -43,11 +43,12 @@ func (h *VaultFileHandler) List(c echo.Context) error {
 }
 
 func (h *VaultFileHandler) Delete(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_file_id", nil)
 	}
-	if err := h.vaultFileService.Delete(uint(id)); err != nil {
+	if err := h.vaultFileService.Delete(uint(id), vaultID); err != nil {
 		if errors.Is(err, services.ErrFileNotFound) {
 			return response.NotFound(c, "err.file_not_found")
 		}
@@ -111,12 +112,13 @@ func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, file
 }
 
 func (h *VaultFileHandler) Serve(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_file_id", nil)
 	}
 
-	file, err := h.vaultFileService.Get(uint(id))
+	file, err := h.vaultFileService.Get(uint(id), vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrFileNotFound) {
 			return response.NotFound(c, "err.file_not_found")

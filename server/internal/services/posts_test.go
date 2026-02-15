@@ -112,7 +112,7 @@ func TestGetPost(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	got, err := svc.Get(created.ID)
+	got, err := svc.Get(created.ID, journalID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestUpdatePost(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, dto.UpdatePostRequest{
+	updated, err := svc.Update(created.ID, journalID, dto.UpdatePostRequest{
 		Title:     "Updated",
 		Published: true,
 		Sections: []dto.PostSectionInput{
@@ -174,7 +174,7 @@ func TestDeletePost(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID); err != nil {
+	if err := svc.Delete(created.ID, journalID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -188,19 +188,19 @@ func TestDeletePost(t *testing.T) {
 }
 
 func TestPostNotFound(t *testing.T) {
-	svc, _ := setupPostTest(t)
+	svc, journalID := setupPostTest(t)
 
-	_, err := svc.Get(9999)
+	_, err := svc.Get(9999, journalID)
 	if err != ErrPostNotFound {
 		t.Errorf("Expected ErrPostNotFound, got %v", err)
 	}
 
-	_, err = svc.Update(9999, dto.UpdatePostRequest{Title: "nope"})
+	_, err = svc.Update(9999, journalID, dto.UpdatePostRequest{Title: "nope"})
 	if err != ErrPostNotFound {
 		t.Errorf("Expected ErrPostNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999)
+	err = svc.Delete(9999, journalID)
 	if err != ErrPostNotFound {
 		t.Errorf("Expected ErrPostNotFound, got %v", err)
 	}

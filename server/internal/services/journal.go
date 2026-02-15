@@ -45,9 +45,9 @@ func (s *JournalService) Create(vaultID string, req dto.CreateJournalRequest) (*
 	return &resp, nil
 }
 
-func (s *JournalService) Get(id uint) (*dto.JournalResponse, error) {
+func (s *JournalService) Get(id uint, vaultID string) (*dto.JournalResponse, error) {
 	var journal models.Journal
-	if err := s.db.First(&journal, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&journal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrJournalNotFound
 		}
@@ -59,9 +59,9 @@ func (s *JournalService) Get(id uint) (*dto.JournalResponse, error) {
 	return &resp, nil
 }
 
-func (s *JournalService) Update(id uint, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
+func (s *JournalService) Update(id uint, vaultID string, req dto.UpdateJournalRequest) (*dto.JournalResponse, error) {
 	var journal models.Journal
-	if err := s.db.First(&journal, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&journal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrJournalNotFound
 		}
@@ -78,9 +78,9 @@ func (s *JournalService) Update(id uint, req dto.UpdateJournalRequest) (*dto.Jou
 	return &resp, nil
 }
 
-func (s *JournalService) Delete(id uint) error {
+func (s *JournalService) Delete(id uint, vaultID string) error {
 	var journal models.Journal
-	if err := s.db.First(&journal, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&journal).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrJournalNotFound
 		}

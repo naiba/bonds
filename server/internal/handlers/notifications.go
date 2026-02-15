@@ -45,11 +45,12 @@ func (h *NotificationHandler) Create(c echo.Context) error {
 }
 
 func (h *NotificationHandler) Toggle(c echo.Context) error {
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_channel_id", nil)
 	}
-	channel, err := h.notificationService.Toggle(uint(id))
+	channel, err := h.notificationService.Toggle(uint(id), userID)
 	if err != nil {
 		if errors.Is(err, services.ErrNotificationChannelNotFound) {
 			return response.NotFound(c, "err.notification_channel_not_found")
@@ -60,11 +61,12 @@ func (h *NotificationHandler) Toggle(c echo.Context) error {
 }
 
 func (h *NotificationHandler) Delete(c echo.Context) error {
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_channel_id", nil)
 	}
-	if err := h.notificationService.Delete(uint(id)); err != nil {
+	if err := h.notificationService.Delete(uint(id), userID); err != nil {
 		if errors.Is(err, services.ErrNotificationChannelNotFound) {
 			return response.NotFound(c, "err.notification_channel_not_found")
 		}

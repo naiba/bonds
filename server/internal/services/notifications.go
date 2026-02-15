@@ -45,9 +45,9 @@ func (s *NotificationService) Create(userID string, req dto.CreateNotificationCh
 	return &resp, nil
 }
 
-func (s *NotificationService) Toggle(id uint) (*dto.NotificationChannelResponse, error) {
+func (s *NotificationService) Toggle(id uint, userID string) (*dto.NotificationChannelResponse, error) {
 	var ch models.UserNotificationChannel
-	if err := s.db.First(&ch, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND user_id = ?", id, userID).First(&ch).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotificationChannelNotFound
 		}
@@ -61,9 +61,9 @@ func (s *NotificationService) Toggle(id uint) (*dto.NotificationChannelResponse,
 	return &resp, nil
 }
 
-func (s *NotificationService) Delete(id uint) error {
+func (s *NotificationService) Delete(id uint, userID string) error {
 	var ch models.UserNotificationChannel
-	if err := s.db.First(&ch, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND user_id = ?", id, userID).First(&ch).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotificationChannelNotFound
 		}

@@ -59,14 +59,14 @@ func (s *PostService) Create(journalID uint, req dto.CreatePostRequest) (*dto.Po
 		return nil, err
 	}
 
-	return s.Get(post.ID)
+	return s.Get(post.ID, journalID)
 }
 
-func (s *PostService) Get(id uint) (*dto.PostResponse, error) {
+func (s *PostService) Get(id uint, journalID uint) (*dto.PostResponse, error) {
 	var post models.Post
-	if err := s.db.Preload("PostSections", func(db *gorm.DB) *gorm.DB {
+	if err := s.db.Where("id = ? AND journal_id = ?", id, journalID).Preload("PostSections", func(db *gorm.DB) *gorm.DB {
 		return db.Order("position ASC")
-	}).First(&post, id).Error; err != nil {
+	}).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
 		}
@@ -76,9 +76,9 @@ func (s *PostService) Get(id uint) (*dto.PostResponse, error) {
 	return &resp, nil
 }
 
-func (s *PostService) Update(id uint, req dto.UpdatePostRequest) (*dto.PostResponse, error) {
+func (s *PostService) Update(id uint, journalID uint, req dto.UpdatePostRequest) (*dto.PostResponse, error) {
 	var post models.Post
-	if err := s.db.First(&post, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND journal_id = ?", id, journalID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
 		}
@@ -115,12 +115,12 @@ func (s *PostService) Update(id uint, req dto.UpdatePostRequest) (*dto.PostRespo
 	if err != nil {
 		return nil, err
 	}
-	return s.Get(id)
+	return s.Get(id, journalID)
 }
 
-func (s *PostService) Delete(id uint) error {
+func (s *PostService) Delete(id uint, journalID uint) error {
 	var post models.Post
-	if err := s.db.First(&post, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND journal_id = ?", id, journalID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrPostNotFound
 		}

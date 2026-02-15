@@ -88,7 +88,7 @@ func TestGetJournal(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	got, err := svc.Get(created.ID)
+	got, err := svc.Get(created.ID, vaultID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestUpdateJournal(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, dto.UpdateJournalRequest{
+	updated, err := svc.Update(created.ID, vaultID, dto.UpdateJournalRequest{
 		Name:        "Updated",
 		Description: "New description",
 	})
@@ -131,7 +131,7 @@ func TestDeleteJournal(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID); err != nil {
+	if err := svc.Delete(created.ID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -145,19 +145,19 @@ func TestDeleteJournal(t *testing.T) {
 }
 
 func TestJournalNotFound(t *testing.T) {
-	svc, _ := setupJournalTest(t)
+	svc, vaultID := setupJournalTest(t)
 
-	_, err := svc.Get(9999)
+	_, err := svc.Get(9999, vaultID)
 	if err != ErrJournalNotFound {
 		t.Errorf("Expected ErrJournalNotFound, got %v", err)
 	}
 
-	_, err = svc.Update(9999, dto.UpdateJournalRequest{Name: "nope"})
+	_, err = svc.Update(9999, vaultID, dto.UpdateJournalRequest{Name: "nope"})
 	if err != ErrJournalNotFound {
 		t.Errorf("Expected ErrJournalNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999)
+	err = svc.Delete(9999, vaultID)
 	if err != ErrJournalNotFound {
 		t.Errorf("Expected ErrJournalNotFound, got %v", err)
 	}

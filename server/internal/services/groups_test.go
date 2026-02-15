@@ -63,7 +63,7 @@ func TestGetGroup(t *testing.T) {
 		t.Fatalf("Create group failed: %v", err)
 	}
 
-	got, err := svc.Get(group.ID)
+	got, err := svc.Get(group.ID, vaultID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestUpdateGroup(t *testing.T) {
 		t.Fatalf("Create group failed: %v", err)
 	}
 
-	updated, err := svc.Update(group.ID, dto.UpdateGroupRequest{
+	updated, err := svc.Update(group.ID, vaultID, dto.UpdateGroupRequest{
 		Name: "Updated Group",
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func TestDeleteGroup(t *testing.T) {
 		t.Fatalf("Create group failed: %v", err)
 	}
 
-	if err := svc.Delete(group.ID); err != nil {
+	if err := svc.Delete(group.ID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -122,18 +122,18 @@ func TestDeleteGroup(t *testing.T) {
 }
 
 func TestDeleteGroupNotFound(t *testing.T) {
-	svc, _, _ := setupGroupTest(t)
+	svc, vaultID, _ := setupGroupTest(t)
 
-	err := svc.Delete(9999)
+	err := svc.Delete(9999, vaultID)
 	if err != ErrGroupNotFound {
 		t.Errorf("Expected ErrGroupNotFound, got %v", err)
 	}
 }
 
 func TestGetGroupNotFound(t *testing.T) {
-	svc, _, _ := setupGroupTest(t)
+	svc, vaultID, _ := setupGroupTest(t)
 
-	_, err := svc.Get(9999)
+	_, err := svc.Get(9999, vaultID)
 	if err != ErrGroupNotFound {
 		t.Errorf("Expected ErrGroupNotFound, got %v", err)
 	}

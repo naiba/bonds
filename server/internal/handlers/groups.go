@@ -28,11 +28,12 @@ func (h *GroupHandler) List(c echo.Context) error {
 }
 
 func (h *GroupHandler) Get(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_group_id", nil)
 	}
-	group, err := h.groupService.Get(uint(id))
+	group, err := h.groupService.Get(uint(id), vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrGroupNotFound) {
 			return response.NotFound(c, "err.group_not_found")
@@ -67,6 +68,7 @@ func (h *GroupHandler) RemoveContactFromGroup(c echo.Context) error {
 }
 
 func (h *GroupHandler) Update(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_group_id", nil)
@@ -78,7 +80,7 @@ func (h *GroupHandler) Update(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	group, err := h.groupService.Update(uint(id), req)
+	group, err := h.groupService.Update(uint(id), vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrGroupNotFound) {
 			return response.NotFound(c, "err.group_not_found")
@@ -89,11 +91,12 @@ func (h *GroupHandler) Update(c echo.Context) error {
 }
 
 func (h *GroupHandler) Delete(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_group_id", nil)
 	}
-	if err := h.groupService.Delete(uint(id)); err != nil {
+	if err := h.groupService.Delete(uint(id), vaultID); err != nil {
 		if errors.Is(err, services.ErrGroupNotFound) {
 			return response.NotFound(c, "err.group_not_found")
 		}

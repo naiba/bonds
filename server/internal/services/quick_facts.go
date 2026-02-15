@@ -55,7 +55,7 @@ func (s *QuickFactService) Update(id uint, contactID, vaultID string, req dto.Up
 		return nil, err
 	}
 	var fact models.QuickFact
-	if err := s.db.First(&fact, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&fact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrQuickFactNotFound
 		}
@@ -74,7 +74,7 @@ func (s *QuickFactService) Delete(id uint, contactID, vaultID string) error {
 		return err
 	}
 	var fact models.QuickFact
-	if err := s.db.First(&fact, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&fact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrQuickFactNotFound
 		}

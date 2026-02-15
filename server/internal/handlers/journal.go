@@ -44,11 +44,12 @@ func (h *JournalHandler) Create(c echo.Context) error {
 }
 
 func (h *JournalHandler) Get(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_journal_id", nil)
 	}
-	journal, err := h.journalService.Get(uint(id))
+	journal, err := h.journalService.Get(uint(id), vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrJournalNotFound) {
 			return response.NotFound(c, "err.journal_not_found")
@@ -59,6 +60,7 @@ func (h *JournalHandler) Get(c echo.Context) error {
 }
 
 func (h *JournalHandler) Update(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_journal_id", nil)
@@ -70,7 +72,7 @@ func (h *JournalHandler) Update(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	journal, err := h.journalService.Update(uint(id), req)
+	journal, err := h.journalService.Update(uint(id), vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrJournalNotFound) {
 			return response.NotFound(c, "err.journal_not_found")
@@ -81,11 +83,12 @@ func (h *JournalHandler) Update(c echo.Context) error {
 }
 
 func (h *JournalHandler) Delete(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_journal_id", nil)
 	}
-	if err := h.journalService.Delete(uint(id)); err != nil {
+	if err := h.journalService.Delete(uint(id), vaultID); err != nil {
 		if errors.Is(err, services.ErrJournalNotFound) {
 			return response.NotFound(c, "err.journal_not_found")
 		}

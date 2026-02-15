@@ -30,9 +30,9 @@ func (s *GroupService) List(vaultID string) ([]dto.GroupResponse, error) {
 	return result, nil
 }
 
-func (s *GroupService) Get(id uint) (*dto.GroupResponse, error) {
+func (s *GroupService) Get(id uint, vaultID string) (*dto.GroupResponse, error) {
 	var group models.Group
-	if err := s.db.Preload("Contacts").First(&group, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).Preload("Contacts").First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGroupNotFound
 		}
@@ -55,9 +55,9 @@ func (s *GroupService) RemoveContactFromGroup(contactID string, groupID uint) er
 	return s.db.Where("contact_id = ? AND group_id = ?", contactID, groupID).Delete(&models.ContactGroup{}).Error
 }
 
-func (s *GroupService) Update(id uint, req dto.UpdateGroupRequest) (*dto.GroupResponse, error) {
+func (s *GroupService) Update(id uint, vaultID string, req dto.UpdateGroupRequest) (*dto.GroupResponse, error) {
 	var group models.Group
-	if err := s.db.First(&group, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGroupNotFound
 		}
@@ -72,9 +72,9 @@ func (s *GroupService) Update(id uint, req dto.UpdateGroupRequest) (*dto.GroupRe
 	return &resp, nil
 }
 
-func (s *GroupService) Delete(id uint) error {
+func (s *GroupService) Delete(id uint, vaultID string) error {
 	var group models.Group
-	if err := s.db.First(&group, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrGroupNotFound
 		}

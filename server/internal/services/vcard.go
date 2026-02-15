@@ -23,9 +23,9 @@ func NewVCardService(db *gorm.DB) *VCardService {
 	return &VCardService{db: db}
 }
 
-func (s *VCardService) ExportContact(contactID string) ([]byte, error) {
+func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, error) {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}

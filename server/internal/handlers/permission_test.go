@@ -893,3 +893,717 @@ func TestUnauthenticatedCannotAccessContacts(t *testing.T) {
 		t.Errorf("expected 401 for unauthenticated GET contacts, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// ==================== Helper Functions for New Sections ====================
+
+func createTestJournal(t *testing.T, ts *testServer, token, vaultID string) string {
+	t.Helper()
+	path := fmt.Sprintf("/api/vaults/%s/journals", vaultID)
+	rec := ts.doRequest(http.MethodPost, path, `{"name":"Test Journal"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("createTestJournal failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse journal data: %v", err)
+	}
+	return fmt.Sprintf("%v", data["id"])
+}
+
+func createTestPost(t *testing.T, ts *testServer, token, vaultID, journalID string) string {
+	t.Helper()
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts", vaultID, journalID)
+	rec := ts.doRequest(http.MethodPost, path, `{"title":"Test Post","written_at":"2024-01-01T00:00:00Z","sections":[{"position":1,"label":"Section","content":"Content"}]}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("createTestPost failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse post data: %v", err)
+	}
+	return fmt.Sprintf("%v", data["id"])
+}
+
+func createTestGroup(t *testing.T, ts *testServer, vaultID, name string) uint {
+	t.Helper()
+	group := models.Group{VaultID: vaultID, Name: name}
+	if err := ts.db.Create(&group).Error; err != nil {
+		t.Fatalf("failed to create group: %v", err)
+	}
+	return group.ID
+}
+
+func createTestFile(t *testing.T, ts *testServer, vaultID string) uint {
+	t.Helper()
+	file := models.File{VaultID: vaultID, UUID: "test-uuid-perm", Name: "test.pdf", MimeType: "application/pdf", Type: "document", Size: 100}
+	if err := ts.db.Create(&file).Error; err != nil {
+		t.Fatalf("failed to create file: %v", err)
+	}
+	return file.ID
+}
+
+func createTestNotificationChannel(t *testing.T, ts *testServer, token string) string {
+	t.Helper()
+	rec := ts.doRequest(http.MethodPost, "/api/settings/notifications",
+		`{"type":"email","content":"test-notif@example.com"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("createTestNotificationChannel failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse notification data: %v", err)
+	}
+	return fmt.Sprintf("%v", data["id"])
+}
+
+// ==================== I. Cross-Vault IDOR Tests for Journals ====================
+
+func TestCrossVaultJournalGetBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-journal-get@example.com")
+	vault1 := ts.createTestVault(t, token, "Journal Vault A")
+	vault2 := ts.createTestVault(t, token, "Journal Vault B")
+
+	journalID := createTestJournal(t, ts, token, vault1.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s", vault2.ID, journalID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault journal GET, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultJournalUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-journal-update@example.com")
+	vault1 := ts.createTestVault(t, token, "Journal Update Vault A")
+	vault2 := ts.createTestVault(t, token, "Journal Update Vault B")
+
+	journalID := createTestJournal(t, ts, token, vault1.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s", vault2.ID, journalID)
+	rec := ts.doRequest(http.MethodPut, path, `{"name":"Hacked"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault journal UPDATE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultJournalDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-journal-delete@example.com")
+	vault1 := ts.createTestVault(t, token, "Journal Delete Vault A")
+	vault2 := ts.createTestVault(t, token, "Journal Delete Vault B")
+
+	journalID := createTestJournal(t, ts, token, vault1.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s", vault2.ID, journalID)
+	rec := ts.doRequest(http.MethodDelete, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault journal DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== J. Cross-Vault IDOR Tests for Posts ====================
+
+func TestCrossVaultPostGetBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-post-get@example.com")
+	vault1 := ts.createTestVault(t, token, "Post Vault A")
+	vault2 := ts.createTestVault(t, token, "Post Vault B")
+
+	journal1ID := createTestJournal(t, ts, token, vault1.ID)
+	post1ID := createTestPost(t, ts, token, vault1.ID, journal1ID)
+
+	journal2ID := createTestJournal(t, ts, token, vault2.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s", vault2.ID, journal2ID, post1ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault post GET, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultPostUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-post-update@example.com")
+	vault1 := ts.createTestVault(t, token, "Post Update Vault A")
+	vault2 := ts.createTestVault(t, token, "Post Update Vault B")
+
+	journal1ID := createTestJournal(t, ts, token, vault1.ID)
+	post1ID := createTestPost(t, ts, token, vault1.ID, journal1ID)
+
+	journal2ID := createTestJournal(t, ts, token, vault2.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s", vault2.ID, journal2ID, post1ID)
+	rec := ts.doRequest(http.MethodPut, path, `{"title":"Hacked","written_at":"2024-01-01T00:00:00Z","sections":[{"position":1,"label":"S","content":"C"}]}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault post UPDATE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultPostDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-post-delete@example.com")
+	vault1 := ts.createTestVault(t, token, "Post Delete Vault A")
+	vault2 := ts.createTestVault(t, token, "Post Delete Vault B")
+
+	journal1ID := createTestJournal(t, ts, token, vault1.ID)
+	post1ID := createTestPost(t, ts, token, vault1.ID, journal1ID)
+
+	journal2ID := createTestJournal(t, ts, token, vault2.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s", vault2.ID, journal2ID, post1ID)
+	rec := ts.doRequest(http.MethodDelete, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault post DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== K. Cross-Vault IDOR Tests for Groups ====================
+
+func TestCrossVaultGroupGetBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-group-get@example.com")
+	vault1 := ts.createTestVault(t, token, "Group Vault A")
+	vault2 := ts.createTestVault(t, token, "Group Vault B")
+
+	groupID := createTestGroup(t, ts, vault1.ID, "Test Group A")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups/%d", vault2.ID, groupID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault group GET, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultGroupUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-group-update@example.com")
+	vault1 := ts.createTestVault(t, token, "Group Update Vault A")
+	vault2 := ts.createTestVault(t, token, "Group Update Vault B")
+
+	groupID := createTestGroup(t, ts, vault1.ID, "Test Group Update")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups/%d", vault2.ID, groupID)
+	rec := ts.doRequest(http.MethodPut, path, `{"name":"Hacked"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault group UPDATE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultGroupDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-group-delete@example.com")
+	vault1 := ts.createTestVault(t, token, "Group Delete Vault A")
+	vault2 := ts.createTestVault(t, token, "Group Delete Vault B")
+
+	groupID := createTestGroup(t, ts, vault1.ID, "Test Group Delete")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups/%d", vault2.ID, groupID)
+	rec := ts.doRequest(http.MethodDelete, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault group DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== L. Cross-Vault IDOR Tests for Files ====================
+
+func TestCrossVaultFileDownloadBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-file-download@example.com")
+	vault1 := ts.createTestVault(t, token, "File Download Vault A")
+	vault2 := ts.createTestVault(t, token, "File Download Vault B")
+
+	fileID := createTestFile(t, ts, vault1.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/files/%d/download", vault2.ID, fileID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault file download, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultFileDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-file-delete@example.com")
+	vault1 := ts.createTestVault(t, token, "File Delete Vault A")
+	vault2 := ts.createTestVault(t, token, "File Delete Vault B")
+
+	fileID := createTestFile(t, ts, vault1.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/files/%d", vault2.ID, fileID)
+	rec := ts.doRequest(http.MethodDelete, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault file DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== M. Cross-User Notification Channel Isolation ====================
+
+func TestCrossUserNotificationToggleBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "notif-owner@example.com")
+	channelID := createTestNotificationChannel(t, ts, token1)
+
+	token2, _ := ts.registerTestUser(t, "notif-intruder@example.com")
+
+	path := fmt.Sprintf("/api/settings/notifications/%s/toggle", channelID)
+	rec := ts.doRequest(http.MethodPut, path, "", token2)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-user notification toggle, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossUserNotificationDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "notif-del-owner@example.com")
+	channelID := createTestNotificationChannel(t, ts, token1)
+
+	token2, _ := ts.registerTestUser(t, "notif-del-intruder@example.com")
+
+	path := fmt.Sprintf("/api/settings/notifications/%s", channelID)
+	rec := ts.doRequest(http.MethodDelete, path, "", token2)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-user notification DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== N. Cross-Vault VCard Export Blocked ====================
+
+func TestCrossVaultVCardExportBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-vcard@example.com")
+	vault1 := ts.createTestVault(t, token, "VCard Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "VCardContact")
+
+	vault2 := ts.createTestVault(t, token, "VCard Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/vcard", vault2.ID, contact1.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault vcard export, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== O. Viewer Cannot Write Journals/Posts/Groups ====================
+
+func TestViewerCannotCreateJournal(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals", vaultID)
+	rec := ts.doRequest(http.MethodPost, path, `{"name":"Blocked Journal"}`, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating journal, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotUpdateJournal(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s", vaultID, journalID)
+	rec := ts.doRequest(http.MethodPut, path, `{"name":"Hacked"}`, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer updating journal, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotDeleteJournal(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s", vaultID, journalID)
+	rec := ts.doRequest(http.MethodDelete, path, "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer deleting journal, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreatePost(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts", vaultID, journalID)
+	rec := ts.doRequest(http.MethodPost, path, `{"title":"Blocked Post","written_at":"2024-01-01T00:00:00Z","sections":[{"position":1,"label":"S","content":"C"}]}`, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating post, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotUpdatePost(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	postID := createTestPost(t, ts, adminToken, vaultID, journalID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s", vaultID, journalID, postID)
+	rec := ts.doRequest(http.MethodPut, path, `{"title":"Hacked","written_at":"2024-01-01T00:00:00Z","sections":[{"position":1,"label":"S","content":"C"}]}`, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer updating post, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotDeletePost(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	postID := createTestPost(t, ts, adminToken, vaultID, journalID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s", vaultID, journalID, postID)
+	rec := ts.doRequest(http.MethodDelete, path, "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer deleting post, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotUpdateGroup(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	groupID := createTestGroup(t, ts, vaultID, "Viewer Group Update")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups/%d", vaultID, groupID)
+	rec := ts.doRequest(http.MethodPut, path, `{"name":"Hacked"}`, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer updating group, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotDeleteGroup(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	groupID := createTestGroup(t, ts, vaultID, "Viewer Group Delete")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups/%d", vaultID, groupID)
+	rec := ts.doRequest(http.MethodDelete, path, "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer deleting group, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCanReadJournals(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	createTestJournal(t, ts, adminToken, vaultID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals", vaultID)
+	rec := ts.doRequest(http.MethodGet, path, "", viewerToken)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for Viewer reading journals, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCanReadGroups(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	createTestGroup(t, ts, vaultID, "Viewer Read Group")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups", vaultID)
+	rec := ts.doRequest(http.MethodGet, path, "", viewerToken)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for Viewer reading groups, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCanReadPosts(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	createTestPost(t, ts, adminToken, vaultID, journalID)
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts", vaultID, journalID)
+	rec := ts.doRequest(http.MethodGet, path, "", viewerToken)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 for Viewer reading posts, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== P. Cross-Vault Quick Facts IDOR ====================
+
+func TestCrossVaultQuickFactUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-quickfact@example.com")
+	vault1 := ts.createTestVault(t, token, "QuickFact Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "QFContact1")
+
+	// Find a quick facts template for vault1 (seeded by SeedVaultDefaults)
+	var template1 models.VaultQuickFactsTemplate
+	if err := ts.db.Where("vault_id = ?", vault1.ID).First(&template1).Error; err != nil {
+		t.Fatalf("failed to find quick facts template for vault1: %v", err)
+	}
+
+	// Create a quick fact for contact1
+	createPath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d", vault1.ID, contact1.ID, template1.ID)
+	rec := ts.doRequest(http.MethodPost, createPath, `{"content":"Likes hiking"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("failed to create quick fact: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var qfData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &qfData); err != nil {
+		t.Fatalf("failed to parse quick fact: %v", err)
+	}
+	qfID := fmt.Sprintf("%v", qfData["id"])
+
+	vault2 := ts.createTestVault(t, token, "QuickFact Vault B")
+	contact2 := ts.createTestContact(t, token, vault2.ID, "QFContact2")
+
+	// Find a template for vault2
+	var template2 models.VaultQuickFactsTemplate
+	if err := ts.db.Where("vault_id = ?", vault2.ID).First(&template2).Error; err != nil {
+		t.Fatalf("failed to find quick facts template for vault2: %v", err)
+	}
+
+	// Try to update quickfact1 via vault2/contact2 — should fail because qf belongs to contact1
+	updatePath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/%s", vault2.ID, contact2.ID, template2.ID, qfID)
+	rec = ts.doRequest(http.MethodPut, updatePath, `{"content":"Hacked"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault quick fact UPDATE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultQuickFactDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-quickfact-del@example.com")
+	vault1 := ts.createTestVault(t, token, "QF Del Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "QFDelContact1")
+
+	var template1 models.VaultQuickFactsTemplate
+	if err := ts.db.Where("vault_id = ?", vault1.ID).First(&template1).Error; err != nil {
+		t.Fatalf("failed to find quick facts template: %v", err)
+	}
+
+	createPath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d", vault1.ID, contact1.ID, template1.ID)
+	rec := ts.doRequest(http.MethodPost, createPath, `{"content":"To delete"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("failed to create quick fact: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var qfData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &qfData); err != nil {
+		t.Fatalf("failed to parse quick fact: %v", err)
+	}
+	qfID := fmt.Sprintf("%v", qfData["id"])
+
+	vault2 := ts.createTestVault(t, token, "QF Del Vault B")
+	contact2 := ts.createTestContact(t, token, vault2.ID, "QFDelContact2")
+
+	var template2 models.VaultQuickFactsTemplate
+	if err := ts.db.Where("vault_id = ?", vault2.ID).First(&template2).Error; err != nil {
+		t.Fatalf("failed to find quick facts template for vault2: %v", err)
+	}
+
+	deletePath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/%s", vault2.ID, contact2.ID, template2.ID, qfID)
+	rec = ts.doRequest(http.MethodDelete, deletePath, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault quick fact DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== Q. Cross-Account Isolation for Journals/Files ====================
+
+func TestCrossAccountJournalIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "cross-acct-journal-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Owner Journal Vault")
+	createTestJournal(t, ts, token1, vault1.ID)
+
+	token2, _ := ts.registerTestUser(t, "cross-acct-journal-intruder@example.com")
+
+	path := fmt.Sprintf("/api/vaults/%s/journals", vault1.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for cross-account journal list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossAccountFileIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "cross-acct-file-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Owner File Vault")
+	createTestFile(t, ts, vault1.ID)
+
+	token2, _ := ts.registerTestUser(t, "cross-acct-file-intruder@example.com")
+
+	path := fmt.Sprintf("/api/vaults/%s/files", vault1.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for cross-account file list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossAccountJournalCreateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "cross-acct-journal-create-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Blocked Journal Create Vault")
+
+	token2, _ := ts.registerTestUser(t, "cross-acct-journal-create-intruder@example.com")
+
+	path := fmt.Sprintf("/api/vaults/%s/journals", vault1.ID)
+	rec := ts.doRequest(http.MethodPost, path, `{"name":"Intruder Journal"}`, token2)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for cross-account journal create, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossAccountGroupIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "cross-acct-group-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Owner Group Vault")
+	createTestGroup(t, ts, vault1.ID, "Owner Group")
+
+	token2, _ := ts.registerTestUser(t, "cross-acct-group-intruder@example.com")
+
+	path := fmt.Sprintf("/api/vaults/%s/groups", vault1.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for cross-account group list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossAccountPostIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token1, _ := ts.registerTestUser(t, "cross-acct-post-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Owner Post Vault")
+	journalID := createTestJournal(t, ts, token1, vault1.ID)
+	createTestPost(t, ts, token1, vault1.ID, journalID)
+
+	token2, _ := ts.registerTestUser(t, "cross-acct-post-intruder@example.com")
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts", vault1.ID, journalID)
+	rec := ts.doRequest(http.MethodGet, path, "", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for cross-account post list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossVaultJournalListIsolated(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-journal-list@example.com")
+	vault1 := ts.createTestVault(t, token, "Journal List Vault A")
+	vault2 := ts.createTestVault(t, token, "Journal List Vault B")
+
+	createTestJournal(t, ts, token, vault1.ID)
+
+	// List journals in vault2 — should NOT see vault1's journal
+	path := fmt.Sprintf("/api/vaults/%s/journals", vault2.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for journal list, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var journals []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &journals); err != nil {
+		t.Fatalf("failed to parse journals: %v", err)
+	}
+	if len(journals) != 0 {
+		t.Errorf("expected 0 journals in vault2, got %d", len(journals))
+	}
+}
+
+func TestCrossVaultGroupListIsolated(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-group-list@example.com")
+	vault1 := ts.createTestVault(t, token, "Group List Vault A")
+	vault2 := ts.createTestVault(t, token, "Group List Vault B")
+
+	createTestGroup(t, ts, vault1.ID, "Isolated Group")
+
+	// Count groups in vault2 — groups from seed only, not from vault1
+	path := fmt.Sprintf("/api/vaults/%s/groups", vault2.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for group list, got %d: %s", rec.Code, rec.Body.String())
+	}
+	// Just verify it doesn't contain our custom group name
+	resp := parseResponse(t, rec)
+	var groups []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &groups); err != nil {
+		t.Fatalf("failed to parse groups: %v", err)
+	}
+	for _, g := range groups {
+		if g["name"] == "Isolated Group" {
+			t.Error("vault2 should not contain vault1's 'Isolated Group'")
+		}
+	}
+}
+
+func TestCrossVaultFileListIsolated(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-file-list@example.com")
+	vault1 := ts.createTestVault(t, token, "File List Vault A")
+	vault2 := ts.createTestVault(t, token, "File List Vault B")
+
+	createTestFile(t, ts, vault1.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/files", vault2.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for file list, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var files []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &files); err != nil {
+		t.Fatalf("failed to parse files: %v", err)
+	}
+	if len(files) != 0 {
+		t.Errorf("expected 0 files in vault2, got %d", len(files))
+	}
+}
+
+func TestCrossVaultPostListIsolated(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-post-list@example.com")
+	vault1 := ts.createTestVault(t, token, "Post List Vault A")
+	vault2 := ts.createTestVault(t, token, "Post List Vault B")
+
+	journal1ID := createTestJournal(t, ts, token, vault1.ID)
+	createTestPost(t, ts, token, vault1.ID, journal1ID)
+
+	journal2ID := createTestJournal(t, ts, token, vault2.ID)
+
+	// List posts in vault2/journal2 — should NOT see vault1's posts
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts", vault2.ID, journal2ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for post list, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var posts []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &posts); err != nil {
+		t.Fatalf("failed to parse posts: %v", err)
+	}
+	if len(posts) != 0 {
+		t.Errorf("expected 0 posts in vault2's journal, got %d", len(posts))
+	}
+}
