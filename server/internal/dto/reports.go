@@ -8,13 +8,17 @@ type AddressReportItem struct {
 }
 
 type ImportantDateReportItem struct {
-	ContactID string `json:"contact_id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Label     string `json:"label"`
-	Day       *int   `json:"day"`
-	Month     *int   `json:"month"`
-	Year      *int   `json:"year"`
+	ContactID     string `json:"contact_id"`
+	FirstName     string `json:"first_name"`
+	LastName      string `json:"last_name"`
+	Label         string `json:"label"`
+	Day           *int   `json:"day"`
+	Month         *int   `json:"month"`
+	Year          *int   `json:"year"`
+	CalendarType  string `json:"calendar_type"`
+	OriginalDay   *int   `json:"original_day"`
+	OriginalMonth *int   `json:"original_month"`
+	OriginalYear  *int   `json:"original_year"`
 }
 
 type MoodReportItem struct {

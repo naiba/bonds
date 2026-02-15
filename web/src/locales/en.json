@@ -581,5 +581,12 @@
     "continueWith": "Or continue with",
     "github": "GitHub",
     "google": "Google"
+  },
+  "calendar": {
+    "gregorian": "Gregorian",
+    "lunar": "Chinese Lunar",
+    "year": "Year",
+    "month": "Month",
+    "day": "Day"
   }
 }

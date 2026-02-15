@@ -103,11 +103,16 @@ cp server/.env.example server/.env
 |----------|---------|-------------|
 | `JWT_SECRET` | — | **Required in production.** Signing key for auth tokens |
 | `SERVER_PORT` | `8080` | Port the server listens on |
+| `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
 | `DB_DSN` | `bonds.db` | SQLite database file path |
+| `DB_DRIVER` | `sqlite` | Database driver |
+| `APP_NAME` | `Bonds` | Application name (used in emails, WebAuthn, etc.) |
 | `APP_ENV` | `development` | Set to `production` for production use |
 | `APP_URL` | `http://localhost:8080` | Public URL (used in emails and OAuth callbacks) |
+| `JWT_EXPIRY_HRS` | `24` | JWT token expiry in hours |
+| `JWT_REFRESH_HRS` | `168` | JWT refresh window in hours (default 7 days) |
 | `SMTP_HOST` | — | SMTP server for sending emails |
-| `SMTP_PORT` | — | SMTP port |
+| `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_USERNAME` | — | SMTP username |
 | `SMTP_PASSWORD` | — | SMTP password |
 | `SMTP_FROM` | — | Sender email address |
@@ -122,8 +127,9 @@ cp server/.env.example server/.env
 | `GEOCODING_PROVIDER` | `nominatim` | Geocoding provider (`nominatim` or `locationiq`) |
 | `GEOCODING_API_KEY` | — | API key for LocationIQ |
 | `WEBAUTHN_RP_ID` | — | WebAuthn Relying Party ID (e.g. `bonds.example.com`) |
-| `WEBAUTHN_RP_DISPLAY_NAME` | — | WebAuthn display name |
+| `WEBAUTHN_RP_DISPLAY_NAME` | `Bonds` | WebAuthn display name |
 | `WEBAUTHN_RP_ORIGINS` | — | Allowed WebAuthn origins (comma-separated) |
+| `ANNOUNCEMENT` | — | Announcement banner text displayed to all users |
 
 ## Development
 

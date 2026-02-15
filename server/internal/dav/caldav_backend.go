@@ -473,11 +473,18 @@ func buildCalendarFromImportantDate(d *models.ContactImportantDate) *ical.Calend
 	prop.Value = dtStart.Format("20060102")
 	event.Props.Set(prop)
 
-	// If it's a birthday/anniversary type, set yearly recurrence
 	if d.Year != nil {
 		rruleProp := ical.NewProp(ical.PropRecurrenceRule)
 		rruleProp.Value = "FREQ=YEARLY"
 		event.Props.Set(rruleProp)
+	}
+
+	if d.CalendarType != "" && d.CalendarType != "gregorian" && d.OriginalMonth != nil && d.OriginalDay != nil {
+		desc := fmt.Sprintf("Calendar: %s, Original date: %d/%d", d.CalendarType, *d.OriginalMonth, *d.OriginalDay)
+		if d.OriginalYear != nil {
+			desc = fmt.Sprintf("Calendar: %s, Original date: %d-%d-%d", d.CalendarType, *d.OriginalYear, *d.OriginalMonth, *d.OriginalDay)
+		}
+		event.Props.SetText(ical.PropDescription, desc)
 	}
 
 	cal.Children = append(cal.Children, event)

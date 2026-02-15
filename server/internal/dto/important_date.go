@@ -7,6 +7,10 @@ type CreateImportantDateRequest struct {
 	Day                        *int   `json:"day"`
 	Month                      *int   `json:"month"`
 	Year                       *int   `json:"year"`
+	CalendarType               string `json:"calendar_type"`
+	OriginalDay                *int   `json:"original_day"`
+	OriginalMonth              *int   `json:"original_month"`
+	OriginalYear               *int   `json:"original_year"`
 	ContactImportantDateTypeID *uint  `json:"contact_important_date_type_id"`
 }
 
@@ -15,6 +19,10 @@ type UpdateImportantDateRequest struct {
 	Day                        *int   `json:"day"`
 	Month                      *int   `json:"month"`
 	Year                       *int   `json:"year"`
+	CalendarType               string `json:"calendar_type"`
+	OriginalDay                *int   `json:"original_day"`
+	OriginalMonth              *int   `json:"original_month"`
+	OriginalYear               *int   `json:"original_year"`
 	ContactImportantDateTypeID *uint  `json:"contact_important_date_type_id"`
 }
 
@@ -25,6 +33,10 @@ type ImportantDateResponse struct {
 	Day                        *int      `json:"day"`
 	Month                      *int      `json:"month"`
 	Year                       *int      `json:"year"`
+	CalendarType               string    `json:"calendar_type"`
+	OriginalDay                *int      `json:"original_day"`
+	OriginalMonth              *int      `json:"original_month"`
+	OriginalYear               *int      `json:"original_year"`
 	ContactImportantDateTypeID *uint     `json:"contact_important_date_type_id"`
 	CreatedAt                  time.Time `json:"created_at"`
 	UpdatedAt                  time.Time `json:"updated_at"`

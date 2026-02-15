@@ -150,6 +150,86 @@ func TestImportantDatesReport(t *testing.T) {
 	}
 }
 
+func TestImportantDatesReportLunar(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "reports-lunar@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Lunar"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	origDay := 15
+	origMonth := 1
+	origYear := 2025
+	gregDay := 12
+	gregMonth := 2
+	gregYear := 2025
+	importantDate := &models.ContactImportantDate{
+		ContactID:     contact.ID,
+		Label:         "Lunar New Year",
+		Day:           &gregDay,
+		Month:         &gregMonth,
+		Year:          &gregYear,
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+		OriginalYear:  &origYear,
+	}
+	if err := db.Create(importantDate).Error; err != nil {
+		t.Fatalf("Create important date failed: %v", err)
+	}
+
+	svc := NewReportService(db)
+	report, err := svc.ImportantDatesReport(vault.ID)
+	if err != nil {
+		t.Fatalf("ImportantDatesReport failed: %v", err)
+	}
+	if len(report) != 1 {
+		t.Fatalf("Expected 1 important date report item, got %d", len(report))
+	}
+	item := report[0]
+	if item.Label != "Lunar New Year" {
+		t.Errorf("Expected label 'Lunar New Year', got '%s'", item.Label)
+	}
+	if item.CalendarType != "lunar" {
+		t.Errorf("Expected CalendarType 'lunar', got '%s'", item.CalendarType)
+	}
+	if item.OriginalDay == nil || *item.OriginalDay != 15 {
+		t.Errorf("Expected OriginalDay 15, got %v", item.OriginalDay)
+	}
+	if item.OriginalMonth == nil || *item.OriginalMonth != 1 {
+		t.Errorf("Expected OriginalMonth 1, got %v", item.OriginalMonth)
+	}
+	if item.OriginalYear == nil || *item.OriginalYear != 2025 {
+		t.Errorf("Expected OriginalYear 2025, got %v", item.OriginalYear)
+	}
+	if item.Day == nil || *item.Day != 12 {
+		t.Errorf("Expected gregorian Day 12, got %v", item.Day)
+	}
+	if item.Month == nil || *item.Month != 2 {
+		t.Errorf("Expected gregorian Month 2, got %v", item.Month)
+	}
+}
+
 func TestMoodReport(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()

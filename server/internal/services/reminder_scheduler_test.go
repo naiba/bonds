@@ -452,7 +452,95 @@ func TestRescheduleRecurringYear(t *testing.T) {
 	}
 }
 
-// --- Test 10: buildContactName with various name combinations ---
+func TestRescheduleRecurringYearLunar(t *testing.T) {
+	ctx := setupReminderSchedulerTest(t)
+	ch := ctx.createEmailChannel(t)
+
+	origDay := 15
+	origMonth := 1
+	reminder := &models.ContactReminder{
+		ContactID:     ctx.contactID,
+		Label:         "Lunar Birthday",
+		Type:          "recurring_year",
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+	}
+	if err := ctx.db.Create(reminder).Error; err != nil {
+		t.Fatalf("create reminder failed: %v", err)
+	}
+
+	pastTime := time.Now().Add(-10 * time.Minute).Truncate(time.Minute)
+	ctx.createScheduled(t, reminder.ID, ch.ID, pastTime, nil)
+
+	ctx.svc.ProcessDueReminders()
+
+	var allScheduled []models.ContactReminderScheduled
+	if err := ctx.db.Where("contact_reminder_id = ?", reminder.ID).Find(&allScheduled).Error; err != nil {
+		t.Fatalf("failed to query scheduled: %v", err)
+	}
+	if len(allScheduled) != 2 {
+		t.Fatalf("expected 2 scheduled entries (original + rescheduled), got %d", len(allScheduled))
+	}
+
+	var found bool
+	for _, s := range allScheduled {
+		if s.TriggeredAt == nil && s.ScheduledAt.After(time.Now()) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected to find a new future scheduled entry for lunar yearly recurrence")
+	}
+}
+
+func TestCalcNextYearlyScheduleLunar(t *testing.T) {
+	origDay := 15
+	origMonth := 8
+	reminder := &models.ContactReminder{
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+	}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	nextTime, ok := calcNextYearlySchedule(reminder, now)
+	if !ok {
+		t.Fatal("expected calcNextYearlySchedule to return ok=true for lunar")
+	}
+	if nextTime.Year() != 2026 {
+		t.Errorf("expected year 2026, got %d", nextTime.Year())
+	}
+	if nextTime.Month() < 9 || nextTime.Month() > 10 {
+		t.Errorf("expected month 9-10 for lunar 八月十五, got %d", nextTime.Month())
+	}
+}
+
+func TestCalcNextYearlyScheduleGregorian(t *testing.T) {
+	origDay := 15
+	origMonth := 6
+	reminder := &models.ContactReminder{
+		CalendarType:  "gregorian",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+	}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	_, ok := calcNextYearlySchedule(reminder, now)
+	if ok {
+		t.Error("expected calcNextYearlySchedule to return ok=false for gregorian (uses standard path)")
+	}
+}
+
+func TestCalcNextYearlyScheduleNoOriginal(t *testing.T) {
+	reminder := &models.ContactReminder{
+		CalendarType: "lunar",
+	}
+	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	_, ok := calcNextYearlySchedule(reminder, now)
+	if ok {
+		t.Error("expected ok=false when OriginalMonth/OriginalDay are nil")
+	}
+}
 
 func TestBuildContactName(t *testing.T) {
 	first := "Alice"

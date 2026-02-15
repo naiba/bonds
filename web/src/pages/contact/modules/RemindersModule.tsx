@@ -6,7 +6,6 @@ import {
   Modal,
   Form,
   Input,
-  DatePicker,
   Select,
   Popconfirm,
   App,
@@ -16,17 +15,37 @@ import {
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { remindersApi } from "@/api/reminders";
-import type { Reminder } from "@/types/modules";
+import type { Reminder, CreateReminderRequest } from "@/types/modules";
 import type { APIError } from "@/types/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import CalendarDatePicker from "@/components/CalendarDatePicker";
+import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
+import { getCalendarSystem } from "@/utils/calendar";
+import type { CalendarType } from "@/utils/calendar";
 
 const freqColor: Record<string, string> = {
   one_time: "blue",
-  weekly: "green",
-  monthly: "orange",
-  yearly: "purple",
+  recurring_week: "green",
+  recurring_month: "orange",
+  recurring_year: "purple",
 };
+
+function formatReminderDate(r: Reminder): string {
+  if (r.calendar_type && r.calendar_type !== "gregorian" && r.original_month != null && r.original_day != null) {
+    const sys = getCalendarSystem(r.calendar_type as CalendarType);
+    const formatted = sys.formatDate({
+      day: r.original_day,
+      month: r.original_month,
+      year: r.original_year ?? 0,
+    });
+    const gd = r.year && r.month && r.day ? `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}` : "";
+    return gd ? `${formatted} (${gd})` : formatted;
+  }
+  if (r.year && r.month && r.day) {
+    return `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`;
+  }
+  return "";
+}
 
 export default function RemindersModule({
   vaultId,
@@ -45,9 +64,9 @@ export default function RemindersModule({
 
   const frequencyOptions = [
     { value: "one_time", label: t("modules.reminders.freq_one_time") },
-    { value: "weekly", label: t("modules.reminders.freq_weekly") },
-    { value: "monthly", label: t("modules.reminders.freq_monthly") },
-    { value: "yearly", label: t("modules.reminders.freq_yearly") },
+    { value: "recurring_week", label: t("modules.reminders.freq_weekly") },
+    { value: "recurring_month", label: t("modules.reminders.freq_monthly") },
+    { value: "recurring_year", label: t("modules.reminders.freq_yearly") },
   ];
 
   const { data: reminders = [], isLoading } = useQuery({
@@ -59,12 +78,26 @@ export default function RemindersModule({
   });
 
   const saveMutation = useMutation({
-    mutationFn: (values: { label: string; date: dayjs.Dayjs; frequency: string }) => {
-      const data = {
+    mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; frequency: string }) => {
+      const { calendarDate } = values;
+      const sys = getCalendarSystem(calendarDate.calendarType);
+      const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
+
+      const data: CreateReminderRequest = {
         label: values.label,
-        date: values.date.format("YYYY-MM-DD"),
-        frequency: values.frequency,
+        day: gd.day,
+        month: gd.month,
+        year: gd.year,
+        type: values.frequency,
+        calendar_type: calendarDate.calendarType,
       };
+
+      if (calendarDate.calendarType !== "gregorian") {
+        data.original_day = calendarDate.day;
+        data.original_month = calendarDate.month;
+        data.original_year = calendarDate.year;
+      }
+
       if (editingId) {
         return remindersApi.update(vaultId, contactId, editingId, data);
       }
@@ -89,11 +122,12 @@ export default function RemindersModule({
 
   function openEdit(r: Reminder) {
     setEditingId(r.id);
-    form.setFieldsValue({
-      label: r.label,
-      date: dayjs(r.date),
-      frequency: r.frequency,
-    });
+    const ct = (r.calendar_type || "gregorian") as CalendarType;
+    const pickerVal: CalendarDatePickerValue =
+      ct !== "gregorian" && r.original_day != null && r.original_month != null
+        ? { calendarType: ct, day: r.original_day, month: r.original_month, year: r.original_year ?? new Date().getFullYear() }
+        : { calendarType: "gregorian", day: r.day ?? 1, month: r.month ?? 1, year: r.year ?? new Date().getFullYear() };
+    form.setFieldsValue({ label: r.label, calendarDate: pickerVal, frequency: r.type });
     setOpen(true);
   }
 
@@ -129,8 +163,11 @@ export default function RemindersModule({
               title={r.label}
               description={
                 <>
-                  {dayjs(r.date).format("MMM D, YYYY")}{" "}
-                  <Tag color={freqColor[r.frequency] ?? "default"}>{r.frequency}</Tag>
+                  {formatReminderDate(r)}{" "}
+                  <Tag color={freqColor[r.type] ?? "default"}>{r.type}</Tag>
+                  {r.calendar_type && r.calendar_type !== "gregorian" && (
+                    <Tag color="volcano">{r.calendar_type}</Tag>
+                  )}
                 </>
               }
             />
@@ -149,8 +186,8 @@ export default function RemindersModule({
           <Form.Item name="label" label={t("modules.reminders.label")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="date" label={t("modules.reminders.date")} rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+          <Form.Item name="calendarDate" label={t("modules.reminders.date")} rules={[{ required: true }]}>
+            <CalendarDatePicker />
           </Form.Item>
           <Form.Item name="frequency" label={t("modules.reminders.frequency")} rules={[{ required: true }]}>
             <Select options={frequencyOptions} />

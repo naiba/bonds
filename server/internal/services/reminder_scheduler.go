@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	calendarPkg "github.com/naiba/bonds/internal/calendar"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
@@ -200,7 +201,11 @@ func (s *ReminderSchedulerService) rescheduleIfRecurring(reminder *models.Contac
 	case "recurring_month":
 		nextSchedule = now.AddDate(0, freq, 0)
 	case "recurring_year":
-		nextSchedule = now.AddDate(freq, 0, 0)
+		if ns, ok := calcNextYearlySchedule(reminder, now); ok {
+			nextSchedule = ns
+		} else {
+			nextSchedule = now.AddDate(freq, 0, 0)
+		}
 	default:
 		return
 	}
@@ -210,6 +215,30 @@ func (s *ReminderSchedulerService) rescheduleIfRecurring(reminder *models.Contac
 		ContactReminderID:         reminder.ID,
 		ScheduledAt:               nextSchedule,
 	})
+}
+
+func calcNextYearlySchedule(reminder *models.ContactReminder, now time.Time) (time.Time, bool) {
+	ct := calendarPkg.CalendarType(reminder.CalendarType)
+	if ct == "" || ct == calendarPkg.Gregorian {
+		return time.Time{}, false
+	}
+	if reminder.OriginalMonth == nil || reminder.OriginalDay == nil {
+		return time.Time{}, false
+	}
+	converter, ok := calendarPkg.Get(ct)
+	if !ok {
+		return time.Time{}, false
+	}
+	origDate := calendarPkg.DateInfo{
+		Day:   *reminder.OriginalDay,
+		Month: *reminder.OriginalMonth,
+	}
+	gd, err := converter.NextOccurrence(origDate, now)
+	if err != nil {
+		log.Printf("[reminder-scheduler] calendar NextOccurrence failed: %v", err)
+		return time.Time{}, false
+	}
+	return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 9, 0, 0, 0, now.Location()), true
 }
 
 func buildContactName(contact *models.Contact) string {

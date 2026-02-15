@@ -39,6 +39,9 @@ func (s *ImportantDateService) Create(contactID string, req dto.CreateImportantD
 		Year:                       req.Year,
 		ContactImportantDateTypeID: req.ContactImportantDateTypeID,
 	}
+	applyCalendarFields(&date.CalendarType, &date.OriginalDay, &date.OriginalMonth, &date.OriginalYear,
+		&date.Day, &date.Month, &date.Year,
+		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if err := s.db.Create(&date).Error; err != nil {
 		return nil, err
 	}
@@ -59,6 +62,9 @@ func (s *ImportantDateService) Update(id uint, contactID string, req dto.UpdateI
 	date.Month = req.Month
 	date.Year = req.Year
 	date.ContactImportantDateTypeID = req.ContactImportantDateTypeID
+	applyCalendarFields(&date.CalendarType, &date.OriginalDay, &date.OriginalMonth, &date.OriginalYear,
+		&date.Day, &date.Month, &date.Year,
+		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if err := s.db.Save(&date).Error; err != nil {
 		return nil, err
 	}
@@ -85,6 +91,10 @@ func toImportantDateResponse(d *models.ContactImportantDate) dto.ImportantDateRe
 		Day:                        d.Day,
 		Month:                      d.Month,
 		Year:                       d.Year,
+		CalendarType:               d.CalendarType,
+		OriginalDay:                d.OriginalDay,
+		OriginalMonth:              d.OriginalMonth,
+		OriginalYear:               d.OriginalYear,
 		ContactImportantDateTypeID: d.ContactImportantDateTypeID,
 		CreatedAt:                  d.CreatedAt,
 		UpdatedAt:                  d.UpdatedAt,

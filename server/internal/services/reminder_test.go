@@ -149,3 +149,91 @@ func TestReminderNotFound(t *testing.T) {
 		t.Errorf("Expected ErrReminderNotFound, got %v", err)
 	}
 }
+
+func TestCreateReminderLunar(t *testing.T) {
+	svc, contactID := setupReminderTest(t)
+
+	reminder, err := svc.Create(contactID, dto.CreateReminderRequest{
+		Label:         "Lunar Birthday",
+		Type:          "recurring_year",
+		CalendarType:  "lunar",
+		OriginalDay:   intPtr(15),
+		OriginalMonth: intPtr(1),
+		OriginalYear:  intPtr(2025),
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if reminder.CalendarType != "lunar" {
+		t.Errorf("Expected calendar_type 'lunar', got '%s'", reminder.CalendarType)
+	}
+	if reminder.OriginalDay == nil || *reminder.OriginalDay != 15 {
+		t.Errorf("Expected original_day 15, got %v", reminder.OriginalDay)
+	}
+	if reminder.OriginalMonth == nil || *reminder.OriginalMonth != 1 {
+		t.Errorf("Expected original_month 1, got %v", reminder.OriginalMonth)
+	}
+	if reminder.Day == nil || reminder.Month == nil || reminder.Year == nil {
+		t.Fatal("Expected gregorian day/month/year to be converted")
+	}
+	if *reminder.Year != 2025 {
+		t.Errorf("Expected gregorian year 2025, got %d", *reminder.Year)
+	}
+}
+
+func TestCreateReminderDefaultGregorian(t *testing.T) {
+	svc, contactID := setupReminderTest(t)
+
+	reminder, err := svc.Create(contactID, dto.CreateReminderRequest{
+		Label: "Regular Reminder",
+		Day:   intPtr(25),
+		Month: intPtr(12),
+		Year:  intPtr(2025),
+		Type:  "one_time",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if reminder.CalendarType != "gregorian" {
+		t.Errorf("Expected default calendar_type 'gregorian', got '%s'", reminder.CalendarType)
+	}
+	if reminder.OriginalDay != nil {
+		t.Errorf("Expected nil original_day for gregorian, got %v", reminder.OriginalDay)
+	}
+}
+
+func TestUpdateReminderToLunar(t *testing.T) {
+	svc, contactID := setupReminderTest(t)
+
+	created, err := svc.Create(contactID, dto.CreateReminderRequest{
+		Label: "Original",
+		Type:  "one_time",
+		Day:   intPtr(1),
+		Month: intPtr(1),
+		Year:  intPtr(2025),
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	updated, err := svc.Update(created.ID, contactID, dto.UpdateReminderRequest{
+		Label:         "Lunar Update",
+		Type:          "recurring_year",
+		CalendarType:  "lunar",
+		OriginalDay:   intPtr(8),
+		OriginalMonth: intPtr(8),
+		OriginalYear:  intPtr(2025),
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.CalendarType != "lunar" {
+		t.Errorf("Expected calendar_type 'lunar', got '%s'", updated.CalendarType)
+	}
+	if updated.OriginalDay == nil || *updated.OriginalDay != 8 {
+		t.Errorf("Expected original_day 8, got %v", updated.OriginalDay)
+	}
+	if updated.Day == nil || updated.Month == nil {
+		t.Fatal("Expected gregorian day/month to be set after lunar conversion")
+	}
+}

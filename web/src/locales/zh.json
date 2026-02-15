@@ -581,5 +581,12 @@
     "continueWith": "或使用以下方式登录",
     "github": "GitHub",
     "google": "Google"
+  },
+  "calendar": {
+    "gregorian": "公历",
+    "lunar": "农历",
+    "year": "年",
+    "month": "月",
+    "day": "日"
   }
 }

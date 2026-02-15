@@ -45,18 +45,22 @@ func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDat
 	}
 
 	type dateRow struct {
-		ContactID string  `gorm:"column:contact_id"`
-		FirstName *string `gorm:"column:first_name"`
-		LastName  *string `gorm:"column:last_name"`
-		Label     string  `gorm:"column:label"`
-		Day       *int    `gorm:"column:day"`
-		Month     *int    `gorm:"column:month"`
-		Year      *int    `gorm:"column:year"`
+		ContactID     string  `gorm:"column:contact_id"`
+		FirstName     *string `gorm:"column:first_name"`
+		LastName      *string `gorm:"column:last_name"`
+		Label         string  `gorm:"column:label"`
+		Day           *int    `gorm:"column:day"`
+		Month         *int    `gorm:"column:month"`
+		Year          *int    `gorm:"column:year"`
+		CalendarType  string  `gorm:"column:calendar_type"`
+		OriginalDay   *int    `gorm:"column:original_day"`
+		OriginalMonth *int    `gorm:"column:original_month"`
+		OriginalYear  *int    `gorm:"column:original_year"`
 	}
 
 	var rows []dateRow
 	err := s.db.Model(&models.ContactImportantDate{}).
-		Select("contact_important_dates.contact_id, contacts.first_name, contacts.last_name, contact_important_dates.label, contact_important_dates.day, contact_important_dates.month, contact_important_dates.year").
+		Select("contact_important_dates.contact_id, contacts.first_name, contacts.last_name, contact_important_dates.label, contact_important_dates.day, contact_important_dates.month, contact_important_dates.year, contact_important_dates.calendar_type, contact_important_dates.original_day, contact_important_dates.original_month, contact_important_dates.original_year").
 		Joins("JOIN contacts ON contacts.id = contact_important_dates.contact_id").
 		Where("contact_important_dates.contact_id IN ?", contactIDs).
 		Order("contact_important_dates.month ASC, contact_important_dates.day ASC").
@@ -68,13 +72,17 @@ func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDat
 	result := make([]dto.ImportantDateReportItem, len(rows))
 	for i, r := range rows {
 		result[i] = dto.ImportantDateReportItem{
-			ContactID: r.ContactID,
-			FirstName: ptrToStr(r.FirstName),
-			LastName:  ptrToStr(r.LastName),
-			Label:     r.Label,
-			Day:       r.Day,
-			Month:     r.Month,
-			Year:      r.Year,
+			ContactID:     r.ContactID,
+			FirstName:     ptrToStr(r.FirstName),
+			LastName:      ptrToStr(r.LastName),
+			Label:         r.Label,
+			Day:           r.Day,
+			Month:         r.Month,
+			Year:          r.Year,
+			CalendarType:  r.CalendarType,
+			OriginalDay:   r.OriginalDay,
+			OriginalMonth: r.OriginalMonth,
+			OriginalYear:  r.OriginalYear,
 		}
 	}
 	return result, nil

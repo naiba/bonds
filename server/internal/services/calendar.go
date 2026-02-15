@@ -50,12 +50,16 @@ func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.Cal
 	importantDates := make([]dto.CalendarDateItem, len(dates))
 	for i, d := range dates {
 		importantDates[i] = dto.CalendarDateItem{
-			ID:        d.ID,
-			ContactID: d.ContactID,
-			Label:     d.Label,
-			Day:       d.Day,
-			Month:     d.Month,
-			Year:      d.Year,
+			ID:            d.ID,
+			ContactID:     d.ContactID,
+			Label:         d.Label,
+			Day:           d.Day,
+			Month:         d.Month,
+			Year:          d.Year,
+			CalendarType:  d.CalendarType,
+			OriginalDay:   d.OriginalDay,
+			OriginalMonth: d.OriginalMonth,
+			OriginalYear:  d.OriginalYear,
 		}
 	}
 	resp.ImportantDates = importantDates
@@ -72,14 +76,18 @@ func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.Cal
 	reminderItems := make([]dto.CalendarReminderItem, len(reminders))
 	for i, r := range reminders {
 		reminderItems[i] = dto.CalendarReminderItem{
-			ID:        r.ID,
-			ContactID: r.ContactID,
-			Label:     r.Label,
-			Day:       r.Day,
-			Month:     r.Month,
-			Year:      r.Year,
-			Type:      r.Type,
-			CreatedAt: r.CreatedAt,
+			ID:            r.ID,
+			ContactID:     r.ContactID,
+			Label:         r.Label,
+			Day:           r.Day,
+			Month:         r.Month,
+			Year:          r.Year,
+			CalendarType:  r.CalendarType,
+			OriginalDay:   r.OriginalDay,
+			OriginalMonth: r.OriginalMonth,
+			OriginalYear:  r.OriginalYear,
+			Type:          r.Type,
+			CreatedAt:     r.CreatedAt,
 		}
 	}
 	resp.Reminders = reminderItems

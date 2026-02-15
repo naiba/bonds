@@ -1341,6 +1341,72 @@ func TestImportantDateCreate_Success(t *testing.T) {
 	}
 }
 
+func TestImportantDateCreateLunar_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "date-lunar@example.com")
+	vault := ts.createTestVault(t, token, "Lunar Date Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+
+	rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/dates",
+		`{"label":"Lunar Birthday","calendar_type":"lunar","original_day":15,"original_month":1,"original_year":2025}`, token)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse date data: %v", err)
+	}
+	if data["calendar_type"] != "lunar" {
+		t.Errorf("expected calendar_type='lunar', got %v", data["calendar_type"])
+	}
+	if data["original_day"] == nil {
+		t.Error("expected original_day to be set")
+	}
+	if data["original_month"] == nil {
+		t.Error("expected original_month to be set")
+	}
+}
+
+func TestReminderCreateLunar_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "reminder-lunar@example.com")
+	vault := ts.createTestVault(t, token, "Lunar Reminder Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+
+	rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/reminders",
+		`{"label":"Lunar Bday","type":"recurring_year","calendar_type":"lunar","original_day":15,"original_month":1,"original_year":2025}`, token)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var data map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse reminder data: %v", err)
+	}
+	if data["calendar_type"] != "lunar" {
+		t.Errorf("expected calendar_type='lunar', got %v", data["calendar_type"])
+	}
+	if data["original_day"] == nil {
+		t.Error("expected original_day to be set")
+	}
+	if data["day"] == nil {
+		t.Error("expected converted gregorian day to be set")
+	}
+}
+
 // ==================== Unauthorized ====================
 
 func TestNoteCreate_Unauthorized(t *testing.T) {

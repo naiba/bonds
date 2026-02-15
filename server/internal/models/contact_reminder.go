@@ -9,6 +9,10 @@ type ContactReminder struct {
 	Day                  *int       `json:"day"`
 	Month                *int       `json:"month"`
 	Year                 *int       `json:"year"`
+	CalendarType         string     `json:"calendar_type" gorm:"default:'gregorian'"`
+	OriginalDay          *int       `json:"original_day"`
+	OriginalMonth        *int       `json:"original_month"`
+	OriginalYear         *int       `json:"original_year"`
 	Type                 string     `json:"type" gorm:"not null"`
 	FrequencyNumber      *int       `json:"frequency_number"`
 	LastTriggeredAt      *time.Time `json:"last_triggered_at"`

@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	calendarPkg "github.com/naiba/bonds/internal/calendar"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
@@ -47,6 +48,9 @@ func (s *ReminderService) Create(contactID string, req dto.CreateReminderRequest
 		Type:            req.Type,
 		FrequencyNumber: req.FrequencyNumber,
 	}
+	applyCalendarFields(&reminder.CalendarType, &reminder.OriginalDay, &reminder.OriginalMonth, &reminder.OriginalYear,
+		&reminder.Day, &reminder.Month, &reminder.Year,
+		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if err := s.db.Create(&reminder).Error; err != nil {
 		return nil, err
 	}
@@ -76,6 +80,9 @@ func (s *ReminderService) Update(id uint, contactID string, req dto.UpdateRemind
 	reminder.Year = req.Year
 	reminder.Type = req.Type
 	reminder.FrequencyNumber = req.FrequencyNumber
+	applyCalendarFields(&reminder.CalendarType, &reminder.OriginalDay, &reminder.OriginalMonth, &reminder.OriginalYear,
+		&reminder.Day, &reminder.Month, &reminder.Year,
+		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if err := s.db.Save(&reminder).Error; err != nil {
 		return nil, err
 	}
@@ -138,6 +145,30 @@ func (s *ReminderService) scheduleReminder(reminder *models.ContactReminder) {
 
 func calcInitialSchedule(reminder *models.ContactReminder) time.Time {
 	now := time.Now()
+
+	ct := calendarPkg.CalendarType(reminder.CalendarType)
+	if ct != "" && ct != calendarPkg.Gregorian && reminder.OriginalMonth != nil && reminder.OriginalDay != nil {
+		converter, ok := calendarPkg.Get(ct)
+		if ok {
+			origDate := calendarPkg.DateInfo{
+				Day:   *reminder.OriginalDay,
+				Month: *reminder.OriginalMonth,
+			}
+			if reminder.OriginalYear != nil {
+				origDate.Year = *reminder.OriginalYear
+			} else {
+				afterSolar := calendarPkg.GregorianDate{Day: now.Day(), Month: int(now.Month()), Year: now.Year()}
+				if fromG, err := converter.FromGregorian(afterSolar); err == nil {
+					origDate.Year = fromG.Year
+				}
+			}
+			gd, err := converter.NextOccurrence(origDate, now.AddDate(0, 0, -1))
+			if err == nil {
+				return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 9, 0, 0, 0, now.Location())
+			}
+		}
+	}
+
 	year := now.Year()
 	month := time.January
 	day := 1
@@ -169,6 +200,10 @@ func toReminderResponse(r *models.ContactReminder) dto.ReminderResponse {
 		Day:                  r.Day,
 		Month:                r.Month,
 		Year:                 r.Year,
+		CalendarType:         r.CalendarType,
+		OriginalDay:          r.OriginalDay,
+		OriginalMonth:        r.OriginalMonth,
+		OriginalYear:         r.OriginalYear,
 		Type:                 r.Type,
 		FrequencyNumber:      r.FrequencyNumber,
 		LastTriggeredAt:      r.LastTriggeredAt,

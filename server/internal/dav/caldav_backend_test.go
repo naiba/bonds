@@ -2,6 +2,7 @@ package dav
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -319,6 +320,66 @@ func TestCalendarHomeSetPath(t *testing.T) {
 	expected := "/dav/calendars/" + userID + "/"
 	if path != expected {
 		t.Errorf("Expected '%s', got '%s'", expected, path)
+	}
+}
+
+func TestListCalendarObjectsLunarDate(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCalDAVTest(t)
+
+	contact := createTestContact(t, db, vaultID, userID, "Lunar", "Person")
+
+	uid := uuid.New().String()
+	day := 12
+	month := 2
+	year := 2025
+	origDay := 15
+	origMonth := 1
+	origYear := 2025
+	calType := "lunar"
+
+	date := models.ContactImportantDate{
+		ContactID:     contact.ID,
+		UUID:          &uid,
+		Label:         "Lunar Birthday",
+		Day:           &day,
+		Month:         &month,
+		Year:          &year,
+		CalendarType:  calType,
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+		OriginalYear:  &origYear,
+	}
+	if err := db.Create(&date).Error; err != nil {
+		t.Fatalf("Create lunar date failed: %v", err)
+	}
+
+	path := "/dav/calendars/" + userID + "/" + vaultID + "/"
+	objects, err := backend.ListCalendarObjects(ctx, path, nil)
+	if err != nil {
+		t.Fatalf("ListCalendarObjects failed: %v", err)
+	}
+
+	foundLunar := false
+	for _, obj := range objects {
+		if obj.Data == nil {
+			continue
+		}
+		for _, child := range obj.Data.Children {
+			summary, _ := child.Props.Text(ical.PropSummary)
+			if summary == "Lunar Birthday" {
+				foundLunar = true
+				desc, _ := child.Props.Text(ical.PropDescription)
+				if desc == "" {
+					t.Error("Expected DESCRIPTION for lunar calendar date")
+				}
+				if len(desc) > 0 && !(strings.Contains(desc, "lunar") || strings.Contains(desc, "Calendar")) {
+					t.Errorf("Expected description to mention 'lunar' or 'Calendar', got '%s'", desc)
+				}
+			}
+		}
+	}
+	if !foundLunar {
+		t.Error("Expected to find 'Lunar Birthday' event")
 	}
 }
 

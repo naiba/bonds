@@ -15,36 +15,62 @@ export interface CreateNoteRequest {
 
 export interface Reminder {
   id: number;
-  contact_id: number;
-  vault_id: number;
+  contact_id: string;
   label: string;
-  date: string;
-  frequency: "one_time" | "weekly" | "monthly" | "yearly";
+  day: number | null;
+  month: number | null;
+  year: number | null;
+  type: string;
+  frequency_number: number | null;
+  calendar_type: string;
+  original_day: number | null;
+  original_month: number | null;
+  original_year: number | null;
+  last_triggered_at: string | null;
+  number_times_triggered: number;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateReminderRequest {
   label: string;
-  date: string;
-  frequency: string;
+  day?: number;
+  month?: number;
+  year?: number;
+  type: string;
+  frequency_number?: number;
+  calendar_type?: string;
+  original_day?: number;
+  original_month?: number;
+  original_year?: number;
 }
 
 export interface ImportantDate {
   id: number;
-  contact_id: number;
-  vault_id: number;
+  contact_id: string;
   label: string;
-  date: string;
-  type: string;
+  day: number | null;
+  month: number | null;
+  year: number | null;
+  calendar_type: string;
+  original_day: number | null;
+  original_month: number | null;
+  original_year: number | null;
+  contact_important_date_type_id: number | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateImportantDateRequest {
   label: string;
-  date: string;
-  type: string;
+  day?: number;
+  month?: number;
+  year?: number;
+  calendar_type?: string;
+  original_day?: number;
+  original_month?: number;
+  original_year?: number;
+  contact_important_date_type_id?: number;
 }
 
 export interface Task {

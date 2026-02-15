@@ -152,3 +152,100 @@ func TestDeleteImportantDateNotFound(t *testing.T) {
 		t.Errorf("Expected ErrImportantDateNotFound, got %v", err)
 	}
 }
+
+func TestCreateImportantDateLunar(t *testing.T) {
+	svc, contactID := setupImportantDateTest(t)
+
+	origDay := 15
+	origMonth := 1
+	origYear := 2025
+	date, err := svc.Create(contactID, dto.CreateImportantDateRequest{
+		Label:         "Lunar New Year",
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+		OriginalYear:  &origYear,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if date.Label != "Lunar New Year" {
+		t.Errorf("Expected label 'Lunar New Year', got '%s'", date.Label)
+	}
+	if date.CalendarType != "lunar" {
+		t.Errorf("Expected calendar_type 'lunar', got '%s'", date.CalendarType)
+	}
+	if date.OriginalDay == nil || *date.OriginalDay != 15 {
+		t.Errorf("Expected original_day 15, got %v", date.OriginalDay)
+	}
+	if date.OriginalMonth == nil || *date.OriginalMonth != 1 {
+		t.Errorf("Expected original_month 1, got %v", date.OriginalMonth)
+	}
+	if date.OriginalYear == nil || *date.OriginalYear != 2025 {
+		t.Errorf("Expected original_year 2025, got %v", date.OriginalYear)
+	}
+	if date.Day == nil || date.Month == nil || date.Year == nil {
+		t.Fatal("Expected gregorian day/month/year to be set after conversion")
+	}
+	if *date.Year != 2025 {
+		t.Errorf("Expected gregorian year 2025, got %d", *date.Year)
+	}
+	if *date.Month != 2 {
+		t.Errorf("Expected gregorian month 2 (Feb), got %d", *date.Month)
+	}
+}
+
+func TestCreateImportantDateGregorianDefault(t *testing.T) {
+	svc, contactID := setupImportantDateTest(t)
+
+	day := 25
+	month := 12
+	year := 2025
+	date, err := svc.Create(contactID, dto.CreateImportantDateRequest{
+		Label: "Christmas",
+		Day:   &day,
+		Month: &month,
+		Year:  &year,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if date.CalendarType != "gregorian" {
+		t.Errorf("Expected default calendar_type 'gregorian', got '%s'", date.CalendarType)
+	}
+	if date.OriginalDay != nil {
+		t.Errorf("Expected nil original_day for gregorian, got %v", date.OriginalDay)
+	}
+}
+
+func TestUpdateImportantDateLunar(t *testing.T) {
+	svc, contactID := setupImportantDateTest(t)
+
+	created, err := svc.Create(contactID, dto.CreateImportantDateRequest{Label: "Original"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	origDay := 8
+	origMonth := 8
+	origYear := 2025
+	updated, err := svc.Update(created.ID, contactID, dto.UpdateImportantDateRequest{
+		Label:         "Mid-Autumn",
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+		OriginalYear:  &origYear,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.CalendarType != "lunar" {
+		t.Errorf("Expected calendar_type 'lunar', got '%s'", updated.CalendarType)
+	}
+	if updated.OriginalDay == nil || *updated.OriginalDay != 8 {
+		t.Errorf("Expected original_day 8, got %v", updated.OriginalDay)
+	}
+	if updated.Day == nil || updated.Month == nil {
+		t.Fatal("Expected gregorian day/month to be set")
+	}
+}

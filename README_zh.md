@@ -104,11 +104,16 @@ cp server/.env.example server/.env
 |------|--------|------|
 | `JWT_SECRET` | — | **生产环境必填。** 认证令牌签名密钥 |
 | `SERVER_PORT` | `8080` | 服务端口 |
+| `SERVER_HOST` | `0.0.0.0` | 服务器监听地址 |
 | `DB_DSN` | `bonds.db` | SQLite 数据库文件路径 |
+| `DB_DRIVER` | `sqlite` | 数据库驱动 |
+| `APP_NAME` | `Bonds` | 应用名称（用于邮件、WebAuthn 等） |
 | `APP_ENV` | `development` | 生产环境设置为 `production` |
 | `APP_URL` | `http://localhost:8080` | 公开 URL（用于邮件链接和 OAuth 回调） |
+| `JWT_EXPIRY_HRS` | `24` | JWT 令牌过期时间（小时） |
+| `JWT_REFRESH_HRS` | `168` | JWT 刷新窗口（小时，默认 7 天） |
 | `SMTP_HOST` | — | SMTP 邮件服务器 |
-| `SMTP_PORT` | — | SMTP 端口 |
+| `SMTP_PORT` | `587` | SMTP 端口 |
 | `SMTP_USERNAME` | — | SMTP 用户名 |
 | `SMTP_PASSWORD` | — | SMTP 密码 |
 | `SMTP_FROM` | — | 发件人邮箱 |
@@ -123,8 +128,9 @@ cp server/.env.example server/.env
 | `GEOCODING_PROVIDER` | `nominatim` | 地理编码服务（`nominatim` 或 `locationiq`） |
 | `GEOCODING_API_KEY` | — | LocationIQ API Key |
 | `WEBAUTHN_RP_ID` | — | WebAuthn Relying Party ID（如 `bonds.example.com`） |
-| `WEBAUTHN_RP_DISPLAY_NAME` | — | WebAuthn 显示名称 |
+| `WEBAUTHN_RP_DISPLAY_NAME` | `Bonds` | WebAuthn 显示名称 |
 | `WEBAUTHN_RP_ORIGINS` | — | WebAuthn 允许的来源（逗号分隔） |
+| `ANNOUNCEMENT` | — | 公告横幅内容（显示给所有用户） |
 
 ## 开发
 
