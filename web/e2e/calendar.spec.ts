@@ -35,8 +35,8 @@ test.describe('Calendar System', () => {
     const importantDatesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
     await importantDatesCard.getByRole('button', { name: /add/i }).click();
 
-    await expect(page.getByText('Gregorian')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Chinese Lunar')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Gregorian', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Chinese Lunar', { exact: true })).toBeVisible({ timeout: 5000 });
   });
 
   test('should show calendar type switcher in reminders modal', async ({ page }) => {
@@ -46,8 +46,8 @@ test.describe('Calendar System', () => {
     const remindersCard = page.locator('.ant-card').filter({ hasText: 'Reminders' });
     await remindersCard.getByRole('button', { name: /add/i }).click();
 
-    await expect(page.getByText('Gregorian')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Chinese Lunar')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Gregorian', { exact: true })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Chinese Lunar', { exact: true })).toBeVisible({ timeout: 5000 });
   });
 
   test('should create an important date with lunar calendar', async ({ page }) => {
@@ -63,27 +63,21 @@ test.describe('Calendar System', () => {
     // Fill label
     await modal.getByRole('textbox').first().fill('Lunar Birthday');
 
-    // Switch to Chinese Lunar
-    await page.getByText('Chinese Lunar').click();
+    await page.getByText('Chinese Lunar', { exact: true }).click();
 
-    // Wait for lunar selects to appear (3 selects in Space.Compact)
     const compactSelects = modal.locator('.ant-space-compact .ant-select');
     await expect(compactSelects).toHaveCount(3, { timeout: 5000 });
 
-    // Year select (showSearch enabled): type to filter, then pick 2025
     await compactSelects.nth(0).locator('.ant-select-selection-item').click();
     await page.keyboard.type('2025');
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^2025$/ }).click();
 
-    // Month select: pick first month (正月)
     await compactSelects.nth(1).click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
 
-    // Day select: pick day 15
     await compactSelects.nth(2).click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^15$/ }).click();
 
-    // Type select (outside Space.Compact)
     const typeFormItem = modal.locator('.ant-form-item').filter({ hasText: /type/i });
     await typeFormItem.locator('.ant-select').click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
@@ -107,30 +101,23 @@ test.describe('Calendar System', () => {
     const modal = page.locator('.ant-modal-content');
     await expect(modal).toBeVisible({ timeout: 5000 });
 
-    // Fill label
     await modal.getByRole('textbox').first().fill('Lunar Reminder');
 
-    // Switch to Chinese Lunar
-    await page.getByText('Chinese Lunar').click();
+    await page.getByText('Chinese Lunar', { exact: true }).click();
 
-    // Wait for lunar selects to appear (3 selects in Space.Compact)
     const compactSelects = modal.locator('.ant-space-compact .ant-select');
     await expect(compactSelects).toHaveCount(3, { timeout: 5000 });
 
-    // Year select (showSearch enabled): type to filter, then pick 2025
     await compactSelects.nth(0).locator('.ant-select-selection-item').click();
     await page.keyboard.type('2025');
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^2025$/ }).click();
 
-    // Month select: pick first month (正月)
     await compactSelects.nth(1).click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
 
-    // Day select: pick day 15
     await compactSelects.nth(2).click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^15$/ }).click();
 
-    // Frequency select (outside Space.Compact)
     const freqFormItem = modal.locator('.ant-form-item').filter({ hasText: /frequency/i });
     await freqFormItem.locator('.ant-select').click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /yearly/i }).click();
