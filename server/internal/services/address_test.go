@@ -78,7 +78,7 @@ func TestListAddresses(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	addresses, err := svc.List(contactID)
+	addresses, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestUpdateAddress(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateAddressRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateAddressRequest{
 		Line1: "Updated",
 		City:  "NewCity",
 	})
@@ -121,11 +121,11 @@ func TestDeleteAddress(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	addresses, err := svc.List(contactID)
+	addresses, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -135,14 +135,14 @@ func TestDeleteAddress(t *testing.T) {
 }
 
 func TestAddressNotFound(t *testing.T) {
-	svc, contactID, _ := setupAddressTest(t)
+	svc, contactID, vaultID := setupAddressTest(t)
 
-	_, err := svc.Update(9999, contactID, dto.UpdateAddressRequest{Line1: "nope"})
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateAddressRequest{Line1: "nope"})
 	if err != ErrAddressNotFound {
 		t.Errorf("Expected ErrAddressNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999, contactID)
+	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrAddressNotFound {
 		t.Errorf("Expected ErrAddressNotFound, got %v", err)
 	}

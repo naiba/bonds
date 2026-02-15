@@ -28,7 +28,10 @@ func (s *AddressService) SetGeocoder(g Geocoder) {
 	s.geocoder = g
 }
 
-func (s *AddressService) List(contactID string) ([]dto.AddressResponse, error) {
+func (s *AddressService) List(contactID, vaultID string) ([]dto.AddressResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var pivots []models.ContactAddress
 	if err := s.db.Where("contact_id = ?", contactID).Find(&pivots).Error; err != nil {
 		return nil, err
@@ -57,6 +60,9 @@ func (s *AddressService) List(contactID string) ([]dto.AddressResponse, error) {
 }
 
 func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddressRequest) (*dto.AddressResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	address := models.Address{
 		VaultID:       vaultID,
 		Line1:         strPtrOrNil(req.Line1),
@@ -96,7 +102,10 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 	return &resp, nil
 }
 
-func (s *AddressService) Update(id uint, contactID string, req dto.UpdateAddressRequest) (*dto.AddressResponse, error) {
+func (s *AddressService) Update(id uint, contactID, vaultID string, req dto.UpdateAddressRequest) (*dto.AddressResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var pivot models.ContactAddress
 	if err := s.db.Where("address_id = ? AND contact_id = ?", id, contactID).First(&pivot).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -135,7 +144,10 @@ func (s *AddressService) Update(id uint, contactID string, req dto.UpdateAddress
 	return &resp, nil
 }
 
-func (s *AddressService) Delete(id uint, contactID string) error {
+func (s *AddressService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		result := tx.Where("address_id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactAddress{})
 		if result.Error != nil {
