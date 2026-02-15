@@ -49,6 +49,12 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 			return response.Unauthorized(c, "err.invalid_or_expired_token")
 		}
 
+		// Block access if 2FA verification is still pending.
+		// The temp token is only valid for the /auth/2fa/verify endpoint.
+		if claims.TwoFactorPending {
+			return response.Forbidden(c, "err.two_factor_required")
+		}
+
 		c.Set("user_id", claims.UserID)
 		c.Set("account_id", claims.AccountID)
 		c.Set("email", claims.Email)
