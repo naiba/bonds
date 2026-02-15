@@ -53,11 +53,11 @@ func TestVaultTaskListEmpty(t *testing.T) {
 func TestVaultTaskListWithTasks(t *testing.T) {
 	svc, taskSvc, vaultID, contactID, userID := setupVaultTaskTest(t)
 
-	_, err := taskSvc.Create(contactID, userID, dto.CreateTaskRequest{Label: "Task 1"})
+	_, err := taskSvc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 1"})
 	if err != nil {
 		t.Fatalf("Create task failed: %v", err)
 	}
-	_, err = taskSvc.Create(contactID, userID, dto.CreateTaskRequest{Label: "Task 2"})
+	_, err = taskSvc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Task 2"})
 	if err != nil {
 		t.Fatalf("Create task failed: %v", err)
 	}
