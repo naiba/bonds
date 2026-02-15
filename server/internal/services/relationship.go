@@ -23,7 +23,10 @@ func (s *RelationshipService) SetFeedRecorder(fr *FeedRecorder) {
 	s.feedRecorder = fr
 }
 
-func (s *RelationshipService) List(contactID string) ([]dto.RelationshipResponse, error) {
+func (s *RelationshipService) List(contactID, vaultID string) ([]dto.RelationshipResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var relationships []models.Relationship
 	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&relationships).Error; err != nil {
 		return nil, err
@@ -35,7 +38,10 @@ func (s *RelationshipService) List(contactID string) ([]dto.RelationshipResponse
 	return result, nil
 }
 
-func (s *RelationshipService) Create(contactID string, req dto.CreateRelationshipRequest) (*dto.RelationshipResponse, error) {
+func (s *RelationshipService) Create(contactID, vaultID string, req dto.CreateRelationshipRequest) (*dto.RelationshipResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	relationship := models.Relationship{
 		ContactID:          contactID,
 		RelationshipTypeID: req.RelationshipTypeID,
@@ -54,7 +60,10 @@ func (s *RelationshipService) Create(contactID string, req dto.CreateRelationshi
 	return &resp, nil
 }
 
-func (s *RelationshipService) Update(id uint, contactID string, req dto.UpdateRelationshipRequest) (*dto.RelationshipResponse, error) {
+func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto.UpdateRelationshipRequest) (*dto.RelationshipResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	var relationship models.Relationship
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&relationship).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -71,7 +80,10 @@ func (s *RelationshipService) Update(id uint, contactID string, req dto.UpdateRe
 	return &resp, nil
 }
 
-func (s *RelationshipService) Delete(id uint, contactID string) error {
+func (s *RelationshipService) Delete(id uint, contactID, vaultID string) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.Relationship{})
 	if result.Error != nil {
 		return result.Error

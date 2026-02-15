@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupRelationshipTest(t *testing.T) (*RelationshipService, string, string) {
+func setupRelationshipTest(t *testing.T) (*RelationshipService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -40,13 +40,13 @@ func setupRelationshipTest(t *testing.T) (*RelationshipService, string, string) 
 		t.Fatalf("CreateContact (related) failed: %v", err)
 	}
 
-	return NewRelationshipService(db), contact.ID, relatedContact.ID
+	return NewRelationshipService(db), contact.ID, relatedContact.ID, vault.ID
 }
 
 func TestCreateRelationship(t *testing.T) {
-	svc, contactID, relatedContactID := setupRelationshipTest(t)
+	svc, contactID, relatedContactID, vaultID := setupRelationshipTest(t)
 
-	rel, err := svc.Create(contactID, dto.CreateRelationshipRequest{
+	rel, err := svc.Create(contactID, vaultID, dto.CreateRelationshipRequest{
 		RelationshipTypeID: 1,
 		RelatedContactID:   relatedContactID,
 	})
@@ -68,18 +68,18 @@ func TestCreateRelationship(t *testing.T) {
 }
 
 func TestListRelationships(t *testing.T) {
-	svc, contactID, relatedContactID := setupRelationshipTest(t)
+	svc, contactID, relatedContactID, vaultID := setupRelationshipTest(t)
 
-	_, err := svc.Create(contactID, dto.CreateRelationshipRequest{RelationshipTypeID: 1, RelatedContactID: relatedContactID})
+	_, err := svc.Create(contactID, vaultID, dto.CreateRelationshipRequest{RelationshipTypeID: 1, RelatedContactID: relatedContactID})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, dto.CreateRelationshipRequest{RelationshipTypeID: 2, RelatedContactID: relatedContactID})
+	_, err = svc.Create(contactID, vaultID, dto.CreateRelationshipRequest{RelationshipTypeID: 2, RelatedContactID: relatedContactID})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	relationships, err := svc.List(contactID)
+	relationships, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -89,9 +89,9 @@ func TestListRelationships(t *testing.T) {
 }
 
 func TestUpdateRelationship(t *testing.T) {
-	svc, contactID, relatedContactID := setupRelationshipTest(t)
+	svc, contactID, relatedContactID, vaultID := setupRelationshipTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateRelationshipRequest{
+	created, err := svc.Create(contactID, vaultID, dto.CreateRelationshipRequest{
 		RelationshipTypeID: 1,
 		RelatedContactID:   relatedContactID,
 	})
@@ -99,7 +99,7 @@ func TestUpdateRelationship(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	updated, err := svc.Update(created.ID, contactID, dto.UpdateRelationshipRequest{
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateRelationshipRequest{
 		RelationshipTypeID: 3,
 		RelatedContactID:   relatedContactID,
 	})
@@ -112,9 +112,9 @@ func TestUpdateRelationship(t *testing.T) {
 }
 
 func TestDeleteRelationship(t *testing.T) {
-	svc, contactID, relatedContactID := setupRelationshipTest(t)
+	svc, contactID, relatedContactID, vaultID := setupRelationshipTest(t)
 
-	created, err := svc.Create(contactID, dto.CreateRelationshipRequest{
+	created, err := svc.Create(contactID, vaultID, dto.CreateRelationshipRequest{
 		RelationshipTypeID: 1,
 		RelatedContactID:   relatedContactID,
 	})
@@ -122,11 +122,11 @@ func TestDeleteRelationship(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID); err != nil {
+	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	relationships, err := svc.List(contactID)
+	relationships, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -136,9 +136,9 @@ func TestDeleteRelationship(t *testing.T) {
 }
 
 func TestRelationshipNotFound(t *testing.T) {
-	svc, contactID, relatedContactID := setupRelationshipTest(t)
+	svc, contactID, relatedContactID, vaultID := setupRelationshipTest(t)
 
-	_, err := svc.Update(9999, contactID, dto.UpdateRelationshipRequest{
+	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateRelationshipRequest{
 		RelationshipTypeID: 1,
 		RelatedContactID:   relatedContactID,
 	})
@@ -146,7 +146,7 @@ func TestRelationshipNotFound(t *testing.T) {
 		t.Errorf("Expected ErrRelationshipNotFound, got %v", err)
 	}
 
-	err = svc.Delete(9999, contactID)
+	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrRelationshipNotFound {
 		t.Errorf("Expected ErrRelationshipNotFound, got %v", err)
 	}
