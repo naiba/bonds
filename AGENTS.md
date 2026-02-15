@@ -43,6 +43,7 @@ make setup                                # 安装依赖（go mod download + bun
 server/                    # Go 后端（模块：github.com/naiba/bonds）
   cmd/server/main.go       # 入口 — Echo + GORM + Cron 初始化 + SPA 服务 + 信号优雅关闭
   internal/
+    calendar/               # 多历法抽象：Converter 接口 + 注册表，gregorian.go（直通）、lunar.go（农历，6tail/lunar-go）
     config/                 # 基于环境变量的配置加载（含 SMTP/OAuth/Telegram/Geocoding/Bleve/WebAuthn）
     cron/                   # Cron 调度器（robfig/cron v3），支持数据库锁防重复执行
     database/               # GORM Connect + AutoMigrate
@@ -56,6 +57,7 @@ server/                    # Go 后端（模块：github.com/naiba/bonds）
     dto/                    # 请求/响应结构体（json + validate 标签）
     search/                 # 全文搜索引擎（Bleve v2），CJK 中文分词，Engine 接口 + NoopEngine
     services/               # 业务逻辑，每个领域一个文件
+      calendar_convert.go   # 共享历法转换辅助函数 applyCalendarFields()
     handlers/               # HTTP 处理器（Echo），routes.go 统一注册路由
     middleware/              # JWT 认证、CORS、locale、vault 权限校验
     testutil/               # SetupTestDB（内存 SQLite）、TestJWTConfig
@@ -66,11 +68,12 @@ server/                    # Go 后端（模块：github.com/naiba/bonds）
 web/                       # React 前端（Vite + TypeScript）
   src/
     api/                    # Axios API 客户端模块，每个领域一个文件（含 twofactor/search/invitations/vcard）
-    components/             # 共享组件（Layout.tsx、SearchBar.tsx）
+    components/             # 共享组件（Layout.tsx、SearchBar.tsx、CalendarDatePicker.tsx）
     locales/                # 前端 i18n：en.json、zh.json（react-i18next）
     pages/                  # 按领域组织的路由页面（含 TwoFactor/Invitations/AcceptInvite/OAuthCallback）
     stores/                 # AuthProvider 上下文
-    types/                  # TypeScript 类型定义
+    types/                  # TypeScript 类型定义（含 lunar-javascript.d.ts）
+    utils/                  # 工具函数（calendar.ts — 前端多历法抽象 + 注册表）
     test/                   # Vitest 单元测试 + setup.ts
     i18n.ts                 # react-i18next 初始化 + 语言检测
   e2e/                      # Playwright 测试用例
@@ -195,7 +198,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 ### E2E（Playwright）
 
-- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`。
+- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`file-upload.spec.ts`。
 - Playwright 自动启动 Go 服务器（端口 8080）和 Vite 开发服务器（端口 5173）。
 - Ant Design 表单：使用 `page.getByPlaceholder(...)` 而非 `getByLabel(...)`。
 
@@ -313,6 +316,11 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 - TypeScript 严格模式已开启：`noUnusedLocals`、`noUnusedParameters`、`noFallthroughCasesInSwitch`。
 - Go：`go vet` 必须通过。没有正当理由禁止 `//nolint`。
 - 格式化：Go 使用 `gofmt`，前端使用 Prettier。
+- **提交前必须运行 `cd web && bun run lint`**（ESLint），CI 会检查。
+- **React Hooks ESLint 规则**（`eslint-plugin-react-hooks`）：
+  - `react-hooks/set-state-in-effect`：禁止在 `useEffect` 内同步调用 `setState`。如需同步外部 prop 到内部状态，使用纯受控模式（直接从 prop 派生）或用 `key` prop 重置组件。
+  - `react-hooks/refs`：禁止在渲染期间读写 `ref.current`。Ref 只能在事件处理器或 effect 中访问。
+  - 组件优先使用**受控模式**（状态由父组件通过 `value`/`onChange` 管理），避免内部 `useState` + `useEffect` 同步 prop 的反模式。
 
 ## 项目规模（供参考）
 
@@ -320,27 +328,28 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 |------|------|
 | Go Model 文件 | 49 |
 | Go Handler 文件 | 39 |
-| Go Service 文件 | 43 |
+| Go Service 文件 | 44 |
 | Go DTO 文件 | 30 |
-| API 路由 | ~142 |
+| API 路由 | ~143 |
 | React 页面组件 | 43 |
 | 前端 API 客户端 | 23 |
-| i18n 翻译键 | ~585（en + zh 各一份） |
+| i18n 翻译键 | ~478（en + zh 各一份） |
 
 ### 测试数量明细
 
 | 层级 | 文件数 | 测试函数数 |
 |------|--------|-----------|
-| Go Service 测试 | 40 | ~238 |
-| Go Handler 集成测试 | 1 | 71 |
+| Go Service 测试 | 41 | ~254 |
+| Go Handler 集成测试 | 1 | 73 |
 | Go Cron 测试 | 1 | 7 |
-| Go DAV 测试 | 2 | 19 |
+| Go DAV 测试 | 2 | 20 |
 | Go Search 测试 | 1 | 4 |
 | Go Avatar 测试 | 1 | 7 |
-| **Go 后端总计** | **46** | **~347** |
-| React Vitest | 16 | 54 |
-| Playwright E2E | 6 | — |
-| **全部总计** | **68** | **401+** |
+| Go Calendar 测试 | 1 | 13 |
+| **Go 后端总计** | **48** | **~378** |
+| React Vitest | 21 | 88 |
+| Playwright E2E | 7 | — |
+| **全部总计** | **76** | **466+** |
 
 ## 已知坑和注意事项
 
@@ -407,6 +416,7 @@ defer cleanup()
 | `jordan-wright/email` | v4.0.1 | SMTP 发送 |
 | `golang-jwt/jwt/v5` | v5.3.1 | JWT |
 | `golang.org/x/crypto` | v0.48.0 | bcrypt 等 |
+| `6tail/lunar-go` | v1.4.6 | 农历转换 |
 
 ### React 前端
 
@@ -435,3 +445,4 @@ defer cleanup()
 - **OAuth**：`OAUTH_GITHUB_KEY/SECRET`、`OAUTH_GOOGLE_KEY/SECRET`
 - **Geocoding**：`GEOCODING_PROVIDER`（nominatim/locationiq）、`GEOCODING_API_KEY`
 - **WebAuthn**：`WEBAUTHN_RP_ID`、`WEBAUTHN_RP_DISPLAY_NAME`、`WEBAUTHN_RP_ORIGINS`
+- **其他**：`ANNOUNCEMENT`（全局公告横幅文字）
