@@ -101,6 +101,7 @@ cp server/.env.example server/.env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `DEBUG` | `false` | Enable debug mode: Echo request logging, GORM SQL logging, Swagger UI |
 | `JWT_SECRET` | — | **Required in production.** Signing key for auth tokens |
 | `SERVER_PORT` | `8080` | Port the server listens on |
 | `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
@@ -146,8 +147,22 @@ Other useful commands:
 make test          # Run all tests (backend + frontend)
 make test-e2e      # Run end-to-end tests (Playwright)
 make lint          # Run linters
+make swagger       # Regenerate Swagger/OpenAPI docs
 make clean         # Clean build artifacts
 ```
+
+### API Documentation
+
+Bonds provides auto-generated OpenAPI/Swagger documentation covering all 286 API endpoints.
+
+To access the Swagger UI, enable debug mode and start the server:
+
+```bash
+DEBUG=true ./bonds-server
+# Open http://localhost:8080/swagger/index.html
+```
+
+> Swagger UI is only available when `DEBUG=true`. It is not exposed in production.
 
 ## Relationship to Monica
 

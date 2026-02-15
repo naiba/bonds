@@ -102,6 +102,7 @@ cp server/.env.example server/.env
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
+| `DEBUG` | `false` | 调试模式：启用 Echo 请求日志、GORM SQL 日志、Swagger UI |
 | `JWT_SECRET` | — | **生产环境必填。** 认证令牌签名密钥 |
 | `SERVER_PORT` | `8080` | 服务端口 |
 | `SERVER_HOST` | `0.0.0.0` | 服务器监听地址 |
@@ -147,8 +148,22 @@ Go 后端运行在 `:8080`，Vite 开发服务器运行在 `:5173`。前端自�
 make test          # 运行所有测试（后端 + 前端）
 make test-e2e      # 运行端到端测试（Playwright）
 make lint          # 运行代码检查
+make swagger       # 重新生成 Swagger/OpenAPI 文档
 make clean         # 清理构建产物
 ```
+
+### API 文档
+
+Bonds 提供自动生成的 OpenAPI/Swagger 文档，覆盖全部 286 个 API 端点。
+
+启用调试模式后访问 Swagger UI：
+
+```bash
+DEBUG=true ./bonds-server
+# 打开 http://localhost:8080/swagger/index.html
+```
+
+> Swagger UI 仅在 `DEBUG=true` 时可用，生产环境不暴露。
 
 ## 与 Monica 的关系
 
