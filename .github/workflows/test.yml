@@ -87,6 +87,17 @@ jobs:
       - name: Install SQLite
         run: sudo apt-get install -y gcc sqlite3 libsqlite3-dev
 
+      - name: Download Go dependencies
+        working-directory: ./server
+        run: go mod download
+
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Generate Swagger docs
+        working-directory: ./server
+        run: swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+
       - name: Build server
         working-directory: ./server
         run: CGO_ENABLED=1 go build -o bin/bonds-server cmd/server/main.go

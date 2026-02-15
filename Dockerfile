@@ -13,9 +13,11 @@ RUN apk add --no-cache gcc musl-dev sqlite-dev
 WORKDIR /build
 COPY server/go.mod server/go.sum ./
 RUN go mod download
+RUN go install github.com/swaggo/swag/cmd/swag@latest
 COPY server/ .
 COPY --from=frontend /build/dist ./internal/frontend/dist/
 
+RUN swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
 RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o bonds-server cmd/server/main.go
 
 FROM alpine:3.21
