@@ -3,6 +3,7 @@ server/server
 server/bonds.db
 server/bonds.db-wal
 server/bonds.db-shm
+server/data/
 server/internal/frontend/dist/*
 !server/internal/frontend/dist/.gitkeep
 .env
@@ -10,4 +11,5 @@ server/internal/frontend/dist/*
 *.log
 *.test
 .DS_Store
+.opencode/
 monica-php
