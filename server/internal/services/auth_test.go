@@ -181,75 +181,42 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 	}
 }
 
-func TestLogin(t *testing.T) {
+func TestLoginScenarios(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
 	svc := NewAuthService(db, cfg)
 
-	regReq := dto.RegisterRequest{
+	_, err := svc.Register(dto.RegisterRequest{
 		FirstName: "Jane",
 		LastName:  "Doe",
 		Email:     "jane@example.com",
 		Password:  "password123",
-	}
-	_, err := svc.Register(regReq)
+	})
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	loginReq := dto.LoginRequest{
-		Email:    "jane@example.com",
-		Password: "password123",
-	}
-	resp, err := svc.Login(loginReq)
-	if err != nil {
-		t.Fatalf("Login failed: %v", err)
-	}
-	if resp.Token == "" {
-		t.Error("Expected token to be non-empty")
-	}
-	if resp.User.Email != "jane@example.com" {
-		t.Errorf("Expected email jane@example.com, got %s", resp.User.Email)
-	}
-}
-
-func TestLoginInvalidPassword(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	cfg := testutil.TestJWTConfig()
-	svc := NewAuthService(db, cfg)
-
-	regReq := dto.RegisterRequest{
-		FirstName: "Test",
-		LastName:  "User",
-		Email:     "test@example.com",
-		Password:  "correctpassword",
-	}
-	_, err := svc.Register(regReq)
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
+	tests := []struct {
+		name      string
+		email     string
+		password  string
+		wantErr   error
+		wantToken bool
+	}{
+		{"valid credentials", "jane@example.com", "password123", nil, true},
+		{"invalid password", "jane@example.com", "wrongpassword", ErrInvalidCredentials, false},
+		{"nonexistent user", "nobody@example.com", "password123", ErrInvalidCredentials, false},
 	}
 
-	loginReq := dto.LoginRequest{
-		Email:    "test@example.com",
-		Password: "wrongpassword",
-	}
-	_, err = svc.Login(loginReq)
-	if err != ErrInvalidCredentials {
-		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
-	}
-}
-
-func TestLoginNonexistentUser(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	cfg := testutil.TestJWTConfig()
-	svc := NewAuthService(db, cfg)
-
-	loginReq := dto.LoginRequest{
-		Email:    "nobody@example.com",
-		Password: "password123",
-	}
-	_, err := svc.Login(loginReq)
-	if err != ErrInvalidCredentials {
-		t.Errorf("Expected ErrInvalidCredentials, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := svc.Login(dto.LoginRequest{Email: tt.email, Password: tt.password})
+			if err != tt.wantErr {
+				t.Errorf("expected error %v, got %v", tt.wantErr, err)
+			}
+			if tt.wantToken && (resp == nil || resp.Token == "") {
+				t.Error("expected non-empty token")
+			}
+		})
 	}
 }

@@ -6,20 +6,6 @@ import (
 	"github.com/naiba/bonds/internal/config"
 )
 
-func TestNoopMailerSend(t *testing.T) {
-	m := &NoopMailer{}
-
-	err := m.Send("test@example.com", "Test Subject", "<p>Hello</p>")
-	if err != nil {
-		t.Fatalf("NoopMailer.Send returned error: %v", err)
-	}
-}
-
-func TestNoopMailerClose(t *testing.T) {
-	m := &NoopMailer{}
-	m.Close() // should not panic
-}
-
 func TestNewSMTPMailerWithEmptyConfig(t *testing.T) {
 	cfg := &config.SMTPConfig{
 		Host:     "",

@@ -127,20 +127,16 @@ func TestDeleteNote(t *testing.T) {
 	}
 }
 
-func TestDeleteNoteNotFound(t *testing.T) {
-	svc, contactID, vaultID, _ := setupNoteTest(t)
-
-	err := svc.Delete(9999, contactID, vaultID)
-	if err != ErrNoteNotFound {
-		t.Errorf("Expected ErrNoteNotFound, got %v", err)
-	}
-}
-
-func TestUpdateNoteNotFound(t *testing.T) {
+func TestNoteNotFound(t *testing.T) {
 	svc, contactID, vaultID, _ := setupNoteTest(t)
 
 	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateNoteRequest{Body: "nope"})
 	if err != ErrNoteNotFound {
-		t.Errorf("Expected ErrNoteNotFound, got %v", err)
+		t.Errorf("Update: expected ErrNoteNotFound, got %v", err)
+	}
+
+	err = svc.Delete(9999, contactID, vaultID)
+	if err != ErrNoteNotFound {
+		t.Errorf("Delete: expected ErrNoteNotFound, got %v", err)
 	}
 }

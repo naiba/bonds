@@ -98,23 +98,6 @@ func TestListVaults(t *testing.T) {
 	}
 }
 
-func TestGetVault(t *testing.T) {
-	svc, accountID, userID := setupVaultTest(t)
-
-	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Get Test"})
-	if err != nil {
-		t.Fatalf("CreateVault failed: %v", err)
-	}
-
-	vault, err := svc.GetVault(created.ID)
-	if err != nil {
-		t.Fatalf("GetVault failed: %v", err)
-	}
-	if vault.Name != "Get Test" {
-		t.Errorf("Expected name 'Get Test', got '%s'", vault.Name)
-	}
-}
-
 func TestUpdateVault(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 

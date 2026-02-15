@@ -158,29 +158,21 @@ func TestDeleteTask(t *testing.T) {
 	}
 }
 
-func TestDeleteTaskNotFound(t *testing.T) {
-	svc, contactID, vaultID, _ := setupTaskTest(t)
-
-	err := svc.Delete(9999, contactID, vaultID)
-	if err != ErrTaskNotFound {
-		t.Errorf("Expected ErrTaskNotFound, got %v", err)
-	}
-}
-
-func TestUpdateTaskNotFound(t *testing.T) {
+func TestTaskNotFound(t *testing.T) {
 	svc, contactID, vaultID, _ := setupTaskTest(t)
 
 	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateTaskRequest{Label: "nope"})
 	if err != ErrTaskNotFound {
-		t.Errorf("Expected ErrTaskNotFound, got %v", err)
+		t.Errorf("Update: expected ErrTaskNotFound, got %v", err)
 	}
-}
 
-func TestToggleTaskNotFound(t *testing.T) {
-	svc, contactID, vaultID, _ := setupTaskTest(t)
-
-	_, err := svc.ToggleCompleted(9999, contactID, vaultID)
+	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrTaskNotFound {
-		t.Errorf("Expected ErrTaskNotFound, got %v", err)
+		t.Errorf("Delete: expected ErrTaskNotFound, got %v", err)
+	}
+
+	_, err = svc.ToggleCompleted(9999, contactID, vaultID)
+	if err != ErrTaskNotFound {
+		t.Errorf("ToggleCompleted: expected ErrTaskNotFound, got %v", err)
 	}
 }

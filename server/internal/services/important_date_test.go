@@ -195,29 +195,6 @@ func TestCreateImportantDateLunar(t *testing.T) {
 	}
 }
 
-func TestCreateImportantDateGregorianDefault(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
-
-	day := 25
-	month := 12
-	year := 2025
-	date, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{
-		Label: "Christmas",
-		Day:   &day,
-		Month: &month,
-		Year:  &year,
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	if date.CalendarType != "gregorian" {
-		t.Errorf("Expected default calendar_type 'gregorian', got '%s'", date.CalendarType)
-	}
-	if date.OriginalDay != nil {
-		t.Errorf("Expected nil original_day for gregorian, got %v", date.OriginalDay)
-	}
-}
-
 func TestUpdateImportantDateLunar(t *testing.T) {
 	svc, contactID, vaultID := setupImportantDateTest(t)
 

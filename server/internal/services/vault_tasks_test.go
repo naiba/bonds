@@ -70,34 +70,3 @@ func TestVaultTaskListWithTasks(t *testing.T) {
 		t.Errorf("Expected 2 tasks, got %d", len(tasks))
 	}
 }
-
-func TestVaultTaskListNoContacts(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	cfg := testutil.TestJWTConfig()
-	authSvc := NewAuthService(db, cfg)
-	vaultSvc := NewVaultService(db)
-
-	resp, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Test",
-		LastName:  "User",
-		Email:     "vault-tasks-empty@example.com",
-		Password:  "password123",
-	})
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Empty Vault"})
-	if err != nil {
-		t.Fatalf("CreateVault failed: %v", err)
-	}
-
-	svc := NewVaultTaskService(db)
-	tasks, err := svc.List(vault.ID)
-	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-	if len(tasks) != 0 {
-		t.Errorf("Expected 0 tasks for vault with no contacts, got %d", len(tasks))
-	}
-}

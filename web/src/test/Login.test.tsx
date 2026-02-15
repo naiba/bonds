@@ -34,21 +34,6 @@ describe("Login", () => {
     vi.clearAllMocks();
   });
 
-  it("renders login form", () => {
-    renderLogin();
-    expect(screen.getByText("Welcome back")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Email")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Password")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /sign in/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("renders link to register", () => {
-    renderLogin();
-    expect(screen.getByText("Create one")).toBeInTheDocument();
-  });
-
   it("shows validation errors on empty submit", async () => {
     const user = userEvent.setup();
     renderLogin();

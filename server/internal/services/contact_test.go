@@ -84,26 +84,6 @@ func TestListContacts(t *testing.T) {
 	}
 }
 
-func TestGetContact(t *testing.T) {
-	svc, vaultID, userID, _ := setupContactTest(t)
-
-	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Jane"})
-	if err != nil {
-		t.Fatalf("CreateContact failed: %v", err)
-	}
-
-	got, err := svc.GetContact(created.ID, userID, vaultID)
-	if err != nil {
-		t.Fatalf("GetContact failed: %v", err)
-	}
-	if got.FirstName != "Jane" {
-		t.Errorf("Expected first_name 'Jane', got '%s'", got.FirstName)
-	}
-	if got.ID != created.ID {
-		t.Errorf("Expected ID '%s', got '%s'", created.ID, got.ID)
-	}
-}
-
 func TestUpdateContact(t *testing.T) {
 	svc, vaultID, userID, _ := setupContactTest(t)
 

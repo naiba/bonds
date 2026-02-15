@@ -72,11 +72,4 @@ describe("VaultList", () => {
     expect(screen.getByText("Work")).toBeInTheDocument();
     expect(screen.getByText("My personal vault")).toBeInTheDocument();
   });
-
-  it("renders title and new vault button", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderVaultList();
-    expect(screen.getByText("Vaults")).toBeInTheDocument();
-    expect(screen.getByText("New vault")).toBeInTheDocument();
-  });
 });

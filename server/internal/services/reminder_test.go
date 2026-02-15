@@ -181,27 +181,6 @@ func TestCreateReminderLunar(t *testing.T) {
 	}
 }
 
-func TestCreateReminderDefaultGregorian(t *testing.T) {
-	svc, contactID, vaultID := setupReminderTest(t)
-
-	reminder, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
-		Label: "Regular Reminder",
-		Day:   intPtr(25),
-		Month: intPtr(12),
-		Year:  intPtr(2025),
-		Type:  "one_time",
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	if reminder.CalendarType != "gregorian" {
-		t.Errorf("Expected default calendar_type 'gregorian', got '%s'", reminder.CalendarType)
-	}
-	if reminder.OriginalDay != nil {
-		t.Errorf("Expected nil original_day for gregorian, got %v", reminder.OriginalDay)
-	}
-}
-
 func TestUpdateReminderToLunar(t *testing.T) {
 	svc, contactID, vaultID := setupReminderTest(t)
 

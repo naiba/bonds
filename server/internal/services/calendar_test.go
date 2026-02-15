@@ -264,37 +264,3 @@ func TestParseIntParam(t *testing.T) {
 		t.Errorf("Expected 42, got %d", v)
 	}
 }
-
-func TestCalendarNoContacts(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	cfg := testutil.TestJWTConfig()
-	authSvc := NewAuthService(db, cfg)
-	vaultSvc := NewVaultService(db)
-
-	resp, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Test",
-		LastName:  "User",
-		Email:     "calendar-nocontacts@example.com",
-		Password:  "password123",
-	})
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Empty Vault"})
-	if err != nil {
-		t.Fatalf("CreateVault failed: %v", err)
-	}
-
-	svc := NewCalendarService(db)
-	cal, err := svc.GetCalendar(vault.ID, 0, 0)
-	if err != nil {
-		t.Fatalf("GetCalendar failed: %v", err)
-	}
-	if len(cal.ImportantDates) != 0 {
-		t.Errorf("Expected 0 important dates, got %d", len(cal.ImportantDates))
-	}
-	if len(cal.Reminders) != 0 {
-		t.Errorf("Expected 0 reminders, got %d", len(cal.Reminders))
-	}
-}

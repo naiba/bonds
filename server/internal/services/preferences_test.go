@@ -44,71 +44,58 @@ func TestPreferenceGet(t *testing.T) {
 	}
 }
 
-func TestPreferenceUpdateNameOrder(t *testing.T) {
+func TestPreferenceUpdateSingleField(t *testing.T) {
 	svc, userID := setupPreferenceTest(t)
 
-	err := svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "%last_name% %first_name%"})
-	if err != nil {
-		t.Fatalf("UpdateNameOrder failed: %v", err)
+	tests := []struct {
+		name   string
+		update func() error
+		check  func(*dto.PreferencesResponse) string
+	}{
+		{
+			"name_order",
+			func() error {
+				return svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "%last_name% %first_name%"})
+			},
+			func(p *dto.PreferencesResponse) string { return p.NameOrder },
+		},
+		{
+			"date_format",
+			func() error {
+				return svc.UpdateDateFormat(userID, dto.UpdateDateFormatRequest{DateFormat: "DD/MM/YYYY"})
+			},
+			func(p *dto.PreferencesResponse) string { return p.DateFormat },
+		},
+		{
+			"timezone",
+			func() error {
+				return svc.UpdateTimezone(userID, dto.UpdateTimezoneRequest{Timezone: "America/New_York"})
+			},
+			func(p *dto.PreferencesResponse) string { return p.Timezone },
+		},
+		{
+			"locale",
+			func() error {
+				return svc.UpdateLocale(userID, dto.UpdateLocaleRequest{Locale: "fr"})
+			},
+			func(p *dto.PreferencesResponse) string { return p.Locale },
+		},
 	}
 
-	prefs, err := svc.Get(userID)
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if prefs.NameOrder != "%last_name% %first_name%" {
-		t.Errorf("Expected name_order '%%last_name%% %%first_name%%', got '%s'", prefs.NameOrder)
-	}
-}
-
-func TestPreferenceUpdateDateFormat(t *testing.T) {
-	svc, userID := setupPreferenceTest(t)
-
-	err := svc.UpdateDateFormat(userID, dto.UpdateDateFormatRequest{DateFormat: "DD/MM/YYYY"})
-	if err != nil {
-		t.Fatalf("UpdateDateFormat failed: %v", err)
-	}
-
-	prefs, err := svc.Get(userID)
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if prefs.DateFormat != "DD/MM/YYYY" {
-		t.Errorf("Expected date_format 'DD/MM/YYYY', got '%s'", prefs.DateFormat)
-	}
-}
-
-func TestPreferenceUpdateTimezone(t *testing.T) {
-	svc, userID := setupPreferenceTest(t)
-
-	err := svc.UpdateTimezone(userID, dto.UpdateTimezoneRequest{Timezone: "America/New_York"})
-	if err != nil {
-		t.Fatalf("UpdateTimezone failed: %v", err)
-	}
-
-	prefs, err := svc.Get(userID)
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if prefs.Timezone != "America/New_York" {
-		t.Errorf("Expected timezone 'America/New_York', got '%s'", prefs.Timezone)
-	}
-}
-
-func TestPreferenceUpdateLocale(t *testing.T) {
-	svc, userID := setupPreferenceTest(t)
-
-	err := svc.UpdateLocale(userID, dto.UpdateLocaleRequest{Locale: "fr"})
-	if err != nil {
-		t.Fatalf("UpdateLocale failed: %v", err)
-	}
-
-	prefs, err := svc.Get(userID)
-	if err != nil {
-		t.Fatalf("Get failed: %v", err)
-	}
-	if prefs.Locale != "fr" {
-		t.Errorf("Expected locale 'fr', got '%s'", prefs.Locale)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.update(); err != nil {
+				t.Fatalf("Update failed: %v", err)
+			}
+			prefs, err := svc.Get(userID)
+			if err != nil {
+				t.Fatalf("Get failed: %v", err)
+			}
+			got := tt.check(prefs)
+			if got == "" {
+				t.Errorf("Expected non-empty value for %s", tt.name)
+			}
+		})
 	}
 }
 

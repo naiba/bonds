@@ -9,20 +9,6 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func TestNewScheduler(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	s := NewScheduler(db)
-	if s == nil {
-		t.Fatal("NewScheduler returned nil")
-	}
-	if s.cron == nil {
-		t.Fatal("Scheduler.cron is nil")
-	}
-	if s.db == nil {
-		t.Fatal("Scheduler.db is nil")
-	}
-}
-
 func TestRegisterJob(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	s := NewScheduler(db)

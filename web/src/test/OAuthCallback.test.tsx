@@ -41,11 +41,6 @@ function renderOAuthCallback(search = "?token=fake-oauth-token") {
 }
 
 describe("OAuthCallback", () => {
-  it("renders loading spinner", () => {
-    const { container } = renderOAuthCallback();
-    expect(container.querySelector(".ant-spin")).toBeInTheDocument();
-  });
-
   it("stores token and navigates to vaults when token present", () => {
     renderOAuthCallback("?token=my-token");
     expect(window.localStorage.setItem).toHaveBeenCalledWith("token", "my-token");

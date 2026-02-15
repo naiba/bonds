@@ -96,7 +96,7 @@ func TestNotificationToggle(t *testing.T) {
 		t.Error("Expected new channel to be inactive")
 	}
 
-	toggled, err := svc.Toggle(created.ID)
+	toggled, err := svc.Toggle(created.ID, userID)
 	if err != nil {
 		t.Fatalf("Toggle failed: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestNotificationToggle(t *testing.T) {
 		t.Error("Expected channel to be active after toggle")
 	}
 
-	toggledBack, err := svc.Toggle(created.ID)
+	toggledBack, err := svc.Toggle(created.ID, userID)
 	if err != nil {
 		t.Fatalf("Toggle back failed: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestNotificationDelete(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID); err != nil {
+	if err := svc.Delete(created.ID, userID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -137,20 +137,16 @@ func TestNotificationDelete(t *testing.T) {
 	}
 }
 
-func TestNotificationDeleteNotFound(t *testing.T) {
-	svc, _ := setupNotificationTest(t)
+func TestNotificationNotFound(t *testing.T) {
+	svc, userID := setupNotificationTest(t)
 
-	err := svc.Delete(9999)
+	err := svc.Delete(9999, userID)
 	if err != ErrNotificationChannelNotFound {
-		t.Errorf("Expected ErrNotificationChannelNotFound, got %v", err)
+		t.Errorf("Delete: expected ErrNotificationChannelNotFound, got %v", err)
 	}
-}
 
-func TestNotificationToggleNotFound(t *testing.T) {
-	svc, _ := setupNotificationTest(t)
-
-	_, err := svc.Toggle(9999)
+	_, err = svc.Toggle(9999, userID)
 	if err != ErrNotificationChannelNotFound {
-		t.Errorf("Expected ErrNotificationChannelNotFound, got %v", err)
+		t.Errorf("Toggle: expected ErrNotificationChannelNotFound, got %v", err)
 	}
 }

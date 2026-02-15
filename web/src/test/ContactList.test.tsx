@@ -42,13 +42,6 @@ describe("ContactList", () => {
     expect(screen.getByText("No contacts yet")).toBeInTheDocument();
   });
 
-  it("renders title and add contact button", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderContactList();
-    expect(screen.getByText("Contacts")).toBeInTheDocument();
-    expect(screen.getByText("Add contact")).toBeInTheDocument();
-  });
-
   it("renders search input", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderContactList();

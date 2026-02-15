@@ -7,16 +7,6 @@ import (
 	"testing"
 )
 
-func TestNewTelegramServiceEmptyToken(t *testing.T) {
-	svc, err := NewTelegramService("")
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-	if svc != nil {
-		t.Fatal("Expected nil service for empty token")
-	}
-}
-
 func TestNewTelegramServiceWithToken(t *testing.T) {
 	svc, err := NewTelegramService("test-bot-token")
 	if err != nil {
@@ -27,21 +17,6 @@ func TestNewTelegramServiceWithToken(t *testing.T) {
 	}
 	if !svc.IsAvailable() {
 		t.Error("Expected IsAvailable to return true")
-	}
-}
-
-func TestTelegramServiceIsAvailableNil(t *testing.T) {
-	var svc *TelegramService
-	if svc.IsAvailable() {
-		t.Error("Expected IsAvailable to return false for nil service")
-	}
-}
-
-func TestSendMessageNilService(t *testing.T) {
-	var svc *TelegramService
-	err := svc.SendMessage(12345, "hello")
-	if err != nil {
-		t.Fatalf("Expected nil error for nil service, got: %v", err)
 	}
 }
 

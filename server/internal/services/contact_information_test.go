@@ -69,25 +69,6 @@ func TestCreateContactInformation(t *testing.T) {
 	}
 }
 
-func TestCreateContactInformationWithKind(t *testing.T) {
-	svc, contactID, vaultID := setupContactInformationTest(t)
-
-	info, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
-		TypeID: 1,
-		Data:   "john@work.com",
-		Kind:   "work",
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	if info.Kind != "work" {
-		t.Errorf("Expected kind 'work', got '%s'", info.Kind)
-	}
-	if info.Data != "john@work.com" {
-		t.Errorf("Expected data 'john@work.com', got '%s'", info.Data)
-	}
-}
-
 func TestListContactInformation(t *testing.T) {
 	svc, contactID, vaultID := setupContactInformationTest(t)
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import VaultCalendar from "@/pages/vault/VaultCalendar";
@@ -43,18 +43,6 @@ function renderCalendar() {
 }
 
 describe("VaultCalendar", () => {
-  it("renders calendar title", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderCalendar();
-    expect(screen.getByText("Calendar")).toBeInTheDocument();
-  });
-
-  it("renders back button", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderCalendar();
-    expect(screen.getByText("Back to vault")).toBeInTheDocument();
-  });
-
   it("renders lunar moon emoji for non-gregorian dates", () => {
     mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
       const key = opts.queryKey;

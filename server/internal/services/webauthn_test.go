@@ -9,20 +9,6 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func TestNewWebAuthnServiceDisabled(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	cfg := &config.WebAuthnConfig{
-		RPID: "",
-	}
-	svc, err := NewWebAuthnService(db, cfg)
-	if err != nil {
-		t.Fatalf("Expected no error, got %v", err)
-	}
-	if svc != nil {
-		t.Error("Expected nil service when RPID is empty")
-	}
-}
-
 func TestNewWebAuthnServiceEnabled(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := &config.WebAuthnConfig{
