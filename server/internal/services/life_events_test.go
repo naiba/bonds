@@ -79,7 +79,7 @@ func TestListTimelineEvents(t *testing.T) {
 		t.Fatalf("CreateTimelineEvent failed: %v", err)
 	}
 
-	events, meta, err := svc.ListTimelineEvents(contactID, 1, 15)
+	events, meta, err := svc.ListTimelineEvents(contactID, vaultID, 1, 15)
 	if err != nil {
 		t.Fatalf("ListTimelineEvents failed: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestAddLifeEvent(t *testing.T) {
 	}
 
 	happenedAt := time.Now()
-	le, err := svc.AddLifeEvent(te.ID, dto.CreateLifeEventRequest{
+	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
 		LifeEventTypeID: 1,
 		HappenedAt:      happenedAt,
 		Summary:         "Got promoted",
@@ -137,7 +137,7 @@ func TestUpdateLifeEvent(t *testing.T) {
 		t.Fatalf("CreateTimelineEvent failed: %v", err)
 	}
 
-	le, err := svc.AddLifeEvent(te.ID, dto.CreateLifeEventRequest{
+	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
 		LifeEventTypeID: 1,
 		HappenedAt:      time.Now(),
 		Summary:         "Original",
@@ -146,7 +146,7 @@ func TestUpdateLifeEvent(t *testing.T) {
 		t.Fatalf("AddLifeEvent failed: %v", err)
 	}
 
-	updated, err := svc.UpdateLifeEvent(te.ID, le.ID, dto.UpdateLifeEventRequest{
+	updated, err := svc.UpdateLifeEvent(te.ID, le.ID, vaultID, dto.UpdateLifeEventRequest{
 		Summary:     "Updated summary",
 		Description: "Updated description",
 	})
@@ -172,7 +172,7 @@ func TestDeleteLifeEvent(t *testing.T) {
 		t.Fatalf("CreateTimelineEvent failed: %v", err)
 	}
 
-	le, err := svc.AddLifeEvent(te.ID, dto.CreateLifeEventRequest{
+	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
 		LifeEventTypeID: 1,
 		HappenedAt:      time.Now(),
 		Summary:         "To delete",
@@ -181,11 +181,11 @@ func TestDeleteLifeEvent(t *testing.T) {
 		t.Fatalf("AddLifeEvent failed: %v", err)
 	}
 
-	if err := svc.DeleteLifeEvent(te.ID, le.ID); err != nil {
+	if err := svc.DeleteLifeEvent(te.ID, le.ID, vaultID); err != nil {
 		t.Fatalf("DeleteLifeEvent failed: %v", err)
 	}
 
-	_, err = svc.UpdateLifeEvent(te.ID, le.ID, dto.UpdateLifeEventRequest{Summary: "nope"})
+	_, err = svc.UpdateLifeEvent(te.ID, le.ID, vaultID, dto.UpdateLifeEventRequest{Summary: "nope"})
 	if err != ErrLifeEventNotFound {
 		t.Errorf("Expected ErrLifeEventNotFound, got %v", err)
 	}
@@ -202,11 +202,11 @@ func TestDeleteTimelineEvent(t *testing.T) {
 		t.Fatalf("CreateTimelineEvent failed: %v", err)
 	}
 
-	if err := svc.DeleteTimelineEvent(te.ID); err != nil {
+	if err := svc.DeleteTimelineEvent(te.ID, vaultID); err != nil {
 		t.Fatalf("DeleteTimelineEvent failed: %v", err)
 	}
 
-	events, _, err := svc.ListTimelineEvents(contactID, 1, 15)
+	events, _, err := svc.ListTimelineEvents(contactID, vaultID, 1, 15)
 	if err != nil {
 		t.Fatalf("ListTimelineEvents failed: %v", err)
 	}
@@ -216,14 +216,14 @@ func TestDeleteTimelineEvent(t *testing.T) {
 }
 
 func TestTimelineEventNotFound(t *testing.T) {
-	svc, _, _ := setupLifeEventTest(t)
+	svc, _, vaultID := setupLifeEventTest(t)
 
-	err := svc.DeleteTimelineEvent(9999)
+	err := svc.DeleteTimelineEvent(9999, vaultID)
 	if err != ErrTimelineEventNotFound {
 		t.Errorf("Expected ErrTimelineEventNotFound, got %v", err)
 	}
 
-	_, err = svc.AddLifeEvent(9999, dto.CreateLifeEventRequest{
+	_, err = svc.AddLifeEvent(9999, vaultID, dto.CreateLifeEventRequest{
 		LifeEventTypeID: 1,
 		HappenedAt:      time.Now(),
 		Summary:         "nope",

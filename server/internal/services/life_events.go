@@ -28,7 +28,10 @@ func (s *LifeEventService) SetFeedRecorder(fr *FeedRecorder) {
 	s.feedRecorder = fr
 }
 
-func (s *LifeEventService) ListTimelineEvents(contactID string, page, perPage int) ([]dto.TimelineEventResponse, response.Meta, error) {
+func (s *LifeEventService) ListTimelineEvents(contactID, vaultID string, page, perPage int) ([]dto.TimelineEventResponse, response.Meta, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, response.Meta{}, err
+	}
 	var participantIDs []uint
 	s.db.Model(&models.TimelineEventParticipant{}).Where("contact_id = ?", contactID).Pluck("timeline_event_id", &participantIDs)
 
@@ -67,6 +70,9 @@ func (s *LifeEventService) ListTimelineEvents(contactID string, page, perPage in
 }
 
 func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dto.CreateTimelineEventRequest) (*dto.TimelineEventResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
 	label := req.Label
 	event := models.TimelineEvent{
 		VaultID:   vaultID,
@@ -96,9 +102,9 @@ func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dt
 	return &resp, nil
 }
 
-func (s *LifeEventService) AddLifeEvent(timelineEventID uint, req dto.CreateLifeEventRequest) (*dto.LifeEventResponse, error) {
+func (s *LifeEventService) AddLifeEvent(timelineEventID uint, vaultID string, req dto.CreateLifeEventRequest) (*dto.LifeEventResponse, error) {
 	var te models.TimelineEvent
-	if err := s.db.First(&te, timelineEventID).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", timelineEventID, vaultID).First(&te).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrTimelineEventNotFound
 		}
@@ -127,7 +133,7 @@ func (s *LifeEventService) AddLifeEvent(timelineEventID uint, req dto.CreateLife
 	return &resp, nil
 }
 
-func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, req dto.UpdateLifeEventRequest) (*dto.LifeEventResponse, error) {
+func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, vaultID string, req dto.UpdateLifeEventRequest) (*dto.LifeEventResponse, error) {
 	var le models.LifeEvent
 	if err := s.db.Where("id = ? AND timeline_event_id = ?", lifeEventID, timelineEventID).First(&le).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -160,9 +166,9 @@ func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, re
 	return &resp, nil
 }
 
-func (s *LifeEventService) DeleteTimelineEvent(id uint) error {
+func (s *LifeEventService) DeleteTimelineEvent(id uint, vaultID string) error {
 	var te models.TimelineEvent
-	if err := s.db.First(&te, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&te).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrTimelineEventNotFound
 		}
@@ -179,7 +185,7 @@ func (s *LifeEventService) DeleteTimelineEvent(id uint) error {
 	})
 }
 
-func (s *LifeEventService) DeleteLifeEvent(timelineEventID, lifeEventID uint) error {
+func (s *LifeEventService) DeleteLifeEvent(timelineEventID, lifeEventID uint, vaultID string) error {
 	var le models.LifeEvent
 	if err := s.db.Where("id = ? AND timeline_event_id = ?", lifeEventID, timelineEventID).First(&le).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

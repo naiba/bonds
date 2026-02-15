@@ -20,11 +20,15 @@ func NewLifeEventHandler(lifeEventService *services.LifeEventService) *LifeEvent
 
 func (h *LifeEventHandler) ListTimelineEvents(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 
-	events, meta, err := h.lifeEventService.ListTimelineEvents(contactID, page, perPage)
+	events, meta, err := h.lifeEventService.ListTimelineEvents(contactID, vaultID, page, perPage)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_list_timeline_events")
 	}
 	return response.Paginated(c, events, meta)
@@ -39,12 +43,16 @@ func (h *LifeEventHandler) CreateTimelineEvent(c echo.Context) error {
 	}
 	event, err := h.lifeEventService.CreateTimelineEvent(contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_timeline_event")
 	}
 	return response.Created(c, event)
 }
 
 func (h *LifeEventHandler) AddLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_timeline_event_id", nil)
@@ -53,7 +61,7 @@ func (h *LifeEventHandler) AddLifeEvent(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	event, err := h.lifeEventService.AddLifeEvent(uint(id), req)
+	event, err := h.lifeEventService.AddLifeEvent(uint(id), vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrTimelineEventNotFound) {
 			return response.NotFound(c, "err.timeline_event_not_found")
@@ -64,6 +72,7 @@ func (h *LifeEventHandler) AddLifeEvent(c echo.Context) error {
 }
 
 func (h *LifeEventHandler) UpdateLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_timeline_event_id", nil)
@@ -76,7 +85,7 @@ func (h *LifeEventHandler) UpdateLifeEvent(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	event, err := h.lifeEventService.UpdateLifeEvent(uint(id), uint(lifeEventID), req)
+	event, err := h.lifeEventService.UpdateLifeEvent(uint(id), uint(lifeEventID), vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrLifeEventNotFound) {
 			return response.NotFound(c, "err.life_event_not_found")
@@ -87,11 +96,12 @@ func (h *LifeEventHandler) UpdateLifeEvent(c echo.Context) error {
 }
 
 func (h *LifeEventHandler) DeleteTimelineEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_timeline_event_id", nil)
 	}
-	if err := h.lifeEventService.DeleteTimelineEvent(uint(id)); err != nil {
+	if err := h.lifeEventService.DeleteTimelineEvent(uint(id), vaultID); err != nil {
 		if errors.Is(err, services.ErrTimelineEventNotFound) {
 			return response.NotFound(c, "err.timeline_event_not_found")
 		}
@@ -101,6 +111,7 @@ func (h *LifeEventHandler) DeleteTimelineEvent(c echo.Context) error {
 }
 
 func (h *LifeEventHandler) DeleteLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_timeline_event_id", nil)
@@ -109,7 +120,7 @@ func (h *LifeEventHandler) DeleteLifeEvent(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_life_event_id", nil)
 	}
-	if err := h.lifeEventService.DeleteLifeEvent(uint(id), uint(lifeEventID)); err != nil {
+	if err := h.lifeEventService.DeleteLifeEvent(uint(id), uint(lifeEventID), vaultID); err != nil {
 		if errors.Is(err, services.ErrLifeEventNotFound) {
 			return response.NotFound(c, "err.life_event_not_found")
 		}
