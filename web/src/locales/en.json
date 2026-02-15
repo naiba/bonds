@@ -22,7 +22,16 @@
     "default": "Default",
     "disabled": "Disabled",
     "active": "Active",
-    "archived": "Archived"
+    "archived": "Archived",
+    "actions": "Actions",
+    "confirmDelete": "Confirm Delete",
+    "confirmDeleteDescription": "Are you sure you want to delete this item? This action cannot be undone.",
+    "contact": "Contact",
+    "delete_confirm": "Are you sure you want to delete this?",
+    "deleted": "Deleted",
+    "error": "Error",
+    "saved": "Saved",
+    "updated": "Updated"
   },
   "nav": {
     "vaults": "Vaults",
@@ -187,6 +196,27 @@
       "modal_title": "New Group",
       "members_count": "{{count}} members"
     },
+    "companies": {
+      "title": "Companies",
+      "create": "Add Company",
+      "edit": "Edit Company",
+      "name": "Company Name",
+      "employees": "Employees"
+    },
+    "lifeMetrics": {
+      "title": "Life Metrics",
+      "create": "Add Metric",
+      "edit": "Edit Metric",
+      "label": "Label",
+      "contacts": "Contacts",
+      "addContact": "Add Contact"
+    },
+    "reminders": {
+      "title": "All Reminders",
+      "label": "Label",
+      "date": "Date",
+      "type": "Type"
+    },
     "group_detail": {
       "back": "Back to groups",
       "members": "Members",
@@ -246,7 +276,25 @@
       "first_name": "First name",
       "last_name": "Last name",
       "nickname": "Nickname",
-      "status": "Status"
+      "status": "Status",
+      "company": "Company",
+      "job_info": "Job Information",
+      "job_position": "Position",
+      "religion": "Religion",
+      "no_religion": "No religion set",
+      "feed": {
+        "title": "Activity Feed",
+        "no_activity": "No activity yet"
+      },
+      "labels": {
+        "title": "Labels",
+        "add": "Add Label",
+        "added": "Label added",
+        "removed": "Label removed",
+        "no_labels": "No labels assigned",
+        "no_labels_available": "No labels available",
+        "select_placeholder": "Select a label"
+      }
     }
   },
   "modules": {
@@ -532,6 +580,34 @@
       "role_admin": "Admin",
       "role_user": "User",
       "no_users": "No users found"
+    },
+    "webauthn": {
+      "title": "Security Keys",
+      "description": "Manage your WebAuthn / FIDO2 security keys for passwordless login.",
+      "register": "Register New Key",
+      "registered": "Security key registered",
+      "deleted": "Security key deleted",
+      "delete_confirm": "Are you sure you want to remove this security key?",
+      "no_keys": "No security keys registered",
+      "col_name": "Name",
+      "col_created": "Created",
+      "unnamed_key": "Unnamed key"
+    },
+    "oauth": {
+      "title": "Connected Accounts",
+      "description": "Manage your linked OAuth providers for single sign-on.",
+      "no_providers": "No connected accounts",
+      "linked_at": "Linked at",
+      "unlink": "Unlink",
+      "unlink_confirm": "Are you sure you want to unlink this account?",
+      "unlinked": "Account unlinked"
+    },
+    "storage": {
+      "title": "Storage",
+      "description": "View your file storage usage and limits.",
+      "used": "Used",
+      "remaining": "Remaining",
+      "usage_percent": "{{percent}}% used"
     }
   },
   "twoFactor": {
@@ -602,5 +678,33 @@
     "light": "Light",
     "dark": "Dark",
     "system": "System"
+  },
+  "vault_settings": {
+    "title": "Vault Settings",
+    "description": "Description",
+    "description_label": "Description",
+    "general": "General",
+    "name": "Name",
+    "labels": "Labels",
+    "tags": "Tags",
+    "date_types": "Important Date Types",
+    "mood_params": "Mood Parameters",
+    "life_events": "Life Events",
+    "quick_facts": "Quick Fact Templates",
+    "tabs": "Tab Visibility",
+    "users": "Users",
+    "default_template": "Default Template",
+    "add_category": "Add Category",
+    "add_type": "Add Type",
+    "add_user": "Add User",
+    "hex_color": "Hex Color",
+    "user_email": "Email",
+    "tab_journal": "Journal",
+    "tab_companies": "Companies",
+    "tab_reports": "Reports",
+    "tab_calendar": "Calendar",
+    "tab_tasks": "Tasks",
+    "tab_files": "Files",
+    "tab_group": "Groups"
   }
 }

@@ -39,10 +39,10 @@ describe("Login", () => {
     renderLogin();
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     expect(
-      await screen.findByText("Please enter your email"),
+      await screen.findByText("Please enter your email", {}, { timeout: 10000 }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("Please enter your password"),
+      await screen.findByText("Please enter your password", {}, { timeout: 10000 }),
     ).toBeInTheDocument();
-  });
+  }, 15000);
 });

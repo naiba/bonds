@@ -42,6 +42,6 @@ test.describe('Settings', () => {
     await page.goto('/settings');
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('rowgroup').getByText('Test User')).toBeVisible();
-    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByText(email).first()).toBeVisible();
   });
 });

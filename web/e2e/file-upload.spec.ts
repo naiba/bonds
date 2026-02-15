@@ -43,14 +43,11 @@ test.describe('File Upload', () => {
     await registerUser(page, email);
     await setupVaultAndContact(page);
 
-    // Click the Photos & Docs tab
     const photosTab = page.getByRole('tab', { name: /photos/i });
-    if (await photosTab.isVisible()) {
-      await photosTab.click();
-      // Should see the Photos or Documents card heading in the tab content
-      await expect(
-        page.getByText('Photos', { exact: true }),
-      ).toBeVisible({ timeout: 5000 });
-    }
+    await expect(photosTab).toBeVisible({ timeout: 10000 });
+    await photosTab.click();
+    await expect(
+      page.getByText('Photos', { exact: true }).first(),
+    ).toBeVisible({ timeout: 5000 });
   });
 });

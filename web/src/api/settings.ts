@@ -8,6 +8,7 @@ import type {
   CreatePersonalizeItemRequest,
 } from "@/types/modules";
 import type { User } from "@/types/auth";
+import type { StorageUsage } from "@/types/settings_extra";
 
 export const settingsApi = {
   getPreferences() {
@@ -78,5 +79,9 @@ export const settingsApi = {
 
   listUsers() {
     return client.get<APIResponse<User[]>>("/settings/users");
+  },
+
+  getStorageUsage() {
+    return client.get<APIResponse<StorageUsage>>("/settings/storage");
   },
 };

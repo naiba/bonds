@@ -427,3 +427,79 @@ export interface PersonalizeItem {
 export interface CreatePersonalizeItemRequest {
   label: string;
 }
+
+export interface CalendarResponse {
+  important_dates: ImportantDate[];
+  reminders: Reminder[];
+}
+
+export interface VaultReminderItem {
+  id: number;
+  contact_id: number;
+  label: string;
+  day: number;
+  month: number;
+  year: number;
+  type: string;
+  contact_first_name: string;
+  contact_last_name: string;
+}
+
+export interface Company {
+  id: number;
+  vault_id: number;
+  name: string;
+  type: string;
+  contacts?: { id: number; first_name: string; last_name: string }[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCompanyRequest {
+  name: string;
+  type?: string;
+}
+
+export interface LifeMetric {
+  id: number;
+  vault_id: number;
+  label: string;
+  contacts?: { id: number; first_name: string; last_name: string }[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateLifeMetricRequest {
+  label: string;
+}
+
+export interface AddLifeMetricContactRequest {
+  contact_id: number;
+}
+
+export interface AddressReportItem {
+  country: string;
+  province: string;
+  city: string;
+  count: number;
+}
+
+export interface ImportantDateReportItem {
+  contact_id: number;
+  first_name: string;
+  last_name: string;
+  label: string;
+  day: number;
+  month: number;
+  year: number;
+  calendar_type: string;
+  original_day: number;
+  original_month: number;
+  original_year: number;
+}
+
+export interface MoodReportItem {
+  parameter_label: string;
+  hex_color: string;
+  count: number;
+}

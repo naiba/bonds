@@ -22,7 +22,16 @@
     "default": "默认",
     "disabled": "已禁用",
     "active": "活跃",
-    "archived": "已归档"
+    "archived": "已归档",
+    "actions": "操作",
+    "confirmDelete": "确认删除",
+    "confirmDeleteDescription": "确定要删除此项吗？此操作无法撤销。",
+    "contact": "联系人",
+    "delete_confirm": "确定要删除吗？",
+    "deleted": "已删除",
+    "error": "错误",
+    "saved": "已保存",
+    "updated": "已更新"
   },
   "nav": {
     "vaults": "保险库",
@@ -187,6 +196,27 @@
       "modal_title": "新建群组",
       "members_count": "{{count}} 位成员"
     },
+    "companies": {
+      "title": "公司",
+      "create": "添加公司",
+      "edit": "编辑公司",
+      "name": "公司名称",
+      "employees": "员工"
+    },
+    "lifeMetrics": {
+      "title": "生活指标",
+      "create": "添加指标",
+      "edit": "编辑指标",
+      "label": "标签",
+      "contacts": "联系人",
+      "addContact": "添加联系人"
+    },
+    "reminders": {
+      "title": "所有提醒",
+      "label": "标签",
+      "date": "日期",
+      "type": "类型"
+    },
     "group_detail": {
       "back": "返回群组列表",
       "members": "成员",
@@ -246,7 +276,25 @@
       "first_name": "名",
       "last_name": "姓",
       "nickname": "昵称",
-      "status": "状态"
+      "status": "状态",
+      "company": "公司",
+      "job_info": "工作信息",
+      "job_position": "职位",
+      "religion": "宗教",
+      "no_religion": "未设置宗教",
+      "feed": {
+        "title": "动态",
+        "no_activity": "暂无动态"
+      },
+      "labels": {
+        "title": "标签",
+        "add": "添加标签",
+        "added": "标签已添加",
+        "removed": "标签已移除",
+        "no_labels": "暂无标签",
+        "no_labels_available": "暂无可用标签",
+        "select_placeholder": "选择标签"
+      }
     }
   },
   "modules": {
@@ -532,6 +580,34 @@
       "role_admin": "管理员",
       "role_user": "用户",
       "no_users": "暂无用户"
+    },
+    "webauthn": {
+      "title": "安全密钥",
+      "description": "管理你的 WebAuthn / FIDO2 安全密钥，用于无密码登录。",
+      "register": "注册新密钥",
+      "registered": "安全密钥已注册",
+      "deleted": "安全密钥已删除",
+      "delete_confirm": "确定要移除此安全密钥吗？",
+      "no_keys": "暂无安全密钥",
+      "col_name": "名称",
+      "col_created": "创建时间",
+      "unnamed_key": "未命名密钥"
+    },
+    "oauth": {
+      "title": "关联账户",
+      "description": "管理已关联的 OAuth 登录方式。",
+      "no_providers": "暂无关联账户",
+      "linked_at": "关联时间",
+      "unlink": "取消关联",
+      "unlink_confirm": "确定要取消关联此账户吗？",
+      "unlinked": "已取消关联"
+    },
+    "storage": {
+      "title": "存储空间",
+      "description": "查看文件存储使用情况和限制。",
+      "used": "已使用",
+      "remaining": "剩余",
+      "usage_percent": "已使用 {{percent}}%"
     }
   },
   "twoFactor": {
@@ -602,5 +678,33 @@
     "light": "浅色",
     "dark": "深色",
     "system": "跟随系统"
+  },
+  "vault_settings": {
+    "title": "保险库设置",
+    "description": "描述",
+    "description_label": "描述",
+    "general": "基本信息",
+    "name": "名称",
+    "labels": "标签",
+    "tags": "标签分类",
+    "date_types": "重要日期类型",
+    "mood_params": "心情参数",
+    "life_events": "人生事件",
+    "quick_facts": "速览模板",
+    "tabs": "标签页可见性",
+    "users": "用户",
+    "default_template": "默认模板",
+    "add_category": "添加分类",
+    "add_type": "添加类型",
+    "add_user": "添加用户",
+    "hex_color": "十六进制颜色",
+    "user_email": "邮箱",
+    "tab_journal": "日记",
+    "tab_companies": "公司",
+    "tab_reports": "报表",
+    "tab_calendar": "日历",
+    "tab_tasks": "任务",
+    "tab_files": "文件",
+    "tab_group": "群组"
   }
 }

@@ -29,6 +29,8 @@ async function createContact(page: import('@playwright/test').Page, firstName: s
   await page.getByPlaceholder('First name').fill(firstName);
   await page.getByPlaceholder('Last name').fill(lastName);
   await page.getByRole('button', { name: /create contact/i }).click();
+  // Wait for navigation to contact detail page
+  await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
   await expect(page.getByText(`${firstName} ${lastName}`)).toBeVisible({ timeout: 5000 });
 }
 

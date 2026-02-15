@@ -23,6 +23,12 @@ const VaultFiles = lazy(() => import("@/pages/vault/VaultFiles"));
 const VaultCalendar = lazy(() => import("@/pages/vault/VaultCalendar"));
 const VaultReports = lazy(() => import("@/pages/vault/VaultReports"));
 const VaultFeed = lazy(() => import("@/pages/vault/VaultFeed"));
+const VaultSettings = lazy(() => import("@/pages/vault/VaultSettings"));
+const VaultCompanies = lazy(() => import("@/pages/vault/VaultCompanies"));
+const VaultReminders = lazy(() => import("@/pages/vault/VaultReminders"));
+const VaultLifeMetrics = lazy(
+  () => import("@/pages/vault/VaultLifeMetrics")
+);
 
 // Contact pages
 const ContactList = lazy(() => import("@/pages/contact/ContactList"));
@@ -37,6 +43,9 @@ const Personalize = lazy(() => import("@/pages/settings/Personalize"));
 const Users = lazy(() => import("@/pages/settings/Users"));
 const TwoFactor = lazy(() => import("@/pages/settings/TwoFactor"));
 const Invitations = lazy(() => import("@/pages/settings/Invitations"));
+const WebAuthn = lazy(() => import("@/pages/settings/WebAuthn"));
+const OAuthProviders = lazy(() => import("@/pages/settings/OAuthProviders"));
+const StorageInfo = lazy(() => import("@/pages/settings/StorageInfo"));
 
 // Public auth pages
 const AcceptInvite = lazy(() => import("@/pages/auth/AcceptInvite"));
@@ -124,6 +133,22 @@ export default function App() {
             <Route path="/vaults/:id/calendar" element={<VaultCalendar />} />
             <Route path="/vaults/:id/reports" element={<VaultReports />} />
             <Route path="/vaults/:id/feed" element={<VaultFeed />} />
+            <Route
+              path="/vaults/:id/settings"
+              element={<VaultSettings />}
+            />
+            <Route
+              path="/vaults/:id/companies"
+              element={<VaultCompanies />}
+            />
+            <Route
+              path="/vaults/:id/reminders"
+              element={<VaultReminders />}
+            />
+            <Route
+              path="/vaults/:id/life-metrics"
+              element={<VaultLifeMetrics />}
+            />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/preferences" element={<Preferences />} />
             <Route
@@ -134,6 +159,9 @@ export default function App() {
             <Route path="/settings/users" element={<Users />} />
             <Route path="/settings/2fa" element={<TwoFactor />} />
             <Route path="/settings/invitations" element={<Invitations />} />
+            <Route path="/settings/webauthn" element={<WebAuthn />} />
+            <Route path="/settings/oauth" element={<OAuthProviders />} />
+            <Route path="/settings/storage" element={<StorageInfo />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/vaults" replace />} />
