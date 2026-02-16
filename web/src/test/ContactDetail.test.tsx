@@ -157,7 +157,7 @@ describe("ContactDetail", () => {
       screen.getByRole("button", { name: /archive/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /delete/i }),
+      screen.getByRole("button", { name: /more/i }),
     ).toBeInTheDocument();
   });
 

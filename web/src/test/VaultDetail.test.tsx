@@ -12,21 +12,22 @@ beforeAll(() => {
   };
 });
 
-vi.mock("@/api/vaults", () => ({
-  vaultsApi: {
-    get: vi.fn(),
-  },
-}));
-
-vi.mock("@/api/contacts", () => ({
-  contactsApi: {
-    list: vi.fn(),
+vi.mock("@/api", () => ({
+  api: {
+    vaults: {
+      vaultsDetail: vi.fn(),
+      vaultsUpdate: vi.fn(),
+      vaultsDelete: vi.fn(),
+    },
+    contacts: { contactsList: vi.fn() },
   },
 }));
 
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 vi.mock("react-router-dom", async () => {

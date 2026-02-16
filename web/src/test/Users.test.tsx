@@ -12,15 +12,28 @@ beforeAll(() => {
   };
 });
 
-vi.mock("@/api/settings", () => ({
-  settingsApi: {
-    listUsers: vi.fn(),
+vi.mock("@/api", () => ({
+  api: {
+    users: {
+      usersList: vi.fn(),
+      usersCreate: vi.fn(),
+      usersUpdate: vi.fn(),
+      usersDelete: vi.fn(),
+    },
   },
+}));
+
+vi.mock("@/stores/auth", () => ({
+  useAuth: () => ({
+    user: { id: "u1", is_admin: true },
+  }),
 }));
 
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 function renderUsers() {

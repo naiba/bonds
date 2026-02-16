@@ -12,22 +12,19 @@ beforeAll(() => {
   };
 });
 
-vi.mock("@/api/contacts", () => ({
-  contactsApi: {
-    list: vi.fn(),
-  },
-}));
-
-vi.mock("@/api/vcard", () => ({
-  vcardApi: {
-    importVCard: vi.fn(),
-    exportVault: vi.fn(),
+vi.mock("@/api", () => ({
+  api: {
+    contacts: { contactsList: vi.fn() },
+    contactLabels: { contactLabelsList: vi.fn() },
+    vcard: { contactsExportList: vi.fn(), contactsImportCreate: vi.fn() },
   },
 }));
 
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
 function renderContactList() {
@@ -61,7 +58,7 @@ describe("ContactList", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderContactList();
     expect(
-      screen.getByPlaceholderText("Search contacts..."),
+      screen.getByPlaceholderText("Quick search"),
     ).toBeInTheDocument();
   });
 });
