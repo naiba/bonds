@@ -16,6 +16,7 @@ import {
 import {
   PlusOutlined,
   DeleteOutlined,
+  EditOutlined,
   ArrowLeftOutlined,
   BookOutlined,
 } from "@ant-design/icons";
@@ -32,6 +33,7 @@ export default function JournalList() {
   const vaultId = id!;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -65,6 +67,19 @@ export default function JournalList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("vault.journals.deleted_success"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: { name: string; description?: string }) =>
+      api.journals.journalsUpdate(String(vaultId), editingId!, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      setOpen(false);
+      setEditingId(null);
+      form.resetFields();
+      message.success(t("vault.journals.updated"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -117,6 +132,18 @@ export default function JournalList() {
                 cursor: "pointer",
               }}
               actions={[
+                <Button
+                  key="e"
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingId(journal.id!);
+                    form.setFieldsValue({ name: journal.name, description: journal.description });
+                    setOpen(true);
+                  }}
+                />,
                 <Popconfirm
                   key="d"
                   title={t("vault.journals.delete_confirm")}
@@ -158,13 +185,13 @@ export default function JournalList() {
       </div>
 
       <Modal
-        title={t("vault.journals.modal_title")}
+        title={editingId ? t("vault.journals.edit_title") : t("vault.journals.modal_title")}
         open={open}
-        onCancel={() => { setOpen(false); form.resetFields(); }}
+        onCancel={() => { setOpen(false); setEditingId(null); form.resetFields(); }}
         onOk={() => form.submit()}
-        confirmLoading={createMutation.isPending}
+        confirmLoading={editingId ? updateMutation.isPending : createMutation.isPending}
       >
-        <Form form={form} layout="vertical" onFinish={(v) => createMutation.mutate(v)}>
+        <Form form={form} layout="vertical" onFinish={(v) => editingId ? updateMutation.mutate(v) : createMutation.mutate(v)}>
           <Form.Item name="name" label={t("common.name")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>

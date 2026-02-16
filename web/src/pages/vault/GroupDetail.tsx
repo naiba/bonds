@@ -82,6 +82,18 @@ export default function GroupDetail() {
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (name: string) =>
+      api.groups.groupsUpdate(String(vaultId), Number(gId), { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "groups", gId],
+      });
+      message.success(t("vault.group_detail.name_updated"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   if (isLoading) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
@@ -117,7 +129,17 @@ export default function GroupDetail() {
         >
           <TeamOutlined style={{ fontSize: 16, color: token.colorPrimary }} />
         </div>
-        <Title level={4} style={{ margin: 0, flex: 1 }}>{group.name}</Title>
+        <Title
+          level={4}
+          style={{ margin: 0, flex: 1 }}
+          editable={{
+            onChange: (val: string) => { if (val.trim()) updateMutation.mutate(val.trim()); },
+            triggerType: ["text"],
+            tooltip: t("vault.group_detail.edit_name"),
+          }}
+        >
+          {group.name}
+        </Title>
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
