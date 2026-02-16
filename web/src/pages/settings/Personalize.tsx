@@ -12,8 +12,10 @@ import {
   Empty,
   Badge,
   theme,
+  Tag,
+  Select,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, EditOutlined, RightOutlined, DownOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined, RightOutlined, DownOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
@@ -55,6 +57,7 @@ interface SubItemConfig {
   create: (parentId: number, body: Record<string, string>) => Promise<unknown>;
   update: (parentId: number, itemId: number, body: Record<string, string>) => Promise<unknown>;
   remove: (parentId: number, itemId: number) => Promise<unknown>;
+  position?: (parentId: number, itemId: number, position: number) => Promise<unknown>;
 }
 
 const subItemConfigs: Record<string, SubItemConfig> = {
@@ -75,6 +78,7 @@ const subItemConfigs: Record<string, SubItemConfig> = {
     create: (id, b) => api.postTemplateSections.personalizePostTemplatesSectionsCreate(id, { label: b.label }),
     update: (id, itemId, b) => api.postTemplateSections.personalizePostTemplatesSectionsUpdate(id, itemId, { label: b.label }),
     remove: (id, itemId) => api.postTemplateSections.personalizePostTemplatesSectionsDelete(id, itemId),
+    position: (id, itemId, pos) => api.postTemplateSections.personalizePostTemplatesSectionsPositionCreate(id, itemId, { position: pos }),
   },
   "group-types": {
     labelKey: "settings.personalize.roles",
@@ -84,6 +88,7 @@ const subItemConfigs: Record<string, SubItemConfig> = {
     create: (id, b) => api.groupTypeRoles.personalizeGroupTypesRolesCreate(id, { label: b.label }),
     update: (id, itemId, b) => api.groupTypeRoles.personalizeGroupTypesRolesUpdate(id, itemId, { label: b.label }),
     remove: (id, itemId) => api.groupTypeRoles.personalizeGroupTypesRolesDelete(id, itemId),
+    position: (id, itemId, pos) => api.groupTypeRoles.personalizeGroupTypesRolesPositionCreate(id, itemId, { position: pos }),
   },
   "call-reasons": {
     labelKey: "settings.personalize.reasons",
@@ -113,6 +118,8 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [expandedModulePageId, setExpandedModulePageId] = useState<number | null>(null);
+  const showModules = sectionKey === "templates";
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -146,6 +153,15 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const subPositionMutation = useMutation({
+    mutationFn: ({ itemId, position }: { itemId: number; position: number }) => {
+      if (!config.position) throw new Error("No position API");
+      return config.position(parentId, itemId, position);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   function resetForm() {
     setAdding(false);
     setEditingId(null);
@@ -168,6 +184,7 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
 
   const hasValues = config.fields.every((f) => (formValues[f.key] ?? "").trim());
   const showForm = adding || editingId !== null;
+  const hasPosition = !!config.position;
 
   function getDisplayLabel(item: Record<string, unknown>): string {
     const primary = String(item[config.fields[0].key] ?? item.label ?? "");
@@ -229,20 +246,157 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
         dataSource={items}
         locale={{ emptyText: <Empty description={t("settings.personalize.no_items")} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
         size="small"
-        renderItem={(item: Record<string, unknown>) => (
-          <List.Item
-            style={{ padding: "4px 0" }}
-            actions={[
-              <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-              <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id as number)}>
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <span style={{ fontSize: 13 }}>{getDisplayLabel(item)}</span>
-          </List.Item>
+        renderItem={(item: Record<string, unknown>, index: number) => (
+          <div>
+            <List.Item
+              style={{ padding: "4px 0" }}
+              actions={[
+                ...(hasPosition ? [
+                  <Button
+                    key="up"
+                    type="text"
+                    size="small"
+                    icon={<ArrowUpOutlined />}
+                    title={t("settings.personalize.move_up")}
+                    disabled={index === 0}
+                    onClick={() => subPositionMutation.mutate({ itemId: item.id as number, position: index - 1 })}
+                  />,
+                  <Button
+                    key="down"
+                    type="text"
+                    size="small"
+                    icon={<ArrowDownOutlined />}
+                    title={t("settings.personalize.move_down")}
+                    disabled={index === items.length - 1}
+                    onClick={() => subPositionMutation.mutate({ itemId: item.id as number, position: index + 1 })}
+                  />,
+                ] : []),
+                ...(showModules ? [
+                  <Button
+                    key="modules"
+                    type="text"
+                    size="small"
+                    icon={<AppstoreOutlined />}
+                    title={t("settings.personalize.page_modules")}
+                    onClick={() => setExpandedModulePageId(expandedModulePageId === (item.id as number) ? null : (item.id as number))}
+                    style={expandedModulePageId === (item.id as number) ? { color: '#1677ff' } : undefined}
+                  />,
+                ] : []),
+                <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
+                <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id as number)}>
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              <span style={{ fontSize: 13 }}>{getDisplayLabel(item)}</span>
+            </List.Item>
+            {showModules && expandedModulePageId === (item.id as number) && (
+              <ModulesPanel templateId={parentId} pageId={item.id as number} />
+            )}
+          </div>
         )}
       />
+    </div>
+  );
+}
+
+function ModulesPanel({ templateId, pageId }: { templateId: number; pageId: number }) {
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const { t } = useTranslation();
+  const [selectedModuleId, setSelectedModuleId] = useState<number | null>(null);
+
+  const modulesQk = ["settings", "personalize", "templates", templateId, "pages", pageId, "modules"];
+
+  const { data: pageModules = [], isLoading: loadingPageModules } = useQuery({
+    queryKey: modulesQk,
+    queryFn: async () => {
+      const res = await api.templatePages.personalizeTemplatesPagesModulesList(templateId, pageId);
+      return (res.data ?? []) as Array<Record<string, unknown>>;
+    },
+  });
+
+  const { data: availableModules = [] } = useQuery({
+    queryKey: ["settings", "personalize", "modules"],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("modules");
+      return res.data ?? [];
+    },
+  });
+
+  const addModuleMutation = useMutation({
+    mutationFn: (moduleId: number) =>
+      api.templatePages.personalizeTemplatesPagesModulesCreate(templateId, pageId, { module_id: moduleId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: modulesQk });
+      setSelectedModuleId(null);
+      message.success(t("common.created"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const removeModuleMutation = useMutation({
+    mutationFn: (moduleId: number) =>
+      api.templatePages.personalizeTemplatesPagesModulesDelete(templateId, pageId, moduleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: modulesQk });
+      message.success(t("common.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const assignedModuleIds = new Set(pageModules.map((m: Record<string, unknown>) => m.module_id as number));
+  const unassignedModules = availableModules.filter((m: PersonalizeItem) => !assignedModuleIds.has(m.id!));
+
+  return (
+    <div style={{ paddingLeft: 24, paddingTop: 8, paddingBottom: 4, borderLeft: "2px solid #e8e8e8" }}>
+      <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
+        <AppstoreOutlined /> {t("settings.personalize.page_modules")}
+      </Text>
+
+      {loadingPageModules ? null : pageModules.length === 0 ? (
+        <Text type="secondary" style={{ fontSize: 12, fontStyle: "italic", display: "block", marginBottom: 8 }}>
+          {t("settings.personalize.no_modules")}
+        </Text>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+          {pageModules.map((mod) => (
+            <Tag
+              key={mod.module_id as number}
+              closable
+              onClose={(e) => {
+                e.preventDefault();
+                removeModuleMutation.mutate(mod.module_id as number);
+              }}
+            >
+              {(mod.module_name as string) ?? `Module #${mod.module_id}`}
+            </Tag>
+          ))}
+        </div>
+      )}
+
+      {unassignedModules.length > 0 && (
+        <Space.Compact size="small" style={{ width: "100%" }}>
+          <Select
+            size="small"
+            style={{ flex: 1 }}
+            placeholder={t("settings.personalize.available_modules")}
+            value={selectedModuleId}
+            onChange={(val) => setSelectedModuleId(val)}
+            options={unassignedModules.map((m: PersonalizeItem) => ({ label: m.label ?? m.name, value: m.id }))}
+          />
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            disabled={selectedModuleId === null}
+            loading={addModuleMutation.isPending}
+            onClick={() => { if (selectedModuleId !== null) addModuleMutation.mutate(selectedModuleId); }}
+          >
+            {t("settings.personalize.add_module")}
+          </Button>
+        </Space.Compact>
+      )}
     </div>
   );
 }
@@ -282,6 +436,13 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.personalize.personalizeDelete(sectionKey, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const positionMutation = useMutation({
+    mutationFn: ({ id, position }: { id: number; position: number }) =>
+      api.personalize.personalizePositionCreate(sectionKey, id, { position }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
     onError: (e: APIError) => message.error(e.message),
   });
@@ -346,10 +507,28 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
         dataSource={items}
         locale={{ emptyText: <Empty description={t("settings.personalize.no_items")} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
         size="small"
-        renderItem={(item: PersonalizeItem) => (
+        renderItem={(item: PersonalizeItem, index: number) => (
           <div>
             <List.Item
               actions={[
+                <Button
+                  key="up"
+                  type="text"
+                  size="small"
+                  icon={<ArrowUpOutlined />}
+                  title={t("settings.personalize.move_up")}
+                  disabled={index === 0}
+                  onClick={() => positionMutation.mutate({ id: item.id!, position: index - 1 })}
+                />,
+                <Button
+                  key="down"
+                  type="text"
+                  size="small"
+                  icon={<ArrowDownOutlined />}
+                  title={t("settings.personalize.move_down")}
+                  disabled={index === items.length - 1}
+                  onClick={() => positionMutation.mutate({ id: item.id!, position: index + 1 })}
+                />,
                 <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
                 <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
                   <Button type="text" size="small" danger icon={<DeleteOutlined />} />
