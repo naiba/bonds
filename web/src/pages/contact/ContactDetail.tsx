@@ -17,6 +17,7 @@ import {
   Select,
   Upload,
   theme,
+  Dropdown,
 } from "antd";
 import {
   EditOutlined,
@@ -28,10 +29,12 @@ import {
   DownloadOutlined,
   CameraOutlined,
   ExportOutlined,
+  MoreOutlined,
+  LayoutOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { api, httpClient } from "@/api";
-import type { APIError, UpdateContactRequest, Vault } from "@/api";
+import type { APIError, UpdateContactRequest, Vault, PersonalizeItem } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -68,8 +71,10 @@ export default function ContactDetail() {
   const { token } = theme.useToken();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editForm] = Form.useForm();
   const [moveForm] = Form.useForm();
+  const [templateForm] = Form.useForm();
 
   const { data: contact, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", cId],
@@ -89,6 +94,15 @@ export default function ContactDetail() {
     enabled: isMoveModalOpen,
   });
 
+  const { data: templates = [] } = useQuery<PersonalizeItem[]>({
+    queryKey: ["settings", "personalize", "templates"],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("templates");
+      return res.data ?? [];
+    },
+    enabled: isTemplateModalOpen,
+  });
+
   const updateContactMutation = useMutation({
     mutationFn: (values: UpdateContactRequest) =>
       api.contacts.contactsUpdate(String(vaultId), String(cId), values),
@@ -98,6 +112,21 @@ export default function ContactDetail() {
       });
       message.success(t("contact.detail.edit_success"));
       setIsEditModalOpen(false);
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: (templateId: number) =>
+      api.contacts.contactsTemplateUpdate(String(vaultId), String(cId), { template_id: templateId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", cId],
+      });
+      message.success(t("contact.detail.template_updated"));
+      setIsTemplateModalOpen(false);
     },
     onError: (err: APIError) => {
       message.error(err.message || t("common.error"));
@@ -456,17 +485,43 @@ export default function ContactDetail() {
 
           <span style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: "0 4px", flexShrink: 0 }} />
 
-          <Popconfirm
-            title={t("contact.detail.delete_confirm")}
-            description={t("contact.detail.delete_warning")}
-            onConfirm={() => deleteMutation.mutate()}
-            okText={t("contact.detail.delete_ok")}
-            okButtonProps={{ danger: true }}
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "template",
+                  label: t("contact.detail.change_template"),
+                  icon: <LayoutOutlined />,
+                  onClick: () => {
+                    templateForm.setFieldValue("template_id", contact.template_id);
+                    setIsTemplateModalOpen(true);
+                  },
+                },
+                {
+                  type: "divider",
+                },
+                {
+                  key: "delete",
+                  label: t("common.delete"),
+                  icon: <DeleteOutlined />,
+                  danger: true,
+                  onClick: () => {
+                    Modal.confirm({
+                      title: t("contact.detail.delete_confirm"),
+                      content: t("contact.detail.delete_warning"),
+                      okText: t("contact.detail.delete_ok"),
+                      okType: "danger",
+                      cancelText: t("common.cancel"),
+                      onOk: () => deleteMutation.mutate(),
+                    });
+                  },
+                },
+              ],
+            }}
+            trigger={["click"]}
           >
-            <Button danger type="text" icon={<DeleteOutlined />}>
-              {t("common.delete")}
-            </Button>
-          </Popconfirm>
+            <Button icon={<MoreOutlined />} type="text" />
+          </Dropdown>
         </div>
       </Card>
 
@@ -562,6 +617,43 @@ export default function ContactDetail() {
               loading={moveContactMutation.isPending}
             >
               {t("contact.detail.move")}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={t("contact.detail.change_template")}
+        open={isTemplateModalOpen}
+        onCancel={() => setIsTemplateModalOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={templateForm}
+          layout="vertical"
+          onFinish={(values) => updateTemplateMutation.mutate(values.template_id)}
+        >
+          <Form.Item
+            name="template_id"
+            label={t("vault_settings.select_template")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              loading={!templates.length}
+              options={templates.map((tpl) => ({ label: tpl.label, value: tpl.id }))}
+            />
+          </Form.Item>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => setIsTemplateModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={updateTemplateMutation.isPending}
+            >
+              {t("common.save")}
             </Button>
           </div>
         </Form>
