@@ -4,7 +4,7 @@ import { Card, Form, Input, Button, Typography, App, Divider, theme } from "antd
 import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined, KeyOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
-import { api } from "@/api";
+import { api, httpClient } from "@/api";
 import type { LoginRequest, APIError } from "@/api";
 import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
@@ -50,16 +50,14 @@ export default function Login() {
       // 2. Authenticate with browser
       const asseResp = await startAuthentication({ optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON });
 
-      // 3. Verify with server
-      const verifyRes = await api.webauthn.webauthnLoginFinishCreate(
-        {}, 
-        { 
-          body: asseResp,
-          type: ContentType.Json
-        }
-      );
+      // 3. Verify with server — send assertion as raw body via httpClient
+      //    (generated client doesn't declare a body param for this endpoint)
+      const verifyRes = await httpClient.instance.post<{
+        success: boolean;
+        data: { token: string; user: { id: string; email: string } };
+      }>("/auth/webauthn/login/finish", asseResp);
       
-      const auth = verifyRes.data!;
+      const auth = verifyRes.data.data;
       localStorage.setItem("token", auth.token);
       // Force reload to update auth state since we bypassed the store login method
       window.location.href = from;

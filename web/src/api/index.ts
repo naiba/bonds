@@ -88,9 +88,60 @@ httpClient.instance.interceptors.request.use((config) => {
   return config;
 });
 
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+function addRefreshSubscriber(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
 httpClient.instance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    if (
+      error.response?.status === 401 &&
+      localStorage.getItem("token") &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes("/auth/refresh")
+    ) {
+      if (isRefreshing) {
+        return new Promise<string>((resolve) => {
+          addRefreshSubscriber((newToken: string) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            resolve(httpClient.instance(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const res = await httpClient.instance.post("/auth/refresh");
+        const newToken = res.data?.data?.token as string | undefined;
+        if (newToken) {
+          localStorage.setItem("token", newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          onRefreshed(newToken);
+          return httpClient.instance(originalRequest);
+        }
+      } catch {
+        localStorage.removeItem("token");
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+        return Promise.reject(error);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
       if (window.location.pathname !== "/login") {

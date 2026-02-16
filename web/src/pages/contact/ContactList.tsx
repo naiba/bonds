@@ -68,7 +68,7 @@ export default function ContactList() {
   });
 
   const searchMutation = useMutation({
-    mutationFn: (query: string) => api.contacts.searchContactsCreate(String(vaultId), { search: query }),
+    mutationFn: (query: string) => api.contacts.searchContactsCreate(String(vaultId), { search_term: query }),
     onSuccess: (res) => {
         if (res.data) {
              queryClient.setQueryData(["vaults", vaultId, "contacts", labelFilter], res.data);
