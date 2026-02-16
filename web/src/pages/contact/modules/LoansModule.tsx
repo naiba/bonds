@@ -14,7 +14,7 @@ import {
   Empty,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, CheckOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, CheckOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Loan, APIError } from "@/api";
@@ -29,6 +29,7 @@ export default function LoansModule({
   contactId: string | number;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -51,12 +52,18 @@ export default function LoansModule({
       description?: string;
       amount_lent: number;
       currency: string;
-    }) => api.loans.contactsLoansCreate(String(vaultId), String(contactId), values),
+    }) => {
+      if (editingId) {
+        return api.loans.contactsLoansUpdate(String(vaultId), String(contactId), editingId, values);
+      }
+      return api.loans.contactsLoansCreate(String(vaultId), String(contactId), values);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
+      setEditingId(null);
       form.resetFields();
-      message.success(t("modules.loans.added"));
+      message.success(editingId ? t("modules.loans.updated") : t("modules.loans.added"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -87,7 +94,16 @@ export default function LoansModule({
         body: { padding: '16px 24px' },
       }}
       extra={
-        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
+        <Button
+          type="text"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setEditingId(null);
+            form.resetFields();
+            setOpen(true);
+          }}
+          style={{ color: token.colorPrimary }}
+        >
           {t("modules.loans.add")}
         </Button>
       }
@@ -108,6 +124,17 @@ export default function LoansModule({
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
+              <Button
+                key="edit"
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingId(loan.id!);
+                  form.setFieldsValue(loan);
+                  setOpen(true);
+                }}
+              />,
               <Button
                 key="settle"
                 type="text"
@@ -147,9 +174,9 @@ export default function LoansModule({
       />
 
       <Modal
-        title={t("modules.loans.modal_title")}
+        title={editingId ? t("modules.loans.edit") : t("modules.loans.modal_title")}
         open={open}
-        onCancel={() => { setOpen(false); form.resetFields(); }}
+        onCancel={() => { setOpen(false); setEditingId(null); form.resetFields(); }}
         onOk={() => form.submit()}
         confirmLoading={createMutation.isPending}
       >

@@ -12,7 +12,7 @@ import {
   Empty,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, UserOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Relationship, Contact, APIError } from "@/api";
@@ -38,6 +38,7 @@ export default function RelationshipsModule({
   contactId: string | number;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -62,13 +63,20 @@ export default function RelationshipsModule({
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { related_contact_id: string; relationship_type_id: number }) =>
-      api.relationships.contactsRelationshipsCreate(String(vaultId), String(contactId), values),
+    mutationFn: (values: { related_contact_id: string; relationship_type_id: number }) => {
+      if (editingId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return api.relationships.contactsRelationshipsUpdate(String(vaultId), String(contactId), editingId, values as any);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return api.relationships.contactsRelationshipsCreate(String(vaultId), String(contactId), values as any);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
+      setEditingId(null);
       form.resetFields();
-      message.success(t("modules.relationships.added"));
+      message.success(editingId ? t("modules.relationships.updated") : t("modules.relationships.added"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -97,7 +105,16 @@ export default function RelationshipsModule({
         body: { padding: '16px 24px' },
       }}
       extra={
-        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
+        <Button
+          type="text"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setEditingId(null);
+            form.resetFields();
+            setOpen(true);
+          }}
+          style={{ color: token.colorPrimary }}
+        >
           {t("modules.relationships.add")}
         </Button>
       }
@@ -118,6 +135,20 @@ export default function RelationshipsModule({
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
+              <Button
+                key="edit"
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingId(r.id!);
+                  form.setFieldsValue({
+                    related_contact_id: r.related_contact_id,
+                    relationship_type: r.relationship_type?.name,
+                  });
+                  setOpen(true);
+                }}
+              />,
               <Popconfirm key="d" title={t("modules.relationships.remove_confirm")} onConfirm={() => deleteMutation.mutate(r.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
@@ -125,17 +156,17 @@ export default function RelationshipsModule({
           >
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              title={<span style={{ fontWeight: 500 }}>{r.related_contact_id}</span>}
-              description={<Tag color="blue">{r.relationship_type_id ? `#${r.relationship_type_id}` : ''}</Tag>}
+              title={<span style={{ fontWeight: 500 }}>{r.related_contact?.first_name} {r.related_contact?.last_name}</span>}
+              description={<Tag color="blue">{r.relationship_type ? r.relationship_type.name : ''}</Tag>}
             />
           </List.Item>
         )}
       />
 
       <Modal
-        title={t("modules.relationships.modal_title")}
+        title={editingId ? t("modules.relationships.edit") : t("modules.relationships.modal_title")}
         open={open}
-        onCancel={() => { setOpen(false); form.resetFields(); }}
+        onCancel={() => { setOpen(false); setEditingId(null); form.resetFields(); }}
         onOk={() => form.submit()}
         confirmLoading={createMutation.isPending}
       >

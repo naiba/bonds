@@ -12,7 +12,7 @@ import {
   Calendar,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Goal, APIError } from "@/api";
@@ -28,6 +28,7 @@ export default function GoalsModule({
   contactId: string | number;
 }) {
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("");
   const [selectedGoal, setSelectedGoal] = useState<number | null>(null);
   const queryClient = useQueryClient();
@@ -45,13 +46,18 @@ export default function GoalsModule({
   });
 
   const createMutation = useMutation({
-    mutationFn: (goalName: string) =>
-      api.goals.contactsGoalsCreate(String(vaultId), String(contactId), { name: goalName }),
+    mutationFn: (goalName: string) => {
+      if (editingId) {
+        return api.goals.contactsGoalsUpdate(String(vaultId), String(contactId), editingId, { name: goalName });
+      }
+      return api.goals.contactsGoalsCreate(String(vaultId), String(contactId), { name: goalName });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setAdding(false);
+      setEditingId(null);
       setName("");
-      message.success(t("modules.goals.added"));
+      message.success(editingId ? t("modules.goals.updated") : t("modules.goals.added"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -104,8 +110,8 @@ export default function GoalsModule({
         body: { padding: '16px 24px' },
       }}
       extra={
-        !adding && (
-          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
+        !adding && !editingId && (
+          <Button type="text" icon={<PlusOutlined />} onClick={() => { setAdding(true); setName(""); }} style={{ color: token.colorPrimary }}>
             {t("modules.goals.add")}
           </Button>
         )
@@ -124,6 +130,7 @@ export default function GoalsModule({
               value={name}
               onChange={(e) => setName(e.target.value)}
               onPressEnter={() => name.trim() && createMutation.mutate(name.trim())}
+              autoFocus
             />
             <Button
               type="primary"
@@ -144,40 +151,84 @@ export default function GoalsModule({
         dataSource={goals}
         locale={{ emptyText: <Empty description={t("modules.goals.no_goals")} /> }}
         split={false}
-        renderItem={(goal: Goal) => (
-          <List.Item
-            style={{
-              borderRadius: token.borderRadius,
-              padding: '10px 12px',
-              marginBottom: 4,
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            actions={[
-              <Button
-                key="view"
-                type="text"
-                size="small"
-                 onClick={() => setSelectedGoal(selectedGoal === goal.id ? null : goal.id ?? null)}
-              >
-                {selectedGoal === goal.id ? t("modules.goals.hide") : t("modules.goals.streaks")}
-              </Button>,
-              <Popconfirm key="d" title={t("modules.goals.delete_confirm")} onConfirm={() => deleteMutation.mutate(goal.id!)}>
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <List.Item.Meta
-              title={<span style={{ fontWeight: 500 }}>{goal.name}</span>}
-              description={
-                <Tag color={goal.active ? "green" : "default"}>
-                  {t("modules.goals.streaks_count", { count: goal.streaks?.length ?? 0 })}
-                </Tag>
-              }
-            />
-          </List.Item>
-        )}
+        renderItem={(goal: Goal) => {
+          if (editingId === goal.id) {
+            return (
+              <List.Item style={{ padding: '8px 12px' }}>
+                <Space.Compact style={{ width: "100%" }}>
+                  <Input
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onPressEnter={() => name.trim() && createMutation.mutate(name.trim())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setEditingId(null);
+                        setName("");
+                      }
+                    }}
+                  />
+                  <Button
+                    type="primary"
+                    onClick={() => name.trim() && createMutation.mutate(name.trim())}
+                    loading={createMutation.isPending}
+                  >
+                    {t("common.save")}
+                  </Button>
+                  <Button onClick={() => { setEditingId(null); setName(""); }}>
+                    {t("common.cancel")}
+                  </Button>
+                </Space.Compact>
+              </List.Item>
+            );
+          }
+
+          return (
+            <List.Item
+              style={{
+                borderRadius: token.borderRadius,
+                padding: '10px 12px',
+                marginBottom: 4,
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              actions={[
+                <Button
+                  key="edit"
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setEditingId(goal.id!);
+                    setName(goal.name!);
+                    setAdding(false);
+                  }}
+                />,
+                <Button
+                  key="view"
+                  type="text"
+                  size="small"
+                  onClick={() => setSelectedGoal(selectedGoal === goal.id ? null : goal.id ?? null)}
+                >
+                  {selectedGoal === goal.id ? t("modules.goals.hide") : t("modules.goals.streaks")}
+                </Button>,
+                <Popconfirm key="d" title={t("modules.goals.delete_confirm")} onConfirm={() => deleteMutation.mutate(goal.id!)}>
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              <List.Item.Meta
+                title={<span style={{ fontWeight: 500 }}>{goal.name}</span>}
+                description={
+                  <Tag color={goal.active ? "green" : "default"}>
+                    {t("modules.goals.streaks_count", { count: goal.streaks?.length ?? 0 })}
+                  </Tag>
+                }
+              />
+            </List.Item>
+          );
+        }}
       />
 
       {selectedGoal && activeGoal && (

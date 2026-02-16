@@ -19,6 +19,7 @@ import {
   PlusOutlined,
   DeleteOutlined,
   PhoneOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
@@ -40,6 +41,7 @@ export default function CallsModule({
   contactId: string | number;
 }) {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -75,13 +77,18 @@ export default function CallsModule({
         description: values.description,
         who_initiated: values.type === "outgoing" ? "me" : "contact",
       };
+      
+      if (editingId) {
+        return api.calls.contactsCallsUpdate(String(vaultId), String(contactId), editingId, data);
+      }
       return api.calls.contactsCallsCreate(String(vaultId), String(contactId), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
+      setEditingId(null);
       form.resetFields();
-      message.success(t("modules.calls.logged"));
+      message.success(editingId ? t("modules.calls.updated") : t("modules.calls.logged"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -103,7 +110,16 @@ export default function CallsModule({
         body: { padding: '16px 24px' },
       }}
       extra={
-        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
+        <Button 
+          type="text" 
+          icon={<PlusOutlined />} 
+          onClick={() => {
+            setEditingId(null);
+            form.resetFields();
+            setOpen(true);
+          }} 
+          style={{ color: token.colorPrimary }}
+        >
           {t("modules.calls.log_call")}
         </Button>
       }
@@ -124,6 +140,20 @@ export default function CallsModule({
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
+              <Button
+                key="edit"
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => {
+                  setEditingId(c.id!);
+                  form.setFieldsValue({
+                    ...c,
+                    called_at: dayjs(c.called_at),
+                  });
+                  setOpen(true);
+                }}
+              />,
               <Popconfirm key="d" title={t("modules.calls.delete_confirm")} onConfirm={() => deleteMutation.mutate(c.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
@@ -149,9 +179,9 @@ export default function CallsModule({
       />
 
       <Modal
-        title={t("modules.calls.modal_title")}
+        title={editingId ? t("modules.calls.edit_call") : t("modules.calls.modal_title")}
         open={open}
-        onCancel={() => { setOpen(false); form.resetFields(); }}
+        onCancel={() => { setOpen(false); setEditingId(null); form.resetFields(); }}
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
       >

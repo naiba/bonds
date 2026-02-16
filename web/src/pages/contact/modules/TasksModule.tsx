@@ -12,7 +12,7 @@ import {
   Empty,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Task, APIError } from "@/api";
@@ -26,6 +26,7 @@ export default function TasksModule({
   contactId: string | number;
 }) {
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [label, setLabel] = useState("");
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -42,13 +43,18 @@ export default function TasksModule({
   });
 
   const createMutation = useMutation({
-    mutationFn: (taskLabel: string) =>
-      api.tasks.contactsTasksCreate(String(vaultId), String(contactId), { label: taskLabel }),
+    mutationFn: (taskLabel: string) => {
+      if (editingId) {
+        return api.tasks.contactsTasksUpdate(String(vaultId), String(contactId), editingId, { label: taskLabel });
+      }
+      return api.tasks.contactsTasksCreate(String(vaultId), String(contactId), { label: taskLabel });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setAdding(false);
+      setEditingId(null);
       setLabel("");
-      message.success(t("modules.tasks.added"));
+      message.success(editingId ? t("modules.tasks.updated") : t("modules.tasks.added"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -73,6 +79,37 @@ export default function TasksModule({
   const completed = tasks.filter((t: Task) => t.completed);
 
   function renderItem(task: Task) {
+    if (editingId === task.id) {
+      return (
+        <List.Item style={{ padding: '8px 12px' }}>
+          <Space.Compact style={{ width: "100%" }}>
+            <Input
+              autoFocus
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onPressEnter={() => label.trim() && createMutation.mutate(label.trim())}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setEditingId(null);
+                  setLabel("");
+                }
+              }}
+            />
+            <Button
+              type="primary"
+              onClick={() => label.trim() && createMutation.mutate(label.trim())}
+              loading={createMutation.isPending}
+            >
+              {t("common.save")}
+            </Button>
+            <Button onClick={() => { setEditingId(null); setLabel(""); }}>
+              {t("common.cancel")}
+            </Button>
+          </Space.Compact>
+        </List.Item>
+      );
+    }
+
     return (
       <List.Item
         style={{
@@ -84,6 +121,17 @@ export default function TasksModule({
         onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         actions={[
+          <Button
+            key="edit"
+            type="text"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => {
+              setEditingId(task.id!);
+              setLabel(task.label!);
+              setAdding(false);
+            }}
+          />,
           <Popconfirm key="d" title={t("modules.tasks.delete_confirm")} onConfirm={() => deleteMutation.mutate(task.id!)}>
             <Button type="text" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>,
@@ -111,8 +159,8 @@ export default function TasksModule({
         body: { padding: '16px 24px' },
       }}
       extra={
-        !adding && (
-          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
+        !adding && !editingId && (
+          <Button type="text" icon={<PlusOutlined />} onClick={() => { setAdding(true); setLabel(""); }} style={{ color: token.colorPrimary }}>
             {t("modules.tasks.add")}
           </Button>
         )
@@ -131,6 +179,7 @@ export default function TasksModule({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               onPressEnter={() => label.trim() && createMutation.mutate(label.trim())}
+              autoFocus
             />
             <Button
               type="primary"

@@ -15,7 +15,7 @@ import {
   Space,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { TimelineEvent as TEvent, APIError } from "@/api";
@@ -34,6 +34,7 @@ export default function LifeEventsModule({
   const [tlOpen, setTlOpen] = useState(false);
   const [leOpen, setLeOpen] = useState(false);
   const [selectedTimeline, setSelectedTimeline] = useState<number | null>(null);
+  const [editingLeId, setEditingLeId] = useState<number | null>(null);
   const [tlForm] = Form.useForm();
   const [leForm] = Form.useForm();
   const queryClient = useQueryClient();
@@ -77,18 +78,23 @@ export default function LifeEventsModule({
   const createLifeEventMutation = useMutation({
     mutationFn: (values: { label: string; happened_at: dayjs.Dayjs; description?: string }) => {
       if (!selectedTimeline) throw new Error("No timeline");
-      return api.lifeEvents.contactsTimelineEventsLifeEventsCreate(String(vaultId), String(contactId), selectedTimeline, {
+      const data = {
         summary: values.label,
         happened_at: values.happened_at.format("YYYY-MM-DD"),
         description: values.description,
         life_event_type_id: 1,
-      });
+      };
+      if (editingLeId) {
+        return api.lifeEvents.contactsTimelineEventsLifeEventsUpdate(String(vaultId), String(contactId), selectedTimeline, editingLeId, data);
+      }
+      return api.lifeEvents.contactsTimelineEventsLifeEventsCreate(String(vaultId), String(contactId), selectedTimeline, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setLeOpen(false);
+      setEditingLeId(null);
       leForm.resetFields();
-      message.success(t("modules.life_events.event_added"));
+      message.success(editingLeId ? t("modules.life_events.event_updated") : t("modules.life_events.event_added"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -119,6 +125,8 @@ export default function LifeEventsModule({
             onClick={(e) => {
               e.stopPropagation();
                setSelectedTimeline(tl.id ?? null);
+               setEditingLeId(null);
+               leForm.resetFields();
                setLeOpen(true);
             }}
           >
@@ -159,17 +167,35 @@ export default function LifeEventsModule({
                   <div style={{ marginTop: 4, color: token.colorTextSecondary }}>{le.description}</div>
                 )}
               </div>
-              <Popconfirm
-                title={t("modules.life_events.delete_event_confirm")}
-                onConfirm={() =>
-                  deleteLifeEventMutation.mutate({
-                    timelineId: tl.id!,
-                    lifeEventId: le.id!,
-                  })
-                }
-              >
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>
+              <div>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedTimeline(tl.id ?? null);
+                    setEditingLeId(le.id!);
+                    leForm.setFieldsValue({
+                      label: le.summary,
+                      happened_at: dayjs(le.happened_at),
+                      description: le.description,
+                    });
+                    setLeOpen(true);
+                  }}
+                />
+                <Popconfirm
+                  title={t("modules.life_events.delete_event_confirm")}
+                  onConfirm={() =>
+                    deleteLifeEventMutation.mutate({
+                      timelineId: tl.id!,
+                      lifeEventId: le.id!,
+                    })
+                  }
+                >
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </div>
             </div>
           ),
         }))}
@@ -216,9 +242,9 @@ export default function LifeEventsModule({
       </Modal>
 
       <Modal
-        title={t("modules.life_events.event_modal")}
+        title={editingLeId ? t("modules.life_events.edit_event") : t("modules.life_events.event_modal")}
         open={leOpen}
-        onCancel={() => { setLeOpen(false); leForm.resetFields(); }}
+        onCancel={() => { setLeOpen(false); setEditingLeId(null); leForm.resetFields(); }}
         onOk={() => leForm.submit()}
         confirmLoading={createLifeEventMutation.isPending}
       >
