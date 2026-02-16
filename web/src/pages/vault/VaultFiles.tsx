@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -8,6 +9,9 @@ import {
   Spin,
   Empty,
   theme,
+  Upload,
+  Popconfirm,
+  App,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -16,10 +20,12 @@ import {
   FolderOpenOutlined,
   FileImageOutlined,
   FilePdfOutlined,
+  DeleteOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Document } from "@/api";
+import type { Document, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -37,6 +43,33 @@ export default function VaultFiles() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const [uploading, setUploading] = useState(false);
+
+  const deleteMutation = useMutation({
+    mutationFn: (fileId: number) => api.files.filesDelete(String(vaultId), fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files"] });
+      message.success(t("vault.files.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      await api.files.filesCreate(String(vaultId), { file });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files"] });
+      message.success(t("vault.files.upload_success"));
+    } catch (e: unknown) {
+      const err = e as APIError;
+      message.error(err.message || t("vault.files.upload_failed"));
+    } finally {
+      setUploading(false);
+    }
+    return false;
+  };
 
   function getFileIcon(mimeType: string) {
     if (mimeType.startsWith("image/"))
@@ -111,13 +144,27 @@ export default function VaultFiles() {
       title: "",
       key: "actions",
       render: (_: unknown, record: Document) => (
-        <Button
-          type="text"
-          size="small"
-          icon={<DownloadOutlined />}
-          href={`/api/vaults/${vaultId}/files/${record.id}/download`}
-          target="_blank"
-        />
+        <span style={{ display: "flex", gap: 4 }}>
+          <Button
+            type="text"
+            size="small"
+            icon={<DownloadOutlined />}
+            href={`/api/vaults/${vaultId}/files/${record.id}/download`}
+            target="_blank"
+          />
+          <Popconfirm
+            title={t("vault.files.delete_confirm")}
+            onConfirm={() => deleteMutation.mutate(record.id!)}
+          >
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              loading={deleteMutation.isPending}
+            />
+          </Popconfirm>
+        </span>
       ),
     },
   ];
@@ -132,7 +179,12 @@ export default function VaultFiles() {
           style={{ color: token.colorTextSecondary }}
         />
         <FolderOpenOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
-        <Title level={4} style={{ margin: 0 }}>{t("vault.files.title")}</Title>
+        <Title level={4} style={{ margin: 0, flex: 1 }}>{t("vault.files.title")}</Title>
+        <Upload beforeUpload={handleUpload} showUploadList={false}>
+          <Button icon={<UploadOutlined />} loading={uploading}>
+            {t("vault.files.upload")}
+          </Button>
+        </Upload>
       </div>
 
       <Card
@@ -143,8 +195,6 @@ export default function VaultFiles() {
       >
         {isLoading ? (
           <Spin />
-        ) : files.length === 0 ? (
-          <Empty description={t("vault.files.no_files")} />
         ) : (
           <Table
             dataSource={files}
@@ -152,6 +202,7 @@ export default function VaultFiles() {
             rowKey="id"
             pagination={false}
             style={{ marginTop: -8 }}
+            locale={{ emptyText: <Empty description={t("vault.files.no_files")} /> }}
           />
         )}
       </Card>

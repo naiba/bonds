@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
-import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme } from "antd";
-import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
+import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme, Dropdown, Modal, Form, Input, Popconfirm, App, List, Avatar } from "antd";
+import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -14,6 +15,10 @@ export default function VaultDetail() {
   const vaultId = id!;
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [form] = Form.useForm();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
 
   const { data: vault, isLoading: vaultLoading } = useQuery({
     queryKey: ["vaults", vaultId],
@@ -33,6 +38,33 @@ export default function VaultDetail() {
     enabled: !!vaultId,
   });
 
+  const { data: mostConsulted = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "mostConsulted"],
+    queryFn: async () => {
+      const res = await api.search.searchMostConsultedList(String(vaultId));
+      return res.data ?? [];
+    },
+    enabled: !!vaultId,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: { name: string; description?: string }) =>
+      api.vaults.vaultsUpdate(String(vaultId), values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
+      message.success(t("vault.detail.updated"));
+      setEditModalOpen(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.vaults.vaultsDelete(String(vaultId)),
+    onSuccess: () => {
+      message.success(t("vault.detail.deleted"));
+      navigate("/vaults");
+    },
+  });
+
   if (vaultLoading) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
@@ -46,6 +78,36 @@ export default function VaultDetail() {
   const contactCount = contacts?.length ?? 0;
   const recentContacts = (contacts ?? []).slice(0, 5);
 
+  const settingsMenu = [
+    {
+      key: "edit",
+      icon: <EditOutlined />,
+      label: t("vault.detail.edit"),
+      onClick: () => {
+        form.setFieldsValue({
+          name: vault.name,
+          description: vault.description,
+        });
+        setEditModalOpen(true);
+      },
+    },
+    {
+      key: "delete",
+      danger: true,
+      icon: <DeleteOutlined />,
+      label: (
+        <Popconfirm
+          title={t("vault.detail.delete_confirm")}
+          onConfirm={() => deleteMutation.mutate()}
+          okText={t("common.delete")}
+          cancelText={t("common.cancel")}
+        >
+          <div onClick={(e) => e.stopPropagation()}>{t("vault.detail.delete")}</div>
+        </Popconfirm>
+      ),
+    },
+  ];
+
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
       <div
@@ -56,9 +118,14 @@ export default function VaultDetail() {
           marginBottom: 24,
         }}
       >
-        <Title level={4} style={{ margin: 0 }}>
-          {vault.name}
-        </Title>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Title level={4} style={{ margin: 0 }}>
+            {vault.name}
+          </Title>
+          <Dropdown menu={{ items: settingsMenu }} trigger={["click"]}>
+            <Button type="text" icon={<SettingOutlined />} />
+          </Dropdown>
+        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -131,7 +198,7 @@ export default function VaultDetail() {
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card>
+          <Card style={{ marginBottom: 16 }}>
             <Statistic
               title={t("vault.detail.total_contacts")}
               value={contactCount}
@@ -145,10 +212,52 @@ export default function VaultDetail() {
               {t("vault.detail.view_all_contacts")}
             </Button>
           </Card>
+
+          <Card title={t("vault.detail.most_consulted")}>
+            <List
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              dataSource={mostConsulted as any[]}
+              loading={false}
+              locale={{ emptyText: t("vault.detail.no_consulted") }}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              renderItem={(item: any) => (
+                <List.Item
+                  style={{ cursor: "pointer", padding: "8px 0" }}
+                  onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.id}`)}
+                >
+                  <List.Item.Meta
+                    avatar={<Avatar icon={<UserOutlined />} src={item.avatar_url} />}
+                    title={`${item.first_name} ${item.last_name}`}
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
         </Col>
       </Row>
 
       <Outlet />
+
+      <Modal
+        title={t("vault.detail.edit")}
+        open={editModalOpen}
+        onCancel={() => setEditModalOpen(false)}
+        onOk={() => form.submit()}
+        confirmLoading={updateMutation.isPending}
+      >
+        <Form form={form} layout="vertical" onFinish={(v) => updateMutation.mutate(v)}>
+          <Form.Item
+            name="name"
+            label={t("vault.create.name_label")}
+            rules={[{ required: true, message: t("vault.create.name_required") }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item name="description" label={t("vault.create.description_label")}>
+            <Input.TextArea />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

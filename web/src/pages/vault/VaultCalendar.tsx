@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -6,6 +7,8 @@ import {
   Calendar,
   Badge,
   theme,
+  Modal,
+  Empty,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -14,6 +17,10 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { ImportantDate, Reminder } from "@/api";
+import type {
+  GithubComNaibaBondsInternalDtoCalendarDateItem as CalendarDateItem,
+  GithubComNaibaBondsInternalDtoCalendarReminderItem as CalendarReminderItem,
+} from "@/api/generated/data-contracts";
 import type { Dayjs } from "dayjs";
 import { useTranslation } from "react-i18next";
 
@@ -32,6 +39,7 @@ export default function VaultCalendar() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const { data: dates = [] } = useQuery({
     queryKey: ["vaults", vaultId, "calendar", "dates"],
@@ -49,6 +57,16 @@ export default function VaultCalendar() {
       return (res.data ?? []) as Reminder[];
     },
     enabled: !!vaultId,
+  });
+
+  const { data: dayDetail } = useQuery({
+    queryKey: ["vaults", vaultId, "calendar", "day", selectedDate],
+    queryFn: async () => {
+      const [y, m, d] = selectedDate!.split("-").map(Number);
+      const res = await api.calendar.calendarYearsMonthsDaysDetail(String(vaultId), y, m, d);
+      return res.data as { important_dates?: CalendarDateItem[]; reminders?: CalendarReminderItem[] } | undefined;
+    },
+    enabled: selectedDate !== null,
   });
 
   function toDateKey(year: number | null, month: number | null, day: number | null): string | null {
@@ -76,23 +94,25 @@ export default function VaultCalendar() {
     if (!items?.length) return null;
 
     return (
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-        {items.map((item, i) => (
-          <li key={i}>
-            <Badge
-              status={item.type === "date" ? "success" : "warning"}
-              text={
-                <span style={{ fontSize: 11 }}>
-                  {item.label}
-                  {item.calendarType && item.calendarType !== "gregorian" && (
-                    <span style={{ marginLeft: 2, color: "#fa541c", fontSize: 10 }}>🌙</span>
-                  )}
-                </span>
-              }
-            />
-          </li>
-        ))}
-      </ul>
+      <div onClick={() => setSelectedDate(key)} style={{ cursor: "pointer" }}>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {items.map((item, i) => (
+            <li key={i}>
+              <Badge
+                status={item.type === "date" ? "success" : "warning"}
+                text={
+                  <span style={{ fontSize: 11 }}>
+                    {item.label}
+                    {item.calendarType && item.calendarType !== "gregorian" && (
+                      <span style={{ marginLeft: 2, color: "#fa541c", fontSize: 10 }}>🌙</span>
+                    )}
+                  </span>
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
     );
   }
 
@@ -116,8 +136,38 @@ export default function VaultCalendar() {
           padding: 8,
         }}
       >
-        <Calendar cellRender={(date) => cellRender(date as Dayjs)} />
+        <Calendar
+          cellRender={(date) => cellRender(date as Dayjs)}
+          onSelect={(date) => setSelectedDate((date as Dayjs).format("YYYY-MM-DD"))}
+        />
       </Card>
+
+      <Modal
+        title={selectedDate ? `${t("vault.calendar.day_detail")} — ${selectedDate}` : ""}
+        open={selectedDate !== null}
+        onCancel={() => setSelectedDate(null)}
+        footer={null}
+      >
+        {dayDetail ? (
+          <div>
+            {(dayDetail.important_dates ?? []).map((d: CalendarDateItem, i: number) => (
+              <div key={`d-${i}`} style={{ marginBottom: 8 }}>
+                <Badge status="success" text={d.label ?? ""} />
+              </div>
+            ))}
+            {(dayDetail.reminders ?? []).map((r: CalendarReminderItem, i: number) => (
+              <div key={`r-${i}`} style={{ marginBottom: 8 }}>
+                <Badge status="warning" text={r.label ?? ""} />
+              </div>
+            ))}
+            {!(dayDetail.important_dates?.length || dayDetail.reminders?.length) && (
+              <Empty description={t("vault.calendar.no_events")} />
+            )}
+          </div>
+        ) : (
+          <Empty description={t("vault.calendar.no_events")} />
+        )}
+      </Modal>
     </div>
   );
 }
