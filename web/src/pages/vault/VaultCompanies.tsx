@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -7,12 +8,19 @@ import {
   Table,
   theme,
   Tag,
+  Drawer,
+  Descriptions,
+  List,
+  Avatar,
+  Empty
 } from "antd";
 import {
   BankOutlined,
   ArrowLeftOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { api } from "@/api";
+import type { Company } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -22,6 +30,7 @@ export default function VaultCompanies() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const { data: companies = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "companies"],
@@ -31,6 +40,22 @@ export default function VaultCompanies() {
     },
     enabled: !!vaultId,
   });
+
+  const { data: companyDetails } = useQuery({
+    queryKey: ["vaults", vaultId, "companies", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return null;
+      try {
+        const res = await api.companies.companiesDetail(String(vaultId), selectedCompany.id);
+        return res.data;
+      } catch {
+        return selectedCompany;
+      }
+    },
+    enabled: !!selectedCompany?.id,
+  });
+
+  const employees = companyDetails?.contacts ?? selectedCompany?.contacts ?? [];
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto" }}>
@@ -53,6 +78,10 @@ export default function VaultCompanies() {
         rowKey="id"
         loading={isLoading}
         pagination={false}
+        onRow={(record) => ({
+          onClick: () => setSelectedCompany(record),
+          style: { cursor: "pointer" },
+        })}
         columns={[
           {
             title: t("vault.companies.name"),
@@ -71,14 +100,14 @@ export default function VaultCompanies() {
                     key={contact.id}
                     style={{ margin: 0 }}
                   >
-                    <a
+                    <span
                       onClick={(e) => {
-                        e.preventDefault();
+                        e.stopPropagation();
                         navigate(`/vaults/${vaultId}/contacts/${contact.id}`);
                       }}
                     >
                       {contact.first_name} {contact.last_name}
-                    </a>
+                    </span>
                   </Tag>
                 ))}
               </div>
@@ -86,6 +115,54 @@ export default function VaultCompanies() {
           },
         ]}
       />
+
+      <Drawer
+        title={companyDetails?.name || selectedCompany?.name}
+        placement="right"
+        onClose={() => setSelectedCompany(null)}
+        open={!!selectedCompany}
+        width={500}
+      >
+        {selectedCompany && (
+            <>
+            <Descriptions column={1} bordered>
+                <Descriptions.Item label={t("vault.companies.name")}>
+                {companyDetails?.name || selectedCompany.name}
+                </Descriptions.Item>
+            </Descriptions>
+
+            <Title level={5} style={{ marginTop: 24, marginBottom: 16 }}>
+                {t("vault.companies.employees")}
+            </Title>
+            
+            <List
+                itemLayout="horizontal"
+                dataSource={employees}
+                locale={{ emptyText: <Empty description={t("vault.companies.no_employees")} /> }}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                renderItem={(item: any) => (
+                <List.Item
+                    actions={[
+                    <Button 
+                        type="link" 
+                        size="small"
+                        onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.id}`)}
+                    >
+                        {t("common.view")}
+                    </Button>
+                    ]}
+                >
+                    <List.Item.Meta
+                    avatar={<Avatar icon={<UserOutlined />} src={item.avatar_url} />}
+                    title={`${item.first_name} ${item.last_name}`}
+                    description={item.job_title}
+                    />
+                </List.Item>
+                )}
+            />
+            </>
+        )}
+      </Drawer>
     </div>
   );
 }

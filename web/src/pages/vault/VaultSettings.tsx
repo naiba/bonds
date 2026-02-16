@@ -25,6 +25,8 @@ import {
   EditOutlined,
   UserAddOutlined,
   ArrowLeftOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
 } from "@ant-design/icons";
 import type { TabsProps } from "antd";
 import { api } from "@/api";
@@ -83,6 +85,35 @@ export default function VaultSettings() {
     onSuccess: () => {
       message.success(t("common.saved"));
       queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const positionMutation = useMutation({
+    mutationFn: async ({ entityType, id, position, categoryId }: { entityType: string; id: number; position: number; categoryId?: number }): Promise<void> => {
+      const vid = String(vaultId);
+      switch (entityType) {
+        case "lifeEventCategories":
+          await api.vaultSettings.settingsLifeEventCategoriesPositionCreate(vid, id, { position });
+          break;
+        case "lifeEventTypes":
+          await api.vaultSettings.settingsLifeEventCategoriesTypesPositionCreate(vid, categoryId!, id, { position });
+          break;
+        case "moodParams":
+          await api.vaultSettings.settingsMoodParamsPositionCreate(vid, id, { position });
+          break;
+        case "quickFactTemplates":
+          await api.vaultSettings.settingsQuickFactTemplatesPositionCreate(vid, id, { position });
+          break;
+      }
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+      if (vars.entityType === "lifeEventCategories" || vars.entityType === "lifeEventTypes") {
+        queryClient.invalidateQueries({ queryKey: ["vault", vaultId, "lifeEventCategories"] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["vault", vaultId, vars.entityType] });
+      }
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -441,7 +472,7 @@ export default function VaultSettings() {
     initialValue?: string;
     rules?: { required?: boolean }[];
   }
-  const SimpleCrudTab = <T extends { id: number; label?: string; name?: string; hex_color?: string }>({
+  const SimpleCrudTab = <T extends { id: number; label?: string; name?: string; hex_color?: string; position?: number }>({
     queryKeySuffix,
     apiList,
     apiCreate,
@@ -450,6 +481,7 @@ export default function VaultSettings() {
     title,
     itemNameKey = "label",
     extraFields = [],
+    positionEntityType,
   }: {
     queryKeySuffix: string;
     apiList: (vid: number) => Promise<{ data?: T[] }>;
@@ -459,6 +491,7 @@ export default function VaultSettings() {
     title: string;
     itemNameKey?: "label" | "name";
     extraFields?: ExtraField[];
+    positionEntityType?: string;
   }) => {
     const queryKey = ["vault", vaultId, queryKeySuffix];
     const { data: items = [], isLoading } = useQuery({
@@ -556,11 +589,29 @@ export default function VaultSettings() {
           <List
             loading={isLoading}
             dataSource={items}
-            renderItem={(item: T) => (
+            renderItem={(item: T, index: number) => (
               <List.Item
                 actions={[
-                  <Button icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-                  <Popconfirm title={t("common.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id)}>
+                  ...(positionEntityType ? [
+                    <Button
+                      key="up"
+                      size="small"
+                      icon={<ArrowUpOutlined />}
+                      title={t("vault_settings.move_up")}
+                      disabled={index === 0}
+                      onClick={() => positionMutation.mutate({ entityType: positionEntityType, id: item.id, position: index - 1 })}
+                    />,
+                    <Button
+                      key="down"
+                      size="small"
+                      icon={<ArrowDownOutlined />}
+                      title={t("vault_settings.move_down")}
+                      disabled={index === items.length - 1}
+                      onClick={() => positionMutation.mutate({ entityType: positionEntityType, id: item.id, position: index + 1 })}
+                    />,
+                  ] : []),
+                  <Button key="edit" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
+                  <Popconfirm key="del" title={t("common.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id)}>
                     <Button danger icon={<DeleteOutlined />} />
                   </Popconfirm>,
                 ]}
@@ -633,14 +684,30 @@ export default function VaultSettings() {
              
              <Card title={t("vault_settings.life_events")}>
                 <Collapse accordion>
-                    {categories.map((cat: LifeEventCategoryResponse) => (
+                    {categories.map((cat: LifeEventCategoryResponse, catIndex: number) => (
                          <Collapse.Panel 
                             key={cat.id!} 
                             header={cat.label}
                             extra={
-                                <Popconfirm title={t("common.delete_confirm")} onConfirm={(e) => { e?.stopPropagation(); deleteCategory.mutate(cat.id!); }}>
-                                    <DeleteOutlined onClick={(e) => e.stopPropagation()} style={{color: 'red'}} />
-                                </Popconfirm>
+                                <Space onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                        size="small"
+                                        icon={<ArrowUpOutlined />}
+                                        title={t("vault_settings.move_up")}
+                                        disabled={catIndex === 0}
+                                        onClick={(e) => { e.stopPropagation(); positionMutation.mutate({ entityType: "lifeEventCategories", id: cat.id!, position: catIndex - 1 }); }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        icon={<ArrowDownOutlined />}
+                                        title={t("vault_settings.move_down")}
+                                        disabled={catIndex === categories.length - 1}
+                                        onClick={(e) => { e.stopPropagation(); positionMutation.mutate({ entityType: "lifeEventCategories", id: cat.id!, position: catIndex + 1 }); }}
+                                    />
+                                    <Popconfirm title={t("common.delete_confirm")} onConfirm={(e) => { e?.stopPropagation(); deleteCategory.mutate(cat.id!); }}>
+                                        <DeleteOutlined onClick={(e) => e.stopPropagation()} style={{color: 'red'}} />
+                                    </Popconfirm>
+                                </Space>
                             }
                         >
                              <List
@@ -656,10 +723,28 @@ export default function VaultSettings() {
                                         <Button type="dashed" onClick={() => handleAddType(cat.id!)}>{t("common.add")}</Button>
                                     </Space>
                                 }
-                                renderItem={(type: LifeEventCategoryTypeResponse) => (
+                                renderItem={(type: LifeEventCategoryTypeResponse, typeIndex: number) => (
                                     <List.Item
                                         actions={[
-                                            <Popconfirm title={t("common.delete_confirm")} onConfirm={() => deleteType.mutate({ catId: cat.id!, typeId: type.id! })}>
+                                            <Button
+                                                key="up"
+                                                size="small"
+                                                icon={<ArrowUpOutlined />}
+                                                title={t("vault_settings.move_up")}
+                                                type="text"
+                                                disabled={typeIndex === 0}
+                                                onClick={() => positionMutation.mutate({ entityType: "lifeEventTypes", id: type.id!, position: typeIndex - 1, categoryId: cat.id! })}
+                                            />,
+                                            <Button
+                                                key="down"
+                                                size="small"
+                                                icon={<ArrowDownOutlined />}
+                                                title={t("vault_settings.move_down")}
+                                                type="text"
+                                                disabled={typeIndex === (cat.types?.length ?? 1) - 1}
+                                                onClick={() => positionMutation.mutate({ entityType: "lifeEventTypes", id: type.id!, position: typeIndex + 1, categoryId: cat.id! })}
+                                            />,
+                                            <Popconfirm key="del" title={t("common.delete_confirm")} onConfirm={() => deleteType.mutate({ catId: cat.id!, typeId: type.id! })}>
                                                 <Button danger size="small" icon={<DeleteOutlined />} type="text" />
                                             </Popconfirm>
                                         ]}
@@ -707,6 +792,7 @@ export default function VaultSettings() {
         apiDelete={(vid, id) => api.vaultSettings.settingsMoodParamsDelete(String(vid), id)}
         title={t("vault_settings.mood_params")}
         extraFields={[{name: 'hex_color', label: t("vault_settings.hex_color"), type: 'color', initialValue: '#1677ff'}]}
+        positionEntityType="moodParams"
     /> },
     { key: "lifeEvents", label: t("vault_settings.life_events"), children: <LifeEventsTab /> },
     { key: "quickFacts", label: t("vault_settings.quick_facts"), children: <SimpleCrudTab 
@@ -716,6 +802,7 @@ export default function VaultSettings() {
         apiUpdate={(vid, id, data) => api.vaultSettings.settingsQuickFactTemplatesUpdate(String(vid), id, data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoUpdateQuickFactTemplateRequest)}
         apiDelete={(vid, id) => api.vaultSettings.settingsQuickFactTemplatesDelete(String(vid), id)}
         title={t("vault_settings.quick_facts")}
+        positionEntityType="quickFactTemplates"
     /> },
   ];
 
