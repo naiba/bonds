@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   List,
@@ -16,19 +16,8 @@ import { PlusOutlined, DeleteOutlined, UserOutlined, EditOutlined } from "@ant-d
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Relationship, Contact, APIError } from "@/api";
+import type { GithubComNaibaBondsInternalDtoRelationshipTypeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
-
-const relationshipTypes = [
-  "partner",
-  "spouse",
-  "child",
-  "parent",
-  "sibling",
-  "friend",
-  "colleague",
-  "mentor",
-  "other",
-];
 
 export default function RelationshipsModule({
   vaultId,
@@ -61,6 +50,30 @@ export default function RelationshipsModule({
       return res.data ?? [];
     },
   });
+
+  const { data: relationshipTypes = [] } = useQuery({
+    queryKey: ["personalize", "relationship-types"],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("relationship-types");
+      return (res.data ?? []) as GithubComNaibaBondsInternalDtoRelationshipTypeResponse[];
+    },
+  });
+
+  const contactMap = useMemo(() => {
+    const m = new Map<string, Contact>();
+    for (const c of contacts) {
+      if (c.id) m.set(c.id, c);
+    }
+    return m;
+  }, [contacts]);
+
+  const typeMap = useMemo(() => {
+    const m = new Map<number, GithubComNaibaBondsInternalDtoRelationshipTypeResponse>();
+    for (const t of relationshipTypes) {
+      if (t.id) m.set(t.id, t);
+    }
+    return m;
+  }, [relationshipTypes]);
 
   const createMutation = useMutation({
     mutationFn: (values: { related_contact_id: string; relationship_type_id: number }) => {
@@ -144,7 +157,7 @@ export default function RelationshipsModule({
                   setEditingId(r.id!);
                   form.setFieldsValue({
                     related_contact_id: r.related_contact_id,
-                    relationship_type: r.relationship_type?.name,
+                    relationship_type_id: r.relationship_type_id,
                   });
                   setOpen(true);
                 }}
@@ -156,8 +169,8 @@ export default function RelationshipsModule({
           >
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              title={<span style={{ fontWeight: 500 }}>{r.related_contact?.first_name} {r.related_contact?.last_name}</span>}
-              description={<Tag color="blue">{r.relationship_type ? r.relationship_type.name : ''}</Tag>}
+              title={<span style={{ fontWeight: 500 }}>{(() => { const c = contactMap.get(r.related_contact_id ?? ""); return c ? `${c.first_name} ${c.last_name}`.trim() : r.related_contact_id; })()}</span>}
+              description={<Tag color="blue">{typeMap.get(r.relationship_type_id ?? 0)?.name ?? ""}</Tag>}
             />
           </List.Item>
         )}
@@ -181,9 +194,9 @@ export default function RelationshipsModule({
               placeholder={t("modules.relationships.select_contact")}
             />
           </Form.Item>
-          <Form.Item name="relationship_type" label={t("modules.relationships.relationship_type")} rules={[{ required: true }]}>
+          <Form.Item name="relationship_type_id" label={t("modules.relationships.relationship_type")} rules={[{ required: true }]}>
             <Select
-              options={relationshipTypes.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+              options={relationshipTypes.map((rt) => ({ value: rt.id!, label: rt.name ?? "" }))}
             />
           </Form.Item>
         </Form>
