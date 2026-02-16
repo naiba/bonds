@@ -16,6 +16,7 @@ import {
   InputNumber,
   Row,
   Col,
+  Select,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -24,6 +25,9 @@ import {
   DeleteOutlined,
   FormOutlined,
   InboxOutlined,
+  LinkOutlined,
+  CheckOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, httpClient } from "@/api";
@@ -34,6 +38,7 @@ import type {
   Photo,
   PostMetric,
   JournalMetric,
+  SliceOfLifeResponse,
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -63,6 +68,8 @@ export default function PostDetail() {
   );
   const [newTagName, setNewTagName] = useState("");
   const [isAddingTag, setIsAddingTag] = useState(false);
+  const [editingTagId, setEditingTagId] = useState<number | null>(null);
+  const [editingTagName, setEditingTagName] = useState("");
 
   const { data: post, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId, "posts", pId],
@@ -123,6 +130,55 @@ export default function PostDetail() {
       return res.data ?? [];
     },
     enabled: !!vaultId && !!jId && !!pId,
+  });
+
+  const { data: slices } = useQuery({
+    queryKey: ["vaults", vaultId, "journals", jId, "slices"],
+    queryFn: async () => {
+      const res = await api.slicesOfLife.journalsSlicesList(vaultId, jId);
+      return (res.data ?? []) as SliceOfLifeResponse[];
+    },
+    enabled: !!vaultId && !!jId,
+  });
+
+  const assignSliceMutation = useMutation({
+    mutationFn: (sliceOfLifeId: number) =>
+      api.posts.journalsPostsSlicesUpdate(vaultId, jId, pId, {
+        slice_of_life_id: sliceOfLifeId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "journals", jId, "posts", pId],
+      });
+      message.success(t("vault.post_detail.slice_linked"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const removeSliceMutation = useMutation({
+    mutationFn: () =>
+      api.posts.journalsPostsSlicesDelete(vaultId, jId, pId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "journals", jId, "posts", pId],
+      });
+      message.success(t("vault.post_detail.slice_unlinked"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateTagMutation = useMutation({
+    mutationFn: ({ tagId, name }: { tagId: number; name: string }) =>
+      api.postTags.journalsPostsTagsUpdate(vaultId, jId, pId, tagId, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "journals", jId, "posts", pId, "tags"],
+      });
+      setEditingTagId(null);
+      setEditingTagName("");
+      message.success(t("vault.post_detail.tag_updated"));
+    },
+    onError: (e: APIError) => message.error(e.message),
   });
 
   const updateMutation = useMutation({
@@ -416,16 +472,52 @@ export default function PostDetail() {
 
                 <div style={{ marginBottom: 24 }}>
                   <Space wrap size={[0, 8]}>
-                    {tags?.map((tag: PostTag) => (
-                      <Tag
-                        key={tag.id}
-                        closable
-                        onClose={() => removeTagMutation.mutate(tag.id!)}
-                        color="blue"
-                      >
-                        {tag.name}
-                      </Tag>
-                    ))}
+                    {tags?.map((tag: PostTag) =>
+                      editingTagId === tag.id ? (
+                        <Space.Compact key={tag.id} size="small">
+                          <Input
+                            size="small"
+                            style={{ width: 100 }}
+                            value={editingTagName}
+                            onChange={(e) => setEditingTagName(e.target.value)}
+                            onPressEnter={() => {
+                              if (editingTagName.trim()) {
+                                updateTagMutation.mutate({ tagId: tag.id!, name: editingTagName.trim() });
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<CheckOutlined />}
+                            onClick={() => {
+                              if (editingTagName.trim()) {
+                                updateTagMutation.mutate({ tagId: tag.id!, name: editingTagName.trim() });
+                              }
+                            }}
+                          />
+                          <Button
+                            size="small"
+                            type="text"
+                            icon={<CloseOutlined />}
+                            onClick={() => { setEditingTagId(null); setEditingTagName(""); }}
+                          />
+                        </Space.Compact>
+                      ) : (
+                        <Tag
+                          key={tag.id}
+                          closable
+                          onClose={() => removeTagMutation.mutate(tag.id!)}
+                          color="blue"
+                          style={{ cursor: "pointer" }}
+                          onClick={() => { setEditingTagId(tag.id!); setEditingTagName(tag.name ?? ""); }}
+                          title={t("vault.post_detail.edit_tag")}
+                        >
+                          {tag.name}
+                        </Tag>
+                      ),
+                    )}
                     {isAddingTag ? (
                       <Input
                         type="text"
@@ -582,6 +674,42 @@ export default function PostDetail() {
 
         <Col xs={24} lg={8}>
           <Space direction="vertical" size={24} style={{ width: "100%" }}>
+            <Card
+              title={
+                <Space>
+                  <LinkOutlined />
+                  {t("vault.post_detail.link_slice")}
+                </Space>
+              }
+              style={{
+                boxShadow: token.boxShadowTertiary,
+                borderRadius: token.borderRadiusLG,
+              }}
+            >
+              <Select
+                style={{ width: "100%" }}
+                placeholder={t("vault.post_detail.select_slice")}
+                allowClear
+                loading={assignSliceMutation.isPending || removeSliceMutation.isPending}
+                onChange={(value) => {
+                  if (value) {
+                    assignSliceMutation.mutate(value);
+                  } else {
+                    removeSliceMutation.mutate();
+                  }
+                }}
+                options={slices?.map((s: SliceOfLifeResponse) => ({
+                  label: s.name,
+                  value: s.id,
+                }))}
+              />
+              {slices?.length === 0 && (
+                <Text type="secondary" style={{ display: "block", marginTop: 8, fontSize: 12 }}>
+                  {t("vault.post_detail.no_slice")}
+                </Text>
+              )}
+            </Card>
+
             <Card
               title={t("vault.post_detail.metrics")}
               style={{

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -17,6 +17,8 @@ import {
   Tag,
   Row,
   Col,
+  Segmented,
+  Image,
 } from "antd";
 import {
   PlusOutlined,
@@ -25,10 +27,11 @@ import {
   BookOutlined,
   CalendarOutlined,
   EditOutlined,
+  PictureOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Post, APIError, JournalMetricResponse, SliceOfLifeResponse } from "@/api";
+import type { Post, Photo, APIError, JournalMetricResponse, SliceOfLifeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -48,6 +51,9 @@ export default function JournalDetail() {
 
   const [metricInput, setMetricInput] = useState("");
   const [isAddingMetric, setIsAddingMetric] = useState(false);
+
+  const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [activeSection, setActiveSection] = useState<string>("posts");
 
   const [sliceModalOpen, setSliceModalOpen] = useState(false);
   const [editingSlice, setEditingSlice] = useState<SliceOfLifeResponse | null>(null);
@@ -80,13 +86,43 @@ export default function JournalDetail() {
     enabled: !!vaultId && !!jId,
   });
 
-  const { data: posts = [] } = useQuery({
+  const { data: allPosts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId, "posts"],
     queryFn: async () => {
       const res = await api.posts.journalsPostsList(String(vaultId), Number(jId));
       return res.data ?? [];
     },
     enabled: !!vaultId && !!jId,
+  });
+
+  const yearNum = selectedYear !== "all" ? Number(selectedYear) : null;
+
+  const { data: yearPosts } = useQuery({
+    queryKey: ["vaults", vaultId, "journals", jId, "posts", "year", yearNum],
+    queryFn: async () => {
+      const res = await api.journals.journalsYearsDetail(String(vaultId), Number(jId), yearNum!);
+      return (res.data ?? []) as Post[];
+    },
+    enabled: !!vaultId && !!jId && yearNum !== null,
+  });
+
+  const posts: Post[] = yearNum !== null && yearPosts ? yearPosts : allPosts;
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    for (const p of allPosts) {
+      if (p.written_at) years.add(dayjs(p.written_at).year());
+    }
+    return Array.from(years).sort((a, b) => b - a);
+  }, [allPosts]);
+
+  const { data: journalPhotos = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "journals", jId, "photos"],
+    queryFn: async () => {
+      const res = await api.journals.journalsPhotosList(String(vaultId), Number(jId));
+      return (res.data ?? []) as Photo[];
+    },
+    enabled: !!vaultId && !!jId && activeSection === "photos",
   });
 
   const createMetricMutation = useMutation({
@@ -148,6 +184,40 @@ export default function JournalDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "slices"] });
       message.success(t("vault.journal_detail.slice_deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [coverSliceId, setCoverSliceId] = useState<number | null>(null);
+
+  const { data: vaultFiles = [] } = useQuery<Photo[]>({
+    queryKey: ["vaults", vaultId, "files", "photos"],
+    queryFn: async () => {
+      const res = await api.files.filesPhotosList(String(vaultId));
+      return (res.data ?? []) as Photo[];
+    },
+    enabled: coverModalOpen,
+  });
+
+  const setCoverMutation = useMutation({
+    mutationFn: ({ sliceId, fileId }: { sliceId: number; fileId: number }) =>
+      api.slicesOfLife.journalsSlicesCoverUpdate(String(vaultId), Number(jId), sliceId, { file_id: fileId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "slices"] });
+      setCoverModalOpen(false);
+      setCoverSliceId(null);
+      message.success(t("vault.journal_detail.cover_set"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const removeCoverMutation = useMutation({
+    mutationFn: (sliceId: number) =>
+      api.slicesOfLife.journalsSlicesCoverDelete(String(vaultId), Number(jId), sliceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "slices"] });
+      message.success(t("vault.journal_detail.cover_removed"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -308,7 +378,29 @@ export default function JournalDetail() {
                 hoverable
                 size="small"
                 style={{ height: "100%", boxShadow: token.boxShadowTertiary }}
+                cover={
+                  slice.file_cover_image_id ? (
+                    <img
+                      alt={slice.name}
+                      src={`/api/vaults/${vaultId}/files/${slice.file_cover_image_id}/download`}
+                      style={{ height: 120, objectFit: "cover" }}
+                    />
+                  ) : undefined
+                }
                 actions={[
+                  <PictureOutlined
+                    key="cover"
+                    onClick={() => {
+                      if (slice.file_cover_image_id) {
+                        removeCoverMutation.mutate(slice.id!);
+                      } else {
+                        setCoverSliceId(slice.id!);
+                        setCoverModalOpen(true);
+                      }
+                    }}
+                    title={slice.file_cover_image_id ? t("vault.journal_detail.remove_cover") : t("vault.journal_detail.set_cover")}
+                    style={slice.file_cover_image_id ? { color: token.colorPrimary } : undefined}
+                  />,
                   <EditOutlined
                     key="edit"
                     onClick={() => {
@@ -345,66 +437,117 @@ export default function JournalDetail() {
       )}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <Title level={5} style={{ margin: 0 }}>{t("vault.journal_detail.posts")}</Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
-          {t("vault.journal_detail.new_post")}
-        </Button>
+        <Segmented
+          value={activeSection}
+          onChange={(v) => setActiveSection(v as string)}
+          options={[
+            { label: t("vault.journal_detail.posts"), value: "posts" },
+            { label: t("vault.journal_detail.photos_tab"), value: "photos" },
+          ]}
+        />
+        {activeSection === "posts" && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+            {t("vault.journal_detail.new_post")}
+          </Button>
+        )}
       </div>
 
-      <div
-        style={{
-          background: token.colorBgContainer,
-          borderRadius: token.borderRadiusLG,
-          boxShadow: token.boxShadowTertiary,
-          padding: "4px 0",
-        }}
-      >
-        <List
-          dataSource={posts}
-          locale={{ emptyText: <Empty description={t("vault.journal_detail.no_posts")} style={{ padding: 32 }} /> }}
-          renderItem={(post: Post) => (
-            <List.Item
-              style={{
-                margin: "4px 16px",
-                paddingLeft: 16,
-                borderRadius: token.borderRadius,
-                cursor: "pointer",
-                transition: "background 0.2s",
-              }}
-              actions={[
-                <Popconfirm
-                  key="d"
-                  title={t("vault.journal_detail.delete_post_confirm")}
-                   onConfirm={(e) => { e?.stopPropagation(); deletePostMutation.mutate(post.id!); }}
-                >
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </Popconfirm>,
-              ]}
-              onClick={() => navigate(`/vaults/${vaultId}/journals/${jId}/posts/${post.id}`)}
-            >
-              <List.Item.Meta
-                title={
-                  <Text strong style={{ fontSize: 15 }}>
-                    {post.title}
-                  </Text>
-                }
-                description={
-                  <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <CalendarOutlined style={{ fontSize: 12 }} />
-                    {dayjs(post.written_at).format("MMMM D, YYYY")}
-                  </span>
-                }
+      {activeSection === "posts" && (
+        <>
+          {availableYears.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <Segmented
+                size="small"
+                value={selectedYear}
+                onChange={(v) => setSelectedYear(v as string)}
+                options={[
+                  { label: t("vault.journal_detail.all_years"), value: "all" },
+                  ...availableYears.map((y) => ({ label: String(y), value: String(y) })),
+                ]}
               />
-            </List.Item>
+            </div>
           )}
-        />
-      </div>
+          <div
+            style={{
+              background: token.colorBgContainer,
+              borderRadius: token.borderRadiusLG,
+              boxShadow: token.boxShadowTertiary,
+              padding: "4px 0",
+            }}
+          >
+            <List
+              dataSource={posts}
+              locale={{ emptyText: <Empty description={t("vault.journal_detail.no_posts")} style={{ padding: 32 }} /> }}
+              renderItem={(post: Post) => (
+                <List.Item
+                  style={{
+                    margin: "4px 16px",
+                    paddingLeft: 16,
+                    borderRadius: token.borderRadius,
+                    cursor: "pointer",
+                    transition: "background 0.2s",
+                  }}
+                  actions={[
+                    <Popconfirm
+                      key="d"
+                      title={t("vault.journal_detail.delete_post_confirm")}
+                       onConfirm={(e) => { e?.stopPropagation(); deletePostMutation.mutate(post.id!); }}
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </Popconfirm>,
+                  ]}
+                  onClick={() => navigate(`/vaults/${vaultId}/journals/${jId}/posts/${post.id}`)}
+                >
+                  <List.Item.Meta
+                    title={
+                      <Text strong style={{ fontSize: 15 }}>
+                        {post.title}
+                      </Text>
+                    }
+                    description={
+                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <CalendarOutlined style={{ fontSize: 12 }} />
+                        {dayjs(post.written_at).format("MMMM D, YYYY")}
+                      </span>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </div>
+        </>
+      )}
+
+      {activeSection === "photos" && (
+        <Card
+          style={{ boxShadow: token.boxShadowTertiary }}
+          styles={{ body: { padding: 16 } }}
+        >
+          {journalPhotos.length === 0 ? (
+            <Empty description={t("vault.journal_detail.no_photos")} />
+          ) : (
+            <Image.PreviewGroup>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                {journalPhotos.map((photo: Photo) => (
+                  <Image
+                    key={photo.id}
+                    width={120}
+                    height={120}
+                    src={`/api/vaults/${vaultId}/files/${photo.id}/download`}
+                    style={{ objectFit: "cover", borderRadius: token.borderRadius }}
+                  />
+                ))}
+              </div>
+            </Image.PreviewGroup>
+          )}
+        </Card>
+      )}
 
       <Modal
         title={editingSlice ? t("common.edit") : t("vault.journal_detail.new_slice")}
@@ -461,6 +604,48 @@ export default function JournalDetail() {
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={t("vault.journal_detail.select_cover")}
+        open={coverModalOpen}
+        onCancel={() => { setCoverModalOpen(false); setCoverSliceId(null); }}
+        footer={null}
+        width={600}
+      >
+        {vaultFiles.length === 0 ? (
+          <Empty description={t("vault.files.no_files")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        ) : (
+          <Row gutter={[8, 8]}>
+            {vaultFiles.map((file: Photo) => (
+              <Col span={6} key={file.id}>
+                <Card
+                  hoverable
+                  size="small"
+                  style={{ overflow: "hidden" }}
+                  styles={{ body: { padding: 4 } }}
+                  onClick={() => {
+                    if (coverSliceId !== null && file.id) {
+                      setCoverMutation.mutate({ sliceId: coverSliceId, fileId: file.id });
+                    }
+                  }}
+                >
+                  <img
+                    alt={file.name}
+                    src={`/api/vaults/${vaultId}/files/${file.id}/download`}
+                    style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }}
+                  />
+                  <Text
+                    ellipsis={{ tooltip: file.name }}
+                    style={{ fontSize: 11, display: "block", textAlign: "center", marginTop: 2 }}
+                  >
+                    {file.name}
+                  </Text>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
       </Modal>
     </div>
   );
