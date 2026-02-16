@@ -10,12 +10,15 @@ import {
   Descriptions,
   Input,
   Popconfirm,
+  Tag,
+  Empty,
 } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import { EditOutlined, ShopOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
-import type { Contact, UpdateContactReligionRequest, APIError } from "@/api";
+import type { Contact, Company, UpdateContactReligionRequest, APIError } from "@/api";
 import { useState } from "react";
 
 const { Title, Text } = Typography;
@@ -39,6 +42,7 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isReligionModalOpen, setIsReligionModalOpen] = useState(false);
   const [religionForm] = Form.useForm();
 
@@ -106,6 +110,15 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
     },
   });
 
+  const { data: contactCompanies = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", contactId, "companies"],
+    queryFn: async () => {
+      const res = await api.companies.contactsCompaniesListList(String(vaultId), String(contactId));
+      return (res.data ?? []) as Company[];
+    },
+    enabled: !!vaultId && !!contactId,
+  });
+
   return (
     <Space orientation="vertical" style={{ width: "100%" }} size={16}>
       <Card
@@ -170,6 +183,36 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
                {extra.job_position || "—"}
              </Descriptions.Item>
          </Descriptions>
+      </Card>
+
+      <Card
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <ShopOutlined />
+            <Title level={5} style={{ margin: 0 }}>
+              {t("modules.extra_info.companies")}
+            </Title>
+          </div>
+        }
+      >
+        {contactCompanies.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {contactCompanies.map((company: Company) => (
+              <Tag
+                key={company.id}
+                style={{ cursor: "pointer", fontSize: 14, padding: "4px 10px" }}
+                onClick={() => navigate(`/vaults/${vaultId}/companies`)}
+              >
+                {company.name}
+              </Tag>
+            ))}
+          </div>
+        ) : (
+          <Empty
+            description={t("modules.extra_info.no_companies")}
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        )}
       </Card>
 
       <Modal

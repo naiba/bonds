@@ -15,7 +15,15 @@ import {
   Space,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
+  StarOutlined,
+  StarFilled,
+} from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { TimelineEvent as TEvent, APIError } from "@/api";
@@ -109,14 +117,45 @@ export default function LifeEventsModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const toggleTimelineMutation = useMutation({
+    mutationFn: (timelineId: number) =>
+      api.lifeEvents.contactsTimelineEventsToggleUpdate(String(vaultId), String(contactId), timelineId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("modules.life_events.timeline_toggled"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const toggleLifeEventMutation = useMutation({
+    mutationFn: ({ timelineId, lifeEventId }: { timelineId: number; lifeEventId: number }) =>
+      api.lifeEvents.contactsTimelineEventsLifeEventsToggleUpdate(String(vaultId), String(contactId), timelineId, lifeEventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("modules.life_events.event_toggled"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   if (isLoading) return <Card loading />;
 
   const collapseItems = timelines.map((tl: TEvent) => ({
     key: tl.id,
     label: (
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 500 }}>{tl.label} — <span style={{ color: token.colorTextSecondary, fontWeight: 400 }}>{dayjs(tl.started_at).format("MMM YYYY")}</span></span>
+        <span style={{ fontWeight: 500, opacity: tl.collapsed ? 0.5 : 1 }}>{tl.label} — <span style={{ color: token.colorTextSecondary, fontWeight: 400 }}>{dayjs(tl.started_at).format("MMM YYYY")}</span></span>
         <Space>
+          <Button
+            type="text"
+            size="small"
+            icon={tl.collapsed ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+            style={{ color: tl.collapsed ? token.colorTextDisabled : token.colorPrimary }}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleTimelineMutation.mutate(tl.id!);
+            }}
+            title={t("modules.life_events.toggle_timeline")}
+          />
           <Button
             type="text"
             size="small"
@@ -157,7 +196,7 @@ export default function LifeEventsModule({
           color: token.colorPrimary,
           children: (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
+              <div style={{ opacity: le.collapsed ? 0.5 : 1 }}>
                 <strong style={{ fontWeight: 500 }}>{le.summary ?? le.description}</strong>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -168,6 +207,19 @@ export default function LifeEventsModule({
                 )}
               </div>
               <div>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={le.collapsed ? <StarFilled style={{ color: token.colorWarning }} /> : <StarOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleLifeEventMutation.mutate({
+                      timelineId: tl.id!,
+                      lifeEventId: le.id!,
+                    });
+                  }}
+                  title={t("modules.life_events.toggle_event")}
+                />
                 <Button
                   type="text"
                   size="small"
