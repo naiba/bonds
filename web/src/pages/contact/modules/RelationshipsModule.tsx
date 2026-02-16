@@ -14,11 +14,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { relationshipsApi } from "@/api/relationships";
-import { contactsApi } from "@/api/contacts";
-import type { Relationship } from "@/types/modules";
-import type { Contact } from "@/types/contact";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Relationship, Contact, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const relationshipTypes = [
@@ -51,22 +48,22 @@ export default function RelationshipsModule({
   const { data: relationships = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await relationshipsApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.relationships.contactsRelationshipsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts"],
     queryFn: async () => {
-      const res = await contactsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.contacts.contactsList(String(vaultId));
+      return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { related_contact_id: number; relationship_type: string }) =>
-      relationshipsApi.create(vaultId, contactId, values),
+    mutationFn: (values: { related_contact_id: string; relationship_type_id: number }) =>
+      api.relationships.contactsRelationshipsCreate(String(vaultId), String(contactId), values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -77,7 +74,7 @@ export default function RelationshipsModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => relationshipsApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.relationships.contactsRelationshipsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.relationships.removed"));
@@ -121,15 +118,15 @@ export default function RelationshipsModule({
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
-              <Popconfirm key="d" title={t("modules.relationships.remove_confirm")} onConfirm={() => deleteMutation.mutate(r.id)}>
+              <Popconfirm key="d" title={t("modules.relationships.remove_confirm")} onConfirm={() => deleteMutation.mutate(r.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
           >
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              title={<span style={{ fontWeight: 500 }}>{r.related_contact_name}</span>}
-              description={<Tag color="blue">{r.relationship_type}</Tag>}
+              title={<span style={{ fontWeight: 500 }}>{r.related_contact_id}</span>}
+              description={<Tag color="blue">{r.relationship_type_id ? `#${r.relationship_type_id}` : ''}</Tag>}
             />
           </List.Item>
         )}

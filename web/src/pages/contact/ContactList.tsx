@@ -10,9 +10,8 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { contactsApi } from "@/api/contacts";
-import { vcardApi } from "@/api/vcard";
-import type { Contact } from "@/types/contact";
+import { api } from "@/api";
+import type { Contact } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -45,8 +44,8 @@ export default function ContactList() {
   const { data, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts"],
     queryFn: async () => {
-      const res = await contactsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.contacts.contactsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
     meta: {
@@ -58,9 +57,9 @@ export default function ContactList() {
     const all = data ?? [];
     if (!search) return all;
     const q = search.toLowerCase();
-    return all.filter((c) =>
-      c.first_name.toLowerCase().includes(q) ||
-      c.last_name.toLowerCase().includes(q) ||
+    return all.filter((c: Contact) =>
+      (c.first_name ?? '').toLowerCase().includes(q) ||
+      (c.last_name ?? '').toLowerCase().includes(q) ||
       c.nickname?.toLowerCase().includes(q)
     );
   }, [data, search]);
@@ -70,8 +69,8 @@ export default function ContactList() {
       title: t("contact.list.col_name"),
       key: "name",
       render: (_, record) => {
-        const initials = `${record.first_name.charAt(0)}${record.last_name?.charAt(0) ?? ""}`.toUpperCase();
-        const bgColor = getAvatarColor(record.first_name + record.last_name);
+        const initials = `${(record.first_name ?? '').charAt(0)}${(record.last_name ?? '').charAt(0)}`.toUpperCase();
+        const bgColor = getAvatarColor((record.first_name ?? '') + (record.last_name ?? ''));
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div
@@ -101,7 +100,7 @@ export default function ContactList() {
           </div>
         );
       },
-      sorter: (a, b) => a.first_name.localeCompare(b.first_name),
+      sorter: (a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''),
     },
     {
       title: t("contact.list.col_nickname"),
@@ -190,8 +189,8 @@ export default function ContactList() {
               showUploadList={false}
               customRequest={async ({ file }) => {
                 try {
-                  const res = await vcardApi.importVCard(vaultId, file as File);
-                  const count = (res.data.data as { count?: number })?.count ?? 0;
+                  const res = await api.vcard.contactsImportCreate(String(vaultId), { file: file as File });
+                  const count = (res.data as { count?: number })?.count ?? 0;
                   message.success(t("vcard.importSuccess", { count }));
                 } catch {
                   message.error(t("contact.list.load_failed"));
@@ -205,8 +204,8 @@ export default function ContactList() {
               icon={<DownloadOutlined />}
               onClick={async () => {
                 try {
-                  const res = await vcardApi.exportVault(vaultId);
-                  const blob = new Blob([res.data as BlobPart]);
+                  const res = await api.vcard.contactsExportList(String(vaultId));
+                  const blob = new Blob([res as BlobPart]);
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
                   a.href = url;

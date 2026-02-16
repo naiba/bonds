@@ -5,9 +5,8 @@ import {
   DownloadOutlined,
 } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import client from "@/api/client";
-import type { APIResponse } from "@/types/api";
-import type { Document } from "@/types/modules";
+import { api } from "@/api";
+import type { Document } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Dragger } = Upload;
@@ -34,10 +33,8 @@ export default function DocumentsModule({
   const { data: documents = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await client.get<APIResponse<Document[]>>(
-        `/vaults/${vaultId}/contacts/${contactId}/documents`,
-      );
-      return res.data.data ?? [];
+      const res = await api.contactDocuments.contactsDocumentsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -98,17 +95,17 @@ export default function DocumentsModule({
                 type="text"
                 size="small"
                 icon={<DownloadOutlined />}
-                href={doc.url}
+                href={`/api/vaults/${vaultId}/files/${doc.id}/download`}
                 target="_blank"
               />,
             ]}
           >
             <List.Item.Meta
               avatar={<FileOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              title={<span style={{ fontWeight: 500 }}>{doc.filename}</span>}
+              title={<span style={{ fontWeight: 500 }}>{doc.name}</span>}
               description={
                 <span style={{ color: token.colorTextSecondary }}>
-                  <Tag>{doc.mime_type}</Tag> {formatSize(doc.size)}
+                  <Tag>{doc.mime_type}</Tag> {formatSize(doc.size!)}
                 </span>
               }
             />

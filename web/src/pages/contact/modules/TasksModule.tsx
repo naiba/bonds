@@ -14,9 +14,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { tasksApi } from "@/api/tasks";
-import type { Task } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Task, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 export default function TasksModule({
@@ -37,14 +36,14 @@ export default function TasksModule({
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await tasksApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.tasks.contactsTasksList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (taskLabel: string) =>
-      tasksApi.create(vaultId, contactId, { label: taskLabel }),
+      api.tasks.contactsTasksCreate(String(vaultId), String(contactId), { label: taskLabel }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setAdding(false);
@@ -56,15 +55,13 @@ export default function TasksModule({
 
   const toggleMutation = useMutation({
     mutationFn: (task: Task) =>
-      tasksApi.update(vaultId, contactId, task.id, {
-        is_completed: !task.is_completed,
-      }),
+      api.tasks.contactsTasksToggleUpdate(String(vaultId), String(contactId), task.id!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
     onError: (e: APIError) => message.error(e.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (taskId: number) => tasksApi.delete(vaultId, contactId, taskId),
+    mutationFn: (taskId: number) => api.tasks.contactsTasksDelete(String(vaultId), String(contactId), taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.tasks.deleted"));
@@ -72,8 +69,8 @@ export default function TasksModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
-  const pending = tasks.filter((t) => !t.is_completed);
-  const completed = tasks.filter((t) => t.is_completed);
+  const pending = tasks.filter((t: Task) => !t.completed);
+  const completed = tasks.filter((t: Task) => t.completed);
 
   function renderItem(task: Task) {
     return (
@@ -87,17 +84,17 @@ export default function TasksModule({
         onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         actions={[
-          <Popconfirm key="d" title={t("modules.tasks.delete_confirm")} onConfirm={() => deleteMutation.mutate(task.id)}>
+          <Popconfirm key="d" title={t("modules.tasks.delete_confirm")} onConfirm={() => deleteMutation.mutate(task.id!)}>
             <Button type="text" size="small" danger icon={<DeleteOutlined />} />
           </Popconfirm>,
         ]}
       >
         <Checkbox
-          checked={task.is_completed}
+          checked={task.completed}
           onChange={() => toggleMutation.mutate(task)}
           style={{
-            textDecoration: task.is_completed ? "line-through" : undefined,
-            color: task.is_completed ? token.colorTextQuaternary : token.colorText,
+            textDecoration: task.completed ? "line-through" : undefined,
+            color: task.completed ? token.colorTextQuaternary : token.colorText,
           }}
         >
           {task.label}

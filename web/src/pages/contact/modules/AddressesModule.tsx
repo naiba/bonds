@@ -20,9 +20,8 @@ import {
   EnvironmentOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { addressesApi } from "@/api/addresses";
-import type { Address } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Address, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 export default function AddressesModule({
@@ -44,8 +43,8 @@ export default function AddressesModule({
   const { data: addresses = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await addressesApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.addresses.contactsAddressesList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -61,9 +60,9 @@ export default function AddressesModule({
       is_primary?: boolean;
     }) => {
       if (editingId) {
-        return addressesApi.update(vaultId, contactId, editingId, values);
+        return api.addresses.contactsAddressesUpdate(String(vaultId), String(contactId), editingId, values);
       }
-      return addressesApi.create(vaultId, contactId, values);
+      return api.addresses.contactsAddressesCreate(String(vaultId), String(contactId), values);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -74,7 +73,7 @@ export default function AddressesModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => addressesApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.addresses.contactsAddressesDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.addresses.deleted"));
@@ -83,7 +82,7 @@ export default function AddressesModule({
   });
 
   function openEdit(a: Address) {
-    setEditingId(a.id);
+    setEditingId(a.id ?? null);
     form.setFieldsValue(a);
     setOpen(true);
   }
@@ -95,7 +94,7 @@ export default function AddressesModule({
   }
 
   function formatAddress(a: Address) {
-    return [a.address_line_1, a.address_line_2, a.city, a.province, a.postal_code, a.country]
+    return [a.line_1, a.line_2, a.city, a.province, a.postal_code, a.country]
       .filter(Boolean)
       .join(", ");
   }
@@ -135,7 +134,7 @@ export default function AddressesModule({
             actions={[
               <Button key="map" type="text" size="small" icon={<EnvironmentOutlined />} href={mapsUrl(a)} target="_blank" />,
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(a)} />,
-              <Popconfirm key="d" title={t("modules.addresses.delete_confirm")} onConfirm={() => deleteMutation.mutate(a.id)}>
+              <Popconfirm key="d" title={t("modules.addresses.delete_confirm")} onConfirm={() => deleteMutation.mutate(a.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
@@ -143,7 +142,7 @@ export default function AddressesModule({
             <List.Item.Meta
               title={
                 <span style={{ fontWeight: 500 }}>
-                  {a.label} {a.is_primary && <Tag color="blue">{t("common.primary")}</Tag>}
+                  {a.address_type_id ? `#${a.address_type_id}` : ''} {a.is_past_address && <Tag color="blue">{t("common.primary")}</Tag>}
                 </span>
               }
               description={<span style={{ color: token.colorTextSecondary }}>{formatAddress(a)}</span>}

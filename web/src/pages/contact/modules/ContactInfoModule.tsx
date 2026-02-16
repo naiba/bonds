@@ -14,9 +14,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contactInfoApi } from "@/api/contactInfo";
-import type { ContactInfo } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { ContactInfo, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const infoTypes = [
@@ -47,23 +46,23 @@ export default function ContactInfoModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const qk = ["vaults", vaultId, "contacts", contactId, "contact-info"];
+  const qk = ["vaults", vaultId, "contacts", contactId, "contactInformation"];
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await contactInfoApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.contactInformation.contactsContactInformationList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const data = { type, label, value };
+      const payload = { data: value, kind: label || type, type_id: Math.max(1, infoTypes.findIndex((t) => t.value === type) + 1) };
       if (editingId) {
-        return contactInfoApi.update(vaultId, contactId, editingId, data);
+        return api.contactInformation.contactsContactInformationUpdate(String(vaultId), String(contactId), editingId, payload);
       }
-      return contactInfoApi.create(vaultId, contactId, data);
+      return api.contactInformation.contactsContactInformationCreate(String(vaultId), String(contactId), payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -74,7 +73,7 @@ export default function ContactInfoModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => contactInfoApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.contactInformation.contactsContactInformationDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.contact_info.deleted"));
@@ -91,10 +90,10 @@ export default function ContactInfoModule({
   }
 
   function startEdit(item: ContactInfo) {
-    setEditingId(item.id);
-    setType(item.type);
-    setLabel(item.label);
-    setValue(item.value);
+    setEditingId(item.id ?? null);
+    setType(item.kind ?? 'email');
+    setLabel(item.kind ?? '');
+    setValue(item.data ?? '');
     setAdding(false);
   }
 
@@ -172,7 +171,7 @@ export default function ContactInfoModule({
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-              <Popconfirm key="d" title={t("modules.contact_info.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id)}>
+              <Popconfirm key="d" title={t("modules.contact_info.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
@@ -180,10 +179,10 @@ export default function ContactInfoModule({
             <List.Item.Meta
               title={
                 <span style={{ fontWeight: 500 }}>
-                  <Tag>{item.type}</Tag> {item.label}
+                  <Tag>{item.kind}</Tag> {item.kind}
                 </span>
               }
-              description={<span style={{ color: token.colorTextSecondary }}>{item.value}</span>}
+              description={<span style={{ color: token.colorTextSecondary }}>{item.data}</span>}
             />
           </List.Item>
         )}

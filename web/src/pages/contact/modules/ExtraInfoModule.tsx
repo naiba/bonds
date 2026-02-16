@@ -11,14 +11,20 @@ import {
 } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contactExtraApi } from "@/api/contactExtra";
-import { settingsApi } from "@/api/settings";
+import { api } from "@/api";
 import { useTranslation } from "react-i18next";
-import type { Contact, UpdateContactReligionRequest } from "@/types/contact";
-import type { APIError } from "@/types/api";
+import type { Contact, UpdateContactReligionRequest, APIError } from "@/api";
 import { useState } from "react";
 
 const { Title, Text } = Typography;
+
+// The backend returns religion_id, company_id, job_position in JSON but swagger
+// annotations don't include them in ContactResponse. Use an extended interface.
+interface ContactExtra {
+  religion_id?: number;
+  company_id?: number;
+  job_position?: string;
+}
 
 interface ExtraInfoModuleProps {
   vaultId: string;
@@ -27,6 +33,7 @@ interface ExtraInfoModuleProps {
 }
 
 export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraInfoModuleProps) {
+  const extra = contact as Contact & ContactExtra;
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -36,14 +43,14 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
   const { data: religions = [] } = useQuery({
     queryKey: ["vaults", vaultId, "personalize", "religions"],
     queryFn: async () => {
-      const res = await settingsApi.listPersonalizeItems("religions");
-      return res.data.data ?? [];
+      const res = await api.personalize.personalizeDetail("religions");
+      return res.data ?? [];
     },
   });
 
   const religionMutation = useMutation({
     mutationFn: (values: UpdateContactReligionRequest) =>
-      contactExtraApi.updateReligion(vaultId, contactId, values),
+      api.contacts.contactsReligionUpdate(String(vaultId), String(contactId), values),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts", contactId],
@@ -71,7 +78,7 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
             type="text"
             icon={<EditOutlined />}
             onClick={() => {
-              religionForm.setFieldsValue({ religion_id: contact.religion_id });
+              religionForm.setFieldsValue({ religion_id: extra.religion_id });
               setIsReligionModalOpen(true);
             }}
           >
@@ -79,8 +86,9 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
           </Button>
         }
       >
-        {contact.religion_id ? (
-          <Text>{religions.find((r) => r.id === contact.religion_id)?.label || contact.religion_id}</Text>
+        {extra.religion_id ? (
+          <Text>{/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {religions.find((r: any) => r.id === extra.religion_id)?.label || extra.religion_id}</Text>
         ) : (
           <Text type="secondary">{t("contact.detail.no_religion")}</Text>
         )}
@@ -96,12 +104,12 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
         }
       >
          <Descriptions column={1}>
-            <Descriptions.Item label={t("contact.detail.company")}>
-              {contact.company_id ? `Company #${contact.company_id}` : "—"} 
-            </Descriptions.Item>
-            <Descriptions.Item label={t("contact.detail.job_position")}>
-              {contact.job_position || "—"}
-            </Descriptions.Item>
+             <Descriptions.Item label={t("contact.detail.company")}>
+               {extra.company_id ? `Company #${extra.company_id}` : "—"} 
+             </Descriptions.Item>
+             <Descriptions.Item label={t("contact.detail.job_position")}>
+               {extra.job_position || "—"}
+             </Descriptions.Item>
          </Descriptions>
       </Card>
 
@@ -120,7 +128,8 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
           <Form.Item name="religion_id" label={t("contact.detail.religion")}>
             <Select
               allowClear
-              options={religions.map((r) => ({ label: r.label, value: r.id }))}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              options={religions.map((r: any) => ({ label: r.label, value: r.id }))}
               placeholder={t("contact.detail.labels.select_placeholder")}
             />
           </Form.Item>

@@ -15,9 +15,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { importantDatesApi } from "@/api/importantDates";
-import type { ImportantDate, CreateImportantDateRequest } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { ImportantDate, CreateImportantDateRequest, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
@@ -68,8 +67,8 @@ export default function ImportantDatesModule({
   const { data: dates = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await importantDatesApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.importantDates.contactsDatesList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -94,9 +93,9 @@ export default function ImportantDatesModule({
       }
 
       if (editingId) {
-        return importantDatesApi.update(vaultId, contactId, editingId, data);
+        return api.importantDates.contactsDatesUpdate(String(vaultId), String(contactId), editingId, data);
       }
-      return importantDatesApi.create(vaultId, contactId, data);
+      return api.importantDates.contactsDatesCreate(String(vaultId), String(contactId), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -107,7 +106,7 @@ export default function ImportantDatesModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => importantDatesApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.importantDates.contactsDatesDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.important_dates.deleted"));
@@ -116,7 +115,7 @@ export default function ImportantDatesModule({
   });
 
   function openEdit(d: ImportantDate) {
-    setEditingId(d.id);
+    setEditingId(d.id ?? null);
     const ct = (d.calendar_type || "gregorian") as CalendarType;
     const pickerVal: CalendarDatePickerValue =
       ct !== "gregorian" && d.original_day != null && d.original_month != null
@@ -162,7 +161,7 @@ export default function ImportantDatesModule({
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(d)} />,
-              <Popconfirm key="d" title={t("modules.important_dates.delete_confirm")} onConfirm={() => deleteMutation.mutate(d.id)}>
+              <Popconfirm key="d" title={t("modules.important_dates.delete_confirm")} onConfirm={() => deleteMutation.mutate(d.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}

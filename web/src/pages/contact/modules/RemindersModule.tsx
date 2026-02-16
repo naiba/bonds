@@ -15,9 +15,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { remindersApi } from "@/api/reminders";
-import type { Reminder, CreateReminderRequest } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Reminder, CreateReminderRequest, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
@@ -74,8 +73,8 @@ export default function RemindersModule({
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await remindersApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.reminders.contactsRemindersList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -101,9 +100,9 @@ export default function RemindersModule({
       }
 
       if (editingId) {
-        return remindersApi.update(vaultId, contactId, editingId, data);
+        return api.reminders.contactsRemindersUpdate(String(vaultId), String(contactId), editingId, data);
       }
-      return remindersApi.create(vaultId, contactId, data);
+      return api.reminders.contactsRemindersCreate(String(vaultId), String(contactId), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -114,7 +113,7 @@ export default function RemindersModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => remindersApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.reminders.contactsRemindersDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.reminders.deleted"));
@@ -123,7 +122,7 @@ export default function RemindersModule({
   });
 
   function openEdit(r: Reminder) {
-    setEditingId(r.id);
+    setEditingId(r.id ?? null);
     const ct = (r.calendar_type || "gregorian") as CalendarType;
     const pickerVal: CalendarDatePickerValue =
       ct !== "gregorian" && r.original_day != null && r.original_month != null
@@ -169,7 +168,7 @@ export default function RemindersModule({
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(r)} />,
-              <Popconfirm key="d" title={t("modules.reminders.delete_confirm")} onConfirm={() => deleteMutation.mutate(r.id)}>
+              <Popconfirm key="d" title={t("modules.reminders.delete_confirm")} onConfirm={() => deleteMutation.mutate(r.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
@@ -179,7 +178,7 @@ export default function RemindersModule({
               description={
                 <>
                   <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r)}</span>{" "}
-                  <Tag color={freqColor[r.type] ?? "default"}>{r.type}</Tag>
+                  <Tag color={freqColor[r.type!] ?? "default"}>{r.type}</Tag>
                   {r.calendar_type && r.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{r.calendar_type}</Tag>
                   )}

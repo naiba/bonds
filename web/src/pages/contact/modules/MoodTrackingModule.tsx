@@ -13,9 +13,8 @@ import {
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { lifeEventsApi } from "@/api/lifeEvents";
-import type { MoodTrackingEvent } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { MoodTrackingEvent, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -45,18 +44,21 @@ export default function MoodTrackingModule({
   const { data: moods = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await lifeEventsApi.listMoods(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.moodTracking.contactsMoodTrackingEventsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      lifeEventsApi.createMood(vaultId, contactId, {
+    mutationFn: () => {
+      const activeParams = params.filter((p) => p.rating > 0);
+      const firstParam = activeParams[0];
+      return api.moodTracking.contactsMoodTrackingEventsCreate(String(vaultId), String(contactId), {
         rated_at: dayjs().toISOString(),
         note: note || undefined,
-        parameters: params.filter((p) => p.rating > 0),
-      }),
+        mood_tracking_parameter_id: firstParam ? firstParam.rating : 1,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setAdding(false);
@@ -146,11 +148,11 @@ export default function MoodTrackingModule({
               description={
                 <>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                    {mood.parameters?.map((p) => (
-                      <Tag key={p.id} color={ratingColors[p.rating - 1] ?? "default"}>
-                        {p.label}: {p.rating}/5
+                    {mood.mood_tracking_parameter_id != null && (
+                      <Tag color={ratingColors[(mood.mood_tracking_parameter_id - 1) % ratingColors.length] ?? "default"}>
+                        {t("modules.mood_tracking.parameter")} #{mood.mood_tracking_parameter_id}
                       </Tag>
-                    ))}
+                    )}
                   </div>
                   {mood.note && <div style={{ color: token.colorTextSecondary }}>{mood.note}</div>}
                 </>

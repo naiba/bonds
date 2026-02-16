@@ -1,9 +1,8 @@
 import { Card, Upload, Image, Empty, App, theme } from "antd";
 import { InboxOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import client from "@/api/client";
-import type { APIResponse } from "@/types/api";
-import type { Photo } from "@/types/modules";
+import { api } from "@/api";
+import type { Photo } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Dragger } = Upload;
@@ -24,10 +23,8 @@ export default function PhotosModule({
   const { data: photos = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await client.get<APIResponse<Photo[]>>(
-        `/vaults/${vaultId}/contacts/${contactId}/photos`,
-      );
-      return res.data.data ?? [];
+      const res = await api.contactPhotos.contactsPhotosList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -78,7 +75,7 @@ export default function PhotosModule({
                 key={photo.id}
                 width={120}
                 height={120}
-                src={photo.url}
+                src={`/api/vaults/${vaultId}/files/${photo.id}/download`}
                 style={{ objectFit: "cover", borderRadius: token.borderRadius }}
               />
             ))}

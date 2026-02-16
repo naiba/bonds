@@ -13,10 +13,9 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contactLabelsApi } from "@/api/contactLabels";
-import { vaultSettingsApi } from "@/api/vaultSettings";
+import { api } from "@/api";
 import { useTranslation } from "react-i18next";
-import type { APIError } from "@/types/api";
+import type { APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -35,23 +34,23 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
   const { data: labels = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", contactId, "labels"],
     queryFn: async () => {
-      const res = await contactLabelsApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.contactLabels.contactsLabelsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const { data: allLabels = [] } = useQuery({
     queryKey: ["vaults", vaultId, "labels"],
     queryFn: async () => {
-      const res = await vaultSettingsApi.listLabels(parseInt(vaultId, 10));
-      return res.data.data ?? [];
+      const res = await api.vaultSettings.settingsLabelsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: isModalOpen,
   });
 
   const addMutation = useMutation({
     mutationFn: (values: { label_id: number }) =>
-      contactLabelsApi.add(vaultId, contactId, values),
+      api.contactLabels.contactsLabelsCreate(String(vaultId), String(contactId), values),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts", contactId, "labels"],
@@ -67,7 +66,7 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
 
   const removeMutation = useMutation({
     mutationFn: (labelId: number) =>
-      contactLabelsApi.remove(vaultId, contactId, labelId),
+      api.contactLabels.contactsLabelsDelete(String(vaultId), String(contactId), labelId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts", contactId, "labels"],
@@ -80,7 +79,8 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
   });
 
   const availableLabels = allLabels.filter(
-    (l) => !labels.some((cl) => cl.label_id === l.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (l: any) => !labels.some((cl: any) => cl.label_id === l.id)
   );
 
   return (
@@ -111,7 +111,8 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
         <Text type="secondary">{t("contact.detail.labels.no_labels")}</Text>
       ) : (
         <Space size={[8, 8]} wrap>
-          {labels.map((label) => (
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {labels.map((label: any) => (
             <Tag
               key={label.id}
               color={label.bg_color || "default"}
@@ -155,7 +156,8 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
           >
             <Select
               placeholder={t("contact.detail.labels.select_placeholder")}
-              options={availableLabels.map((l) => ({
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              options={availableLabels.map((l: any) => ({
                 label: l.name,
                 value: l.id,
               }))}

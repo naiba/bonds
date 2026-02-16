@@ -12,8 +12,8 @@ import {
   ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { contactExtraApi } from "@/api/contactExtra";
-import type { FeedItem } from "@/types/modules";
+import { api } from "@/api";
+import type { FeedItem } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -41,8 +41,8 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
   const { data: feed = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", contactId, "feed"],
     queryFn: async () => {
-      const res = await contactExtraApi.getFeed(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.feed.contactsFeedList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -92,7 +92,7 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
               title={
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <Tag
-                    color={getActionColor(item.action)}
+                    color={getActionColor(item.action ?? '')}
                     style={{ borderRadius: 12, fontSize: 11, margin: 0 }}
                   >
                     {item.action}
@@ -100,7 +100,7 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <ClockCircleOutlined style={{ fontSize: 11, color: token.colorTextQuaternary }} />
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      {dayjs(item.happened_at).fromNow()}
+                      {dayjs(item.created_at).fromNow()}
                     </Text>
                   </div>
                 </div>

@@ -2,9 +2,8 @@ import { useState } from "react";
 import { Card, List, Button, Input, Space, Popconfirm, App, Empty, theme } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { notesApi } from "@/api/notes";
-import type { Note } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Note, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -30,14 +29,14 @@ export default function NotesModule({
   const { data: notes = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await notesApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.notes.contactsNotesList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (data: { title: string; body: string }) =>
-      notesApi.create(vaultId, contactId, data),
+      api.notes.contactsNotesCreate(String(vaultId), String(contactId), data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       resetForm();
@@ -53,7 +52,7 @@ export default function NotesModule({
     }: {
       noteId: number;
       data: { title: string; body: string };
-    }) => notesApi.update(vaultId, contactId, noteId, data),
+    }) => api.notes.contactsNotesUpdate(String(vaultId), String(contactId), noteId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       resetForm();
@@ -63,7 +62,7 @@ export default function NotesModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (noteId: number) => notesApi.delete(vaultId, contactId, noteId),
+    mutationFn: (noteId: number) => api.notes.contactsNotesDelete(String(vaultId), String(contactId), noteId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.notes.deleted"));
@@ -79,9 +78,9 @@ export default function NotesModule({
   }
 
   function startEdit(note: Note) {
-    setEditingId(note.id);
-    setTitle(note.title);
-    setBody(note.body);
+    setEditingId(note.id ?? null);
+    setTitle(note.title ?? '');
+    setBody(note.body ?? '');
     setAdding(false);
   }
 
@@ -177,7 +176,7 @@ export default function NotesModule({
               <Popconfirm
                 key="del"
                 title={t("modules.notes.delete_confirm")}
-                onConfirm={() => deleteMutation.mutate(note.id)}
+                onConfirm={() => deleteMutation.mutate(note.id!)}
               >
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,

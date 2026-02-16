@@ -21,9 +21,8 @@ import {
   PhoneOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { callsApi } from "@/api/calls";
-import type { Call } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Call, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -57,8 +56,8 @@ export default function CallsModule({
   const { data: calls = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await callsApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.calls.contactsCallsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -74,8 +73,9 @@ export default function CallsModule({
         duration: values.duration,
         type: values.type,
         description: values.description,
+        who_initiated: values.type === "outgoing" ? "me" : "contact",
       };
-      return callsApi.create(vaultId, contactId, data);
+      return api.calls.contactsCallsCreate(String(vaultId), String(contactId), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -87,7 +87,7 @@ export default function CallsModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => callsApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.calls.contactsCallsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.calls.deleted"));
@@ -124,7 +124,7 @@ export default function CallsModule({
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
-              <Popconfirm key="d" title={t("modules.calls.delete_confirm")} onConfirm={() => deleteMutation.mutate(c.id)}>
+              <Popconfirm key="d" title={t("modules.calls.delete_confirm")} onConfirm={() => deleteMutation.mutate(c.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
@@ -133,7 +133,7 @@ export default function CallsModule({
               avatar={<PhoneOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
               title={
                 <>
-                  <Tag color={typeColor[c.type] ?? "default"}>{c.type}</Tag>
+                    <Tag color={typeColor[c.type!] ?? "default"}>{c.type}</Tag>
                   <span style={{ fontWeight: 400, color: token.colorTextSecondary }}>{dayjs(c.called_at).format("MMM D, YYYY h:mm A")}</span>
                 </>
               }

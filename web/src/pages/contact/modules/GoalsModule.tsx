@@ -14,9 +14,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { goalsApi } from "@/api/goals";
-import type { Goal } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Goal, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
@@ -40,14 +39,14 @@ export default function GoalsModule({
   const { data: goals = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await goalsApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.goals.contactsGoalsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (goalName: string) =>
-      goalsApi.create(vaultId, contactId, { name: goalName }),
+      api.goals.contactsGoalsCreate(String(vaultId), String(contactId), { name: goalName }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setAdding(false);
@@ -58,7 +57,7 @@ export default function GoalsModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (goalId: number) => goalsApi.delete(vaultId, contactId, goalId),
+    mutationFn: (goalId: number) => api.goals.contactsGoalsDelete(String(vaultId), String(contactId), goalId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       if (selectedGoal) setSelectedGoal(null);
@@ -69,14 +68,15 @@ export default function GoalsModule({
 
   const streakMutation = useMutation({
     mutationFn: ({ goalId, date }: { goalId: number; date: string }) =>
-      goalsApi.toggleStreak(vaultId, contactId, goalId, date),
+      api.goals.contactsGoalsStreaksUpdate(String(vaultId), String(contactId), goalId, { happened_at: date }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
     onError: (e: APIError) => message.error(e.message),
   });
 
   const activeGoal = goals.find((g: Goal) => g.id === selectedGoal);
   const streakDates = new Set(
-    (activeGoal?.streaks ?? []).map((s) => dayjs(s.happened_at).format("YYYY-MM-DD")),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (activeGoal?.streaks ?? []).map((s: any) => dayjs(s.happened_at).format("YYYY-MM-DD")),
   );
 
   function dateCellRender(date: Dayjs) {
@@ -159,11 +159,11 @@ export default function GoalsModule({
                 key="view"
                 type="text"
                 size="small"
-                onClick={() => setSelectedGoal(selectedGoal === goal.id ? null : goal.id)}
+                 onClick={() => setSelectedGoal(selectedGoal === goal.id ? null : goal.id ?? null)}
               >
                 {selectedGoal === goal.id ? t("modules.goals.hide") : t("modules.goals.streaks")}
               </Button>,
-              <Popconfirm key="d" title={t("modules.goals.delete_confirm")} onConfirm={() => deleteMutation.mutate(goal.id)}>
+              <Popconfirm key="d" title={t("modules.goals.delete_confirm")} onConfirm={() => deleteMutation.mutate(goal.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}

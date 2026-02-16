@@ -13,9 +13,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { petsApi } from "@/api/pets";
-import type { Pet } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Pet, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 export default function PetsModule({
@@ -38,18 +37,18 @@ export default function PetsModule({
   const { data: pets = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await petsApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.pets.contactsPetsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const data = { name, category };
+      const data = { name, pet_category_id: Number(category) || 0 };
       if (editingId) {
-        return petsApi.update(vaultId, contactId, editingId, data);
+        return api.pets.contactsPetsUpdate(String(vaultId), String(contactId), editingId, data);
       }
-      return petsApi.create(vaultId, contactId, data);
+      return api.pets.contactsPetsCreate(String(vaultId), String(contactId), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -60,7 +59,7 @@ export default function PetsModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => petsApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.pets.contactsPetsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.pets.deleted"));
@@ -76,9 +75,9 @@ export default function PetsModule({
   }
 
   function startEdit(pet: Pet) {
-    setEditingId(pet.id);
-    setName(pet.name);
-    setCategory(pet.category);
+    setEditingId(pet.id ?? null);
+    setName(pet.name ?? '');
+    setCategory(String(pet.pet_category_id ?? ''));
     setAdding(false);
   }
 
@@ -150,14 +149,14 @@ export default function PetsModule({
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(pet)} />,
-              <Popconfirm key="d" title={t("modules.pets.delete_confirm")} onConfirm={() => deleteMutation.mutate(pet.id)}>
+              <Popconfirm key="d" title={t("modules.pets.delete_confirm")} onConfirm={() => deleteMutation.mutate(pet.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
           >
             <List.Item.Meta
               title={<span style={{ fontWeight: 500 }}>{pet.name}</span>}
-              description={<Tag>{pet.category}</Tag>}
+              description={<Tag>{pet.pet_category_id ? `#${pet.pet_category_id}` : ''}</Tag>}
             />
           </List.Item>
         )}

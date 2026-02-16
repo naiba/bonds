@@ -3,9 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, App, theme } from "antd";
 import { ArrowLeftOutlined, UserOutlined } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { contactsApi } from "@/api/contacts";
-import type { CreateContactRequest } from "@/types/contact";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { CreateContactRequest, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Title, Text } = Typography;
@@ -22,13 +21,13 @@ export default function ContactCreate() {
 
   const mutation = useMutation({
     mutationFn: (data: CreateContactRequest) =>
-      contactsApi.create(vaultId, data),
+      api.contacts.contactsCreate(String(vaultId), data),
     onSuccess: (res) => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts"],
       });
       message.success(t("contact.create.success"));
-      const contact = res.data.data;
+      const contact = res.data;
       navigate(
         contact
           ? `/vaults/${vaultId}/contacts/${contact.id}`

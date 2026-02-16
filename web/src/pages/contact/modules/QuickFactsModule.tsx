@@ -12,67 +12,45 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import client from "@/api/client";
-import type { APIResponse } from "@/types/api";
-import type { QuickFact } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { QuickFact, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
-const quickFactsApi = {
-  list(vaultId: string | number, contactId: string | number) {
-    return client.get<APIResponse<QuickFact[]>>(
-      `/vaults/${vaultId}/contacts/${contactId}/quick-facts`,
-    );
-  },
-  create(vaultId: string | number, contactId: string | number, data: { label: string; value: string }) {
-    return client.post<APIResponse<QuickFact>>(
-      `/vaults/${vaultId}/contacts/${contactId}/quick-facts`,
-      data,
-    );
-  },
-  update(vaultId: string | number, contactId: string | number, id: number, data: { label: string; value: string }) {
-    return client.put<APIResponse<QuickFact>>(
-      `/vaults/${vaultId}/contacts/${contactId}/quick-facts/${id}`,
-      data,
-    );
-  },
-  delete(vaultId: string | number, contactId: string | number, id: number) {
-    return client.delete(`/vaults/${vaultId}/contacts/${contactId}/quick-facts/${id}`);
-  },
-};
+
 
 export default function QuickFactsModule({
   vaultId,
   contactId,
+  templateId = 1,
 }: {
   vaultId: string | number;
   contactId: string | number;
+  templateId?: number;
 }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [label, setLabel] = useState("");
-  const [value, setValue] = useState("");
+  const [content, setContent] = useState("");
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const qk = ["vaults", vaultId, "contacts", contactId, "quick-facts"];
+  const qk = ["vaults", vaultId, "contacts", contactId, "quickFacts", templateId];
 
   const { data: facts = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await quickFactsApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.quickFacts.contactsQuickFactsDetail(String(vaultId), String(contactId), templateId);
+      return res.data ?? [];
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const data = { label, value };
+      const data = { content };
       if (editingId) {
-        return quickFactsApi.update(vaultId, contactId, editingId, data);
+        return api.quickFacts.contactsQuickFactsUpdate(String(vaultId), String(contactId), templateId, editingId, data);
       }
-      return quickFactsApi.create(vaultId, contactId, data);
+      return api.quickFacts.contactsQuickFactsCreate(String(vaultId), String(contactId), templateId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -82,7 +60,7 @@ export default function QuickFactsModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => quickFactsApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.quickFacts.contactsQuickFactsDelete(String(vaultId), String(contactId), templateId, id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
     },
@@ -92,14 +70,12 @@ export default function QuickFactsModule({
   function resetForm() {
     setAdding(false);
     setEditingId(null);
-    setLabel("");
-    setValue("");
+    setContent("");
   }
 
   function startEdit(fact: QuickFact) {
-    setEditingId(fact.id);
-    setLabel(fact.label);
-    setValue(fact.value);
+    setEditingId(fact.id ?? null);
+    setContent(fact.content ?? '');
     setAdding(false);
   }
 
@@ -128,14 +104,13 @@ export default function QuickFactsModule({
           borderRadius: token.borderRadius,
         }}>
           <Space orientation="vertical" style={{ width: "100%" }}>
-            <Input placeholder={t("modules.quick_facts.label_placeholder")} value={label} onChange={(e) => setLabel(e.target.value)} />
-            <Input placeholder={t("modules.quick_facts.value_placeholder")} value={value} onChange={(e) => setValue(e.target.value)} />
+            <Input placeholder={t("modules.quick_facts.content_placeholder")} value={content} onChange={(e) => setContent(e.target.value)} />
             <Space>
               <Button
                 type="primary"
                 onClick={() => saveMutation.mutate()}
                 loading={saveMutation.isPending}
-                disabled={!label.trim() || !value.trim()}
+                disabled={!content.trim()}
                 size="small"
               >
                 {editingId ? t("common.update") : t("common.save")}
@@ -163,14 +138,13 @@ export default function QuickFactsModule({
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(fact)} />,
-              <Popconfirm key="d" title={t("modules.quick_facts.delete_confirm")} onConfirm={() => deleteMutation.mutate(fact.id)}>
+              <Popconfirm key="d" title={t("modules.quick_facts.delete_confirm")} onConfirm={() => deleteMutation.mutate(fact.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
           >
             <List.Item.Meta
-              title={<span style={{ fontWeight: 500 }}>{fact.label}</span>}
-              description={<span style={{ color: token.colorTextSecondary }}>{fact.value}</span>}
+              title={<span style={{ fontWeight: 500 }}>{fact.content}</span>}
             />
           </List.Item>
         )}

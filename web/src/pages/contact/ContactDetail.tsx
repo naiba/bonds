@@ -25,9 +25,8 @@ import {
   DownloadOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { contactsApi } from "@/api/contacts";
-import { vcardApi } from "@/api/vcard";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -63,14 +62,14 @@ export default function ContactDetail() {
   const { data: contact, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", cId],
     queryFn: async () => {
-      const res = await contactsApi.get(vaultId, cId);
-      return res.data.data!;
+      const res = await api.contacts.contactsDetail(String(vaultId), String(cId));
+      return res.data!;
     },
     enabled: !!vaultId && !!cId,
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => contactsApi.delete(vaultId, cId),
+    mutationFn: () => api.contacts.contactsDelete(String(vaultId), String(cId)),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts"],
@@ -84,18 +83,29 @@ export default function ContactDetail() {
   });
 
   const toggleFavoriteMutation = useMutation({
-    mutationFn: () => {
-      if (!contact) throw new Error("No contact");
-      return contactsApi.update(vaultId, cId, {
-        first_name: contact.first_name,
-        last_name: contact.last_name,
-        nickname: contact.nickname,
-      });
-    },
+    mutationFn: () => api.contacts.contactsFavoriteUpdate(String(vaultId), String(cId)),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts", cId],
       });
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("contact.detail.delete_failed"));
+    },
+  });
+
+  const toggleArchiveMutation = useMutation({
+    mutationFn: () => api.contacts.contactsArchiveUpdate(String(vaultId), String(cId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", cId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts"],
+      });
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("contact.detail.delete_failed"));
     },
   });
 
@@ -144,7 +154,7 @@ export default function ContactDetail() {
               </Descriptions.Item>
             </Descriptions>
           </Card>
-          <QuickFactsModule {...moduleProps} />
+          <QuickFactsModule {...moduleProps} templateId={1} />
           <NotesModule {...moduleProps} />
         </Space>
       ),
@@ -311,8 +321,8 @@ export default function ContactDetail() {
               type="text"
               onClick={async () => {
                 try {
-                  const res = await vcardApi.exportContact(vaultId, cId);
-                  const blob = new Blob([res.data as BlobPart]);
+                  const res = await api.vcard.contactsVcardList(String(vaultId), String(cId));
+                  const blob = new Blob([res as BlobPart]);
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement("a");
                   a.href = url;
@@ -329,6 +339,8 @@ export default function ContactDetail() {
             <Button
               icon={<InboxOutlined />}
               type="text"
+              onClick={() => toggleArchiveMutation.mutate()}
+              loading={toggleArchiveMutation.isPending}
             >
               {contact.is_archived ? t("contact.detail.unarchive") : t("contact.detail.archive")}
             </Button>

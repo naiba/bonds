@@ -17,9 +17,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { lifeEventsApi } from "@/api/lifeEvents";
-import type { TimelineEvent as TEvent } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { TimelineEvent as TEvent, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -41,19 +40,19 @@ export default function LifeEventsModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const qk = ["vaults", vaultId, "contacts", contactId, "timeline-events"];
+  const qk = ["vaults", vaultId, "contacts", contactId, "timelineEvents"];
 
   const { data: timelines = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await lifeEventsApi.listTimelines(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.lifeEvents.contactsTimelineEventsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
   const createTimelineMutation = useMutation({
     mutationFn: (values: { label: string; started_at: dayjs.Dayjs }) =>
-      lifeEventsApi.createTimeline(vaultId, contactId, {
+      api.lifeEvents.contactsTimelineEventsCreate(String(vaultId), String(contactId), {
         label: values.label,
         started_at: values.started_at.format("YYYY-MM-DD"),
       }),
@@ -67,7 +66,7 @@ export default function LifeEventsModule({
   });
 
   const deleteTimelineMutation = useMutation({
-    mutationFn: (id: number) => lifeEventsApi.deleteTimeline(vaultId, contactId, id),
+    mutationFn: (id: number) => api.lifeEvents.contactsTimelineEventsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.life_events.timeline_deleted"));
@@ -78,10 +77,11 @@ export default function LifeEventsModule({
   const createLifeEventMutation = useMutation({
     mutationFn: (values: { label: string; happened_at: dayjs.Dayjs; description?: string }) => {
       if (!selectedTimeline) throw new Error("No timeline");
-      return lifeEventsApi.createLifeEvent(vaultId, contactId, selectedTimeline, {
-        label: values.label,
+      return api.lifeEvents.contactsTimelineEventsLifeEventsCreate(String(vaultId), String(contactId), selectedTimeline, {
+        summary: values.label,
         happened_at: values.happened_at.format("YYYY-MM-DD"),
         description: values.description,
+        life_event_type_id: 1,
       });
     },
     onSuccess: () => {
@@ -95,7 +95,7 @@ export default function LifeEventsModule({
 
   const deleteLifeEventMutation = useMutation({
     mutationFn: ({ timelineId, lifeEventId }: { timelineId: number; lifeEventId: number }) =>
-      lifeEventsApi.deleteLifeEvent(vaultId, contactId, timelineId, lifeEventId),
+      api.lifeEvents.contactsTimelineEventsLifeEventsDelete(String(vaultId), String(contactId), timelineId, lifeEventId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.life_events.event_deleted"));
@@ -118,8 +118,8 @@ export default function LifeEventsModule({
             style={{ color: token.colorPrimary }}
             onClick={(e) => {
               e.stopPropagation();
-              setSelectedTimeline(tl.id);
-              setLeOpen(true);
+               setSelectedTimeline(tl.id ?? null);
+               setLeOpen(true);
             }}
           >
             {t("modules.life_events.event")}
@@ -128,7 +128,7 @@ export default function LifeEventsModule({
             title={t("modules.life_events.delete_timeline_confirm")}
             onConfirm={(e) => {
               e?.stopPropagation();
-              deleteTimelineMutation.mutate(tl.id);
+               deleteTimelineMutation.mutate(tl.id!);
             }}
             onCancel={(e) => e?.stopPropagation()}
           >
@@ -150,7 +150,7 @@ export default function LifeEventsModule({
           children: (
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <strong style={{ fontWeight: 500 }}>{le.label}</strong>
+                <strong style={{ fontWeight: 500 }}>{le.summary ?? le.description}</strong>
                 <br />
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {dayjs(le.happened_at).format("MMM D, YYYY")}
@@ -163,8 +163,8 @@ export default function LifeEventsModule({
                 title={t("modules.life_events.delete_event_confirm")}
                 onConfirm={() =>
                   deleteLifeEventMutation.mutate({
-                    timelineId: tl.id,
-                    lifeEventId: le.id,
+                    timelineId: tl.id!,
+                    lifeEventId: le.id!,
                   })
                 }
               >

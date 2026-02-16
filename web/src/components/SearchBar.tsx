@@ -3,8 +3,8 @@ import { AutoComplete, Input } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { searchApi } from "@/api/search";
-import type { SearchResult } from "@/types/search";
+import { api } from "@/api";
+import type { SearchResult } from "@/api";
 
 export default function SearchBar() {
   const [options, setOptions] = useState<
@@ -26,8 +26,8 @@ export default function SearchBar() {
       }
       timerRef.current = setTimeout(async () => {
         try {
-          const res = await searchApi.search(vaultId, value);
-          const data = res.data.data as {
+          const res = await api.search.searchList(String(vaultId), { q: value });
+          const data = res.data as {
             contacts?: SearchResult[];
             notes?: SearchResult[];
           };
@@ -41,16 +41,7 @@ export default function SearchBar() {
               label: t("search.contacts"),
               options: data.contacts.map((c) => ({
                 value: `contact:${c.id}`,
-                label: c.title,
-              })),
-            });
-          }
-          if (data?.notes?.length) {
-            groups.push({
-              label: t("search.notes"),
-              options: data.notes.map((n) => ({
-                value: `note:${n.contact_id ?? n.id}`,
-                label: n.title,
+                label: c.name ?? '',
               })),
             });
           }

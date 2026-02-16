@@ -16,9 +16,8 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, CheckOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { loansApi } from "@/api/loans";
-import type { Loan } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Loan, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -40,8 +39,8 @@ export default function LoansModule({
   const { data: loans = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await loansApi.list(vaultId, contactId);
-      return res.data.data ?? [];
+      const res = await api.loans.contactsLoansList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
   });
 
@@ -52,7 +51,7 @@ export default function LoansModule({
       description?: string;
       amount_lent: number;
       currency: string;
-    }) => loansApi.create(vaultId, contactId, values),
+    }) => api.loans.contactsLoansCreate(String(vaultId), String(contactId), values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -64,7 +63,7 @@ export default function LoansModule({
 
   const toggleMutation = useMutation({
     mutationFn: (loan: Loan) =>
-      loansApi.update(vaultId, contactId, loan.id, { is_settled: !loan.is_settled }),
+      api.loans.contactsLoansToggleUpdate(String(vaultId), String(contactId), loan.id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
     },
@@ -72,7 +71,7 @@ export default function LoansModule({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => loansApi.delete(vaultId, contactId, id),
+    mutationFn: (id: number) => api.loans.contactsLoansDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.loans.deleted"));
@@ -116,9 +115,9 @@ export default function LoansModule({
                 icon={<CheckOutlined />}
                 onClick={() => toggleMutation.mutate(loan)}
               >
-                {loan.is_settled ? t("modules.loans.reopen") : t("modules.loans.settle")}
+                {loan.settled ? t("modules.loans.reopen") : t("modules.loans.settle")}
               </Button>,
-              <Popconfirm key="d" title={t("modules.loans.delete_confirm")} onConfirm={() => deleteMutation.mutate(loan.id)}>
+              <Popconfirm key="d" title={t("modules.loans.delete_confirm")} onConfirm={() => deleteMutation.mutate(loan.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
@@ -128,12 +127,12 @@ export default function LoansModule({
                 <span style={{ fontWeight: 500 }}>
                   {loan.name}{" "}
                   <Tag color={loan.type === "lender" ? "green" : "orange"}>{loan.type}</Tag>
-                  {loan.is_settled && <Tag color="default">{t("modules.loans.settled")}</Tag>}
+                  {loan.settled && <Tag color="default">{t("modules.loans.settled")}</Tag>}
                 </span>
               }
               description={
                 <span style={{ color: token.colorTextSecondary }}>
-                  {loan.amount_lent} {loan.currency}
+                  {loan.amount_lent} {loan.currency_id ? `#${loan.currency_id}` : ''}
                   {loan.description && ` — ${loan.description}`}
                   {loan.settled_at && (
                     <span style={{ marginLeft: 8, color: token.colorTextQuaternary }}>
