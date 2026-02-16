@@ -234,13 +234,20 @@
       "date_label": "Date",
       "photos_tab": "Photos",
       "no_photos": "No photos in this journal",
+      "all_years": "All",
+      "year_view": "Year",
       "year_filter": "Filter by Year",
       "slice_detail": "Slice Details",
       "slice_cover": "Cover Image",
       "slice_cover_upload": "Upload Cover",
       "slice_cover_remove": "Remove Cover",
       "slice_cover_removed": "Cover image removed",
-      "slice_posts": "Posts in this Slice"
+      "slice_posts": "Posts in this Slice",
+      "set_cover": "Set Cover",
+      "remove_cover": "Remove Cover",
+      "cover_set": "Cover image set",
+      "cover_removed": "Cover image removed",
+      "select_cover": "Select a cover image"
     },
     "post_detail": {
       "back": "Back to journal",
@@ -257,7 +264,23 @@
       "slice_linked": "Slice linked",
       "slice_unlinked": "Slice unlinked",
       "edit_tag": "Edit Tag",
-      "tag_updated": "Tag updated"
+      "tag_updated": "Tag updated",
+      "tag_placeholder": "Tag name",
+      "add_tag": "Add tag",
+      "tag_added": "Tag added",
+      "tag_removed": "Tag removed",
+      "photos": "Photos",
+      "no_photos": "No photos",
+      "upload_photo": "Click or drag to upload photos",
+      "photo_uploaded": "Photo uploaded",
+      "photo_deleted": "Photo deleted",
+      "metrics": "Metrics",
+      "no_metrics": "No metrics",
+      "metric_added": "Metric added",
+      "assign_slice": "Assign to Slice",
+      "remove_slice": "Remove from Slice",
+      "slice_assigned": "Post assigned to slice",
+      "slice_removed": "Post removed from slice"
     },
     "group_list": {
       "title": "Groups",
@@ -596,8 +619,10 @@
         "timeline_modal": "New Timeline Event",
         "event_modal": "Add Life Event",
         "edit_event": "Edit Life Event",
-        "toggle_timeline": "Timeline visibility toggled",
-        "toggle_event": "Event visibility toggled",
+        "toggle_timeline": "Toggle timeline",
+        "toggle_event": "Toggle event",
+        "timeline_toggled": "Timeline toggled",
+        "event_toggled": "Event toggled",
         "label": "Label",
         "started_at": "Started at",
         "happened_at": "Date"
@@ -633,6 +658,10 @@
       "upload_failed": "Upload failed",
       "deleted": "Document deleted",
       "delete_confirm": "Delete this document?"
+    },
+    "extra_info": {
+      "companies": "Companies",
+      "no_companies": "No companies associated"
     }
   },
   "settings": {
@@ -730,6 +759,9 @@
       "modules": "Modules",
       "add_module": "Add Module",
       "remove_module": "Remove Module",
+      "page_modules": "Page Modules",
+      "no_modules": "No modules assigned",
+      "available_modules": "Available Modules",
       "move_up": "Move Up",
       "move_down": "Move Down",
       "post_templates": "Post Templates",
@@ -887,6 +919,7 @@
     "tab_group": "Groups",
     "template": "Vault Template",
     "template_updated": "Vault template updated",
+    "template_description": "New contacts will use this template",
     "select_template": "Select a template",
     "life_event_category_updated": "Life event category updated",
     "life_event_type_updated": "Life event type updated",

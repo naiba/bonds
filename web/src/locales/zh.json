@@ -234,13 +234,20 @@
       "date_label": "日期",
       "photos_tab": "照片墙",
       "no_photos": "此日记本暂无照片",
+      "all_years": "全部",
+      "year_view": "年份",
       "year_filter": "按年份筛选",
       "slice_detail": "片段详情",
       "slice_cover": "封面图片",
       "slice_cover_upload": "上传封面",
       "slice_cover_remove": "移除封面",
       "slice_cover_removed": "封面已移除",
-      "slice_posts": "片段内的文章"
+      "slice_posts": "片段内的文章",
+      "set_cover": "设置封面",
+      "remove_cover": "移除封面",
+      "cover_set": "封面已设置",
+      "cover_removed": "封面已移除",
+      "select_cover": "选择封面图片"
     },
     "post_detail": {
       "back": "返回日记",
@@ -257,7 +264,23 @@
       "slice_linked": "已关联片段",
       "slice_unlinked": "已取消关联",
       "edit_tag": "编辑标签",
-      "tag_updated": "标签已更新"
+      "tag_updated": "标签已更新",
+      "tag_placeholder": "标签名",
+      "add_tag": "添加标签",
+      "tag_added": "标签已添加",
+      "tag_removed": "标签已删除",
+      "photos": "照片",
+      "no_photos": "暂无照片",
+      "upload_photo": "点击或拖拽上传照片",
+      "photo_uploaded": "照片已上传",
+      "photo_deleted": "照片已删除",
+      "metrics": "指标",
+      "no_metrics": "暂无指标",
+      "metric_added": "指标已添加",
+      "assign_slice": "关联人生片段",
+      "remove_slice": "取消关联人生片段",
+      "slice_assigned": "已关联人生片段",
+      "slice_removed": "已取消关联人生片段"
     },
     "group_list": {
       "title": "群组",
@@ -596,8 +619,10 @@
         "timeline_modal": "新建时间线事件",
         "event_modal": "添加人生事件",
         "edit_event": "编辑人生事件",
-        "toggle_timeline": "时间线可见性已切换",
-        "toggle_event": "事件可见性已切换",
+        "toggle_timeline": "切换时间线",
+        "toggle_event": "切换事件",
+        "timeline_toggled": "时间线已切换",
+        "event_toggled": "事件已切换",
         "label": "标签",
         "started_at": "开始时间",
         "happened_at": "日期"
@@ -633,6 +658,10 @@
       "upload_failed": "上传失败",
       "deleted": "文档已删除",
       "delete_confirm": "确定删除此文档？"
+    },
+    "extra_info": {
+      "companies": "公司",
+      "no_companies": "暂无关联公司"
     }
   },
   "settings": {
@@ -730,6 +759,9 @@
       "modules": "模块",
       "add_module": "添加模块",
       "remove_module": "移除模块",
+      "page_modules": "页面模块",
+      "no_modules": "暂无模块",
+      "available_modules": "可用模块",
       "move_up": "上移",
       "move_down": "下移",
       "post_templates": "文章模板",
@@ -887,6 +919,7 @@
     "tab_group": "群组",
     "template": "保险库模板",
     "template_updated": "保险库模板已更新",
+    "template_description": "新联系人将使用此模板",
     "select_template": "选择模板",
     "life_event_category_updated": "人生事件分类已更新",
     "life_event_type_updated": "人生事件类型已更新",
