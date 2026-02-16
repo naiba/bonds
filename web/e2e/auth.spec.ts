@@ -39,7 +39,7 @@ test.describe('Authentication', () => {
     await page.goto('/login');
     await page.getByPlaceholder('Email').fill(email);
     await page.getByPlaceholder('Password').fill(password);
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
   });
 
@@ -47,7 +47,7 @@ test.describe('Authentication', () => {
     await page.goto('/login');
     await page.getByPlaceholder('Email').fill('wrong@example.com');
     await page.getByPlaceholder('Password').fill('wrongpassword');
-    await page.getByRole('button', { name: /sign in/i }).click();
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(page.getByText(/failed|error|invalid|incorrect/i)).toBeVisible({ timeout: 5000 });
   });
 
