@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   Typography,
@@ -5,13 +6,28 @@ import {
   Tag,
   Spin,
   Empty,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Switch,
+  Popconfirm,
+  Space,
+  App,
   theme,
 } from "antd";
-import { CrownOutlined } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
+import {
+  CrownOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
-import type { User } from "@/api";
+import type { User, APIError } from "@/api";
+import type { ColumnsType } from "antd/es/table";
+import { useAuth } from "@/stores/auth";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -31,25 +47,104 @@ function getAvatarColor(name: string): string {
 export default function Users() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const { user: currentUser } = useAuth();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const [form] = Form.useForm();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
+  const qk = ["settings", "users"];
+
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ["settings", "users"],
+    queryKey: qk,
     queryFn: async () => {
       const res = await api.users.usersList();
       return res.data ?? [];
     },
   });
 
-  const columns = [
+  const createMutation = useMutation({
+    mutationFn: (values: {
+      email: string;
+      password: string;
+      first_name?: string;
+      last_name?: string;
+      is_admin?: boolean;
+    }) => api.users.usersCreate(values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("settings.users.created"));
+      setOpen(false);
+      form.resetFields();
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...values }: {
+      id: string;
+      first_name?: string;
+      last_name?: string;
+      is_admin?: boolean;
+    }) => api.users.usersUpdate(id, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("settings.users.updated"));
+      setOpen(false);
+      setEditing(null);
+      form.resetFields();
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.users.usersDelete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("settings.users.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const isAdmin = currentUser?.is_admin === true;
+
+  const openCreate = () => {
+    setEditing(null);
+    form.resetFields();
+    setOpen(true);
+  };
+
+  const openEdit = (record: User) => {
+    setEditing(record);
+    form.setFieldsValue({
+      first_name: record.first_name,
+      last_name: record.last_name,
+      is_admin: record.is_admin ?? false,
+    });
+    setOpen(true);
+  };
+
+  const handleSubmit = () => {
+    form.validateFields().then((values) => {
+      if (editing) {
+        updateMutation.mutate({ id: editing.id!, ...values });
+      } else {
+        createMutation.mutate(values);
+      }
+    });
+  };
+
+  const columns: ColumnsType<User> = [
     {
       title: t("settings.users.col_name"),
       key: "name",
-      render: (_: unknown, record: User) => {
-        const fullName = `${record.first_name} ${record.last_name}`;
+      render: (_, record) => {
+        const fullName = `${record.first_name ?? ""} ${record.last_name ?? ""}`.trim();
         const initials = [record.first_name?.[0], record.last_name?.[0]]
           .filter(Boolean)
           .join("")
           .toUpperCase();
-        const color = getAvatarColor(fullName);
+        const color = getAvatarColor(fullName || "U");
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
@@ -67,9 +162,9 @@ export default function Users() {
                 fontWeight: 600,
               }}
             >
-              {initials}
+              {initials || "U"}
             </div>
-            <span style={{ fontWeight: 500 }}>{fullName}</span>
+            <span style={{ fontWeight: 500 }}>{fullName || record.email}</span>
           </div>
         );
       },
@@ -85,7 +180,7 @@ export default function Users() {
     {
       title: t("settings.users.col_role"),
       key: "role",
-      render: (_: unknown, record: User) =>
+      render: (_, record) =>
         record.is_admin ? (
           <Tag color="blue" icon={<CrownOutlined />}>
             {t("settings.users.role_admin")}
@@ -104,16 +199,66 @@ export default function Users() {
         <Text type="secondary">{dayjs(date).format("MMM D, YYYY")}</Text>
       ),
     },
+    ...(isAdmin
+      ? [
+          {
+            title: "",
+            key: "actions",
+            width: 100,
+            render: (_: unknown, record: User) => {
+              const isSelf = record.id === currentUser?.id;
+              return (
+                <Space size="small">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => openEdit(record)}
+                  />
+                  {!isSelf && (
+                    <Popconfirm
+                      title={t("settings.users.delete_confirm")}
+                      onConfirm={() => deleteMutation.mutate(record.id!)}
+                      okButtonProps={{ danger: true }}
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                      />
+                    </Popconfirm>
+                  )}
+                </Space>
+              );
+            },
+          } as ColumnsType<User>[number],
+        ]
+      : []),
   ];
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Title level={4} style={{ marginBottom: 4 }}>
-        {t("settings.users.title")}
-      </Title>
-      <Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
-        {t("settings.users.description")}
-      </Text>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 24,
+        }}
+      >
+        <div>
+          <Title level={4} style={{ marginBottom: 4 }}>
+            {t("settings.users.title")}
+          </Title>
+          <Text type="secondary">{t("settings.users.description")}</Text>
+        </div>
+        {isAdmin && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            {t("settings.users.create")}
+          </Button>
+        )}
+      </div>
 
       <Card>
         {isLoading ? (
@@ -129,6 +274,69 @@ export default function Users() {
           />
         )}
       </Card>
+
+      <Modal
+        title={
+          editing
+            ? t("settings.users.modal_title_edit")
+            : t("settings.users.modal_title_create")
+        }
+        open={open}
+        onCancel={() => {
+          setOpen(false);
+          setEditing(null);
+          form.resetFields();
+        }}
+        onOk={handleSubmit}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item
+            name="first_name"
+            label={t("settings.users.first_name")}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="last_name"
+            label={t("settings.users.last_name")}
+          >
+            <Input />
+          </Form.Item>
+          {!editing && (
+            <>
+              <Form.Item
+                name="email"
+                label={t("settings.users.email")}
+                rules={[
+                  { required: true },
+                  { type: "email" },
+                ]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="password"
+                label={t("settings.users.password")}
+                rules={[
+                  { required: true },
+                  { min: 6 },
+                ]}
+              >
+                <Input.Password />
+              </Form.Item>
+            </>
+          )}
+          <Form.Item
+            name="is_admin"
+            label={t("settings.users.is_admin")}
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

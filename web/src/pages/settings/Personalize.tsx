@@ -13,7 +13,7 @@ import {
   Badge,
   theme,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined, RightOutlined, DownOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
@@ -25,7 +25,7 @@ const sectionKeys = [
   "genders", "pronouns", "address-types", "pet-categories",
   "contact-info-types", "relationship-types", "templates", "modules",
   "currencies", "religions", "call-reasons",
-  "gift-occasions", "gift-states",
+  "gift-occasions", "gift-states", "post-templates", "group-types",
 ];
 
 const sectionI18nMap: Record<string, string> = {
@@ -43,16 +43,220 @@ const sectionI18nMap: Record<string, string> = {
   "life-event-categories": "settings.personalize.life_event_categories",
   "gift-occasions": "settings.personalize.gift_occasions",
   "gift-states": "settings.personalize.gift_states",
+  "post-templates": "settings.personalize.post_templates",
+  "group-types": "settings.personalize.group_types",
 };
+
+interface SubItemConfig {
+  labelKey: string;
+  addKey: string;
+  fields: Array<{ key: string; placeholder: string }>;
+  list: (parentId: number) => Promise<{ data?: Array<Record<string, unknown>> }>;
+  create: (parentId: number, body: Record<string, string>) => Promise<unknown>;
+  update: (parentId: number, itemId: number, body: Record<string, string>) => Promise<unknown>;
+  remove: (parentId: number, itemId: number) => Promise<unknown>;
+}
+
+const subItemConfigs: Record<string, SubItemConfig> = {
+  "templates": {
+    labelKey: "settings.personalize.pages",
+    addKey: "settings.personalize.add_page",
+    fields: [{ key: "name", placeholder: "common.name" }],
+    list: (id) => api.templatePages.personalizeTemplatesPagesList(id),
+    create: (id, b) => api.templatePages.personalizeTemplatesPagesCreate(id, { name: b.name, slug: b.name.toLowerCase().replace(/\s+/g, "-") }),
+    update: (id, itemId, b) => api.templatePages.personalizeTemplatesPagesUpdate(id, itemId, { name: b.name }),
+    remove: (id, itemId) => api.templatePages.personalizeTemplatesPagesDelete(id, itemId),
+  },
+  "post-templates": {
+    labelKey: "settings.personalize.sections",
+    addKey: "settings.personalize.add_section",
+    fields: [{ key: "label", placeholder: "common.label" }],
+    list: (id) => api.postTemplateSections.personalizePostTemplatesSectionsList(id),
+    create: (id, b) => api.postTemplateSections.personalizePostTemplatesSectionsCreate(id, { label: b.label }),
+    update: (id, itemId, b) => api.postTemplateSections.personalizePostTemplatesSectionsUpdate(id, itemId, { label: b.label }),
+    remove: (id, itemId) => api.postTemplateSections.personalizePostTemplatesSectionsDelete(id, itemId),
+  },
+  "group-types": {
+    labelKey: "settings.personalize.roles",
+    addKey: "settings.personalize.add_role",
+    fields: [{ key: "label", placeholder: "common.label" }],
+    list: (id) => api.groupTypeRoles.personalizeGroupTypesRolesList(id),
+    create: (id, b) => api.groupTypeRoles.personalizeGroupTypesRolesCreate(id, { label: b.label }),
+    update: (id, itemId, b) => api.groupTypeRoles.personalizeGroupTypesRolesUpdate(id, itemId, { label: b.label }),
+    remove: (id, itemId) => api.groupTypeRoles.personalizeGroupTypesRolesDelete(id, itemId),
+  },
+  "call-reasons": {
+    labelKey: "settings.personalize.reasons",
+    addKey: "settings.personalize.add_reason",
+    fields: [{ key: "label", placeholder: "common.label" }],
+    list: (id) => api.callReasons.personalizeCallReasonsReasonsList(id),
+    create: (id, b) => api.callReasons.personalizeCallReasonsReasonsCreate(id, { label: b.label }),
+    update: (id, itemId, b) => api.callReasons.personalizeCallReasonsReasonsUpdate(id, itemId, { label: b.label }),
+    remove: (id, itemId) => api.callReasons.personalizeCallReasonsReasonsDelete(id, itemId),
+  },
+  "relationship-types": {
+    labelKey: "settings.personalize.types",
+    addKey: "settings.personalize.add_type",
+    fields: [
+      { key: "name", placeholder: "common.name" },
+      { key: "name_reverse_relationship", placeholder: "settings.personalize.name_reverse" },
+    ],
+    list: (id) => api.relationshipTypes.personalizeRelationshipTypesTypesList(id),
+    create: (id, b) => api.relationshipTypes.personalizeRelationshipTypesTypesCreate(id, { name: b.name, name_reverse_relationship: b.name_reverse_relationship }),
+    update: (id, itemId, b) => api.relationshipTypes.personalizeRelationshipTypesTypesUpdate(id, itemId, { name: b.name, name_reverse_relationship: b.name_reverse_relationship }),
+    remove: (id, itemId) => api.relationshipTypes.personalizeRelationshipTypesTypesDelete(id, itemId),
+  },
+};
+
+function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey: string }) {
+  const config = subItemConfigs[sectionKey];
+  const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const { t } = useTranslation();
+  const qk = ["settings", "personalize", sectionKey, "sub-items", parentId];
+
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: qk,
+    queryFn: async () => {
+      const res = await config.list(parentId);
+      return (res.data ?? []) as Array<Record<string, unknown>>;
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      if (editingId) {
+        return config.update(parentId, editingId, formValues);
+      }
+      return config.create(parentId, formValues);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      resetForm();
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (itemId: number) => config.remove(parentId, itemId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  function resetForm() {
+    setAdding(false);
+    setEditingId(null);
+    setFormValues({});
+  }
+
+  function startEdit(item: Record<string, unknown>) {
+    setEditingId((item.id as number) ?? null);
+    const vals: Record<string, string> = {};
+    for (const f of config.fields) {
+      vals[f.key] = String(item[f.key] ?? "");
+    }
+    setFormValues(vals);
+    setAdding(false);
+  }
+
+  function updateField(key: string, value: string) {
+    setFormValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const hasValues = config.fields.every((f) => (formValues[f.key] ?? "").trim());
+  const showForm = adding || editingId !== null;
+
+  function getDisplayLabel(item: Record<string, unknown>): string {
+    const primary = String(item[config.fields[0].key] ?? item.label ?? "");
+    if (sectionKey === "relationship-types" && item.name_reverse_relationship) {
+      return `${primary} ↔ ${item.name_reverse_relationship}`;
+    }
+    return primary;
+  }
+
+  return (
+    <div style={{ paddingLeft: 16, paddingTop: 8, paddingBottom: 4, borderLeft: "2px solid #f0f0f0" }}>
+      <Text type="secondary" style={{ fontSize: 12, marginBottom: 8, display: "block" }}>
+        {t(config.labelKey)}
+      </Text>
+
+      {!showForm && (
+        <Button
+          type="dashed"
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={() => setAdding(true)}
+          style={{ marginBottom: 8 }}
+          block
+        >
+          {t(config.addKey)}
+        </Button>
+      )}
+
+      {showForm && (
+        <div style={{ marginBottom: 8 }}>
+          <Space.Compact style={{ width: "100%" }}>
+            {config.fields.map((f) => (
+              <Input
+                key={f.key}
+                size="small"
+                placeholder={t(f.placeholder)}
+                value={formValues[f.key] ?? ""}
+                onChange={(e) => updateField(f.key, e.target.value)}
+                onPressEnter={() => hasValues && saveMutation.mutate()}
+              />
+            ))}
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => hasValues && saveMutation.mutate()}
+              loading={saveMutation.isPending}
+            >
+              {editingId ? t("common.update") : t("common.add")}
+            </Button>
+          </Space.Compact>
+          <Button type="text" size="small" onClick={resetForm} style={{ marginTop: 2 }}>
+            {t("common.cancel")}
+          </Button>
+        </div>
+      )}
+
+      <List
+        loading={isLoading}
+        dataSource={items}
+        locale={{ emptyText: <Empty description={t("settings.personalize.no_items")} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+        size="small"
+        renderItem={(item: Record<string, unknown>) => (
+          <List.Item
+            style={{ padding: "4px 0" }}
+            actions={[
+              <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
+              <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id as number)}>
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>,
+            ]}
+          >
+            <span style={{ fontSize: 13 }}>{getDisplayLabel(item)}</span>
+          </List.Item>
+        )}
+      />
+    </div>
+  );
+}
 
 function SectionPanel({ sectionKey }: { sectionKey: string }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [label, setLabel] = useState("");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const qk = ["settings", "personalize", sectionKey];
+  const hasSubItems = sectionKey in subItemConfigs;
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk,
@@ -92,6 +296,10 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
     setEditingId(item.id ?? null);
     setLabel(item.label ?? '');
     setAdding(false);
+  }
+
+  function toggleExpand(id: number) {
+    setExpandedId((prev) => (prev === id ? null : id));
   }
 
   const showForm = adding || editingId !== null;
@@ -139,18 +347,32 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
         locale={{ emptyText: <Empty description={t("settings.personalize.no_items")} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
         size="small"
         renderItem={(item: PersonalizeItem) => (
-          <List.Item
-            actions={[
-              <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-              <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <span>
-              {item.label}
-            </span>
-          </List.Item>
+          <div>
+            <List.Item
+              actions={[
+                <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
+                <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {hasSubItems && (
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={expandedId === item.id ? <DownOutlined /> : <RightOutlined />}
+                    onClick={() => toggleExpand(item.id!)}
+                    style={{ padding: 0, width: 20, height: 20, minWidth: 20 }}
+                  />
+                )}
+                {item.label}
+              </span>
+            </List.Item>
+            {hasSubItems && expandedId === item.id && (
+              <SubItemsPanel parentId={item.id!} sectionKey={sectionKey} />
+            )}
+          </div>
         )}
       />
     </div>

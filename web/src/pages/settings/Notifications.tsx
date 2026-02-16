@@ -15,6 +15,8 @@ import {
   Empty,
   Spin,
   theme,
+  Drawer,
+  Space,
 } from "antd";
 import {
   PlusOutlined,
@@ -22,11 +24,14 @@ import {
   MailOutlined,
   SendOutlined,
   ApiOutlined,
+  HistoryOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { NotificationChannel, APIError } from "@/api";
+import type { GithubComNaibaBondsInternalDtoNotificationLogResponse as NotificationLog } from "@/api/generated/data-contracts";
 
 const { Title, Text } = Typography;
 
@@ -45,6 +50,7 @@ const channelIconMap: Record<
 
 export default function Notifications() {
   const [open, setOpen] = useState(false);
+  const [logsChannelId, setLogsChannelId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const selectedType = Form.useWatch("type", form) as string | undefined;
   const queryClient = useQueryClient();
@@ -87,6 +93,21 @@ export default function Notifications() {
       message.success(t("settings.notifications.deleted"));
     },
     onError: (e: APIError) => message.error(e.message),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: (id: number) => api.notifications.notificationsTestCreate(id),
+    onSuccess: () => message.success(t("settings.notifications.test_success")),
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const { data: logs = [] } = useQuery({
+    queryKey: ["notifications", "logs", logsChannelId],
+    queryFn: async () => {
+      const res = await api.notifications.notificationsLogsList(logsChannelId!);
+      return (res.data ?? []) as NotificationLog[];
+    },
+    enabled: logsChannelId !== null,
   });
 
   if (isLoading) {
@@ -148,6 +169,23 @@ export default function Notifications() {
                     key="toggle"
                     checked={ch.active}
                     onChange={() => toggleMutation.mutate(ch)}
+                  />,
+                  <Button
+                    key="test"
+                    type="text"
+                    size="small"
+                    icon={<ThunderboltOutlined />}
+                    loading={testMutation.isPending && testMutation.variables === ch.id}
+                    onClick={() => testMutation.mutate(ch.id!)}
+                    title={t("settings.notifications.test_send")}
+                  />,
+                  <Button
+                    key="logs"
+                    type="text"
+                    size="small"
+                    icon={<HistoryOutlined />}
+                    onClick={() => setLogsChannelId(ch.id!)}
+                    title={t("settings.notifications.view_logs")}
                   />,
                   <Popconfirm
                     key="d"
@@ -246,6 +284,40 @@ export default function Notifications() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={t("settings.notifications.logs_title")}
+        open={logsChannelId !== null}
+        onClose={() => setLogsChannelId(null)}
+        width={480}
+      >
+        {logs.length === 0 ? (
+          <Empty description={t("settings.notifications.no_logs")} />
+        ) : (
+          <List
+            dataSource={logs}
+            renderItem={(log: NotificationLog) => (
+              <List.Item>
+                <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                  <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
+                    {log.sent_at ? new Date(log.sent_at).toLocaleString() : log.created_at}
+                  </span>
+                  {log.subject_line && (
+                    <span style={{ fontWeight: 500 }}>{log.subject_line}</span>
+                  )}
+                  {log.error ? (
+                    <Tag color="error" style={{ whiteSpace: "normal", height: "auto" }}>
+                      {log.error}
+                    </Tag>
+                  ) : (
+                    <Tag color="success">{t("common.active")}</Tag>
+                  )}
+                </Space>
+              </List.Item>
+            )}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }
