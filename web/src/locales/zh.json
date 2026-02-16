@@ -450,8 +450,7 @@
     "quick_facts": {
       "title": "速览",
       "add": "添加",
-      "label_placeholder": "标签",
-      "value_placeholder": "值",
+      "content_placeholder": "内容",
       "no_facts": "暂无速览",
       "delete_confirm": "确定删除？"
     },

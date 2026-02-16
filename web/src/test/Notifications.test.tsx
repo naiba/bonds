@@ -16,7 +16,7 @@ vi.mock("@/api/settings", () => ({
   settingsApi: {
     listNotificationChannels: vi.fn(),
     createNotificationChannel: vi.fn(),
-    updateNotificationChannel: vi.fn(),
+    toggleNotificationChannel: vi.fn(),
     deleteNotificationChannel: vi.fn(),
   },
 }));

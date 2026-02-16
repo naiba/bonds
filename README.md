@@ -135,20 +135,51 @@ cp server/.env.example server/.env
 ## Development
 
 ```bash
+# Install dependencies
+make setup
+
+# Generate API client (required before first build)
+make gen-api
+
 # Start both frontend and backend in dev mode
 make dev
 ```
 
 This runs the Go backend on `:8080` and the Vite dev server on `:5173`. The frontend automatically proxies API requests to the backend.
 
-Other useful commands:
+### Code Generation Pipeline
+
+The frontend TypeScript API client is **auto-generated** from the backend's OpenAPI/Swagger spec. The generated files are not committed to git — they are regenerated in CI and during development.
+
+```
+Go handlers (swag annotations)
+    ↓  make swagger
+server/docs/swagger.json
+    ↓  make gen-api (or bun run gen:api)
+web/src/api/generated/   ← gitignored, regenerated on demand
+    ↓
+web/src/api/index.ts     ← entry point, imports generated modules
+```
+
+After changing any backend API (handlers, DTOs, routes), run:
 
 ```bash
+make gen-api       # Regenerate swagger.json + TypeScript API client
+```
+
+### Useful Commands
+
+```bash
+make dev           # Start frontend + backend in dev mode
+make build         # Build backend + frontend separately
+make build-all     # Build single binary with embedded frontend
 make test          # Run all tests (backend + frontend)
 make test-e2e      # Run end-to-end tests (Playwright)
-make lint          # Run linters
-make swagger       # Regenerate Swagger/OpenAPI docs
-make clean         # Clean build artifacts
+make lint          # Run linters (go vet + eslint)
+make swagger       # Regenerate Swagger/OpenAPI docs only
+make gen-api       # Regenerate Swagger docs + TypeScript API client
+make clean         # Clean all build artifacts + generated files
+make setup         # Install all dependencies
 ```
 
 ### API Documentation

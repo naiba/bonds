@@ -1,4 +1,4 @@
-.PHONY: dev dev-server dev-web build build-server build-web build-all test test-server test-web test-e2e lint clean setup
+.PHONY: dev dev-server dev-web build build-server build-web build-all test test-server test-web test-e2e lint clean setup swagger gen-api
 
 dev:
 	@cd server && go run cmd/server/main.go & \
@@ -10,6 +10,12 @@ dev-server:
 dev-web:
 	cd web && bun dev
 
+swagger:
+	cd server && swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+
+gen-api: swagger
+	cd web && bun run gen:api
+
 build: build-server build-web
 
 build-server:
@@ -18,7 +24,7 @@ build-server:
 build-web:
 	cd web && bun run build
 
-build-all: build-web
+build-all: gen-api build-web
 	rm -rf server/internal/frontend/dist/*
 	cp -r web/dist/* server/internal/frontend/dist/
 	cd server && CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o bin/bonds-server cmd/server/main.go
@@ -41,6 +47,8 @@ lint:
 clean:
 	rm -rf server/bin server/bonds.db
 	rm -rf web/dist
+	rm -rf server/docs
+	rm -rf web/src/api/generated
 	find server/internal/frontend/dist -type f ! -name '.gitkeep' -delete 2>/dev/null || true
 
 setup:

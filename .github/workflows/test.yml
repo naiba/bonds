@@ -48,13 +48,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: server/go.sum
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Generate Swagger docs
+        working-directory: ./server
+        run: swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
+
       - name: Install dependencies
         working-directory: ./web
         run: bun install
+
+      - name: Generate API client
+        working-directory: ./web
+        run: bun run gen:api
 
       - name: Lint
         working-directory: ./web
@@ -105,6 +121,10 @@ jobs:
       - name: Install frontend deps
         working-directory: ./web
         run: bun install
+
+      - name: Generate API client
+        working-directory: ./web
+        run: bun run gen:api
 
       - name: Install Playwright
         working-directory: ./web

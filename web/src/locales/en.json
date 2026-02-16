@@ -450,8 +450,7 @@
     "quick_facts": {
       "title": "Quick Facts",
       "add": "Add",
-      "label_placeholder": "Label",
-      "value_placeholder": "Value",
+      "content_placeholder": "Content",
       "no_facts": "No quick facts",
       "delete_confirm": "Delete?"
     },

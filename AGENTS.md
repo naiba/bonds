@@ -31,12 +31,28 @@ make build                                # 后端 + 前端分别构建
 make build-all                            # 构建内嵌前端的单二进制文件
 make dev                                  # 开发模式同时启动前后端
 make swagger                              # 生成 Swagger 文档（swag init）
+make gen-api                              # swagger + 生成前端 TypeScript API client
 make setup                                # 安装依赖（go mod download + bun install）
 ```
 
 **Go 代理（中国网络必须）：** 始终使用 `GOPROXY=https://goproxy.cn,direct` 执行 `go mod download`。
 
 **包管理器：** 使用 `bun`，禁止 `npm` 或 `yarn`。
+
+### 代码生成管线
+
+前端 TypeScript API 客户端从后端 OpenAPI/Swagger 规范**自动生成**，生成的文件不纳入 git 版本控制。
+
+```
+Go handlers (swag 注解) → make swagger → server/docs/swagger.json
+                        → make gen-api → web/src/api/generated/  (gitignored)
+                                       → web/src/api/index.ts    (入口，引用 generated/)
+```
+
+- **修改后端 API 后**必须运行 `make gen-api` 重新生成前端客户端
+- CI/Dockerfile 会在构建前自动生成，无需手动提交
+- 生成工具：`swagger-typescript-api`（dev 依赖），配置在 `web/package.json` 的 `gen:api` 脚本
+- **禁止手动修改 `web/src/api/generated/` 目录下的任何文件**
 
 ## 项目结构
 
@@ -68,12 +84,14 @@ server/                    # Go 后端（模块：github.com/naiba/bonds）
 
 web/                       # React 前端（Vite + TypeScript）
   src/
-    api/                    # Axios API 客户端模块，每个领域一个文件（含 twofactor/search/invitations/vcard）
+    api/                    # API 客户端（自动生成）
+      generated/            # swagger-typescript-api 生成的模块（gitignored，禁止手动修改）
+      index.ts              # API 入口：实例化 HttpClient + 所有生成模块
     components/             # 共享组件（Layout.tsx、SearchBar.tsx、CalendarDatePicker.tsx）
     locales/                # 前端 i18n：en.json、zh.json（react-i18next）
     pages/                  # 按领域组织的路由页面（含 TwoFactor/Invitations/AcceptInvite/OAuthCallback）
     stores/                 # AuthProvider 上下文
-    types/                  # TypeScript 类型定义（含 lunar-javascript.d.ts）
+    types/                  # TypeScript 类型声明（仅 lunar-javascript.d.ts），DTO 类型统一从 @/api 导入
     utils/                  # 工具函数（calendar.ts — 前端多历法抽象 + 注册表）
     test/                   # Vitest 单元测试 + setup.ts
     i18n.ts                 # react-i18next 初始化 + 语言检测
@@ -185,9 +203,10 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 ### API 层
 
-- `src/api/` 下每个领域一个文件，导出 const 对象（如 `export const notesApi = { list, create, ... }`）。
-- API 客户端在 `src/api/client.ts` — Axios，baseURL 为 `/api`，自动从 localStorage 附加 JWT。
-- ID 参数类型为 `string | number`，因为 UUID 从路由参数中以字符串形式获取。
+- `src/api/generated/` 下的文件由 `swagger-typescript-api` 从后端 OpenAPI 规范自动生成，**禁止手动修改**。
+- `src/api/index.ts` 是 API 入口：创建 HttpClient（Axios，baseURL `/api`，JWT interceptor，401 重定向），实例化所有生成的 API 模块。
+- 页面通过 `import { api } from "@/api"` 使用，如 `api.contacts.contactsList({ vaultId })`。
+- 生成的方法直接返回解包后的响应体（`{success, data, error, meta}`），无需 `.data` 二次解包。
 
 ### 测试（Vitest）
 

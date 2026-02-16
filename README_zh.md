@@ -136,20 +136,51 @@ cp server/.env.example server/.env
 ## 开发
 
 ```bash
+# 安装依赖
+make setup
+
+# 生成 API 客户端（首次构建前必须执行）
+make gen-api
+
 # 同时启动前后端开发模式
 make dev
 ```
 
 Go 后端运行在 `:8080`，Vite 开发服务器运行在 `:5173`。前端自动将 API 请求代理到后端。
 
-其他常用命令：
+### 代码生成管线
+
+前端 TypeScript API 客户端从后端 OpenAPI/Swagger 规范**自动生成**。生成的文件不纳入 git 版本控制 — 在 CI 和开发过程中按需重新生成。
+
+```
+Go handlers（swag 注解）
+    ↓  make swagger
+server/docs/swagger.json
+    ↓  make gen-api（或 bun run gen:api）
+web/src/api/generated/   ← gitignored，按需重新生成
+    ↓
+web/src/api/index.ts     ← 入口文件，导入生成的模块 + 类型别名
+```
+
+修改后端 API（handlers、DTOs、routes）后，运行：
 
 ```bash
+make gen-api       # 重新生成 swagger.json + TypeScript API 客户端
+```
+
+### 常用命令
+
+```bash
+make dev           # 同时启动前后端开发模式
+make build         # 分别构建后端和前端
+make build-all     # 构建内嵌前端的单二进制文件
 make test          # 运行所有测试（后端 + 前端）
 make test-e2e      # 运行端到端测试（Playwright）
-make lint          # 运行代码检查
-make swagger       # 重新生成 Swagger/OpenAPI 文档
-make clean         # 清理构建产物
+make lint          # 运行代码检查（go vet + eslint）
+make swagger       # 仅重新生成 Swagger/OpenAPI 文档
+make gen-api       # 重新生成 Swagger 文档 + TypeScript API 客户端
+make clean         # 清理所有构建产物 + 生成文件
+make setup         # 安装所有依赖
 ```
 
 ### API 文档

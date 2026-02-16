@@ -15,9 +15,8 @@ beforeAll(() => {
 vi.mock("@/api/companies", () => ({
   companiesApi: {
     list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
+    get: vi.fn(),
+    listForContact: vi.fn(),
   },
 }));
 
@@ -62,9 +61,9 @@ describe("VaultCompanies", () => {
     expect(document.querySelector(".ant-empty")).toBeInTheDocument();
   });
 
-  it("renders add button", () => {
+  it("renders company title", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderVaultCompanies();
-    expect(screen.getByText("Add Company")).toBeInTheDocument();
+    expect(screen.getByText("Companies")).toBeInTheDocument();
   });
 });

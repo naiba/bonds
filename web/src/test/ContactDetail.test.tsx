@@ -66,6 +66,8 @@ vi.mock("@/api/contacts", () => ({
     get: vi.fn(),
     delete: vi.fn(),
     update: vi.fn(),
+    toggleFavorite: vi.fn(),
+    toggleArchive: vi.fn(),
   },
 }));
 
