@@ -103,6 +103,10 @@ export default function AddressesModule({
     return `https://maps.google.com/?q=${encodeURIComponent(formatAddress(a))}`;
   }
 
+  function mapImageUrl(a: Address) {
+    return `/api/vaults/${vaultId}/contacts/${contactId}/addresses/${a.id}/image/200/150`;
+  }
+
   return (
     <Card
       title={<span style={{ fontWeight: 500 }}>{t("modules.addresses.title")}</span>}
@@ -122,7 +126,7 @@ export default function AddressesModule({
         locale={{ emptyText: <Empty description={t("modules.addresses.no_addresses")} /> }}
         split={false}
         renderItem={(a: Address) => (
-          <List.Item
+            <List.Item
             style={{
               borderRadius: token.borderRadius,
               padding: '10px 12px',
@@ -132,7 +136,7 @@ export default function AddressesModule({
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             actions={[
-              <Button key="map" type="text" size="small" icon={<EnvironmentOutlined />} href={mapsUrl(a)} target="_blank" />,
+              <Button key="map" type="text" size="small" icon={<EnvironmentOutlined />} href={mapsUrl(a)} target="_blank" aria-label={t("modules.addresses.view_map")} />,
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(a)} />,
               <Popconfirm key="d" title={t("modules.addresses.delete_confirm")} onConfirm={() => deleteMutation.mutate(a.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
@@ -140,6 +144,25 @@ export default function AddressesModule({
             ]}
           >
             <List.Item.Meta
+              avatar={
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (a as any).latitude && (a as any).longitude ? (
+                  <img 
+                    src={mapImageUrl(a)} 
+                    alt="Map" 
+                    style={{ 
+                      width: 100, 
+                      height: 75, 
+                      objectFit: 'cover', 
+                      borderRadius: token.borderRadiusSM,
+                      border: `1px solid ${token.colorBorderSecondary}`
+                    }} 
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : null
+              }
               title={
                 <span style={{ fontWeight: 500 }}>
                   {a.address_type_id ? `#${a.address_type_id}` : ''} {a.is_past_address && <Tag color="blue">{t("common.primary")}</Tag>}

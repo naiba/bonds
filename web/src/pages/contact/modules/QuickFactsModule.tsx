@@ -9,8 +9,9 @@ import {
   App,
   Empty,
   theme,
+  Tooltip,
 } from "antd";
-import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined, EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { QuickFact, APIError } from "@/api";
@@ -30,6 +31,8 @@ export default function QuickFactsModule({
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [content, setContent] = useState("");
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -67,6 +70,15 @@ export default function QuickFactsModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const toggleMutation = useMutation({
+      mutationFn: () => api.quickFacts.contactsQuickFactsToggleUpdate(String(vaultId), String(contactId)),
+      onSuccess: () => {
+          setIsCollapsed(!isCollapsed);
+          message.success(t("modules.quick_facts.toggled"));
+      },
+      onError: (e: APIError) => message.error(e.message),
+  });
+
   function resetForm() {
     setAdding(false);
     setEditingId(null);
@@ -86,14 +98,23 @@ export default function QuickFactsModule({
       title={<span style={{ fontWeight: 500 }}>{t("modules.quick_facts.title")}</span>}
       styles={{
         header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
-        body: { padding: '16px 24px' },
+        body: { padding: isCollapsed ? 0 : '16px 24px', display: isCollapsed ? 'none' : 'block' },
       }}
       extra={
-        !showForm && (
-          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
-            {t("modules.quick_facts.add")}
-          </Button>
-        )
+        <Space>
+            <Tooltip title={t("modules.quick_facts.toggle")}>
+                <Button 
+                    type="text" 
+                    icon={isCollapsed ? <EyeInvisibleOutlined /> : <EyeOutlined />} 
+                    onClick={() => toggleMutation.mutate()} 
+                />
+            </Tooltip>
+            {!showForm && (
+            <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
+                {t("modules.quick_facts.add")}
+            </Button>
+            )}
+        </Space>
       }
     >
       {showForm && (

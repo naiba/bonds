@@ -1,8 +1,8 @@
-import { Card, Upload, Image, Empty, App, theme } from "antd";
-import { InboxOutlined } from "@ant-design/icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card, Upload, Image, Empty, App, theme, Button, Popconfirm } from "antd";
+import { InboxOutlined, DeleteOutlined } from "@ant-design/icons";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Photo } from "@/api";
+import type { Photo, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Dragger } = Upload;
@@ -26,6 +26,15 @@ export default function PhotosModule({
       const res = await api.contactPhotos.contactsPhotosList(String(vaultId), String(contactId));
       return res.data ?? [];
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.contactPhotos.contactsPhotosDelete(String(vaultId), String(contactId), id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("modules.photos.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
   });
 
   return (
@@ -71,13 +80,34 @@ export default function PhotosModule({
         <Image.PreviewGroup>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {photos.map((photo: Photo) => (
-              <Image
-                key={photo.id}
-                width={120}
-                height={120}
-                src={`/api/vaults/${vaultId}/files/${photo.id}/download`}
-                style={{ objectFit: "cover", borderRadius: token.borderRadius }}
-              />
+              <div key={photo.id} style={{ position: 'relative', display: 'inline-block' }}>
+                <Image
+                  width={120}
+                  height={120}
+                  src={`/api/vaults/${vaultId}/files/${photo.id}/download`}
+                  style={{ objectFit: "cover", borderRadius: token.borderRadius }}
+                />
+                <Popconfirm
+                  title={t("modules.photos.delete_confirm")}
+                  onConfirm={() => deleteMutation.mutate(photo.id!)}
+                  okText={t("common.delete")}
+                  cancelText={t("common.cancel")}
+                >
+                  <Button 
+                    type="text" 
+                    danger 
+                    icon={<DeleteOutlined />} 
+                    size="small"
+                    style={{ 
+                      position: 'absolute', 
+                      top: 4, 
+                      right: 4, 
+                      background: 'rgba(255, 255, 255, 0.8)',
+                      borderRadius: '50%',
+                    }}
+                  />
+                </Popconfirm>
+              </div>
             ))}
           </div>
         </Image.PreviewGroup>

@@ -1,12 +1,13 @@
-import { Card, List, Upload, Button, App, Empty, Tag, theme } from "antd";
+import { Card, List, Upload, Button, App, Empty, Tag, theme, Popconfirm } from "antd";
 import {
   InboxOutlined,
   FileOutlined,
   DownloadOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Document } from "@/api";
+import type { Document, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Dragger } = Upload;
@@ -36,6 +37,15 @@ export default function DocumentsModule({
       const res = await api.contactDocuments.contactsDocumentsList(String(vaultId), String(contactId));
       return res.data ?? [];
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.contactDocuments.contactsDocumentsDelete(String(vaultId), String(contactId), id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("modules.documents.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
   });
 
   return (
@@ -98,6 +108,13 @@ export default function DocumentsModule({
                 href={`/api/vaults/${vaultId}/files/${doc.id}/download`}
                 target="_blank"
               />,
+              <Popconfirm
+                key="del"
+                title={t("modules.documents.delete_confirm")}
+                onConfirm={() => deleteMutation.mutate(doc.id!)}
+              >
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>,
             ]}
           >
             <List.Item.Meta
