@@ -80,6 +80,14 @@ const httpClient = new HttpClient({
   secure: true,
 });
 
+httpClient.instance.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 httpClient.instance.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -219,6 +227,12 @@ export type { GithubComNaibaBondsInternalDtoNotificationChannelResponse as Notif
 export type { GithubComNaibaBondsInternalDtoPersonalizeEntityResponse as PersonalizeItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCompanyResponse as Company } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoLifeMetricResponse as LifeMetric } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoPostTagResponse as PostTag } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoPostMetricResponse as PostMetric } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoJournalMetricResponse as JournalMetric } from "./generated/data-contracts";
+
+export type { GithubComNaibaBondsInternalDtoJournalMetricResponse as JournalMetricResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoSliceOfLifeResponse as SliceOfLifeResponse } from "./generated/data-contracts";
 
 // Invitation
 export type { GithubComNaibaBondsInternalDtoInvitationResponse as InvitationType } from "./generated/data-contracts";
@@ -241,6 +255,12 @@ export type { GithubComNaibaBondsInternalDtoLifeEventTypeResponse as LifeEventCa
 export type { GithubComNaibaBondsInternalDtoQuickFactTemplateResponse as QuickFactTemplateResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultUserResponse as VaultUserResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateVaultSettingsRequest as UpdateVaultSettingsRequest } from "./generated/data-contracts";
+
+// Reports
+export type { GithubComNaibaBondsInternalDtoAddressReportItem as AddressReportItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoImportantDateReportItem as ImportantDateReportItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoMoodReportItem as MoodReportItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoAddressContactItem as AddressContactItem } from "./generated/data-contracts";
 
 // OAuthProvider — not in generated types (backend returns raw goth data)
 export interface OAuthProvider {

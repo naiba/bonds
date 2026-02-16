@@ -61,6 +61,40 @@ func (h *PostMetricHandler) Create(c echo.Context) error {
 	return response.Created(c, metric)
 }
 
+// List godoc
+//
+//	@Summary		List post metrics
+//	@Description	Return all metrics for a post
+//	@Tags			post-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Post ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.PostMetricResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/metrics [get]
+func (h *PostMetricHandler) List(c echo.Context) error {
+	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_journal_id", nil)
+	}
+	postID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_post_id", nil)
+	}
+	metrics, err := h.svc.List(uint(postID), uint(journalID))
+	if err != nil {
+		if errors.Is(err, services.ErrPostNotFound) {
+			return response.NotFound(c, "err.post_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_post_metrics")
+	}
+	return response.OK(c, metrics)
+}
+
 // Delete godoc
 //
 //	@Summary		Delete a post metric

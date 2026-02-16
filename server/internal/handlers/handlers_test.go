@@ -2427,3 +2427,100 @@ func TestTaskListCompleted_Success(t *testing.T) {
 		t.Fatalf("expected 3 total tasks, got %d", len(allTasks))
 	}
 }
+
+func (ts *testServer) createTestJournal(t *testing.T, token, vaultID, name string) uint {
+	t.Helper()
+	body := `{"name":"` + name + `"}`
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vaultID+"/journals", body, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create journal failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &data)
+	return data.ID
+}
+
+func (ts *testServer) createTestPost(t *testing.T, token, vaultID string, journalID uint, title string) uint {
+	t.Helper()
+	body := fmt.Sprintf(`{"title":"%s","written_at":"2024-01-01T00:00:00Z"}`, title)
+	path := fmt.Sprintf("/api/vaults/%s/journals/%d/posts", vaultID, journalID)
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create post failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &data)
+	return data.ID
+}
+
+func TestPostTagList_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "pt-handler@test.com")
+	vault := ts.createTestVault(t, token, "PT Vault")
+	journalID := ts.createTestJournal(t, token, vault.ID, "Test Journal")
+	postID := ts.createTestPost(t, token, vault.ID, journalID, "Test Post")
+
+	basePath := fmt.Sprintf("/api/vaults/%s/journals/%d/posts/%d/tags", vault.ID, journalID, postID)
+
+	ts.doRequest(http.MethodPost, basePath, `{"name":"alpha"}`, token)
+	ts.doRequest(http.MethodPost, basePath, `{"name":"beta"}`, token)
+
+	rec := ts.doRequest(http.MethodGet, basePath, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var tags []struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+	json.Unmarshal(resp.Data, &tags)
+	if len(tags) != 2 {
+		t.Fatalf("expected 2 tags, got %d", len(tags))
+	}
+}
+
+func TestPostMetricList_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "pm-handler@test.com")
+	vault := ts.createTestVault(t, token, "PM Vault")
+	journalID := ts.createTestJournal(t, token, vault.ID, "Test Journal")
+	postID := ts.createTestPost(t, token, vault.ID, journalID, "Test Post")
+
+	metricPath := fmt.Sprintf("/api/vaults/%s/journals/%d/metrics", vault.ID, journalID)
+	rec := ts.doRequest(http.MethodPost, metricPath, `{"label":"Mood"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create journal metric failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var jm struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &jm)
+
+	pmPath := fmt.Sprintf("/api/vaults/%s/journals/%d/posts/%d/metrics", vault.ID, journalID, postID)
+	ts.doRequest(http.MethodPost, pmPath, fmt.Sprintf(`{"journal_metric_id":%d,"value":7}`, jm.ID), token)
+
+	rec = ts.doRequest(http.MethodGet, pmPath, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var metrics []struct {
+		ID    uint `json:"id"`
+		Value int  `json:"value"`
+	}
+	json.Unmarshal(resp.Data, &metrics)
+	if len(metrics) != 1 {
+		t.Fatalf("expected 1 metric, got %d", len(metrics))
+	}
+	if metrics[0].Value != 7 {
+		t.Errorf("expected value 7, got %d", metrics[0].Value)
+	}
+}

@@ -62,6 +62,40 @@ func (h *PostTagHandler) Add(c echo.Context) error {
 	return response.Created(c, tag)
 }
 
+// List godoc
+//
+//	@Summary		List post tags
+//	@Description	Return all tags for a post
+//	@Tags			post-tags
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			journal_id	path	integer	true	"Journal ID"
+//	@Param			id			path	integer	true	"Post ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.PostTagResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/journals/{journal_id}/posts/{id}/tags [get]
+func (h *PostTagHandler) List(c echo.Context) error {
+	journalID, err := strconv.ParseUint(c.Param("journal_id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_journal_id", nil)
+	}
+	postID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_post_id", nil)
+	}
+	tags, err := h.svc.List(uint(postID), uint(journalID))
+	if err != nil {
+		if errors.Is(err, services.ErrPostNotFound) {
+			return response.NotFound(c, "err.post_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_post_tags")
+	}
+	return response.OK(c, tags)
+}
+
 // Update godoc
 //
 //	@Summary		Update a post tag

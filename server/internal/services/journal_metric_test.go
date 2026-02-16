@@ -127,3 +127,50 @@ func TestPostMetricCreateDelete(t *testing.T) {
 		t.Fatalf("Delete post metric failed: %v", err)
 	}
 }
+
+func TestPostMetricList(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, _ := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test", LastName: "User",
+		Email: "pm-list@example.com", Password: "password123",
+	})
+	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+
+	journalSvc := NewJournalService(db)
+	journal, _ := journalSvc.Create(vault.ID, dto.CreateJournalRequest{Name: "Test Journal"})
+
+	postSvc := NewPostService(db)
+	post, _ := postSvc.Create(journal.ID, dto.CreatePostRequest{
+		Title: "Test Post", WrittenAt: time.Now(),
+	})
+
+	jmSvc := NewJournalMetricService(db)
+	jm1, _ := jmSvc.Create(journal.ID, vault.ID, dto.CreateJournalMetricRequest{Label: "Mood"})
+	jm2, _ := jmSvc.Create(journal.ID, vault.ID, dto.CreateJournalMetricRequest{Label: "Energy"})
+
+	pmSvc := NewPostMetricService(db)
+	pmSvc.Create(post.ID, journal.ID, dto.CreatePostMetricRequest{JournalMetricID: jm1.ID, Value: 8})
+	pmSvc.Create(post.ID, journal.ID, dto.CreatePostMetricRequest{JournalMetricID: jm2.ID, Value: 5})
+
+	metrics, err := pmSvc.List(post.ID, journal.ID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(metrics) != 2 {
+		t.Errorf("Expected 2 metrics, got %d", len(metrics))
+	}
+}
+
+func TestPostMetricListNotFound(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	pmSvc := NewPostMetricService(db)
+
+	_, err := pmSvc.List(99999, 1)
+	if err != ErrPostNotFound {
+		t.Errorf("Expected ErrPostNotFound, got %v", err)
+	}
+}

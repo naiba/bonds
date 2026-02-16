@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
@@ -60,6 +60,15 @@ vi.mock("@/pages/contact/modules/PhotosModule", () => ({
 vi.mock("@/pages/contact/modules/DocumentsModule", () => ({
   default: () => <div>DocumentsModule</div>,
 }));
+vi.mock("@/pages/contact/modules/LabelsModule", () => ({
+  default: () => <div>LabelsModule</div>,
+}));
+vi.mock("@/pages/contact/modules/FeedModule", () => ({
+  default: () => <div>FeedModule</div>,
+}));
+vi.mock("@/pages/contact/modules/ExtraInfoModule", () => ({
+  default: () => <div>ExtraInfoModule</div>,
+}));
 
 vi.mock("@/api/contacts", () => ({
   contactsApi: {
@@ -71,10 +80,17 @@ vi.mock("@/api/contacts", () => ({
   },
 }));
 
-const mockUseQuery = vi.fn();
+const mockContactQuery = vi.fn();
+const mockVaultsQuery = { data: [], isLoading: false };
+let useQueryCallIndex = 0;
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (...args: unknown[]) => mockUseQuery(...args),
-  useMutation: () => ({ mutate: vi.fn(), isLoading: false }),
+  useQuery: (...args: unknown[]) => {
+    // First call is the contact query, second is the vaults query
+    const idx = useQueryCallIndex++;
+    if (idx === 0) return mockContactQuery(...args);
+    return mockVaultsQuery;
+  },
+  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -112,20 +128,24 @@ const mockContact = {
 };
 
 describe("ContactDetail", () => {
+  beforeEach(() => {
+    useQueryCallIndex = 0;
+  });
+
   it("renders loading spinner when loading", () => {
-    mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
+    mockContactQuery.mockReturnValue({ data: undefined, isLoading: true });
     renderContactDetail();
     expect(document.querySelector(".ant-spin")).toBeInTheDocument();
   });
 
   it("renders contact name when loaded", () => {
-    mockUseQuery.mockReturnValue({ data: mockContact, isLoading: false });
+    mockContactQuery.mockReturnValue({ data: mockContact, isLoading: false });
     renderContactDetail();
     expect(screen.getByText("John Doe")).toBeInTheDocument();
   });
 
   it("renders action buttons", () => {
-    mockUseQuery.mockReturnValue({ data: mockContact, isLoading: false });
+    mockContactQuery.mockReturnValue({ data: mockContact, isLoading: false });
     renderContactDetail();
     expect(
       screen.getByRole("button", { name: /edit/i }),
@@ -142,7 +162,7 @@ describe("ContactDetail", () => {
   });
 
   it("renders tabs", () => {
-    mockUseQuery.mockReturnValue({ data: mockContact, isLoading: false });
+    mockContactQuery.mockReturnValue({ data: mockContact, isLoading: false });
     renderContactDetail();
     expect(screen.getByText("Overview")).toBeInTheDocument();
     expect(screen.getByText("Relationships")).toBeInTheDocument();

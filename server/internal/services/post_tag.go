@@ -67,6 +67,31 @@ func (s *PostTagService) Add(postID uint, journalID uint, vaultID string, req dt
 	return &resp, nil
 }
 
+func (s *PostTagService) List(postID uint, journalID uint) ([]dto.PostTagResponse, error) {
+	var post models.Post
+	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		return nil, err
+	}
+
+	var tags []models.Tag
+	if err := s.db.Model(&post).Association("Tags").Find(&tags); err != nil {
+		return nil, err
+	}
+
+	resp := make([]dto.PostTagResponse, len(tags))
+	for i, tag := range tags {
+		resp[i] = dto.PostTagResponse{
+			ID:   tag.ID,
+			Name: tag.Name,
+			Slug: tag.Slug,
+		}
+	}
+	return resp, nil
+}
+
 func (s *PostTagService) Update(tagID uint, postID uint, journalID uint, vaultID string, req dto.UpdatePostTagRequest) (*dto.PostTagResponse, error) {
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {

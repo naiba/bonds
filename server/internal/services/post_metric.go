@@ -48,6 +48,27 @@ func (s *PostMetricService) Create(postID uint, journalID uint, req dto.CreatePo
 	return &resp, nil
 }
 
+func (s *PostMetricService) List(postID uint, journalID uint) ([]dto.PostMetricResponse, error) {
+	var post models.Post
+	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostNotFound
+		}
+		return nil, err
+	}
+
+	var metrics []models.PostMetric
+	if err := s.db.Where("post_id = ?", postID).Find(&metrics).Error; err != nil {
+		return nil, err
+	}
+
+	resp := make([]dto.PostMetricResponse, len(metrics))
+	for i, m := range metrics {
+		resp[i] = toPostMetricResponse(&m)
+	}
+	return resp, nil
+}
+
 func (s *PostMetricService) Delete(metricID uint, postID uint, journalID uint) error {
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {

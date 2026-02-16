@@ -1,16 +1,22 @@
-import { Card, Typography, Descriptions, Button, App, theme } from "antd";
-import { LogoutOutlined, UserOutlined } from "@ant-design/icons";
+import { Card, Typography, Descriptions, Button, App, theme, Modal, Input, Form } from "antd";
+import { LogoutOutlined, UserOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import { api } from "@/api";
+import type { APIError } from "@/api";
+import { useState } from "react";
 
 const { Title, Text } = Typography;
 
 export default function Settings() {
   const { user, logout } = useAuth();
-  const { modal } = App.useApp();
+  const { modal, message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [deleteForm] = Form.useForm();
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   function handleLogout() {
     modal.confirm({
@@ -20,6 +26,21 @@ export default function Settings() {
       okButtonProps: { danger: true },
       onOk: logout,
     });
+  }
+
+  async function handleDeleteAccount(values: { password: string }) {
+    setIsDeleting(true);
+    try {
+      await api.account.accountDelete({ password: values.password });
+      message.success(t("settings.account.delete_success"));
+      setIsDeleteModalOpen(false);
+      logout();
+    } catch (e) {
+      const err = e as APIError;
+      message.error(err.message);
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   const initials = [user?.first_name?.[0], user?.last_name?.[0]]
@@ -123,6 +144,53 @@ export default function Settings() {
           </Button>
         </div>
       </Card>
+
+      <Card
+        style={{ marginTop: 24, borderColor: token.colorError }}
+        styles={{ header: { borderBottomColor: token.colorErrorBorder } }}
+        title={
+          <span style={{ color: token.colorError }}>
+            {t("settings.account.danger_zone")}
+          </span>
+        }
+      >
+        <Button
+          danger
+          type="primary"
+          icon={<DeleteOutlined />}
+          onClick={() => setIsDeleteModalOpen(true)}
+        >
+          {t("settings.account.delete_account")}
+        </Button>
+      </Card>
+
+      <Modal
+        title={t("settings.account.delete_account")}
+        open={isDeleteModalOpen}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          deleteForm.resetFields();
+        }}
+        onOk={() => deleteForm.submit()}
+        okButtonProps={{ danger: true }}
+        okText={t("common.delete")}
+        confirmLoading={isDeleting}
+      >
+        <p style={{ marginBottom: 16 }}>{t("settings.account.delete_confirm")}</p>
+        <Form
+          form={deleteForm}
+          layout="vertical"
+          onFinish={handleDeleteAccount}
+        >
+          <Form.Item
+            name="password"
+            label={t("settings.account.delete_password")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input.Password />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

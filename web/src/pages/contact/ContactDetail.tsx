@@ -1,9 +1,9 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
   Typography,
   Spin,
-  Avatar,
   Button,
   Tabs,
   Descriptions,
@@ -11,7 +11,11 @@ import {
   Popconfirm,
   App,
   Tag,
-
+  Modal,
+  Form,
+  Input,
+  Select,
+  Upload,
   theme,
 } from "antd";
 import {
@@ -21,12 +25,13 @@ import {
   StarFilled,
   InboxOutlined,
   ArrowLeftOutlined,
-  UserOutlined,
   DownloadOutlined,
+  CameraOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api";
-import type { APIError } from "@/api";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { api, httpClient } from "@/api";
+import type { APIError, UpdateContactRequest, Vault } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -46,6 +51,9 @@ import MoodTrackingModule from "./modules/MoodTrackingModule";
 import QuickFactsModule from "./modules/QuickFactsModule";
 import PhotosModule from "./modules/PhotosModule";
 import DocumentsModule from "./modules/DocumentsModule";
+import LabelsModule from "./modules/LabelsModule";
+import FeedModule from "./modules/FeedModule";
+import ExtraInfoModule from "./modules/ExtraInfoModule";
 
 const { Title, Text } = Typography;
 
@@ -58,6 +66,10 @@ export default function ContactDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [editForm] = Form.useForm();
+  const [moveForm] = Form.useForm();
 
   const { data: contact, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", cId],
@@ -66,6 +78,30 @@ export default function ContactDetail() {
       return res.data!;
     },
     enabled: !!vaultId && !!cId,
+  });
+
+  const { data: vaults = [] } = useQuery({
+    queryKey: ["vaults"],
+    queryFn: async () => {
+      const res = await api.vaults.vaultsList();
+      return res.data?.data || [];
+    },
+    enabled: isMoveModalOpen,
+  });
+
+  const updateContactMutation = useMutation({
+    mutationFn: (values: UpdateContactRequest) =>
+      api.contacts.contactsUpdate(String(vaultId), String(cId), values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", cId],
+      });
+      message.success(t("contact.detail.edit_success"));
+      setIsEditModalOpen(false);
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
   });
 
   const deleteMutation = useMutation({
@@ -109,6 +145,56 @@ export default function ContactDetail() {
     },
   });
 
+  const avatarUploadMutation = useMutation({
+    mutationFn: (file: File) =>
+      api.contacts.contactsAvatarUpdate(String(vaultId), String(cId), {
+        file: file as unknown as File,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", cId],
+      });
+      // Force avatar refresh by updating timestamp or key in state if needed,
+      // but invalidateQueries should handle it if URL has a timestamp or unique param,
+      // which it usually doesn't. We might need a key on the avatar to force re-render.
+      message.success(t("contact.detail.avatar_updated"));
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("contact.detail.upload_failed"));
+    },
+  });
+
+  const avatarDeleteMutation = useMutation({
+    mutationFn: () => api.contacts.contactsAvatarDelete(String(vaultId), String(cId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", cId],
+      });
+      message.success(t("contact.detail.avatar_deleted"));
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const moveContactMutation = useMutation({
+    mutationFn: (targetVaultId: string) =>
+      api.contacts.contactsMoveCreate(String(vaultId), String(cId), {
+        target_vault_id: targetVaultId,
+      }),
+    onSuccess: (_, targetVaultId) => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts"],
+      });
+      message.success(t("contact.detail.move_success"));
+      setIsMoveModalOpen(false);
+      navigate(`/vaults/${targetVaultId}/contacts/${cId}`);
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
   if (isLoading) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
@@ -119,7 +205,7 @@ export default function ContactDetail() {
 
   if (!contact) return null;
 
-  const initials = `${contact.first_name.charAt(0)}${contact.last_name?.charAt(0) ?? ""}`.toUpperCase();
+  const initials = `${contact.first_name?.charAt(0) ?? ""}${contact.last_name?.charAt(0) ?? ""}`.toUpperCase();
   const moduleProps = { vaultId, contactId: cId };
 
   const tabItems = [
@@ -154,6 +240,7 @@ export default function ContactDetail() {
               </Descriptions.Item>
             </Descriptions>
           </Card>
+          <LabelsModule {...moduleProps} />
           <QuickFactsModule {...moduleProps} templateId={1} />
           <NotesModule {...moduleProps} />
         </Space>
@@ -172,6 +259,7 @@ export default function ContactDetail() {
           <ContactInfoModule {...moduleProps} />
           <AddressesModule {...moduleProps} />
           <ImportantDatesModule {...moduleProps} />
+          <ExtraInfoModule {...moduleProps} contact={contact} />
           <PetsModule {...moduleProps} />
         </Space>
       ),
@@ -209,6 +297,11 @@ export default function ContactDetail() {
         </Space>
       ),
     },
+    {
+      key: "feed",
+      label: t("contact.detail.feed.title"),
+      children: <FeedModule {...moduleProps} />,
+    },
   ];
 
   return (
@@ -245,42 +338,40 @@ export default function ContactDetail() {
           >
             <div
               style={{
-                display: "flex",
-                gap: 20,
-                alignItems: "center",
-                flex: 1,
-                minWidth: 0,
+                position: "relative",
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                flexShrink: 0,
+                boxShadow: `0 4px 12px ${token.colorPrimaryBorder}`,
               }}
             >
-              <Avatar
-                size={80}
-                icon={<UserOutlined />}
-                style={{
-                  fontSize: 30,
-                  flexShrink: 0,
-                  backgroundColor: token.colorPrimary,
-                  boxShadow: `0 4px 12px ${token.colorPrimaryBorder}`,
-                }}
-              >
-                {initials}
-              </Avatar>
-              <div style={{ minWidth: 0 }}>
-                <Title level={3} style={{ margin: 0 }}>
-                  {contact.first_name} {contact.last_name}
-                </Title>
-                {contact.nickname && (
-                  <Text type="secondary" style={{ fontSize: 15 }}>
-                    &ldquo;{contact.nickname}&rdquo;
-                  </Text>
+              <AvatarImageLoader 
+                url={`/api/vaults/${vaultId}/contacts/${cId}/avatar`} 
+                updatedAt={contact.updated_at ?? ""}
+                initials={initials}
+                token={token}
+                onUpload={(file) => avatarUploadMutation.mutate(file)}
+                onDelete={() => avatarDeleteMutation.mutate()}
+                isUploading={avatarUploadMutation.isPending}
+              />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <Title level={3} style={{ margin: 0 }}>
+                {contact.first_name} {contact.last_name}
+              </Title>
+              {contact.nickname && (
+                <Text type="secondary" style={{ fontSize: 15 }}>
+                  &ldquo;{contact.nickname}&rdquo;
+                </Text>
+              )}
+              <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {contact.is_favorite && (
+                  <Tag color="gold" icon={<StarFilled />}>
+                    {t("contact.detail.favorite")}
+                  </Tag>
                 )}
-                <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {contact.is_favorite && (
-                    <Tag color="gold" icon={<StarFilled />}>
-                      {t("contact.detail.favorite")}
-                    </Tag>
-                  )}
-                  {contact.is_archived && <Tag color="default">{t("common.archived")}</Tag>}
-                </div>
+                {contact.is_archived && <Tag color="default">{t("common.archived")}</Tag>}
               </div>
             </div>
           </div>
@@ -301,8 +392,25 @@ export default function ContactDetail() {
             <Button
               icon={<EditOutlined />}
               type="text"
+              onClick={() => {
+                editForm.setFieldsValue({
+                  first_name: contact.first_name,
+                  last_name: contact.last_name,
+                  nickname: contact.nickname,
+                });
+                setIsEditModalOpen(true);
+              }}
             >
               {t("common.edit")}
+            </Button>
+            <Button
+              icon={<ExportOutlined />}
+              type="text"
+              onClick={() => {
+                setIsMoveModalOpen(true);
+              }}
+            >
+              {t("contact.detail.move")}
             </Button>
             <Button
               icon={contact.is_favorite ? <StarFilled /> : <StarOutlined />}
@@ -373,6 +481,219 @@ export default function ContactDetail() {
           paddingLeft: 4,
         }}
       />
+
+      <Modal
+        title={t("contact.detail.edit_title")}
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={(values) => updateContactMutation.mutate(values)}
+        >
+          <Form.Item
+            name="first_name"
+            label={t("contact.detail.first_name")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="last_name"
+            label={t("contact.detail.last_name")}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="nickname"
+            label={t("contact.detail.nickname")}
+          >
+            <Input />
+          </Form.Item>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => setIsEditModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={updateContactMutation.isPending}
+            >
+              {t("common.save")}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={t("contact.detail.move_title")}
+        open={isMoveModalOpen}
+        onCancel={() => setIsMoveModalOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={moveForm}
+          layout="vertical"
+          onFinish={(values) => moveContactMutation.mutate(values.target_vault_id)}
+        >
+          <Form.Item
+            name="target_vault_id"
+            label={t("contact.detail.select_vault")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              loading={!vaults.length}
+              options={vaults
+                .filter((v: Vault) => v.id !== vaultId)
+                .map((v: Vault) => ({ label: v.name, value: v.id }))}
+            />
+          </Form.Item>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => setIsMoveModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={moveContactMutation.isPending}
+            >
+              {t("contact.detail.move")}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+    </div>
+  );
+}
+
+// Helper component to load authenticated image blob
+function AvatarImageLoader({ 
+  url, 
+  updatedAt, 
+  initials, 
+  token,
+  onUpload,
+  onDelete,
+  isUploading
+}: { 
+  url: string; 
+  updatedAt: string;
+  initials: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  token: any;
+  onUpload: (file: File) => void;
+  onDelete: () => void;
+  isUploading: boolean;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [hasAvatar, setHasAvatar] = useState(false);
+  const { t } = useTranslation();
+
+  // Fetch avatar image with auth header
+  useEffect(() => {
+    let revoke: string | null = null;
+    let cancelled = false;
+
+    httpClient.instance
+      .get(url, { responseType: "blob", params: { t: dayjs(updatedAt).unix() } })
+      .then((response) => {
+        if (cancelled) return;
+        const newUrl = URL.createObjectURL(response.data as Blob);
+        revoke = newUrl;
+        setBlobUrl(newUrl);
+        setHasAvatar(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBlobUrl(null);
+        setHasAvatar(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (revoke) URL.revokeObjectURL(revoke);
+    };
+  }, [url, updatedAt]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        backgroundColor: token.colorPrimary,
+      }}
+    >
+      {isUploading ? (
+        <Spin />
+      ) : hasAvatar && blobUrl ? (
+        <img
+          src={blobUrl}
+          alt="Avatar"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <span style={{ fontSize: 30, color: "#fff", fontWeight: 500 }}>
+          {initials}
+        </span>
+      )}
+
+      {/* Hover Overlay */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          opacity: 0,
+          transition: "opacity 0.2s",
+          cursor: "pointer",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = "1";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "0";
+        }}
+      >
+         <Space>
+            <Upload
+              showUploadList={false}
+              beforeUpload={(file) => {
+                onUpload(file);
+                return false;
+              }}
+            >
+              <Button
+                type="text"
+                icon={<CameraOutlined style={{ color: "#fff", fontSize: 20 }} />}
+                style={{ color: "#fff" }}
+              />
+            </Upload>
+            {hasAvatar && (
+              <Popconfirm
+                title={t("contact.detail.delete_confirm")}
+                onConfirm={onDelete}
+              >
+                 <Button
+                  type="text"
+                  icon={<DeleteOutlined style={{ color: "#fff", fontSize: 16 }} />}
+                  danger
+                />
+              </Popconfirm>
+            )}
+          </Space>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,8 @@ import {
   Modal,
   Select,
   Descriptions,
+  Input,
+  Popconfirm,
 } from "antd";
 import { EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,6 +65,47 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
     },
   });
   
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [jobForm] = Form.useForm();
+
+  const { data: companies = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "companies"],
+    queryFn: async () => {
+      const res = await api.companies.companiesList(String(vaultId));
+      return res.data?.data || [];
+    },
+    enabled: isJobModalOpen,
+  });
+
+  const jobMutation = useMutation({
+    mutationFn: (values: { company_id?: number; job_position?: string }) =>
+      api.contacts.contactsJobInformationUpdate(String(vaultId), String(contactId), values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId],
+      });
+      message.success(t("contact.detail.job_updated"));
+      setIsJobModalOpen(false);
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const clearJobMutation = useMutation({
+    mutationFn: () => api.contacts.contactsJobInformationDelete(String(vaultId), String(contactId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId],
+      });
+      message.success(t("contact.detail.job_updated"));
+      setIsJobModalOpen(false);
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
   return (
     <Space orientation="vertical" style={{ width: "100%" }} size={16}>
       <Card
@@ -94,7 +137,7 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
         )}
       </Card>
 
-       <Card
+      <Card
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Title level={5} style={{ margin: 0 }}>
@@ -102,10 +145,26 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
             </Title>
           </div>
         }
+        extra={
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => {
+              jobForm.setFieldsValue({
+                company_id: extra.company_id,
+                job_position: extra.job_position,
+              });
+              setIsJobModalOpen(true);
+            }}
+          >
+            {t("common.edit")}
+          </Button>
+        }
       >
          <Descriptions column={1}>
              <Descriptions.Item label={t("contact.detail.company")}>
-               {extra.company_id ? `Company #${extra.company_id}` : "—"} 
+               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+               {extra.company_id && companies.length ? companies.find((c: any) => c.id === extra.company_id)?.name : extra.company_id ? `Company #${extra.company_id}` : "—"} 
              </Descriptions.Item>
              <Descriptions.Item label={t("contact.detail.job_position")}>
                {extra.job_position || "—"}
@@ -144,6 +203,60 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
             >
               {t("common.save")}
             </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={t("contact.detail.edit_job")}
+        open={isJobModalOpen}
+        onCancel={() => setIsJobModalOpen(false)}
+        footer={null}
+        destroyOnClose={true}
+      >
+        <Form
+          form={jobForm}
+          layout="vertical"
+          onFinish={(values) => jobMutation.mutate(values)}
+        >
+          <Form.Item name="company_id" label={t("contact.detail.company")}>
+            <Select
+              allowClear
+              showSearch
+              filterOption={(input, option) =>
+                String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              options={companies.map((c: any) => ({ label: c.name, value: c.id }))}
+              placeholder={t("contact.detail.labels.select_placeholder")}
+            />
+          </Form.Item>
+          <Form.Item name="job_position" label={t("contact.detail.job_position")}>
+            <Input />
+          </Form.Item>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+             {(extra.company_id || extra.job_position) && (
+              <Popconfirm
+                title={t("contact.detail.delete_confirm")}
+                onConfirm={() => clearJobMutation.mutate()}
+              >
+                <Button danger type="text">
+                  {t("contact.detail.clear_job")}
+                </Button>
+              </Popconfirm>
+            )}
+            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+              <Button onClick={() => setIsJobModalOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={jobMutation.isPending}
+              >
+                {t("common.save")}
+              </Button>
+            </div>
           </div>
         </Form>
       </Modal>

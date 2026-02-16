@@ -30,24 +30,23 @@ import type { NotificationChannel, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
+const channelTypes = [
+  { label: "Email", value: "email" },
+  { label: "Telegram", value: "telegram" },
+];
+
 const channelIconMap: Record<
   string,
   { icon: React.ReactNode; color: string; bg: string }
 > = {
   email: { icon: <MailOutlined />, color: "#1677ff", bg: "#e6f4ff" },
   telegram: { icon: <SendOutlined />, color: "#0088cc", bg: "#e6f7ff" },
-  slack: { icon: <ApiOutlined />, color: "#611f69", bg: "#f3e8ff" },
 };
-
-const channelTypes = [
-  { value: "email", label: "Email" },
-  { value: "telegram", label: "Telegram" },
-  { value: "slack", label: "Slack" },
-];
 
 export default function Notifications() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
+  const selectedType = Form.useWatch("type", form) as string | undefined;
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -202,19 +201,48 @@ export default function Notifications() {
       <Modal
         title={t("settings.notifications.modal_title")}
         open={open}
-        onCancel={() => { setOpen(false); form.resetFields(); }}
+        onCancel={() => {
+          setOpen(false);
+          form.resetFields();
+        }}
         onOk={() => form.submit()}
         confirmLoading={createMutation.isPending}
       >
-        <Form form={form} layout="vertical" onFinish={(v) => createMutation.mutate(v)}>
-          <Form.Item name="type" label={t("settings.notifications.type")} rules={[{ required: true }]}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={(v) => createMutation.mutate(v)}
+          initialValues={{ type: "email" }}
+        >
+          <Form.Item
+            name="type"
+            label={t("settings.notifications.type")}
+            rules={[{ required: true }]}
+          >
             <Select options={channelTypes} />
           </Form.Item>
-          <Form.Item name="label" label={t("settings.notifications.label")} rules={[{ required: true }]}>
+          <Form.Item
+            name="label"
+            label={t("settings.notifications.label")}
+            rules={[{ required: true }]}
+          >
             <Input placeholder={t("settings.notifications.label_placeholder")} />
           </Form.Item>
-          <Form.Item name="content" label={t("settings.notifications.destination")} rules={[{ required: true }]}>
-            <Input placeholder={t("settings.notifications.destination_placeholder")} />
+          <Form.Item
+            name="content"
+            label={
+              selectedType === "telegram"
+                ? t("settings.notifications.telegram_chat_id")
+                : t("settings.notifications.destination")
+            }
+            extra={
+              selectedType === "telegram" ? t("settings.notifications.telegram_help") : null
+            }
+            rules={[{ required: true }]}
+          >
+            <Input
+              placeholder={t("settings.notifications.destination_placeholder")}
+            />
           </Form.Item>
         </Form>
       </Modal>

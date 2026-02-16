@@ -14,6 +14,9 @@ import {
   Empty,
   Spin,
   theme,
+  Tag,
+  Row,
+  Col,
 } from "antd";
 import {
   PlusOutlined,
@@ -21,10 +24,11 @@ import {
   ArrowLeftOutlined,
   BookOutlined,
   CalendarOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Post, APIError } from "@/api";
+import type { Post, APIError, JournalMetricResponse, SliceOfLifeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -42,11 +46,36 @@ export default function JournalDetail() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
 
+  const [metricInput, setMetricInput] = useState("");
+  const [isAddingMetric, setIsAddingMetric] = useState(false);
+
+  const [sliceModalOpen, setSliceModalOpen] = useState(false);
+  const [editingSlice, setEditingSlice] = useState<SliceOfLifeResponse | null>(null);
+  const [sliceForm] = Form.useForm();
+
   const { data: journal, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId],
     queryFn: async () => {
       const res = await api.journals.journalsDetail(String(vaultId), Number(jId));
       return res.data!;
+    },
+    enabled: !!vaultId && !!jId,
+  });
+
+  const { data: metrics = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "journals", jId, "metrics"],
+    queryFn: async () => {
+      const res = await api.journalMetrics.journalsMetricsList(String(vaultId), Number(jId));
+      return res.data ?? [];
+    },
+    enabled: !!vaultId && !!jId,
+  });
+
+  const { data: slices = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "journals", jId, "slices"],
+    queryFn: async () => {
+      const res = await api.slicesOfLife.journalsSlicesList(String(vaultId), Number(jId));
+      return res.data ?? [];
     },
     enabled: !!vaultId && !!jId,
   });
@@ -58,6 +87,69 @@ export default function JournalDetail() {
       return res.data ?? [];
     },
     enabled: !!vaultId && !!jId,
+  });
+
+  const createMetricMutation = useMutation({
+    mutationFn: (label: string) =>
+      api.journalMetrics.journalsMetricsCreate(String(vaultId), Number(jId), { label }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "metrics"] });
+      setMetricInput("");
+      setIsAddingMetric(false);
+      message.success(t("vault.journal_detail.metric_added"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteMetricMutation = useMutation({
+    mutationFn: (metricId: number) =>
+      api.journalMetrics.journalsMetricsDelete(String(vaultId), Number(jId), metricId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "metrics"] });
+      message.success(t("vault.journal_detail.metric_deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const createSliceMutation = useMutation({
+    mutationFn: (values: { name: string; description?: string }) =>
+      api.slicesOfLife.journalsSlicesCreate(String(vaultId), Number(jId), {
+        name: values.name,
+        description: values.description,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "slices"] });
+      setSliceModalOpen(false);
+      sliceForm.resetFields();
+      message.success(t("vault.journal_detail.slice_created"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateSliceMutation = useMutation({
+    mutationFn: (values: { id: number; name: string; description?: string }) =>
+      api.slicesOfLife.journalsSlicesUpdate(String(vaultId), Number(jId), values.id, {
+        name: values.name,
+        description: values.description,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "slices"] });
+      setSliceModalOpen(false);
+      setEditingSlice(null);
+      sliceForm.resetFields();
+      message.success(t("vault.journal_detail.slice_updated"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteSliceMutation = useMutation({
+    mutationFn: (sliceId: number) =>
+      api.slicesOfLife.journalsSlicesDelete(String(vaultId), Number(jId), sliceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "journals", jId, "slices"] });
+      message.success(t("vault.journal_detail.slice_deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
   });
 
   const createPostMutation = useMutation({
@@ -124,6 +216,135 @@ export default function JournalDetail() {
       </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <Title level={5} style={{ margin: 0 }}>{t("vault.journal_detail.metrics")}</Title>
+      </div>
+
+      <Card
+        style={{
+          marginBottom: 24,
+          boxShadow: token.boxShadowTertiary,
+        }}
+        bodyStyle={{ padding: 16 }}
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {metrics.map((metric: JournalMetricResponse) => (
+            <Tag
+              key={metric.id}
+              closable
+              onClose={(e) => {
+                e.preventDefault();
+                deleteMetricMutation.mutate(metric.id!);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "4px 10px",
+                fontSize: 14,
+              }}
+            >
+              {metric.label}
+            </Tag>
+          ))}
+          {isAddingMetric ? (
+            <Input
+              autoFocus
+              type="text"
+              size="small"
+              style={{ width: 120 }}
+              value={metricInput}
+              onChange={(e) => setMetricInput(e.target.value)}
+              onBlur={() => setIsAddingMetric(false)}
+              onPressEnter={() => {
+                if (metricInput.trim()) {
+                  createMetricMutation.mutate(metricInput.trim());
+                } else {
+                  setIsAddingMetric(false);
+                }
+              }}
+            />
+          ) : (
+            <Tag
+              onClick={() => setIsAddingMetric(true)}
+              style={{
+                background: token.colorBgContainer,
+                borderStyle: "dashed",
+                cursor: "pointer",
+                padding: "4px 10px",
+                fontSize: 14,
+              }}
+            >
+              <PlusOutlined /> {t("vault.journal_detail.add_metric")}
+            </Tag>
+          )}
+          {!isAddingMetric && metrics.length === 0 && (
+            <Text type="secondary" style={{ fontSize: 13, fontStyle: "italic", marginLeft: 8 }}>
+              {t("vault.journal_detail.no_metrics")}
+            </Text>
+          )}
+        </div>
+      </Card>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <Title level={5} style={{ margin: 0 }}>{t("vault.journal_detail.slices")}</Title>
+        <Button
+          type="dashed"
+          icon={<PlusOutlined />}
+          size="small"
+          onClick={() => {
+            setEditingSlice(null);
+            sliceForm.resetFields();
+            setSliceModalOpen(true);
+          }}
+        >
+          {t("vault.journal_detail.new_slice")}
+        </Button>
+      </div>
+
+      {slices.length > 0 ? (
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          {slices.map((slice: SliceOfLifeResponse) => (
+            <Col xs={24} sm={12} md={8} key={slice.id}>
+              <Card
+                hoverable
+                size="small"
+                style={{ height: "100%", boxShadow: token.boxShadowTertiary }}
+                actions={[
+                  <EditOutlined
+                    key="edit"
+                    onClick={() => {
+                      setEditingSlice(slice);
+                      sliceForm.setFieldsValue(slice);
+                      setSliceModalOpen(true);
+                    }}
+                  />,
+                  <Popconfirm
+                    key="delete"
+                    title={t("vault.journal_detail.delete_slice_confirm")}
+                    onConfirm={() => deleteSliceMutation.mutate(slice.id!)}
+                  >
+                    <DeleteOutlined style={{ color: token.colorError }} />
+                  </Popconfirm>,
+                ]}
+              >
+                <Card.Meta
+                  title={slice.name}
+                  description={
+                    <Text type="secondary" ellipsis={{ tooltip: slice.description }}>
+                      {slice.description || "-"}
+                    </Text>
+                  }
+                />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Card style={{ marginBottom: 24, boxShadow: token.boxShadowTertiary }}>
+          <Empty description={t("vault.journal_detail.no_slices")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        </Card>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Title level={5} style={{ margin: 0 }}>{t("vault.journal_detail.posts")}</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
           {t("vault.journal_detail.new_post")}
@@ -184,6 +405,41 @@ export default function JournalDetail() {
           )}
         />
       </div>
+
+      <Modal
+        title={editingSlice ? t("common.edit") : t("vault.journal_detail.new_slice")}
+        open={sliceModalOpen}
+        onCancel={() => {
+          setSliceModalOpen(false);
+          setEditingSlice(null);
+          sliceForm.resetFields();
+        }}
+        onOk={() => sliceForm.submit()}
+        confirmLoading={createSliceMutation.isPending || updateSliceMutation.isPending}
+      >
+        <Form
+          form={sliceForm}
+          layout="vertical"
+          onFinish={(v) => {
+            if (editingSlice) {
+              updateSliceMutation.mutate({ ...v, id: editingSlice.id! });
+            } else {
+              createSliceMutation.mutate(v);
+            }
+          }}
+        >
+          <Form.Item
+            name="name"
+            label={t("vault.journal_detail.slice_name")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item name="description" label={t("vault.journal_detail.slice_description")}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title={t("vault.journal_detail.modal_title")}
