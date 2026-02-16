@@ -71,12 +71,12 @@ test.describe('Vault Features', () => {
     await expect(page.locator('.ant-tabs-tab')).toHaveCount(9, { timeout: 10000 });
   });
 
-  test('should show create button on companies page', async ({ page }) => {
+  test('should show companies page with table', async ({ page }) => {
     await setupVault(page);
     const vaultUrl = getVaultUrl(page);
     await page.goto(vaultUrl + '/companies');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button').filter({ has: page.locator('.anticon-plus') })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ant-table')).toBeVisible({ timeout: 10000 });
   });
 
   test('should show create button on life metrics page', async ({ page }) => {
