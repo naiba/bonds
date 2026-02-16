@@ -12,7 +12,7 @@ import {
   BellOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
-import { calendarApi } from "@/api/calendar";
+import { api } from "@/api";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -27,8 +27,8 @@ export default function VaultReminders() {
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "reminders"],
     queryFn: async () => {
-      const res = await calendarApi.getReminders(vaultId);
-      return res.data.data ?? [];
+      const res = await api.reminders.remindersList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
@@ -46,7 +46,8 @@ export default function VaultReminders() {
         <Title level={4} style={{ margin: 0 }}>{t("vault.reminders.title")}</Title>
       </div>
 
-      <Table
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <Table<any>
         dataSource={reminders}
         rowKey="id"
         loading={isLoading}

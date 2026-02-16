@@ -20,11 +20,8 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { groupsApi } from "@/api/groups";
-import { contactsApi } from "@/api/contacts";
-import type { GroupContact } from "@/types/modules";
-import type { Contact } from "@/types/contact";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { GroupContact, Contact, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Title } = Typography;
@@ -44,8 +41,8 @@ export default function GroupDetail() {
   const { data: group, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "groups", gId],
     queryFn: async () => {
-      const res = await groupsApi.get(vaultId, gId);
-      return res.data.data!;
+      const res = await api.groups.groupsDetail(String(vaultId), Number(gId));
+      return res.data!;
     },
     enabled: !!vaultId && !!gId,
   });
@@ -53,15 +50,15 @@ export default function GroupDetail() {
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts"],
     queryFn: async () => {
-      const res = await contactsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.contacts.contactsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
 
   const addMutation = useMutation({
     mutationFn: (contactId: number) =>
-      groupsApi.addContact(vaultId, gId, contactId),
+      api.groups.contactsGroupsCreate(String(vaultId), String(contactId), { group_id: Number(gId) }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "groups", gId],
@@ -74,8 +71,8 @@ export default function GroupDetail() {
   });
 
   const removeMutation = useMutation({
-    mutationFn: (contactId: number) =>
-      groupsApi.removeContact(vaultId, gId, contactId),
+    mutationFn: (contactId: string) =>
+      api.groups.contactsGroupsDelete(String(vaultId), String(contactId), Number(gId)),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "groups", gId],
@@ -95,7 +92,7 @@ export default function GroupDetail() {
 
   if (!group) return null;
 
-  const memberIds = new Set((group.contacts ?? []).map((c: GroupContact) => c.contact_id));
+  const memberIds = new Set((group.contacts ?? []).map((c: GroupContact) => c.id));
   const availableContacts = contacts.filter((c: Contact) => !memberIds.has(c.id));
 
   return (
@@ -184,7 +181,8 @@ export default function GroupDetail() {
           dataSource={group.contacts ?? []}
           locale={{ emptyText: <Empty description={t("vault.group_detail.no_members")} style={{ padding: 32 }} /> }}
           renderItem={(member: GroupContact) => {
-            const initials = (member.contact_name ?? "?").charAt(0).toUpperCase();
+            const contactName = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim() || '?';
+            const initials = contactName.charAt(0).toUpperCase();
             return (
               <List.Item
                 style={{
@@ -197,7 +195,7 @@ export default function GroupDetail() {
                   <Popconfirm
                     key="d"
                     title={t("vault.group_detail.remove_confirm")}
-                    onConfirm={(e) => { e?.stopPropagation(); removeMutation.mutate(member.contact_id); }}
+                    onConfirm={(e) => { e?.stopPropagation(); removeMutation.mutate(member.id!); }}
                   >
                     <Button
                       type="text"
@@ -208,7 +206,7 @@ export default function GroupDetail() {
                     />
                   </Popconfirm>,
                 ]}
-                onClick={() => navigate(`/vaults/${vaultId}/contacts/${member.contact_id}`)}
+                onClick={() => navigate(`/vaults/${vaultId}/contacts/${member.id}`)}
               >
                 <List.Item.Meta
                   avatar={
@@ -231,7 +229,7 @@ export default function GroupDetail() {
                   }
                   title={
                     <span style={{ fontWeight: 500 }}>
-                      {member.contact_name}
+                      {contactName}
                     </span>
                   }
                 />

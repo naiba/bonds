@@ -16,8 +16,8 @@ import {
   CheckSquareOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { tasksApi } from "@/api/tasks";
-import type { Task } from "@/types/modules";
+import { api } from "@/api";
+import type { Task } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -33,8 +33,8 @@ export default function VaultTasks() {
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "all-tasks"],
     queryFn: async () => {
-      const res = await tasksApi.listAll(vaultId);
-      return res.data.data ?? [];
+      const res = await api.vaultTasks.tasksList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
@@ -47,8 +47,8 @@ export default function VaultTasks() {
     );
   }
 
-  const pending = tasks.filter((t: Task) => !t.is_completed);
-  const completed = tasks.filter((t: Task) => t.is_completed);
+  const pending = tasks.filter((t: Task) => !t.completed);
+  const completed = tasks.filter((t: Task) => t.completed);
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>

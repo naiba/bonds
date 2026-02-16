@@ -2,8 +2,7 @@ import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme } from "antd";
 import { TeamOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { vaultsApi } from "@/api/vaults";
-import { contactsApi } from "@/api/contacts";
+import { api } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -19,8 +18,8 @@ export default function VaultDetail() {
   const { data: vault, isLoading: vaultLoading } = useQuery({
     queryKey: ["vaults", vaultId],
     queryFn: async () => {
-      const res = await vaultsApi.get(vaultId);
-      return res.data.data!;
+      const res = await api.vaults.vaultsDetail(String(vaultId));
+      return res.data!;
     },
     enabled: !!vaultId,
   });
@@ -28,8 +27,8 @@ export default function VaultDetail() {
   const { data: contacts } = useQuery({
     queryKey: ["vaults", vaultId, "contacts"],
     queryFn: async () => {
-      const res = await contactsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.contacts.contactsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
@@ -97,7 +96,8 @@ export default function VaultDetail() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {recentContacts.map((contact) => (
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {recentContacts.map((contact: any) => (
                   <Card
                     key={contact.id}
                     size="small"

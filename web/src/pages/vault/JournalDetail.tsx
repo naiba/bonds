@@ -23,9 +23,8 @@ import {
   CalendarOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { journalsApi } from "@/api/journals";
-import type { Post } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Post, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -46,8 +45,8 @@ export default function JournalDetail() {
   const { data: journal, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId],
     queryFn: async () => {
-      const res = await journalsApi.get(vaultId, jId);
-      return res.data.data!;
+      const res = await api.journals.journalsDetail(String(vaultId), Number(jId));
+      return res.data!;
     },
     enabled: !!vaultId && !!jId,
   });
@@ -55,15 +54,15 @@ export default function JournalDetail() {
   const { data: posts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId, "posts"],
     queryFn: async () => {
-      const res = await journalsApi.listPosts(vaultId, jId);
-      return res.data.data ?? [];
+      const res = await api.posts.journalsPostsList(String(vaultId), Number(jId));
+      return res.data ?? [];
     },
     enabled: !!vaultId && !!jId,
   });
 
   const createPostMutation = useMutation({
     mutationFn: (values: { title: string; written_at: dayjs.Dayjs }) =>
-      journalsApi.createPost(vaultId, jId, {
+      api.posts.journalsPostsCreate(String(vaultId), Number(jId), {
         title: values.title,
         written_at: values.written_at.format("YYYY-MM-DD"),
       }),
@@ -79,7 +78,7 @@ export default function JournalDetail() {
   });
 
   const deletePostMutation = useMutation({
-    mutationFn: (postId: number) => journalsApi.deletePost(vaultId, jId, postId),
+    mutationFn: (postId: number) => api.posts.journalsPostsDelete(String(vaultId), Number(jId), Number(postId)),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "journals", jId, "posts"],
@@ -155,7 +154,7 @@ export default function JournalDetail() {
                 <Popconfirm
                   key="d"
                   title={t("vault.journal_detail.delete_post_confirm")}
-                  onConfirm={(e) => { e?.stopPropagation(); deletePostMutation.mutate(post.id); }}
+                   onConfirm={(e) => { e?.stopPropagation(); deletePostMutation.mutate(post.id!); }}
                 >
                   <Button
                     type="text"

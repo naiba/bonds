@@ -14,9 +14,8 @@ import {
   ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import client from "@/api/client";
-import type { APIResponse } from "@/types/api";
-import type { FeedItem } from "@/types/modules";
+import { api } from "@/api";
+import type { FeedItem } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -42,10 +41,8 @@ export default function VaultFeed() {
   const { data: feed = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "feed"],
     queryFn: async () => {
-      const res = await client.get<APIResponse<FeedItem[]>>(
-        `/vaults/${vaultId}/feed`,
-      );
-      return res.data.data ?? [];
+      const res = await api.feed.feedList(String(vaultId));
+      return (res.data ?? []) as FeedItem[];
     },
     enabled: !!vaultId,
   });
@@ -106,22 +103,21 @@ export default function VaultFeed() {
                 title={
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Tag
-                      color={getActionColor(item.action)}
+                      color={getActionColor(item.action ?? '')}
                       style={{ borderRadius: 12, fontSize: 11, margin: 0 }}
                     >
                       {item.action}
                     </Tag>
-                    {item.contact_name && (
+                    {item.contact_id && (
                       <a
                         style={{ fontWeight: 600 }}
                         onClick={() =>
-                          item.contact_id &&
                           navigate(
                             `/vaults/${vaultId}/contacts/${item.contact_id}`,
                           )
                         }
                       >
-                        {item.contact_name}
+                        {item.contact_id}
                       </a>
                     )}
                   </div>
@@ -136,7 +132,7 @@ export default function VaultFeed() {
                     <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 6 }}>
                       <ClockCircleOutlined style={{ fontSize: 11, color: token.colorTextQuaternary }} />
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        {dayjs(item.happened_at).fromNow()}
+                        {dayjs(item.created_at).fromNow()}
                       </Text>
                     </div>
                   </>

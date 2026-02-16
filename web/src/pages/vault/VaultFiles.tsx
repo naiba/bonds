@@ -18,9 +18,8 @@ import {
   FilePdfOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import client from "@/api/client";
-import type { APIResponse } from "@/types/api";
-import type { Document } from "@/types/modules";
+import { api } from "@/api";
+import type { Document } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -50,10 +49,8 @@ export default function VaultFiles() {
   const { data: files = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "files"],
     queryFn: async () => {
-      const res = await client.get<APIResponse<Document[]>>(
-        `/vaults/${vaultId}/files`,
-      );
-      return res.data.data ?? [];
+      const res = await api.files.filesList(String(vaultId));
+      return (res.data ?? []) as Document[];
     },
     enabled: !!vaultId,
   });
@@ -61,8 +58,8 @@ export default function VaultFiles() {
   const columns = [
     {
       title: t("vault.files.col_name"),
-      dataIndex: "filename",
-      key: "filename",
+      dataIndex: "name",
+      key: "name",
       render: (name: string, record: Document) => (
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div
@@ -76,7 +73,7 @@ export default function VaultFiles() {
               justifyContent: "center",
             }}
           >
-            {getFileIcon(record.mime_type)}
+            {getFileIcon(record.mime_type ?? '')}
           </div>
           <span style={{ fontWeight: 500 }}>{name}</span>
         </span>
@@ -118,7 +115,7 @@ export default function VaultFiles() {
           type="text"
           size="small"
           icon={<DownloadOutlined />}
-          href={record.url}
+          href={`/api/vaults/${vaultId}/files/${record.id}/download`}
           target="_blank"
         />
       ),

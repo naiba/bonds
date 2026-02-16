@@ -105,7 +105,7 @@ export default function Layout() {
   };
 
   const initials = user
-    ? `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`.toUpperCase()
+    ? `${(user.first_name ?? '').charAt(0)}${(user.last_name ?? '').charAt(0)}`.toUpperCase()
     : "";
 
   return (

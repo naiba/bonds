@@ -27,18 +27,16 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import type { TabsProps } from "antd";
-import type { AxiosResponse } from "axios";
-import { vaultSettingsApi } from "@/api/vaultSettings";
-import { settingsApi } from "@/api/settings";
-import type { APIError, APIResponse } from "@/types/api";
-import type { PersonalizeItem } from "@/types/modules";
+import { api } from "@/api";
 import type {
+  APIError,
+  PersonalizeItem,
   UpdateVaultSettingsRequest,
   VaultUserResponse,
   LabelResponse,
   LifeEventCategoryResponse,
   LifeEventCategoryTypeResponse,
-} from "@/types/vaultSettings";
+} from "@/api";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -55,8 +53,8 @@ export default function VaultSettings() {
   const { data: vaultSettings } = useQuery({
     queryKey: ["vault", vaultId, "settings"],
     queryFn: async () => {
-      const res = await vaultSettingsApi.getSettings(vaultId);
-      return res.data.data;
+      const res = await api.vaultSettings.settingsList(String(vaultId));
+      return res.data;
     },
     enabled: !!vaultId,
   });
@@ -64,14 +62,14 @@ export default function VaultSettings() {
   const { data: personalizeTemplates } = useQuery<PersonalizeItem[]>({
     queryKey: ["settings", "personalize", "templates"],
     queryFn: async () => {
-      const res = await settingsApi.listPersonalizeItems("templates");
-      return res.data.data ?? [];
+      const res = await api.personalize.personalizeDetail("templates");
+      return res.data ?? [];
     },
   });
 
   const updateSettingsMutation = useMutation({
     mutationFn: (data: UpdateVaultSettingsRequest) =>
-      vaultSettingsApi.updateSettings(vaultId, data),
+      api.vaultSettings.settingsUpdate(String(vaultId), data),
     onSuccess: () => {
       message.success(t("common.saved"));
       queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
@@ -81,7 +79,7 @@ export default function VaultSettings() {
 
   const updateTabVisibilityMutation = useMutation({
     mutationFn: (data: Record<string, boolean>) =>
-      vaultSettingsApi.updateTabVisibility(vaultId, data),
+      api.vaultSettings.settingsVisibilityUpdate(String(vaultId), data),
     onSuccess: () => {
       message.success(t("common.saved"));
       queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
@@ -194,14 +192,14 @@ export default function VaultSettings() {
     const { data: users = [], isLoading } = useQuery({
       queryKey: ["vault", vaultId, "users"],
       queryFn: async () => {
-        const res = await vaultSettingsApi.listUsers(vaultId);
-        return res.data.data ?? [];
+        const res = await api.vaultSettings.settingsUsersList(String(vaultId));
+        return res.data ?? [];
       },
     });
 
     const inviteMutation = useMutation({
       mutationFn: (values: { email: string; permission: number }) =>
-        vaultSettingsApi.inviteUser(vaultId, values),
+        api.vaultSettings.settingsUsersCreate(String(vaultId), values),
       onSuccess: () => {
         message.success(t("invitations.status.pending")); // Or specific success message
         queryClient.invalidateQueries({ queryKey: ["vault", vaultId, "users"] });
@@ -210,7 +208,7 @@ export default function VaultSettings() {
     });
 
     const removeUserMutation = useMutation({
-      mutationFn: (userId: number) => vaultSettingsApi.removeUser(vaultId, userId),
+      mutationFn: (userId: number) => api.vaultSettings.settingsUsersDelete(String(vaultId), userId),
       onSuccess: () => {
         message.success(t("common.deleted"));
         queryClient.invalidateQueries({ queryKey: ["vault", vaultId, "users"] });
@@ -220,7 +218,7 @@ export default function VaultSettings() {
 
     const updateUserPermMutation = useMutation({
       mutationFn: ({ userId, permission }: { userId: number; permission: number }) =>
-        vaultSettingsApi.updateUserPermission(vaultId, userId, { permission }),
+        api.vaultSettings.settingsUsersUpdate(String(vaultId), userId, { permission }),
       onSuccess: () => {
         message.success(t("common.updated"));
         queryClient.invalidateQueries({ queryKey: ["vault", vaultId, "users"] });
@@ -280,10 +278,10 @@ export default function VaultSettings() {
                 actions={[
                   <Select
                     key="perm"
-                    defaultValue={user.permission}
+                    defaultValue={user.permission ?? 300}
                     style={{ width: 120 }}
                     onChange={(val) =>
-                      updateUserPermMutation.mutate({ userId: user.user_id, permission: val })
+                      updateUserPermMutation.mutate({ userId: user.id!, permission: val })
                     }
                     disabled={updateUserPermMutation.isPending}
                   >
@@ -294,7 +292,7 @@ export default function VaultSettings() {
                   <Popconfirm
                     key="del"
                     title={t("common.delete_confirm")}
-                    onConfirm={() => removeUserMutation.mutate(user.user_id)}
+                    onConfirm={() => removeUserMutation.mutate(user.id!)}
                   >
                     <Button danger icon={<DeleteOutlined />} loading={removeUserMutation.isPending} />
                   </Popconfirm>,
@@ -316,11 +314,11 @@ export default function VaultSettings() {
     const queryKey = ["vault", vaultId, "labels"];
     const { data: items = [], isLoading } = useQuery({
       queryKey,
-      queryFn: async () => (await vaultSettingsApi.listLabels(vaultId)).data.data ?? [],
+      queryFn: async () => (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
     });
 
     const createMutation = useMutation({
-      mutationFn: (data: { name: string; description?: string; bg_color: string; text_color: string }) => vaultSettingsApi.createLabel(vaultId, data),
+      mutationFn: (data: { name: string; description?: string; bg_color: string; text_color: string }) => api.vaultSettings.settingsLabelsCreate(String(vaultId), data),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey });
         message.success(t("common.created"));
@@ -329,8 +327,8 @@ export default function VaultSettings() {
     });
 
     const updateMutation = useMutation({
-      mutationFn: ({ id, data }: { id: number; data: { name?: string; description?: string; bg_color?: string; text_color?: string } }) =>
-        vaultSettingsApi.updateLabel(vaultId, id, data),
+      mutationFn: ({ id, data }: { id: number; data: { name: string; description?: string; bg_color: string; text_color: string } }) =>
+        api.vaultSettings.settingsLabelsUpdate(String(vaultId), id, data),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey });
         message.success(t("common.updated"));
@@ -340,7 +338,7 @@ export default function VaultSettings() {
     });
 
     const deleteMutation = useMutation({
-      mutationFn: (id: number) => vaultSettingsApi.deleteLabel(vaultId, id),
+      mutationFn: (id: number) => api.vaultSettings.settingsLabelsDelete(String(vaultId), id),
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey });
         message.success(t("common.deleted"));
@@ -366,7 +364,7 @@ export default function VaultSettings() {
     };
 
     const startEdit = (item: LabelResponse) => {
-      setEditingId(item.id);
+      setEditingId(item.id ?? null);
       form.setFieldsValue({
         name: item.name,
         description: item.description,
@@ -407,14 +405,14 @@ export default function VaultSettings() {
         </Card>
 
         <Card title={t("vault_settings.labels")}>
-          <List
+          <List<LabelResponse>
             loading={isLoading}
-            dataSource={items}
+            dataSource={items as LabelResponse[]}
             renderItem={(item) => (
               <List.Item
                 actions={[
                   <Button icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-                  <Popconfirm title={t("common.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id)}>
+                  <Popconfirm title={t("common.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
                     <Button danger icon={<DeleteOutlined />} />
                   </Popconfirm>,
                 ]}
@@ -454,7 +452,7 @@ export default function VaultSettings() {
     extraFields = [],
   }: {
     queryKeySuffix: string;
-    apiList: (vid: number) => Promise<AxiosResponse<APIResponse<T[]>>>;
+    apiList: (vid: number) => Promise<{ data?: T[] }>;
     apiCreate: (vid: number, data: Record<string, unknown>) => Promise<unknown>;
     apiUpdate: (vid: number, id: number, data: Record<string, unknown>) => Promise<unknown>;
     apiDelete: (vid: number, id: number) => Promise<unknown>;
@@ -465,7 +463,7 @@ export default function VaultSettings() {
     const queryKey = ["vault", vaultId, queryKeySuffix];
     const { data: items = [], isLoading } = useQuery({
       queryKey,
-      queryFn: async () => (await apiList(vaultId)).data.data ?? [],
+      queryFn: async () => (await apiList(vaultId)).data ?? [],
     });
 
     const createMutation = useMutation({
@@ -584,27 +582,27 @@ export default function VaultSettings() {
     const queryKey = ["vault", vaultId, "lifeEventCategories"];
     const { data: categories = [] } = useQuery({
       queryKey,
-      queryFn: async () => (await vaultSettingsApi.listLifeEventCategories(vaultId)).data.data ?? [],
+      queryFn: async () => (await api.vaultSettings.settingsLifeEventCategoriesList(String(vaultId))).data ?? [],
     });
 
     const createCategory = useMutation({
-        mutationFn: (data: { label: string }) => vaultSettingsApi.createLifeEventCategory(vaultId, data),
+        mutationFn: (data: { label: string }) => api.vaultSettings.settingsLifeEventCategoriesCreate(String(vaultId), data),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.created")); },
     });
     const deleteCategory = useMutation({
-        mutationFn: (id: number) => vaultSettingsApi.deleteLifeEventCategory(vaultId, id),
+        mutationFn: (id: number) => api.vaultSettings.settingsLifeEventCategoriesDelete(String(vaultId), id),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.deleted")); },
     });
 
     const createType = useMutation({
         mutationFn: ({ catId, data }: { catId: number, data: { label: string } }) => 
-            vaultSettingsApi.createLifeEventCategoryType(vaultId, catId, data),
+            api.vaultSettings.settingsLifeEventCategoriesTypesCreate(String(vaultId), catId, data),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.created")); },
     });
     
     const deleteType = useMutation({
         mutationFn: ({ catId, typeId }: { catId: number, typeId: number }) => 
-            vaultSettingsApi.deleteLifeEventCategoryType(vaultId, catId, typeId),
+            api.vaultSettings.settingsLifeEventCategoriesTypesDelete(String(vaultId), catId, typeId),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.deleted")); },
     });
 
@@ -636,11 +634,11 @@ export default function VaultSettings() {
              <Card title={t("vault_settings.life_events")}>
                 <Collapse accordion>
                     {categories.map((cat: LifeEventCategoryResponse) => (
-                        <Collapse.Panel 
-                            key={cat.id} 
+                         <Collapse.Panel 
+                            key={cat.id!} 
                             header={cat.label}
                             extra={
-                                <Popconfirm title={t("common.delete_confirm")} onConfirm={(e) => { e?.stopPropagation(); deleteCategory.mutate(cat.id); }}>
+                                <Popconfirm title={t("common.delete_confirm")} onConfirm={(e) => { e?.stopPropagation(); deleteCategory.mutate(cat.id!); }}>
                                     <DeleteOutlined onClick={(e) => e.stopPropagation()} style={{color: 'red'}} />
                                 </Popconfirm>
                             }
@@ -651,17 +649,17 @@ export default function VaultSettings() {
                                     <Space style={{width: '100%'}}>
                                         <Input 
                                             placeholder={t("vault_settings.add_type")} 
-                                            value={newTypeLabel[cat.id] || ""}
-                                            onChange={e => setNewTypeLabel(prev => ({ ...prev, [cat.id]: e.target.value }))}
-                                            onPressEnter={() => handleAddType(cat.id)}
+                                            value={newTypeLabel[cat.id!] || ""}
+                                            onChange={e => setNewTypeLabel(prev => ({ ...prev, [cat.id!]: e.target.value }))}
+                                            onPressEnter={() => handleAddType(cat.id!)}
                                         />
-                                        <Button type="dashed" onClick={() => handleAddType(cat.id)}>{t("common.add")}</Button>
+                                        <Button type="dashed" onClick={() => handleAddType(cat.id!)}>{t("common.add")}</Button>
                                     </Space>
                                 }
                                 renderItem={(type: LifeEventCategoryTypeResponse) => (
                                     <List.Item
                                         actions={[
-                                            <Popconfirm title={t("common.delete_confirm")} onConfirm={() => deleteType.mutate({ catId: cat.id, typeId: type.id })}>
+                                            <Popconfirm title={t("common.delete_confirm")} onConfirm={() => deleteType.mutate({ catId: cat.id!, typeId: type.id! })}>
                                                 <Button danger size="small" icon={<DeleteOutlined />} type="text" />
                                             </Popconfirm>
                                         ]}
@@ -686,37 +684,37 @@ export default function VaultSettings() {
     { key: "labels", label: t("vault_settings.labels"), children: <LabelsTab /> },
     { key: "tags", label: t("vault_settings.tags"), children: <SimpleCrudTab 
         queryKeySuffix="tags" 
-        apiList={(vid) => vaultSettingsApi.listTags(vid)}
-        apiCreate={(vid, data) => vaultSettingsApi.createTag(vid, data as unknown as import("@/types/vaultSettings").CreateTagRequest)}
-        apiUpdate={(vid, id, data) => vaultSettingsApi.updateTag(vid, id, data as unknown as import("@/types/vaultSettings").UpdateTagRequest)}
-        apiDelete={(vid, id) => vaultSettingsApi.deleteTag(vid, id)}
+        apiList={(vid) => api.vaultSettings.settingsTagsList(String(vid))}
+        apiCreate={(vid, data) => api.vaultSettings.settingsTagsCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateTagRequest)}
+        apiUpdate={(vid, id, data) => api.vaultSettings.settingsTagsUpdate(String(vid), id, data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoUpdateTagRequest)}
+        apiDelete={(vid, id) => api.vaultSettings.settingsTagsDelete(String(vid), id)}
         title={t("vault_settings.tags")}
         itemNameKey="name"
     /> },
     { key: "dateTypes", label: t("vault_settings.date_types"), children: <SimpleCrudTab 
         queryKeySuffix="contactImportantDateTypes"
-        apiList={(vid) => vaultSettingsApi.listImportantDateTypes(vid)}
-        apiCreate={(vid, data) => vaultSettingsApi.createImportantDateType(vid, data as unknown as import("@/types/vaultSettings").CreateImportantDateTypeRequest)}
-        apiUpdate={(vid, id, data) => vaultSettingsApi.updateImportantDateType(vid, id, data as unknown as import("@/types/vaultSettings").UpdateImportantDateTypeRequest)}
-        apiDelete={(vid, id) => vaultSettingsApi.deleteImportantDateType(vid, id)}
+        apiList={(vid) => api.vaultSettings.settingsDateTypesList(String(vid))}
+        apiCreate={(vid, data) => api.vaultSettings.settingsDateTypesCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateImportantDateTypeRequest)}
+        apiUpdate={(vid, id, data) => api.vaultSettings.settingsDateTypesUpdate(String(vid), id, data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoUpdateImportantDateTypeRequest)}
+        apiDelete={(vid, id) => api.vaultSettings.settingsDateTypesDelete(String(vid), id)}
         title={t("vault_settings.date_types")}
     /> },
     { key: "moodParams", label: t("vault_settings.mood_params"), children: <SimpleCrudTab 
         queryKeySuffix="moodTrackingParameters"
-        apiList={(vid) => vaultSettingsApi.listMoodTrackingParameters(vid)}
-        apiCreate={(vid, data) => vaultSettingsApi.createMoodTrackingParameter(vid, data as unknown as import("@/types/vaultSettings").CreateMoodTrackingParameterRequest)}
-        apiUpdate={(vid, id, data) => vaultSettingsApi.updateMoodTrackingParameter(vid, id, data as unknown as import("@/types/vaultSettings").UpdateMoodTrackingParameterRequest)}
-        apiDelete={(vid, id) => vaultSettingsApi.deleteMoodTrackingParameter(vid, id)}
+        apiList={(vid) => api.vaultSettings.settingsMoodParamsList(String(vid))}
+        apiCreate={(vid, data) => api.vaultSettings.settingsMoodParamsCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateMoodTrackingParameterRequest)}
+        apiUpdate={(vid, id, data) => api.vaultSettings.settingsMoodParamsUpdate(String(vid), id, data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoUpdateMoodTrackingParameterRequest)}
+        apiDelete={(vid, id) => api.vaultSettings.settingsMoodParamsDelete(String(vid), id)}
         title={t("vault_settings.mood_params")}
         extraFields={[{name: 'hex_color', label: t("vault_settings.hex_color"), type: 'color', initialValue: '#1677ff'}]}
     /> },
     { key: "lifeEvents", label: t("vault_settings.life_events"), children: <LifeEventsTab /> },
     { key: "quickFacts", label: t("vault_settings.quick_facts"), children: <SimpleCrudTab 
         queryKeySuffix="quickFactTemplates"
-        apiList={(vid) => vaultSettingsApi.listQuickFactTemplates(vid)}
-        apiCreate={(vid, data) => vaultSettingsApi.createQuickFactTemplate(vid, data as unknown as import("@/types/vaultSettings").CreateQuickFactTemplateRequest)}
-        apiUpdate={(vid, id, data) => vaultSettingsApi.updateQuickFactTemplate(vid, id, data as unknown as import("@/types/vaultSettings").UpdateQuickFactTemplateRequest)}
-        apiDelete={(vid, id) => vaultSettingsApi.deleteQuickFactTemplate(vid, id)}
+        apiList={(vid) => api.vaultSettings.settingsQuickFactTemplatesList(String(vid))}
+        apiCreate={(vid, data) => api.vaultSettings.settingsQuickFactTemplatesCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateQuickFactTemplateRequest)}
+        apiUpdate={(vid, id, data) => api.vaultSettings.settingsQuickFactTemplatesUpdate(String(vid), id, data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoUpdateQuickFactTemplateRequest)}
+        apiDelete={(vid, id) => api.vaultSettings.settingsQuickFactTemplatesDelete(String(vid), id)}
         title={t("vault_settings.quick_facts")}
     /> },
   ];

@@ -23,10 +23,8 @@ import {
   ArrowLeftOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
-import { lifeMetricsApi } from "@/api/lifeMetrics";
-import { searchApi } from "@/api/search";
-import type { LifeMetric } from "@/types/modules";
-import type { SearchResult } from "@/types/search";
+import { api, httpClient } from "@/api";
+import type { LifeMetric, SearchResult } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -48,15 +46,15 @@ export default function VaultLifeMetrics() {
   const { data: metrics = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "lifeMetrics"],
     queryFn: async () => {
-      const res = await lifeMetricsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.lifeMetrics.lifeMetricsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
 
   const createMutation = useMutation({
     mutationFn: (values: { label: string }) =>
-      lifeMetricsApi.create(vaultId, values),
+      api.lifeMetrics.lifeMetricsCreate(String(vaultId), values),
     onSuccess: () => {
       message.success(t("common.saved"));
       setIsModalOpen(false);
@@ -67,7 +65,7 @@ export default function VaultLifeMetrics() {
 
   const updateMutation = useMutation({
     mutationFn: (values: { id: number; label: string }) =>
-      lifeMetricsApi.update(vaultId, values.id, { label: values.label }),
+      api.lifeMetrics.lifeMetricsUpdate(String(vaultId), values.id, { label: values.label }),
     onSuccess: () => {
       message.success(t("common.saved"));
       setIsModalOpen(false);
@@ -78,7 +76,7 @@ export default function VaultLifeMetrics() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => lifeMetricsApi.delete(vaultId, id),
+    mutationFn: (id: number) => api.lifeMetrics.lifeMetricsDelete(String(vaultId), id),
     onSuccess: () => {
       message.success(t("common.deleted"));
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "lifeMetrics"] });
@@ -87,7 +85,7 @@ export default function VaultLifeMetrics() {
 
   const addContactMutation = useMutation({
     mutationFn: (values: { metricId: number; contactId: number }) =>
-      lifeMetricsApi.addContact(vaultId, values.metricId, { contact_id: values.contactId }),
+      api.lifeMetrics.lifeMetricsContactsCreate(String(vaultId), values.metricId, { contact_id: String(values.contactId) }),
     onSuccess: () => {
       message.success(t("common.saved"));
       setIsContactModalOpen(false);
@@ -98,7 +96,7 @@ export default function VaultLifeMetrics() {
 
   const removeContactMutation = useMutation({
     mutationFn: (values: { metricId: number; contactId: number }) =>
-      lifeMetricsApi.removeContact(vaultId, values.metricId, values.contactId),
+      httpClient.instance.delete(`/vaults/${vaultId}/lifeMetrics/${values.metricId}/contacts/${values.contactId}`),
     onSuccess: () => {
       message.success(t("common.deleted"));
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "lifeMetrics"] });
@@ -134,8 +132,8 @@ export default function VaultLifeMetrics() {
       return;
     }
     try {
-      const res = await searchApi.search(vaultId, value);
-      const data = res.data.data as { contacts?: SearchResult[] };
+      const res = await api.search.searchList(String(vaultId), { q: value });
+      const data = res.data as { contacts?: SearchResult[] };
       setContactSearchResults(data?.contacts ?? []);
     } catch {
       setContactSearchResults([]);
@@ -168,7 +166,8 @@ export default function VaultLifeMetrics() {
         </Button>
       </div>
 
-      <Table
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      <Table<any>
         dataSource={metrics}
         rowKey="id"
         loading={isLoading}
@@ -185,7 +184,8 @@ export default function VaultLifeMetrics() {
             key: "contacts",
             render: (_, record) => (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                {record.contacts?.map((contact) => (
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {record.contacts?.map((contact: any) => (
                   <Tag
                     key={contact.id}
                     closable
@@ -252,7 +252,7 @@ export default function VaultLifeMetrics() {
           layout="vertical"
           onFinish={(values) => {
             if (editingMetric) {
-              updateMutation.mutate({ id: editingMetric.id, label: values.label });
+              updateMutation.mutate({ id: editingMetric.id!, label: values.label });
             } else {
               createMutation.mutate(values);
             }
@@ -299,7 +299,7 @@ export default function VaultLifeMetrics() {
               notFoundContent={null}
               options={contactSearchResults.map((c) => ({
                 value: c.id,
-                label: c.title,
+                label: c.name,
               }))}
             />
           </Form.Item>

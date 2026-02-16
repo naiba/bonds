@@ -20,9 +20,8 @@ import {
   BookOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { journalsApi } from "@/api/journals";
-import type { Journal } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { Journal, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -43,15 +42,15 @@ export default function JournalList() {
   const { data: journals = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await journalsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.journals.journalsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
 
   const createMutation = useMutation({
     mutationFn: (values: { name: string; description?: string }) =>
-      journalsApi.create(vaultId, values),
+      api.journals.journalsCreate(String(vaultId), values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -62,7 +61,7 @@ export default function JournalList() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (journalId: number) => journalsApi.delete(vaultId, journalId),
+    mutationFn: (journalId: number) => api.journals.journalsDelete(String(vaultId), Number(journalId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("vault.journals.deleted_success"));
@@ -121,7 +120,7 @@ export default function JournalList() {
                 <Popconfirm
                   key="d"
                   title={t("vault.journals.delete_confirm")}
-                  onConfirm={(e) => { e?.stopPropagation(); deleteMutation.mutate(journal.id); }}
+                  onConfirm={(e) => { e?.stopPropagation(); deleteMutation.mutate(journal.id!); }}
                 >
                   <Button
                     type="text"

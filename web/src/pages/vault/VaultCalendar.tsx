@@ -12,9 +12,8 @@ import {
   CalendarOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import client from "@/api/client";
-import type { APIResponse } from "@/types/api";
-import type { ImportantDate, Reminder } from "@/types/modules";
+import { api } from "@/api";
+import type { ImportantDate, Reminder } from "@/api";
 import type { Dayjs } from "dayjs";
 import { useTranslation } from "react-i18next";
 
@@ -37,10 +36,8 @@ export default function VaultCalendar() {
   const { data: dates = [] } = useQuery({
     queryKey: ["vaults", vaultId, "calendar", "dates"],
     queryFn: async () => {
-      const res = await client.get<APIResponse<ImportantDate[]>>(
-        `/vaults/${vaultId}/dates`,
-      );
-      return res.data.data ?? [];
+      const res = await api.calendar.calendarList(String(vaultId));
+      return (res.data?.important_dates ?? []) as ImportantDate[];
     },
     enabled: !!vaultId,
   });
@@ -48,10 +45,8 @@ export default function VaultCalendar() {
   const { data: reminders = [] } = useQuery({
     queryKey: ["vaults", vaultId, "calendar", "reminders"],
     queryFn: async () => {
-      const res = await client.get<APIResponse<Reminder[]>>(
-        `/vaults/${vaultId}/reminders`,
-      );
-      return res.data.data ?? [];
+      const res = await api.reminders.remindersList(String(vaultId));
+      return (res.data ?? []) as Reminder[];
     },
     enabled: !!vaultId,
   });
@@ -63,16 +58,16 @@ export default function VaultCalendar() {
 
   const itemsByDate = new Map<string, CalendarItem[]>();
   for (const d of dates) {
-    const key = toDateKey(d.year, d.month, d.day);
+    const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
     if (!key) continue;
     if (!itemsByDate.has(key)) itemsByDate.set(key, []);
-    itemsByDate.get(key)!.push({ type: "date", label: d.label, dateStr: key, calendarType: d.calendar_type });
+    itemsByDate.get(key)!.push({ type: "date", label: d.label ?? '', dateStr: key, calendarType: d.calendar_type });
   }
   for (const r of reminders) {
-    const key = toDateKey(r.year, r.month, r.day);
+    const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
     if (!key) continue;
     if (!itemsByDate.has(key)) itemsByDate.set(key, []);
-    itemsByDate.get(key)!.push({ type: "reminder", label: r.label, dateStr: key, calendarType: r.calendar_type });
+    itemsByDate.get(key)!.push({ type: "reminder", label: r.label ?? '', dateStr: key, calendarType: r.calendar_type });
   }
 
   function cellRender(date: Dayjs) {

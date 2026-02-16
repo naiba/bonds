@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, App, theme } from "antd";
 import { ArrowLeftOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { vaultsApi } from "@/api/vaults";
-import type { CreateVaultRequest } from "@/types/vault";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { CreateVaultRequest, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Title, Text } = Typography;
@@ -19,11 +18,12 @@ export default function VaultCreate() {
   const { token } = theme.useToken();
 
   const mutation = useMutation({
-    mutationFn: (data: CreateVaultRequest) => vaultsApi.create(data),
-    onSuccess: (res) => {
+    mutationFn: (data: CreateVaultRequest) => api.vaults.vaultsCreate(data),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onSuccess: (res: any) => {
       queryClient.invalidateQueries({ queryKey: ["vaults"] });
       message.success(t("vault.create.success"));
-      const vault = res.data.data;
+      const vault = res.data;
       navigate(vault ? `/vaults/${vault.id}` : "/vaults");
     },
     onError: (err: APIError) => {

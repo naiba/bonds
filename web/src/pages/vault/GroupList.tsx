@@ -21,9 +21,8 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { groupsApi } from "@/api/groups";
-import type { Group } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api, httpClient } from "@/api";
+import type { Group, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Title } = Typography;
@@ -43,14 +42,14 @@ export default function GroupList() {
   const { data: groups = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await groupsApi.list(vaultId);
-      return res.data.data ?? [];
+      const res = await api.groups.groupsList(String(vaultId));
+      return res.data ?? [];
     },
     enabled: !!vaultId,
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { name: string }) => groupsApi.create(vaultId, values),
+    mutationFn: (values: { name: string }) => httpClient.instance.post(`/vaults/${vaultId}/groups`, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -61,7 +60,7 @@ export default function GroupList() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (groupId: number) => groupsApi.delete(vaultId, groupId),
+    mutationFn: (groupId: number) => api.groups.groupsDelete(String(vaultId), Number(groupId)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("vault.group_list.deleted_success"));
@@ -128,7 +127,7 @@ export default function GroupList() {
                 <Popconfirm
                   key="d"
                   title={t("vault.group_list.delete_confirm")}
-                  onConfirm={(e) => { e?.stopPropagation(); deleteMutation.mutate(group.id); }}
+                  onConfirm={(e) => { e?.stopPropagation(); deleteMutation.mutate(group.id!); }}
                 >
                   <Button
                     type="text"

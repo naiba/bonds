@@ -19,9 +19,8 @@ import {
   FormOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { journalsApi } from "@/api/journals";
-import type { PostSection } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { PostSection, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -49,15 +48,15 @@ export default function PostDetail() {
   const { data: post, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "journals", jId, "posts", pId],
     queryFn: async () => {
-      const res = await journalsApi.getPost(vaultId, jId, pId);
-      return res.data.data!;
+      const res = await api.posts.journalsPostsDetail(String(vaultId), Number(jId), Number(pId));
+      return res.data!;
     },
     enabled: !!vaultId && !!jId && !!pId,
   });
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      journalsApi.updatePost(vaultId, jId, pId, {
+      api.posts.journalsPostsUpdate(String(vaultId), Number(jId), Number(pId), {
         title,
         written_at: post!.written_at,
         sections: sections.map((s, i) => ({ ...s, position: i })),
@@ -76,7 +75,7 @@ export default function PostDetail() {
     if (!post) return;
     setTitle(post.title);
     setSections(
-      (post.sections ?? []).map((s: PostSection) => ({ label: s.label, body: s.body })),
+      (post.sections ?? []).map((s: PostSection) => ({ label: s.label, body: s.content })),
     );
     setEditing(true);
   }
@@ -203,7 +202,7 @@ export default function PostDetail() {
 
           {post.sections?.length ? (
             post.sections
-              .sort((a: PostSection, b: PostSection) => a.position - b.position)
+              .sort((a: PostSection, b: PostSection) => (a.position ?? 0) - (b.position ?? 0))
               .map((section: PostSection) => (
                 <div
                   key={section.id}
@@ -217,7 +216,7 @@ export default function PostDetail() {
                     {section.label}
                   </Title>
                   <Paragraph style={{ fontSize: 15, lineHeight: 1.8, color: token.colorText }}>
-                    {section.body}
+                    {section.content}
                   </Paragraph>
                 </div>
               ))

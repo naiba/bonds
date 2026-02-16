@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, Button, Typography, Spin, Empty, Row, Col, App, theme } from "antd";
 import { PlusOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
-import { vaultsApi } from "@/api/vaults";
+import { api } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -20,8 +20,8 @@ export default function VaultList() {
   const { data, isLoading } = useQuery({
     queryKey: ["vaults"],
     queryFn: async () => {
-      const res = await vaultsApi.list();
-      return res.data.data ?? [];
+      const res = await api.vaults.vaultsList();
+      return res.data ?? [];
     },
     meta: {
       onError: () => message.error(t("vault.list.load_failed")),
@@ -129,7 +129,8 @@ export default function VaultList() {
         </Card>
       ) : (
         <Row gutter={[20, 20]}>
-          {vaults.map((vault) => (
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {vaults.map((vault: any) => (
             <Col xs={24} sm={12} lg={8} key={vault.id}>
               <Card
                 hoverable
