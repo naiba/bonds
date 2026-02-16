@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -16,12 +16,12 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { ImportantDate, Reminder } from "@/api";
 import type {
   GithubComNaibaBondsInternalDtoCalendarDateItem as CalendarDateItem,
   GithubComNaibaBondsInternalDtoCalendarReminderItem as CalendarReminderItem,
 } from "@/api/generated/data-contracts";
 import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
 const { Title } = Typography;
@@ -40,21 +40,16 @@ export default function VaultCalendar() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [panelDate, setPanelDate] = useState<Dayjs>(dayjs());
 
-  const { data: dates = [] } = useQuery({
-    queryKey: ["vaults", vaultId, "calendar", "dates"],
-    queryFn: async () => {
-      const res = await api.calendar.calendarList(String(vaultId));
-      return (res.data?.important_dates ?? []) as ImportantDate[];
-    },
-    enabled: !!vaultId,
-  });
+  const panelYear = panelDate.year();
+  const panelMonth = panelDate.month() + 1;
 
-  const { data: reminders = [] } = useQuery({
-    queryKey: ["vaults", vaultId, "calendar", "reminders"],
+  const { data: monthData } = useQuery({
+    queryKey: ["vaults", vaultId, "calendar", "month", panelYear, panelMonth],
     queryFn: async () => {
-      const res = await api.reminders.remindersList(String(vaultId));
-      return (res.data ?? []) as Reminder[];
+      const res = await api.calendar.calendarYearsMonthsDetail(String(vaultId), panelYear, panelMonth);
+      return res.data as { important_dates?: CalendarDateItem[]; reminders?: CalendarReminderItem[] } | undefined;
     },
     enabled: !!vaultId,
   });
@@ -74,19 +69,25 @@ export default function VaultCalendar() {
     return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
-  const itemsByDate = new Map<string, CalendarItem[]>();
-  for (const d of dates) {
-    const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
-    if (!key) continue;
-    if (!itemsByDate.has(key)) itemsByDate.set(key, []);
-    itemsByDate.get(key)!.push({ type: "date", label: d.label ?? '', dateStr: key, calendarType: d.calendar_type });
-  }
-  for (const r of reminders) {
-    const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
-    if (!key) continue;
-    if (!itemsByDate.has(key)) itemsByDate.set(key, []);
-    itemsByDate.get(key)!.push({ type: "reminder", label: r.label ?? '', dateStr: key, calendarType: r.calendar_type });
-  }
+  const itemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
+    const dates = monthData?.important_dates ?? [];
+    const reminders = monthData?.reminders ?? [];
+
+    for (const d of dates) {
+      const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ type: "date", label: d.label ?? '', dateStr: key, calendarType: d.calendar_type });
+    }
+    for (const r of reminders) {
+      const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ type: "reminder", label: r.label ?? '', dateStr: key, calendarType: r.calendar_type });
+    }
+    return map;
+  }, [monthData]);
 
   function cellRender(date: Dayjs) {
     const key = date.format("YYYY-MM-DD");
@@ -139,6 +140,7 @@ export default function VaultCalendar() {
         <Calendar
           cellRender={(date) => cellRender(date as Dayjs)}
           onSelect={(date) => setSelectedDate((date as Dayjs).format("YYYY-MM-DD"))}
+          onPanelChange={(date) => setPanelDate(date as Dayjs)}
         />
       </Card>
 

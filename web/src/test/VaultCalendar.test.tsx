@@ -46,32 +46,35 @@ describe("VaultCalendar", () => {
   it("renders lunar moon emoji for non-gregorian dates", () => {
     mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
       const key = opts.queryKey;
-      if (Array.isArray(key) && key.includes("dates")) {
+      if (Array.isArray(key) && key.includes("month")) {
         return {
-          data: [
-            {
-              id: 1,
-              contact_id: "c1",
-              label: "Lunar Birthday",
-              day: 15,
-              month: 2,
-              year: 2026,
-              calendar_type: "lunar",
-              original_day: 15,
-              original_month: 1,
-              original_year: 2026,
-              contact_important_date_type_id: null,
-              created_at: "2025-01-01",
-              updated_at: "2025-01-01",
-            },
-          ],
+          data: {
+            important_dates: [
+              {
+                id: 1,
+                contact_id: "c1",
+                label: "Lunar Birthday",
+                day: 15,
+                month: 2,
+                year: 2026,
+                calendar_type: "lunar",
+                original_day: 15,
+                original_month: 1,
+                original_year: 2026,
+                contact_important_date_type_id: null,
+                created_at: "2025-01-01",
+                updated_at: "2025-01-01",
+              },
+            ],
+            reminders: [],
+          },
           isLoading: false,
         };
       }
-      if (Array.isArray(key) && key.includes("reminders")) {
-        return { data: [], isLoading: false };
+      if (Array.isArray(key) && key.includes("day")) {
+        return { data: undefined, isLoading: false };
       }
-      return { data: [], isLoading: false };
+      return { data: undefined, isLoading: false };
     });
     renderCalendar();
     expect(document.body.textContent).toContain("🌙");

@@ -12,6 +12,7 @@ import {
   Upload,
   Popconfirm,
   App,
+  Segmented,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -46,11 +47,12 @@ export default function VaultFiles() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const [uploading, setUploading] = useState(false);
+  const [filterType, setFilterType] = useState<string>("all");
 
   const deleteMutation = useMutation({
     mutationFn: (fileId: number) => api.files.filesDelete(String(vaultId), fileId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files"] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files", filterType] });
       message.success(t("vault.files.deleted"));
     },
     onError: (e: APIError) => message.error(e.message),
@@ -60,7 +62,7 @@ export default function VaultFiles() {
     setUploading(true);
     try {
       await api.files.filesCreate(String(vaultId), { file });
-      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files"] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files", filterType] });
       message.success(t("vault.files.upload_success"));
     } catch (e: unknown) {
       const err = e as APIError;
@@ -80,9 +82,16 @@ export default function VaultFiles() {
   }
 
   const { data: files = [], isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "files"],
+    queryKey: ["vaults", vaultId, "files", filterType],
     queryFn: async () => {
-      const res = await api.files.filesList(String(vaultId));
+      let res;
+      if (filterType === "photos") {
+        res = await api.files.filesPhotosList(String(vaultId));
+      } else if (filterType === "documents") {
+        res = await api.files.filesDocumentsList(String(vaultId));
+      } else {
+        res = await api.files.filesList(String(vaultId));
+      }
       return (res.data ?? []) as Document[];
     },
     enabled: !!vaultId,
@@ -185,6 +194,18 @@ export default function VaultFiles() {
             {t("vault.files.upload")}
           </Button>
         </Upload>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <Segmented
+          value={filterType}
+          onChange={(val) => setFilterType(val as string)}
+          options={[
+            { label: t("vault.files.filter_all"), value: "all" },
+            { label: t("vault.files.filter_photos"), value: "photos" },
+            { label: t("vault.files.filter_documents"), value: "documents" },
+          ]}
+        />
       </div>
 
       <Card
