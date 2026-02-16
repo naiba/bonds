@@ -18,6 +18,37 @@ func NewGroupHandler(groupService *services.GroupService) *GroupHandler {
 	return &GroupHandler{groupService: groupService}
 }
 
+// Create godoc
+//
+//	@Summary		Create a group
+//	@Description	Create a new group in the vault
+//	@Tags			groups
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string					true	"Vault ID"
+//	@Param			request		body		dto.CreateGroupRequest	true	"Create group request"
+//	@Success		201			{object}	response.APIResponse{data=dto.GroupResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/groups [post]
+func (h *GroupHandler) Create(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	var req dto.CreateGroupRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+	group, err := h.groupService.Create(vaultID, req)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_create_group")
+	}
+	return response.Created(c, group)
+}
+
 // List godoc
 //
 //	@Summary		List groups

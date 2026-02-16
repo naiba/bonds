@@ -381,6 +381,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	quickFactRoutes.DELETE("/:templateId/:id", quickFactHandler.Delete, requireEditor)
 
 	vaultScoped := protected.Group("/vaults/:vault_id", VaultPermissionMiddleware(vaultService, models.PermissionViewer))
+	vaultScoped.POST("/groups", groupHandler.Create, requireEditor)
 	vaultScoped.GET("/groups", groupHandler.List)
 	vaultScoped.GET("/groups/:id", groupHandler.Get)
 	vaultScoped.PUT("/groups/:id", groupHandler.Update, requireEditor)

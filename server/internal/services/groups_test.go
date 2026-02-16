@@ -34,6 +34,45 @@ func setupGroupTest(t *testing.T) (*GroupService, string, *gorm.DB) {
 	return NewGroupService(db), vault.ID, db
 }
 
+func TestCreateGroup(t *testing.T) {
+	svc, vaultID, _ := setupGroupTest(t)
+
+	resp, err := svc.Create(vaultID, dto.CreateGroupRequest{Name: "Close Friends"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if resp.Name != "Close Friends" {
+		t.Errorf("Expected name 'Close Friends', got '%s'", resp.Name)
+	}
+	if resp.VaultID != vaultID {
+		t.Errorf("Expected vault_id '%s', got '%s'", vaultID, resp.VaultID)
+	}
+	if resp.ID == 0 {
+		t.Error("Expected non-zero ID")
+	}
+}
+
+func TestCreateGroup_AppearsInList(t *testing.T) {
+	svc, vaultID, _ := setupGroupTest(t)
+
+	_, err := svc.Create(vaultID, dto.CreateGroupRequest{Name: "Group A"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	_, err = svc.Create(vaultID, dto.CreateGroupRequest{Name: "Group B"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	groups, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Errorf("Expected 2 groups, got %d", len(groups))
+	}
+}
+
 func TestListGroups(t *testing.T) {
 	svc, vaultID, db := setupGroupTest(t)
 

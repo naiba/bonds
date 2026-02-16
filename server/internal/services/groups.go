@@ -18,6 +18,18 @@ func NewGroupService(db *gorm.DB) *GroupService {
 	return &GroupService{db: db}
 }
 
+func (s *GroupService) Create(vaultID string, req dto.CreateGroupRequest) (*dto.GroupResponse, error) {
+	group := models.Group{
+		VaultID: vaultID,
+		Name:    req.Name,
+	}
+	if err := s.db.Create(&group).Error; err != nil {
+		return nil, err
+	}
+	resp := toGroupResponse(&group)
+	return &resp, nil
+}
+
 func (s *GroupService) List(vaultID string) ([]dto.GroupResponse, error) {
 	var groups []models.Group
 	if err := s.db.Where("vault_id = ?", vaultID).Order("created_at DESC").Find(&groups).Error; err != nil {
