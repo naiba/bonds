@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Alert, Spin } from "antd";
 import { AuthProvider, ProtectedRoute } from "@/stores/auth";
 import Layout from "@/components/Layout";
-import client from "@/api/client";
+import { httpClient } from "@/api";
 
 // Auth pages
 const Login = lazy(() => import("@/pages/auth/Login"));
@@ -70,7 +70,7 @@ export default function App() {
   const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {
-    client
+    httpClient.instance
       .get<{ data: { content: string } }>("/announcement")
       .then((res) => setAnnouncement(res.data.data?.content ?? ""))
       .catch(() => {});

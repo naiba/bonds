@@ -4,8 +4,7 @@ import { Card, Form, Input, Button, Typography, App, theme } from "antd";
 import { MailOutlined, LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
-import type { RegisterRequest } from "@/types/auth";
-import type { APIError } from "@/types/api";
+import type { RegisterRequest, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 

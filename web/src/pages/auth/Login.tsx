@@ -4,8 +4,7 @@ import { Card, Form, Input, Button, Typography, App, Divider, theme } from "antd
 import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
-import type { LoginRequest } from "@/types/auth";
-import type { APIError } from "@/types/api";
+import type { LoginRequest, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 

@@ -3,8 +3,8 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, App, theme } from "antd";
 import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
-import { invitationsApi } from "@/api/invitations";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -24,7 +24,7 @@ export default function AcceptInvite() {
   }) {
     setLoading(true);
     try {
-      await invitationsApi.accept({ ...values, token });
+      await api.invitations.acceptCreate({ ...values, token });
       message.success(t("acceptInvite.title"));
       navigate("/login");
     } catch (err) {

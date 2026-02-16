@@ -8,9 +8,8 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { authApi } from "@/api/auth";
-import type { User } from "@/types/auth";
-import type { LoginRequest, RegisterRequest } from "@/types/auth";
+import { api } from "@/api";
+import type { User, LoginRequest, RegisterRequest } from "@/api";
 
 interface AuthContextType {
   user: User | null;
@@ -38,11 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    authApi
-      .getMe()
-      .then((res) => {
-        if (!cancelled && res.data.data) {
-          setUser(res.data.data);
+    api.auth
+      .getAuth()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((res: any) => {
+        if (!cancelled && res.data) {
+          setUser(res.data);
         }
       })
       .catch(() => {
@@ -63,16 +63,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const login = useCallback(async (data: LoginRequest) => {
-    const res = await authApi.login(data);
-    const auth = res.data.data!;
+    const res = await api.auth.loginCreate(data);
+    const auth = res.data!;
     localStorage.setItem("token", auth.token);
     setToken(auth.token);
     setUser(auth.user);
   }, []);
 
   const register = useCallback(async (data: RegisterRequest) => {
-    const res = await authApi.register(data);
-    const auth = res.data.data!;
+    const res = await api.auth.registerCreate(data);
+    const auth = res.data!;
     localStorage.setItem("token", auth.token);
     setToken(auth.token);
     setUser(auth.user);
