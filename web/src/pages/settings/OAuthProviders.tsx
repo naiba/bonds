@@ -18,9 +18,8 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { oauthApi } from "@/api/oauth";
-import type { OAuthProvider } from "@/types/settings_extra";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { OAuthProvider, APIError } from "@/api";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -33,13 +32,13 @@ export default function OAuthProviders() {
   const { data: providers = [], isLoading } = useQuery({
     queryKey: ["settings", "oauth"],
     queryFn: async () => {
-      const res = await oauthApi.listProviders();
-      return res.data.data ?? [];
+      const res = await api.oauth.oauthList();
+      return res.data ?? [];
     },
   });
 
   const unlinkMutation = useMutation({
-    mutationFn: (driver: string) => oauthApi.unlinkProvider(driver),
+    mutationFn: (driver: string) => api.oauth.oauthDelete(driver),
     onSuccess: () => {
       message.success(t("settings.oauth.unlinked"));
       queryClient.invalidateQueries({ queryKey: ["settings", "oauth"] });

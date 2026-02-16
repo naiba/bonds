@@ -18,8 +18,8 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { twofactorApi } from "@/api/twofactor";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { APIError } from "@/api";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -40,15 +40,16 @@ export default function TwoFactor() {
   const { data: status, isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await twofactorApi.getStatus();
-      return res.data.data as { enabled: boolean };
+      const res = await api.twoFactor["2FaStatusList"]();
+      return res.data as { enabled: boolean };
     },
   });
 
   const enableMutation = useMutation({
-    mutationFn: () => twofactorApi.enable(),
-    onSuccess: (res) => {
-      const data = res.data.data as {
+    mutationFn: () => api.twoFactor["2FaEnableCreate"](),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onSuccess: (res: any) => {
+      const data = res.data as {
         secret: string;
         recovery_codes: string[];
       };
@@ -58,7 +59,7 @@ export default function TwoFactor() {
   });
 
   const confirmMutation = useMutation({
-    mutationFn: (code: string) => twofactorApi.confirm(code),
+    mutationFn: (code: string) => api.twoFactor["2FaConfirmCreate"]({ code }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setSetupData(null);
@@ -69,7 +70,7 @@ export default function TwoFactor() {
   });
 
   const disableMutation = useMutation({
-    mutationFn: (code: string) => twofactorApi.disable(code),
+    mutationFn: (code: string) => api.twoFactor["2FaDisableCreate"]({ code }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setDisableModalOpen(false);

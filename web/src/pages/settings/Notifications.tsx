@@ -25,9 +25,8 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { settingsApi } from "@/api/settings";
-import type { NotificationChannel } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { NotificationChannel, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -53,19 +52,19 @@ export default function Notifications() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const qk = ["settings", "notification-channels"];
+  const qk = ["settings", "notifications"];
 
   const { data: channels = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await settingsApi.listNotificationChannels();
-      return res.data.data ?? [];
+      const res = await api.notifications.notificationsList();
+      return res.data ?? [];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (values: { type: string; label: string; content: string }) =>
-      settingsApi.createNotificationChannel(values),
+      api.notifications.notificationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -77,15 +76,13 @@ export default function Notifications() {
 
   const toggleMutation = useMutation({
     mutationFn: (channel: NotificationChannel) =>
-      settingsApi.updateNotificationChannel(channel.id, {
-        active: !channel.active,
-      }),
+      api.notifications.notificationsToggleUpdate(channel.id!),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
     onError: (e: APIError) => message.error(e.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => settingsApi.deleteNotificationChannel(id),
+    mutationFn: (id: number) => api.notifications.notificationsDelete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("settings.notifications.deleted"));
@@ -140,7 +137,7 @@ export default function Notifications() {
             ),
           }}
           renderItem={(ch: NotificationChannel) => {
-            const iconInfo = channelIconMap[ch.type] ?? {
+            const iconInfo = channelIconMap[ch.type!] ?? {
               icon: <ApiOutlined />,
               color: token.colorTextSecondary,
               bg: token.colorBgLayout,
@@ -156,7 +153,7 @@ export default function Notifications() {
                   <Popconfirm
                     key="d"
                     title={t("settings.notifications.delete_confirm")}
-                    onConfirm={() => deleteMutation.mutate(ch.id)}
+                    onConfirm={() => deleteMutation.mutate(ch.id!)}
                   >
                     <Button
                       type="text"

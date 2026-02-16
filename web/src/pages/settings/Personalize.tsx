@@ -10,16 +10,14 @@ import {
   Popconfirm,
   App,
   Empty,
-  Tag,
   Badge,
   theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { settingsApi } from "@/api/settings";
-import type { PersonalizeItem } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { PersonalizeItem, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -59,17 +57,17 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await settingsApi.listPersonalizeItems(sectionKey);
-      return res.data.data ?? [];
+      const res = await api.personalize.personalizeDetail(sectionKey);
+      return res.data ?? [];
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: () => {
       if (editingId) {
-        return settingsApi.updatePersonalizeItem(sectionKey, editingId, { label });
+        return api.personalize.personalizeUpdate(sectionKey, editingId, { label });
       }
-      return settingsApi.createPersonalizeItem(sectionKey, { label });
+      return api.personalize.personalizeCreate(sectionKey, { label });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -79,7 +77,7 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => settingsApi.deletePersonalizeItem(sectionKey, id),
+    mutationFn: (id: number) => api.personalize.personalizeDelete(sectionKey, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
     onError: (e: APIError) => message.error(e.message),
   });
@@ -91,8 +89,8 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
   }
 
   function startEdit(item: PersonalizeItem) {
-    setEditingId(item.id);
-    setLabel(item.label);
+    setEditingId(item.id ?? null);
+    setLabel(item.label ?? '');
     setAdding(false);
   }
 
@@ -144,18 +142,13 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
           <List.Item
             actions={[
               <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-              <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id)}>
+              <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
           >
             <span>
               {item.label}
-              {item.is_default && (
-                <Tag color="blue" style={{ marginLeft: 8 }}>
-                  {t("common.default")}
-                </Tag>
-              )}
             </span>
           </List.Item>
         )}
@@ -174,8 +167,8 @@ function SectionCollapseLabel({
   const { data: items = [] } = useQuery({
     queryKey: ["settings", "personalize", sectionKey],
     queryFn: async () => {
-      const res = await settingsApi.listPersonalizeItems(sectionKey);
-      return res.data.data ?? [];
+      const res = await api.personalize.personalizeDetail(sectionKey);
+      return res.data ?? [];
     },
   });
 

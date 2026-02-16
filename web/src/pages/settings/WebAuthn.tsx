@@ -11,13 +11,11 @@ import {
 import { DeleteOutlined, KeyOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { webauthnApi } from "@/api/webauthn";
-import type { WebAuthnCredential } from "@/types/settings_extra";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { WebAuthnCredential, APIError } from "@/api";
 import dayjs from "dayjs";
 import { startRegistration } from "@simplewebauthn/browser";
 import type { PublicKeyCredentialCreationOptionsJSON as SimpleWebAuthnCreationOptions } from "@simplewebauthn/browser";
-import type { RegistrationResponseJSON } from "@/types/settings_extra";
 
 const { Title, Text } = Typography;
 
@@ -29,21 +27,21 @@ export default function WebAuthn() {
   const { data: credentials = [], isLoading } = useQuery({
     queryKey: ["settings", "webauthn"],
     queryFn: async () => {
-      const res = await webauthnApi.listCredentials();
-      return res.data.data ?? [];
+      const res = await api.webauthn.webauthnCredentialsList();
+      return res.data ?? [];
     },
   });
 
   const registerMutation = useMutation({
     mutationFn: async () => {
       // 1. Get options from server
-      const beginRes = await webauthnApi.registerBegin();
-      const options = beginRes.data.data!.publicKey;
+      const beginRes = await api.webauthn.webauthnRegisterBeginCreate();
+      const options = beginRes.data!.publicKey;
 
       // 2. Create credential in browser
-      const attResp = await startRegistration({ optionsJSON: options as unknown as SimpleWebAuthnCreationOptions });
+      await startRegistration({ optionsJSON: options as unknown as SimpleWebAuthnCreationOptions });
 
-      await webauthnApi.registerFinish(attResp as unknown as RegistrationResponseJSON);
+      await api.webauthn.webauthnRegisterFinishCreate();
     },
     onSuccess: () => {
       message.success(t("settings.webauthn.registered"));
@@ -56,7 +54,7 @@ export default function WebAuthn() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => webauthnApi.deleteCredential(id),
+    mutationFn: (id: number) => api.webauthn.webauthnCredentialsDelete(id),
     onSuccess: () => {
       message.success(t("settings.webauthn.deleted"));
       queryClient.invalidateQueries({ queryKey: ["settings", "webauthn"] });
@@ -91,7 +89,7 @@ export default function WebAuthn() {
       render: (_: unknown, record: WebAuthnCredential) => (
         <Popconfirm
           title={t("settings.webauthn.delete_confirm")}
-          onConfirm={() => deleteMutation.mutate(record.id)}
+          onConfirm={() => deleteMutation.mutate(record.id!)}
         >
           <Button
             type="text"

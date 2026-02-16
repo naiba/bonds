@@ -10,8 +10,8 @@ import {
 import { CrownOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { settingsApi } from "@/api/settings";
-import type { User } from "@/types/auth";
+import { api } from "@/api";
+import type { User } from "@/api";
 import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
@@ -34,8 +34,8 @@ export default function Users() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["settings", "users"],
     queryFn: async () => {
-      const res = await settingsApi.listUsers();
-      return res.data.data ?? [];
+      const res = await api.users.usersList();
+      return res.data ?? [];
     },
   });
 

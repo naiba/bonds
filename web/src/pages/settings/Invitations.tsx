@@ -16,9 +16,8 @@ import {
 import { DeleteOutlined, SendOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { invitationsApi } from "@/api/invitations";
-import type { InvitationType } from "@/types/invitation";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { InvitationType, APIError } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 
@@ -35,14 +34,14 @@ export default function Invitations() {
   const { data: invitations = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await invitationsApi.list();
-      return (res.data.data ?? []) as InvitationType[];
+      const res = await api.invitations.invitationsList();
+      return (res.data ?? []) as InvitationType[];
     },
   });
 
   const createMutation = useMutation({
     mutationFn: (values: { email: string; permission: number }) =>
-      invitationsApi.create(values),
+      api.invitations.invitationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -52,7 +51,7 @@ export default function Invitations() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => invitationsApi.delete(id),
+    mutationFn: (id: number) => api.invitations.invitationsDelete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
     },
@@ -104,7 +103,7 @@ export default function Invitations() {
       title: t("common.type"),
       key: "status",
       render: (_, record) =>
-        record.status === "accepted" ? (
+        record.accepted_at ? (
           <Tag color="green">{t("invitations.status.accepted")}</Tag>
         ) : (
           <Tag color="orange">{t("invitations.status.pending")}</Tag>
@@ -122,10 +121,10 @@ export default function Invitations() {
       title: "",
       key: "actions",
       render: (_, record) =>
-        record.status === "pending" ? (
+        !record.accepted_at ? (
           <Popconfirm
             title={t("invitations.deleteConfirm")}
-            onConfirm={() => deleteMutation.mutate(record.id)}
+            onConfirm={() => deleteMutation.mutate(record.id!)}
           >
             <Button
               type="text"

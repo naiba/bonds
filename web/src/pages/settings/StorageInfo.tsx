@@ -2,7 +2,7 @@ import { Card, Typography, Progress, Spin, Statistic, Row, Col } from "antd";
 import { DatabaseOutlined, HddOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { settingsApi } from "@/api/settings";
+import { api } from "@/api";
 import { filesize } from "filesize";
 
 const { Title, Text } = Typography;
@@ -13,8 +13,8 @@ export default function StorageInfo() {
   const { data: usage, isLoading } = useQuery({
     queryKey: ["settings", "storage"],
     queryFn: async () => {
-      const res = await settingsApi.getStorageUsage();
-      return res.data.data;
+      const res = await api.settings.storageList();
+      return res.data;
     },
   });
 

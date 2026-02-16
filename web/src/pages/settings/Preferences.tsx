@@ -11,9 +11,8 @@ import {
 } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { settingsApi } from "@/api/settings";
-import type { UserPreferences } from "@/types/modules";
-import type { APIError } from "@/types/api";
+import { api } from "@/api";
+import type { UserPreferences, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -64,14 +63,14 @@ export default function Preferences() {
   const { data: prefs, isLoading } = useQuery({
     queryKey: ["settings", "preferences"],
     queryFn: async () => {
-      const res = await settingsApi.getPreferences();
-      return res.data.data!;
+      const res = await api.preferences.preferencesList();
+      return res.data!;
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: (values: Partial<UserPreferences>) =>
-      settingsApi.updatePreferences(values),
+      api.preferences.preferencesUpdate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings", "preferences"] });
       message.success(t("settings.preferences.saved"));
