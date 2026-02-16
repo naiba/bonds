@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, App, Divider, theme } from "antd";
-import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined } from "@ant-design/icons";
+import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined, KeyOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import { useTranslation } from "react-i18next";
+import { api } from "@/api";
 import type { LoginRequest, APIError } from "@/api";
+import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
+import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 
 const { Title, Text } = Typography;
 
@@ -16,6 +19,11 @@ export default function Login() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [isWebAuthnSupported, setIsWebAuthnSupported] = useState(false);
+
+  useEffect(() => {
+    setIsWebAuthnSupported(browserSupportsWebAuthn());
+  }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from
     ?.pathname ?? "/vaults";
@@ -30,6 +38,35 @@ export default function Login() {
       message.error(apiErr.message || t("auth.login.failed"));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleWebAuthnLogin() {
+    try {
+      // 1. Get options from server
+      const beginRes = await api.webauthn.webauthnLoginBeginCreate();
+      const options = beginRes.data!.publicKey;
+
+      // 2. Authenticate with browser
+      const asseResp = await startAuthentication({ optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON });
+
+      // 3. Verify with server
+      const verifyRes = await api.webauthn.webauthnLoginFinishCreate(
+        {}, 
+        { 
+          body: asseResp,
+          type: ContentType.Json
+        }
+      );
+      
+      const auth = verifyRes.data!;
+      localStorage.setItem("token", auth.token);
+      // Force reload to update auth state since we bypassed the store login method
+      window.location.href = from;
+      
+    } catch (error) {
+      console.error(error);
+      message.error(t("auth.login.passkey_failed"));
     }
   }
 
@@ -111,6 +148,19 @@ export default function Login() {
             </Button>
           </Form.Item>
         </Form>
+
+        {isWebAuthnSupported && (
+          <div style={{ marginBottom: 24 }}>
+            <Button 
+              block 
+              icon={<KeyOutlined />} 
+              onClick={handleWebAuthnLogin}
+              style={{ borderColor: token.colorBorderSecondary }}
+            >
+              {t("auth.login.passkey")}
+            </Button>
+          </div>
+        )}
 
         <Divider>{t("oauth.continueWith")}</Divider>
         <div style={{ display: "flex", gap: 12 }}>
