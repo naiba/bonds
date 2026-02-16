@@ -67,6 +67,9 @@
       "submit": "Sign in",
       "no_account": "Don't have an account?",
       "create_one": "Create one",
+      "passkey": "Sign in with Passkey",
+      "passkey_failed": "Passkey authentication failed",
+      "passkey_not_supported": "Passkey is not supported on this device",
       "failed": "Login failed"
     },
     "register": {
@@ -113,11 +116,23 @@
       "recent_contacts": "Recent contacts",
       "no_contacts": "No contacts yet",
       "total_contacts": "Total contacts",
-      "view_all_contacts": "View all contacts →"
+      "view_all_contacts": "View all contacts →",
+      "edit": "Edit Vault",
+      "updated": "Vault updated",
+      "delete": "Delete Vault",
+      "deleted": "Vault deleted",
+      "delete_confirm": "Are you sure you want to delete this vault? All data will be lost.",
+      "most_consulted": "Most Consulted",
+      "no_consulted": "No contacts consulted yet"
     },
     "calendar": {
       "title": "Calendar",
-      "back": "Back to vault"
+      "back": "Back to vault",
+      "day_detail": "Day Detail",
+      "no_events": "No events for this day",
+      "important_dates": "Important Dates",
+      "reminders": "Reminders",
+      "close": "Close"
     },
     "tasks": {
       "title": "All Tasks",
@@ -138,11 +153,24 @@
       "col_name": "Name",
       "col_type": "Type",
       "col_size": "Size",
-      "col_uploaded": "Uploaded"
+      "col_uploaded": "Uploaded",
+      "upload": "Upload File",
+      "upload_success": "File uploaded successfully",
+      "upload_failed": "File upload failed",
+      "deleted": "File deleted",
+      "delete_confirm": "Delete this file?",
+      "filter_all": "All",
+      "filter_photos": "Photos",
+      "filter_documents": "Documents",
+      "filter_avatars": "Avatars"
     },
     "reports": {
       "title": "Reports",
       "back": "Back to vault",
+      "overview": "Overview",
+      "total_contacts": "Total Contacts",
+      "total_addresses": "Total Addresses",
+      "total_dates": "Total Dates",
       "contacts": "Contacts",
       "addresses": "Addresses",
       "important_dates": "Important Dates",
@@ -171,8 +199,11 @@
       "no_journals": "No journals yet",
       "delete_confirm": "Delete this journal?",
       "created_success": "Journal created",
+      "updated": "Journal updated",
       "deleted_success": "Journal deleted",
-      "modal_title": "New Journal"
+      "modal_title": "New Journal",
+      "edit": "Edit Journal",
+      "edit_title": "Edit Journal"
     },
     "journal_detail": {
       "back": "Back to journals",
@@ -200,7 +231,16 @@
       "post_deleted": "Post deleted",
       "modal_title": "New Post",
       "title_label": "Title",
-      "date_label": "Date"
+      "date_label": "Date",
+      "photos_tab": "Photos",
+      "no_photos": "No photos in this journal",
+      "year_filter": "Filter by Year",
+      "slice_detail": "Slice Details",
+      "slice_cover": "Cover Image",
+      "slice_cover_upload": "Upload Cover",
+      "slice_cover_remove": "Remove Cover",
+      "slice_cover_removed": "Cover image removed",
+      "slice_posts": "Posts in this Slice"
     },
     "post_detail": {
       "back": "Back to journal",
@@ -209,7 +249,15 @@
       "section_content_placeholder": "Section content…",
       "add_section": "Add Section",
       "no_sections": "No sections",
-      "post_updated": "Post updated"
+      "post_updated": "Post updated",
+      "link_slice": "Link to Slice of Life",
+      "unlink_slice": "Unlink Slice",
+      "select_slice": "Select a slice",
+      "no_slice": "No slice linked",
+      "slice_linked": "Slice linked",
+      "slice_unlinked": "Slice unlinked",
+      "edit_tag": "Edit Tag",
+      "tag_updated": "Tag updated"
     },
     "group_list": {
       "title": "Groups",
@@ -227,7 +275,9 @@
       "create": "Add Company",
       "edit": "Edit Company",
       "name": "Company Name",
-      "employees": "Employees"
+      "employees": "Employees",
+      "detail": "Company Details",
+      "no_employees": "No employees found"
     },
     "lifeMetrics": {
       "title": "Life Metrics",
@@ -251,7 +301,9 @@
       "no_members": "No members",
       "remove_confirm": "Remove from group?",
       "member_added": "Member added",
-      "member_removed": "Member removed"
+      "member_removed": "Member removed",
+      "edit_name": "Edit group name",
+      "name_updated": "Group name updated"
     }
   },
   "contact": {
@@ -266,7 +318,13 @@
       "total": "{{count}} contacts",
       "no_match": "No contacts match your search",
       "no_contacts": "No contacts yet",
-      "load_failed": "Failed to load contacts"
+      "load_failed": "Failed to load contacts",
+      "sort_by": "Sort by",
+      "sort_name": "Name",
+      "sort_updated": "Last updated",
+      "filter_label": "Filter by label",
+      "all_labels": "All labels",
+      "quick_search": "Quick search"
     },
     "create": {
       "title": "Add a contact",
@@ -291,6 +349,8 @@
       "delete_ok": "Delete",
       "deleted_success": "Contact deleted",
       "delete_failed": "Failed to delete contact",
+      "change_template": "Change Template",
+      "template_updated": "Template updated",
       "tabs": {
         "overview": "Overview",
         "relationships": "Relationships",
@@ -329,6 +389,7 @@
         "title": "Labels",
         "add": "Add Label",
         "added": "Label added",
+        "updated": "Label updated",
         "removed": "Label removed",
         "no_labels": "No labels assigned",
         "no_labels_available": "No labels available",
@@ -392,8 +453,11 @@
       "no_pending": "No pending tasks",
       "delete_confirm": "Delete?",
       "added": "Task added",
+      "updated": "Task updated",
       "deleted": "Task deleted",
-      "completed": "Completed ({{count}})"
+      "completed": "Completed ({{count}})",
+      "show_completed": "Show completed",
+      "hide_completed": "Hide completed"
     },
     "calls": {
       "title": "Calls",
@@ -401,8 +465,10 @@
       "no_calls": "No calls logged",
       "delete_confirm": "Delete?",
       "logged": "Call logged",
+      "updated": "Call updated",
       "deleted": "Call deleted",
       "modal_title": "Log a Call",
+      "edit_call": "Edit Call",
       "date_time": "Date & Time",
       "type": "Type",
       "duration": "Duration (minutes)",
@@ -430,7 +496,8 @@
       "province": "Province / State",
       "postal_code": "Postal Code",
       "country": "Country",
-      "is_primary": "Primary"
+      "is_primary": "Primary",
+      "view_map": "View on Google Maps"
     },
     "contact_info": {
       "title": "Contact Information",
@@ -450,7 +517,9 @@
       "no_goals": "No goals",
       "delete_confirm": "Delete?",
       "added": "Goal added",
+      "updated": "Goal updated",
       "deleted": "Goal deleted",
+      "edit": "Edit",
       "hide": "Hide",
       "streaks": "Streaks",
       "streaks_count": "{{count}} streaks",
@@ -473,7 +542,9 @@
       "no_loans": "No loans",
       "delete_confirm": "Delete?",
       "added": "Loan added",
+      "updated": "Loan updated",
       "deleted": "Loan deleted",
+      "edit": "Edit Loan",
       "settle": "Settle",
       "reopen": "Reopen",
       "settled": "Settled",
@@ -491,7 +562,9 @@
       "add": "Add",
       "content_placeholder": "Content",
       "no_facts": "No quick facts",
-      "delete_confirm": "Delete?"
+      "delete_confirm": "Delete?",
+      "toggle": "Toggle visibility",
+      "toggled": "Visibility updated"
     },
     "relationships": {
       "title": "Relationships",
@@ -499,30 +572,36 @@
       "no_relationships": "No relationships",
       "remove_confirm": "Remove?",
       "added": "Relationship added",
+      "updated": "Relationship updated",
       "removed": "Relationship removed",
+      "edit": "Edit",
       "modal_title": "Add Relationship",
       "contact": "Contact",
       "select_contact": "Select a contact",
       "relationship_type": "Relationship Type"
     },
-    "life_events": {
-      "title": "Life Events",
-      "new_timeline": "New Timeline",
-      "no_timelines": "No life event timelines",
-      "no_events": "No life events in this timeline",
-      "event": "Event",
-      "delete_timeline_confirm": "Delete timeline?",
-      "delete_event_confirm": "Delete?",
-      "timeline_created": "Timeline created",
-      "timeline_deleted": "Timeline deleted",
-      "event_added": "Life event added",
-      "event_deleted": "Life event deleted",
-      "timeline_modal": "New Timeline Event",
-      "event_modal": "Add Life Event",
-      "label": "Label",
-      "started_at": "Started at",
-      "happened_at": "Date"
-    },
+      "life_events": {
+        "title": "Life Events",
+        "new_timeline": "New Timeline",
+        "no_timelines": "No life event timelines",
+        "no_events": "No life events in this timeline",
+        "event": "Event",
+        "delete_timeline_confirm": "Delete timeline?",
+        "delete_event_confirm": "Delete?",
+        "timeline_created": "Timeline created",
+        "timeline_deleted": "Timeline deleted",
+        "event_added": "Life event added",
+        "event_updated": "Life event updated",
+        "event_deleted": "Life event deleted",
+        "timeline_modal": "New Timeline Event",
+        "event_modal": "Add Life Event",
+        "edit_event": "Edit Life Event",
+        "toggle_timeline": "Timeline visibility toggled",
+        "toggle_event": "Event visibility toggled",
+        "label": "Label",
+        "started_at": "Started at",
+        "happened_at": "Date"
+      },
     "mood_tracking": {
       "title": "Mood Tracking",
       "log_mood": "Log Mood",
@@ -535,17 +614,25 @@
     },
     "photos": {
       "title": "Photos",
+      "detail": "Photo Detail",
+      "file_name": "File Name",
+      "file_size": "File Size",
+      "uploaded_at": "Uploaded At",
       "upload_text": "Click or drag to upload photos",
       "no_photos": "No photos uploaded",
       "uploaded": "Photo uploaded",
-      "upload_failed": "Upload failed"
+      "upload_failed": "Upload failed",
+      "deleted": "Photo deleted",
+      "delete_confirm": "Delete this photo?"
     },
     "documents": {
       "title": "Documents",
       "upload_text": "Click or drag to upload documents",
       "no_documents": "No documents",
       "uploaded": "Document uploaded",
-      "upload_failed": "Upload failed"
+      "upload_failed": "Upload failed",
+      "deleted": "Document deleted",
+      "delete_confirm": "Delete this document?"
     }
   },
   "settings": {
@@ -553,6 +640,9 @@
     "description": "Manage your account, preferences, and security settings.",
     "account": {
       "title": "Account",
+      "id": "Account ID",
+      "created": "Created At",
+      "users_count": "Users Count",
       "name": "Name",
       "email": "Email",
       "member_since": "Member since",
@@ -594,7 +684,18 @@
       "type_email": "Email",
       "type_telegram": "Telegram",
       "telegram_chat_id": "Telegram Chat ID",
-      "telegram_help": "Send /start to the bot to get your chat ID"
+      "telegram_help": "Send /start to the bot to get your chat ID",
+      "test_send": "Send Test",
+      "test_success": "Test notification sent",
+      "test_failed": "Failed to send test notification",
+      "view_logs": "View Logs",
+      "logs_title": "Notification Logs",
+      "log_time": "Time",
+      "log_status": "Status",
+      "log_error": "Error",
+      "no_logs": "No logs found",
+      "unverified": "Unverified",
+      "verified": "Verified"
     },
     "personalize": {
       "title": "Personalize",
@@ -615,7 +716,25 @@
       "call_reasons": "Call Reasons",
       "life_event_categories": "Life Event Categories",
       "gift_occasions": "Gift Occasions",
-      "gift_states": "Gift States"
+      "gift_states": "Gift States",
+      "pages": "Pages",
+      "sections": "Sections",
+      "roles": "Roles",
+      "reasons": "Reasons",
+      "types": "Types",
+      "add_page": "Add Page",
+      "add_section": "Add Section",
+      "add_role": "Add Role",
+      "add_reason": "Add Reason",
+      "add_type": "Add Type",
+      "modules": "Modules",
+      "add_module": "Add Module",
+      "remove_module": "Remove Module",
+      "move_up": "Move Up",
+      "move_down": "Move Down",
+      "post_templates": "Post Templates",
+      "group_types": "Group Types",
+      "name_reverse": "Reverse Relationship Name"
     },
     "users": {
       "title": "Users",
@@ -626,7 +745,20 @@
       "col_joined": "Joined",
       "role_admin": "Admin",
       "role_user": "User",
-      "no_users": "No users found"
+      "no_users": "No users found",
+      "create": "Create User",
+      "edit": "Edit User",
+      "created": "User created",
+      "updated": "User updated",
+      "deleted": "User deleted",
+      "delete_confirm": "Delete this user?",
+      "modal_title_create": "Create User",
+      "modal_title_edit": "Edit User",
+      "first_name": "First Name",
+      "last_name": "Last Name",
+      "email": "Email",
+      "password": "Password",
+      "is_admin": "Administrator"
     },
     "webauthn": {
       "title": "Security Keys",
@@ -752,6 +884,13 @@
     "tab_calendar": "Calendar",
     "tab_tasks": "Tasks",
     "tab_files": "Files",
-    "tab_group": "Groups"
+    "tab_group": "Groups",
+    "template": "Vault Template",
+    "template_updated": "Vault template updated",
+    "select_template": "Select a template",
+    "life_event_category_updated": "Life event category updated",
+    "life_event_type_updated": "Life event type updated",
+    "move_up": "Move Up",
+    "move_down": "Move Down"
   }
 }
