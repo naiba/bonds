@@ -21,7 +21,7 @@ import {
   TeamOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, httpClient } from "@/api";
+import { api } from "@/api";
 import type { Group, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
@@ -49,7 +49,7 @@ export default function GroupList() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { name: string }) => httpClient.instance.post(`/vaults/${vaultId}/groups`, values),
+    mutationFn: (values: { name: string }) => api.groups.groupsCreate(vaultId, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);

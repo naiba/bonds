@@ -79,6 +79,16 @@ export default function VaultSettings() {
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const updateTemplateMutation = useMutation({
+    mutationFn: (templateId: number) =>
+      api.vaultSettings.settingsTemplateUpdate(String(vaultId), { default_template_id: templateId }),
+    onSuccess: () => {
+      message.success(t("vault_settings.template_updated"));
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   const updateTabVisibilityMutation = useMutation({
     mutationFn: (data: Record<string, boolean>) =>
       api.vaultSettings.settingsVisibilityUpdate(String(vaultId), data),
@@ -126,54 +136,61 @@ export default function VaultSettings() {
     if (!vaultSettings) return null;
 
     return (
-      <Card title={t("vault_settings.general")}>
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{
-            name: vaultSettings.name,
-            description: vaultSettings.description,
-            default_template_id: vaultSettings.default_template_id,
-          }}
-          onFinish={(values) => updateSettingsMutation.mutate(values)}
-        >
-          <Form.Item
-            name="name"
-            label={t("vault_settings.name")}
-            rules={[{ required: true, message: t("common.required") }]}
+      <Space direction="vertical" style={{ width: "100%" }}>
+        <Card title={t("vault_settings.general")}>
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{
+              name: vaultSettings.name,
+              description: vaultSettings.description,
+            }}
+            onFinish={(values) => updateSettingsMutation.mutate(values)}
           >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label={t("vault_settings.description_label")}
-          >
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item
-            name="default_template_id"
-            label={t("vault_settings.default_template")}
-          >
-            <Select>
-              {personalizeTemplates?.map((tpl) => (
-                <Option key={tpl.id} value={tpl.id}>
-                  {tpl.label}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              icon={<SaveOutlined />}
-              loading={updateSettingsMutation.isPending}
+            <Form.Item
+              name="name"
+              label={t("vault_settings.name")}
+              rules={[{ required: true, message: t("common.required") }]}
             >
-              {t("common.save")}
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="description"
+              label={t("vault_settings.description_label")}
+            >
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                icon={<SaveOutlined />}
+                loading={updateSettingsMutation.isPending}
+              >
+                {t("common.save")}
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+
+        <Card title={t("vault_settings.default_template")}>
+          <Text type="secondary" style={{ display: "block", marginBottom: 12 }}>
+            {t("vault_settings.template_description")}
+          </Text>
+          <Select
+            style={{ width: "100%" }}
+            value={vaultSettings.default_template_id}
+            onChange={(value) => updateTemplateMutation.mutate(value)}
+            loading={updateTemplateMutation.isPending}
+          >
+            {personalizeTemplates?.map((tpl) => (
+              <Option key={tpl.id} value={tpl.id}>
+                {tpl.label}
+              </Option>
+            ))}
+          </Select>
+        </Card>
+      </Space>
     );
   };
 
@@ -640,6 +657,12 @@ export default function VaultSettings() {
         mutationFn: (data: { label: string }) => api.vaultSettings.settingsLifeEventCategoriesCreate(String(vaultId), data),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.created")); },
     });
+    const updateCategory = useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { label: string } }) =>
+            api.vaultSettings.settingsLifeEventCategoriesUpdate(String(vaultId), id, data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("vault_settings.life_event_category_updated")); setEditingCatId(null); setEditingCatLabel(""); },
+        onError: (e: APIError) => message.error(e.message),
+    });
     const deleteCategory = useMutation({
         mutationFn: (id: number) => api.vaultSettings.settingsLifeEventCategoriesDelete(String(vaultId), id),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.deleted")); },
@@ -650,6 +673,13 @@ export default function VaultSettings() {
             api.vaultSettings.settingsLifeEventCategoriesTypesCreate(String(vaultId), catId, data),
         onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("common.created")); },
     });
+
+    const updateType = useMutation({
+        mutationFn: ({ catId, typeId, data }: { catId: number; typeId: number; data: { label: string } }) =>
+            api.vaultSettings.settingsLifeEventCategoriesTypesUpdate(String(vaultId), catId, typeId, data),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey }); message.success(t("vault_settings.life_event_type_updated")); setEditingTypeId(null); setEditingTypeLabel(""); },
+        onError: (e: APIError) => message.error(e.message),
+    });
     
     const deleteType = useMutation({
         mutationFn: ({ catId, typeId }: { catId: number, typeId: number }) => 
@@ -659,6 +689,10 @@ export default function VaultSettings() {
 
     const [newCatLabel, setNewCatLabel] = useState("");
     const [newTypeLabel, setNewTypeLabel] = useState<Record<number, string>>({});
+    const [editingCatId, setEditingCatId] = useState<number | null>(null);
+    const [editingCatLabel, setEditingCatLabel] = useState("");
+    const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
+    const [editingTypeLabel, setEditingTypeLabel] = useState("");
 
     const handleAddType = (catId: number) => {
         if (!newTypeLabel[catId]) return;
@@ -687,7 +721,25 @@ export default function VaultSettings() {
                     {categories.map((cat: LifeEventCategoryResponse, catIndex: number) => (
                          <Collapse.Panel 
                             key={cat.id!} 
-                            header={cat.label}
+                            header={
+                                editingCatId === cat.id ? (
+                                    <Space onClick={(e) => e.stopPropagation()}>
+                                        <Input
+                                            size="small"
+                                            value={editingCatLabel}
+                                            onChange={(e) => setEditingCatLabel(e.target.value)}
+                                            onPressEnter={() => { if (editingCatLabel.trim()) updateCategory.mutate({ id: cat.id!, data: { label: editingCatLabel.trim() } }); }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <Button size="small" type="primary" loading={updateCategory.isPending} onClick={(e) => { e.stopPropagation(); if (editingCatLabel.trim()) updateCategory.mutate({ id: cat.id!, data: { label: editingCatLabel.trim() } }); }}>
+                                            {t("common.save")}
+                                        </Button>
+                                        <Button size="small" onClick={(e) => { e.stopPropagation(); setEditingCatId(null); setEditingCatLabel(""); }}>
+                                            {t("common.cancel")}
+                                        </Button>
+                                    </Space>
+                                ) : cat.label
+                            }
                             extra={
                                 <Space onClick={(e) => e.stopPropagation()}>
                                     <Button
@@ -703,6 +755,11 @@ export default function VaultSettings() {
                                         title={t("vault_settings.move_down")}
                                         disabled={catIndex === categories.length - 1}
                                         onClick={(e) => { e.stopPropagation(); positionMutation.mutate({ entityType: "lifeEventCategories", id: cat.id!, position: catIndex + 1 }); }}
+                                    />
+                                    <Button
+                                        size="small"
+                                        icon={<EditOutlined />}
+                                        onClick={(e) => { e.stopPropagation(); setEditingCatId(cat.id!); setEditingCatLabel(cat.label ?? ""); }}
                                     />
                                     <Popconfirm title={t("common.delete_confirm")} onConfirm={(e) => { e?.stopPropagation(); deleteCategory.mutate(cat.id!); }}>
                                         <DeleteOutlined onClick={(e) => e.stopPropagation()} style={{color: 'red'}} />
@@ -744,12 +801,46 @@ export default function VaultSettings() {
                                                 disabled={typeIndex === (cat.types?.length ?? 1) - 1}
                                                 onClick={() => positionMutation.mutate({ entityType: "lifeEventTypes", id: type.id!, position: typeIndex + 1, categoryId: cat.id! })}
                                             />,
+                                            ...(editingTypeId === type.id ? [
+                                                <Button
+                                                    key="save"
+                                                    size="small"
+                                                    type="primary"
+                                                    loading={updateType.isPending}
+                                                    onClick={() => { if (editingTypeLabel.trim()) updateType.mutate({ catId: cat.id!, typeId: type.id!, data: { label: editingTypeLabel.trim() } }); }}
+                                                >
+                                                    {t("common.save")}
+                                                </Button>,
+                                                <Button
+                                                    key="cancel-edit"
+                                                    size="small"
+                                                    type="text"
+                                                    onClick={() => { setEditingTypeId(null); setEditingTypeLabel(""); }}
+                                                >
+                                                    {t("common.cancel")}
+                                                </Button>,
+                                            ] : [
+                                                <Button
+                                                    key="edit"
+                                                    size="small"
+                                                    icon={<EditOutlined />}
+                                                    type="text"
+                                                    onClick={() => { setEditingTypeId(type.id!); setEditingTypeLabel(type.label ?? ""); }}
+                                                />,
+                                            ]),
                                             <Popconfirm key="del" title={t("common.delete_confirm")} onConfirm={() => deleteType.mutate({ catId: cat.id!, typeId: type.id! })}>
                                                 <Button danger size="small" icon={<DeleteOutlined />} type="text" />
                                             </Popconfirm>
                                         ]}
                                     >
-                                        {type.label}
+                                        {editingTypeId === type.id ? (
+                                            <Input
+                                                size="small"
+                                                value={editingTypeLabel}
+                                                onChange={(e) => setEditingTypeLabel(e.target.value)}
+                                                onPressEnter={() => { if (editingTypeLabel.trim()) updateType.mutate({ catId: cat.id!, typeId: type.id!, data: { label: editingTypeLabel.trim() } }); }}
+                                            />
+                                        ) : type.label}
                                     </List.Item>
                                 )}
                              />
