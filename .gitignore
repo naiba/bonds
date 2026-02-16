@@ -15,5 +15,6 @@ server/internal/frontend/dist/*
 server/docs/
 web/src/api/generated/
 web/playwright-report/
+web/test-results/
 .opencode/
 monica-php
