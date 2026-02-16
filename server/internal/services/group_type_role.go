@@ -19,6 +19,25 @@ func NewGroupTypeRoleService(db *gorm.DB) *GroupTypeRoleService {
 	return &GroupTypeRoleService{db: db}
 }
 
+func (s *GroupTypeRoleService) List(accountID string, groupTypeID uint) ([]dto.GroupTypeRoleResponse, error) {
+	var gt models.GroupType
+	if err := s.db.Where("id = ? AND account_id = ?", groupTypeID, accountID).First(&gt).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrGroupTypeNotFound
+		}
+		return nil, err
+	}
+	var roles []models.GroupTypeRole
+	if err := s.db.Where("group_type_id = ?", groupTypeID).Order("position ASC, id ASC").Find(&roles).Error; err != nil {
+		return nil, err
+	}
+	result := make([]dto.GroupTypeRoleResponse, len(roles))
+	for i, r := range roles {
+		result[i] = toGroupTypeRoleResponse(&r)
+	}
+	return result, nil
+}
+
 func (s *GroupTypeRoleService) Create(accountID string, groupTypeID uint, req dto.CreateGroupTypeRoleRequest) (*dto.GroupTypeRoleResponse, error) {
 	var gt models.GroupType
 	if err := s.db.Where("id = ? AND account_id = ?", groupTypeID, accountID).First(&gt).Error; err != nil {

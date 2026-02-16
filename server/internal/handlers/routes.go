@@ -503,23 +503,27 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	personalizeGroup.POST("/:entity/:id/position", personalizeHandler.UpdatePosition)
 
 	ptSectionGroup := personalizeGroup.Group("/post-templates/:id/sections")
+	ptSectionGroup.GET("", postTemplateSectionHandler.List)
 	ptSectionGroup.POST("", postTemplateSectionHandler.Create)
 	ptSectionGroup.PUT("/:sectionId", postTemplateSectionHandler.Update)
 	ptSectionGroup.DELETE("/:sectionId", postTemplateSectionHandler.Delete)
 	ptSectionGroup.POST("/:sectionId/position", postTemplateSectionHandler.UpdatePosition)
 
 	gtRoleGroup := personalizeGroup.Group("/group-types/:id/roles")
+	gtRoleGroup.GET("", groupTypeRoleHandler.List)
 	gtRoleGroup.POST("", groupTypeRoleHandler.Create)
 	gtRoleGroup.PUT("/:roleId", groupTypeRoleHandler.Update)
 	gtRoleGroup.DELETE("/:roleId", groupTypeRoleHandler.Delete)
 	gtRoleGroup.POST("/:roleId/position", groupTypeRoleHandler.UpdatePosition)
 
 	rtTypeGroup := personalizeGroup.Group("/relationship-types/:id/types")
+	rtTypeGroup.GET("", relationshipTypeHandler.List)
 	rtTypeGroup.POST("", relationshipTypeHandler.Create)
 	rtTypeGroup.PUT("/:typeId", relationshipTypeHandler.Update)
 	rtTypeGroup.DELETE("/:typeId", relationshipTypeHandler.Delete)
 
 	crGroup := personalizeGroup.Group("/call-reasons/:id/reasons")
+	crGroup.GET("", callReasonHandler.List)
 	crGroup.POST("", callReasonHandler.Create)
 	crGroup.PUT("/:reasonId", callReasonHandler.Update)
 	crGroup.DELETE("/:reasonId", callReasonHandler.Delete)

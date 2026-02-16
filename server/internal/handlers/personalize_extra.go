@@ -19,6 +19,36 @@ func NewPostTemplateSectionHandler(svc *services.PostTemplateSectionService) *Po
 	return &PostTemplateSectionHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List post template sections
+//	@Description	Return all sections for a post template
+//	@Tags			post-template-sections
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		integer	true	"Post Template ID"
+//	@Success		200	{object}	response.APIResponse{data=[]dto.PostTemplateSectionResponse}
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/personalize/post-templates/{id}/sections [get]
+func (h *PostTemplateSectionHandler) List(c echo.Context) error {
+	accountID := middleware.GetAccountID(c)
+	templateID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_template_id", nil)
+	}
+	sections, err := h.svc.List(accountID, uint(templateID))
+	if err != nil {
+		if errors.Is(err, services.ErrPostTemplateNotFound) {
+			return response.NotFound(c, "err.post_template_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_sections")
+	}
+	return response.OK(c, sections)
+}
+
 // Create godoc
 //
 //	@Summary		Create a post template section
@@ -191,6 +221,36 @@ type GroupTypeRoleHandler struct {
 
 func NewGroupTypeRoleHandler(svc *services.GroupTypeRoleService) *GroupTypeRoleHandler {
 	return &GroupTypeRoleHandler{svc: svc}
+}
+
+// List godoc
+//
+//	@Summary		List group type roles
+//	@Description	Return all roles for a group type
+//	@Tags			group-type-roles
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		integer	true	"Group Type ID"
+//	@Success		200	{object}	response.APIResponse{data=[]dto.GroupTypeRoleResponse}
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/personalize/group-types/{id}/roles [get]
+func (h *GroupTypeRoleHandler) List(c echo.Context) error {
+	accountID := middleware.GetAccountID(c)
+	groupTypeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_group_type_id", nil)
+	}
+	roles, err := h.svc.List(accountID, uint(groupTypeID))
+	if err != nil {
+		if errors.Is(err, services.ErrGroupTypeNotFound) {
+			return response.NotFound(c, "err.group_type_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_roles")
+	}
+	return response.OK(c, roles)
 }
 
 // Create godoc
@@ -367,6 +427,36 @@ func NewRelationshipTypeHandler(svc *services.RelationshipTypeService) *Relation
 	return &RelationshipTypeHandler{svc: svc}
 }
 
+// List godoc
+//
+//	@Summary		List relationship types
+//	@Description	Return all relationship types for a group type
+//	@Tags			relationship-types
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		integer	true	"Relationship Group Type ID"
+//	@Success		200	{object}	response.APIResponse{data=[]dto.RelationshipTypeResponse}
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/personalize/relationship-types/{id}/types [get]
+func (h *RelationshipTypeHandler) List(c echo.Context) error {
+	accountID := middleware.GetAccountID(c)
+	groupTypeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_relationship_group_type_id", nil)
+	}
+	types, err := h.svc.List(accountID, uint(groupTypeID))
+	if err != nil {
+		if errors.Is(err, services.ErrRelationshipGroupTypeNotFound) {
+			return response.NotFound(c, "err.relationship_group_type_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_relationship_types")
+	}
+	return response.OK(c, types)
+}
+
 // Create godoc
 //
 //	@Summary		Create a relationship type
@@ -500,6 +590,36 @@ type CallReasonHandler struct {
 
 func NewCallReasonHandler(svc *services.CallReasonService) *CallReasonHandler {
 	return &CallReasonHandler{svc: svc}
+}
+
+// List godoc
+//
+//	@Summary		List call reasons
+//	@Description	Return all call reasons for a call reason type
+//	@Tags			call-reasons
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		integer	true	"Call Reason Type ID"
+//	@Success		200	{object}	response.APIResponse{data=[]dto.CallReasonResponse}
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		404	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/personalize/call-reasons/{id}/reasons [get]
+func (h *CallReasonHandler) List(c echo.Context) error {
+	accountID := middleware.GetAccountID(c)
+	callReasonTypeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_call_reason_type_id", nil)
+	}
+	reasons, err := h.svc.List(accountID, uint(callReasonTypeID))
+	if err != nil {
+		if errors.Is(err, services.ErrCallReasonTypeNotFound) {
+			return response.NotFound(c, "err.call_reason_type_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_call_reasons")
+	}
+	return response.OK(c, reasons)
 }
 
 // Create godoc

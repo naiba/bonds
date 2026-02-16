@@ -19,6 +19,25 @@ func NewPostTemplateSectionService(db *gorm.DB) *PostTemplateSectionService {
 	return &PostTemplateSectionService{db: db}
 }
 
+func (s *PostTemplateSectionService) List(accountID string, templateID uint) ([]dto.PostTemplateSectionResponse, error) {
+	var tpl models.PostTemplate
+	if err := s.db.Where("id = ? AND account_id = ?", templateID, accountID).First(&tpl).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPostTemplateNotFound
+		}
+		return nil, err
+	}
+	var sections []models.PostTemplateSection
+	if err := s.db.Where("post_template_id = ?", templateID).Order("position ASC, id ASC").Find(&sections).Error; err != nil {
+		return nil, err
+	}
+	result := make([]dto.PostTemplateSectionResponse, len(sections))
+	for i, s := range sections {
+		result[i] = toPostTemplateSectionResponse(&s)
+	}
+	return result, nil
+}
+
 func (s *PostTemplateSectionService) Create(accountID string, templateID uint, req dto.CreatePostTemplateSectionRequest) (*dto.PostTemplateSectionResponse, error) {
 	var tpl models.PostTemplate
 	if err := s.db.Where("id = ? AND account_id = ?", templateID, accountID).First(&tpl).Error; err != nil {

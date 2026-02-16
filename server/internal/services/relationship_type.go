@@ -20,6 +20,25 @@ func NewRelationshipTypeService(db *gorm.DB) *RelationshipTypeService {
 	return &RelationshipTypeService{db: db}
 }
 
+func (s *RelationshipTypeService) List(accountID string, groupTypeID uint) ([]dto.RelationshipTypeResponse, error) {
+	var gt models.RelationshipGroupType
+	if err := s.db.Where("id = ? AND account_id = ?", groupTypeID, accountID).First(&gt).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrRelationshipGroupTypeNotFound
+		}
+		return nil, err
+	}
+	var types []models.RelationshipType
+	if err := s.db.Where("relationship_group_type_id = ?", groupTypeID).Order("id ASC").Find(&types).Error; err != nil {
+		return nil, err
+	}
+	result := make([]dto.RelationshipTypeResponse, len(types))
+	for i, rt := range types {
+		result[i] = toRelationshipTypeResponse(&rt)
+	}
+	return result, nil
+}
+
 func (s *RelationshipTypeService) Create(accountID string, groupTypeID uint, req dto.CreateRelationshipTypeRequest) (*dto.RelationshipTypeResponse, error) {
 	var gt models.RelationshipGroupType
 	if err := s.db.Where("id = ? AND account_id = ?", groupTypeID, accountID).First(&gt).Error; err != nil {

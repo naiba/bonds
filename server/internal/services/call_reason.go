@@ -19,6 +19,25 @@ func NewCallReasonService(db *gorm.DB) *CallReasonService {
 	return &CallReasonService{db: db}
 }
 
+func (s *CallReasonService) List(accountID string, callReasonTypeID uint) ([]dto.CallReasonResponse, error) {
+	var crt models.CallReasonType
+	if err := s.db.Where("id = ? AND account_id = ?", callReasonTypeID, accountID).First(&crt).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCallReasonTypeNotFound
+		}
+		return nil, err
+	}
+	var reasons []models.CallReason
+	if err := s.db.Where("call_reason_type_id = ?", callReasonTypeID).Order("id ASC").Find(&reasons).Error; err != nil {
+		return nil, err
+	}
+	result := make([]dto.CallReasonResponse, len(reasons))
+	for i, r := range reasons {
+		result[i] = toCallReasonResponse(&r)
+	}
+	return result, nil
+}
+
 func (s *CallReasonService) Create(accountID string, callReasonTypeID uint, req dto.CreateCallReasonRequest) (*dto.CallReasonResponse, error) {
 	var crt models.CallReasonType
 	if err := s.db.Where("id = ? AND account_id = ?", callReasonTypeID, accountID).First(&crt).Error; err != nil {
