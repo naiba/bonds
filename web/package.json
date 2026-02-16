@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "gen:api": "swagger-typescript-api generate -p ../server/docs/swagger.json -o src/api/generated -n api.ts --axios --single-http-client --extract-request-body --extract-response-body --extract-response-error --sort-types --sort-routes --unwrap-response-data --patch --module-name-first-tag --modular"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -43,6 +44,7 @@
     "globals": "^16.5.0",
     "jsdom": "^28.0.0",
     "prettier": "^3.8.1",
+    "swagger-typescript-api": "^13.2.18",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1",
