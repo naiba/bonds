@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "gen:api": "swagger-typescript-api generate -p ../server/docs/swagger.json -o src/api/generated -n api.ts --axios --single-http-client --extract-request-body --extract-response-body --extract-response-error --sort-types --sort-routes --unwrap-response-data --patch --module-name-first-tag --modular"
+    "gen:api": "swagger-typescript-api generate -p ../server/docs/swagger.json -o src/api/generated -n api.ts --axios --single-http-client --extract-request-body --extract-response-body --extract-response-error --sort-types --sort-routes --unwrap-response-data --patch --module-name-first-tag --modular && node scripts/fix-generated-imports.mjs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
