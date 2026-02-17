@@ -96,10 +96,9 @@ test.describe('Enhanced Settings', () => {
 
     await expect(page.getByRole('heading', { level: 4 }).first()).toBeVisible({ timeout: 10000 });
 
-    const currenciesHeader = page.getByText('Currencies').first();
-    await expect(currenciesHeader).toBeVisible({ timeout: 10000 });
-    await currenciesHeader.click();
-    await page.waitForLoadState('networkidle');
+    const currenciesPanel = page.locator('.ant-collapse-item').filter({ hasText: 'Currencies' });
+    await expect(currenciesPanel).toBeVisible({ timeout: 10000 });
+    await currenciesPanel.locator('.ant-collapse-header').click();
 
     await expect(page.getByPlaceholder(/search currencies/i)).toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('button', { name: /enable all/i })).toBeVisible({ timeout: 5000 });
@@ -111,26 +110,29 @@ test.describe('Enhanced Settings', () => {
     await page.goto('/settings/personalize');
     await page.waitForLoadState('networkidle');
 
-    const currenciesHeader = page.getByText('Currencies').first();
-    await currenciesHeader.click();
-    await page.waitForLoadState('networkidle');
+    const currenciesPanel = page.locator('.ant-collapse-item').filter({ hasText: 'Currencies' });
+    await currenciesPanel.locator('.ant-collapse-header').click();
 
     const searchInput = page.getByPlaceholder(/search currencies/i);
     await expect(searchInput).toBeVisible({ timeout: 10000 });
 
+    await expect(page.locator('.ant-switch').first()).toBeVisible({ timeout: 20000 });
+
     await searchInput.fill('USD');
-    await expect(page.getByText('USD')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.ant-list-item').filter({ hasText: 'USD' })).toBeVisible({ timeout: 10000 });
   });
 
   test('should show currency toggle switches', async ({ page }) => {
     await registerUser(page);
+
     await page.goto('/settings/personalize');
     await page.waitForLoadState('networkidle');
 
-    const currenciesHeader = page.getByText('Currencies').first();
-    await currenciesHeader.click();
-    await page.waitForLoadState('networkidle');
+    const currenciesPanel = page.locator('.ant-collapse-item').filter({ hasText: 'Currencies' });
+    await currenciesPanel.locator('.ant-collapse-header').click();
 
-    await expect(page.locator('.ant-switch').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByPlaceholder(/search currencies/i)).toBeVisible({ timeout: 10000 });
+
+    await expect(page.locator('.ant-switch').first()).toBeVisible({ timeout: 20000 });
   });
 });

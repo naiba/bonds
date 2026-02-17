@@ -447,6 +447,13 @@ defer cleanup()
 - Vitest 单元测试中 i18n 会被真实加载（非 mock），因此测试断言应匹配**翻译后的文本**（如 `"Vault Settings"`），而非键路径（如 `"vault_settings.title"`）。
 - 可用脚本检查缺失键：`grep -rhoE 't\("[^"]+"\)' src/pages/ src/components/` 提取所有使用的键，与 en.json 的扁平化键集合做差集。
 
+### Vitest 本地 vs CI 差异（重要）
+
+- **jsdom v28 + undici 平台行为差异**：同一版本的 jsdom 在 macOS 和 Linux 上行为不同。macOS/bun 环境下，未 mock 的 HTTP 请求会静默失败；CI Ubuntu 环境下，undici 会严格校验并抛出 `InvalidArgumentError: invalid onError method`，导致 unhandled rejection。
+- **Vitest unhandled rejection = exit code 1**：即使所有测试用例都通过（85/85 passed），vitest 遇到 unhandled rejection 仍会以 exit code 1 退出，导致 CI 红灯。
+- **解决方案**：测试中必须 mock 所有可能发出真实 HTTP 请求的模块。不仅要 mock `@tanstack/react-query`（覆盖 `useQuery`/`useMutation`），还要 mock `@/api`（覆盖直接使用 `httpClient.instance.get()` 的组件，如 `AvatarImageLoader`）。
+- **规则**：新增组件测试时，检查组件及其子组件是否有绕过 react-query 直接使用 `httpClient` 的代码路径。如有，必须 mock `@/api` 模块的 `httpClient.instance`。
+
 ### 前端新增依赖必须加入 package.json
 
 - 本地 `node_modules` 可能有全局或其他项目安装的包，本地测试通过但 CI 失败。

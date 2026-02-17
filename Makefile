@@ -38,6 +38,8 @@ test-web:
 	cd web && bun run test
 
 test-e2e:
+	rm -f server/bonds.db server/bonds.db-shm server/bonds.db-wal
+	rm -rf server/data server/uploads
 	cd web && bunx playwright test
 
 lint:

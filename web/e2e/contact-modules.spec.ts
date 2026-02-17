@@ -57,16 +57,13 @@ test.describe('Contact Modules - Notes', () => {
     await expect(notesCard).toBeVisible({ timeout: 10000 });
     await notesCard.getByRole('button', { name: /add/i }).click();
 
-    const modal = page.locator('.ant-modal').filter({ hasText: /note/i });
-    await expect(modal).toBeVisible({ timeout: 5000 });
-
-    await modal.getByPlaceholder(/title/i).fill('Test Note Title');
-    await modal.locator('textarea').fill('This is a test note body');
+    await notesCard.getByPlaceholder(/title/i).fill('Test Note Title');
+    await notesCard.locator('textarea').fill('This is a test note body');
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/notes') && resp.request().method() === 'POST'
     );
-    await modal.getByRole('button', { name: /ok|save/i }).click();
+    await notesCard.getByRole('button', { name: /save/i }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -82,23 +79,21 @@ test.describe('Contact Modules - Notes', () => {
 
     const notesCard = page.locator('.ant-card').filter({ hasText: /^Notes/ });
     await expect(notesCard).toBeVisible({ timeout: 10000 });
-    await notesCard.getByRole('button', { name: /add/i }).click();
 
-    const modal = page.locator('.ant-modal').filter({ hasText: /note/i });
-    await expect(modal).toBeVisible({ timeout: 5000 });
-    await modal.getByPlaceholder(/title/i).fill('Delete Me');
-    await modal.locator('textarea').fill('Note to delete');
+    await notesCard.getByRole('button', { name: /add/i }).click();
+    await notesCard.getByPlaceholder(/title/i).fill('Delete Me');
+    await notesCard.locator('textarea').fill('Note to delete');
 
     const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/notes') && resp.request().method() === 'POST'
     );
-    await modal.getByRole('button', { name: /ok|save/i }).click();
+    await notesCard.getByRole('button', { name: /save/i }).click();
     await createResp;
 
     await expect(notesCard.getByText('Delete Me')).toBeVisible({ timeout: 10000 });
 
     await notesCard.getByRole('button', { name: /delete/i }).first().click();
-    await page.getByRole('button', { name: /ok|yes|delete/i }).click();
+    await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
 
     await expect(notesCard.getByText('Delete Me')).not.toBeVisible({ timeout: 10000 });
   });
@@ -144,7 +139,7 @@ test.describe('Contact Modules - Reminders', () => {
     await goToContacts(page);
     await createContact(page, 'ReminderTest', 'User');
 
-    await navigateToTab(page, 'Contact information');
+    await navigateToTab(page, 'Information', true);
 
     const remindersCard = page.locator('.ant-card').filter({ hasText: /Reminders/ });
     await expect(remindersCard).toBeVisible({ timeout: 10000 });
@@ -153,12 +148,19 @@ test.describe('Contact Modules - Reminders', () => {
     const modal = page.locator('.ant-modal').filter({ hasText: /reminder/i });
     await expect(modal).toBeVisible({ timeout: 5000 });
 
-    await modal.getByPlaceholder(/label/i).fill('Birthday reminder');
+    await modal.getByLabel(/label/i).fill('Birthday reminder');
+
+    await modal.locator('.ant-picker').click();
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first();
+    await dateCell.click();
+
+    await page.locator('.ant-modal .ant-select').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/reminders') && resp.request().method() === 'POST'
     );
-    await modal.getByRole('button', { name: /ok|save/i }).click();
+    await page.locator('.ant-modal-footer .ant-btn-primary').click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
@@ -181,7 +183,6 @@ test.describe('Contact Modules - Addresses', () => {
     const modal = page.locator('.ant-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
 
-    await modal.getByLabel(/label/i).fill('Home');
     await modal.getByLabel(/address line 1/i).fill('123 Main St');
     await modal.getByLabel(/city/i).fill('San Francisco');
     await modal.getByLabel(/country/i).fill('USA');
@@ -209,15 +210,13 @@ test.describe('Contact Modules - Pets', () => {
     await expect(petsCard).toBeVisible({ timeout: 10000 });
     await petsCard.getByRole('button', { name: /add/i }).click();
 
-    const modal = page.locator('.ant-modal');
-    await expect(modal).toBeVisible({ timeout: 5000 });
-
-    await modal.getByPlaceholder(/name/i).fill('Buddy');
+    await petsCard.getByPlaceholder(/name/i).fill('Buddy');
+    await petsCard.getByPlaceholder(/category/i).fill('1');
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/pets') && resp.request().method() === 'POST'
     );
-    await modal.getByRole('button', { name: /ok|save/i }).click();
+    await petsCard.getByRole('button', { name: /save/i }).click();
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 

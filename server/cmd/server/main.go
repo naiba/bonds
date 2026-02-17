@@ -17,6 +17,7 @@ import (
 	"github.com/naiba/bonds/internal/frontend"
 	"github.com/naiba/bonds/internal/handlers"
 	appMiddleware "github.com/naiba/bonds/internal/middleware"
+	"github.com/naiba/bonds/internal/models"
 )
 
 //	@title			Bonds API
@@ -46,6 +47,10 @@ func main() {
 
 	if err := database.AutoMigrate(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	if err := models.SeedCurrencies(db); err != nil {
+		log.Fatalf("Failed to seed currencies: %v", err)
 	}
 
 	scheduler := cron.NewScheduler(db)

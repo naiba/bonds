@@ -50,14 +50,13 @@ export default function AddressesModule({
 
   const saveMutation = useMutation({
     mutationFn: (values: {
-      label: string;
-      address_line_1: string;
-      address_line_2?: string;
+      line_1: string;
+      line_2?: string;
       city: string;
       province?: string;
       postal_code?: string;
       country: string;
-      is_primary?: boolean;
+      is_past_address?: boolean;
     }) => {
       if (editingId) {
         return api.addresses.contactsAddressesUpdate(String(vaultId), String(contactId), editingId, values);
@@ -182,13 +181,10 @@ export default function AddressesModule({
         confirmLoading={saveMutation.isPending}
       >
         <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}>
-          <Form.Item name="label" label={t("modules.addresses.label")} rules={[{ required: true }]}>
-            <Input placeholder={t("modules.addresses.label_placeholder")} />
-          </Form.Item>
-          <Form.Item name="address_line_1" label={t("modules.addresses.address_line_1")} rules={[{ required: true }]}>
+          <Form.Item name="line_1" label={t("modules.addresses.address_line_1")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="address_line_2" label={t("modules.addresses.address_line_2")}>
+          <Form.Item name="line_2" label={t("modules.addresses.address_line_2")}>
             <Input />
           </Form.Item>
           <Form.Item name="city" label={t("modules.addresses.city")} rules={[{ required: true }]}>
@@ -203,7 +199,7 @@ export default function AddressesModule({
           <Form.Item name="country" label={t("modules.addresses.country")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="is_primary" label={t("modules.addresses.is_primary")} valuePropName="checked">
+          <Form.Item name="is_past_address" label={t("modules.addresses.is_primary")} valuePropName="checked">
             <Switch />
           </Form.Item>
         </Form>
