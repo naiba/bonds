@@ -26,6 +26,7 @@ import {
   ApiOutlined,
   HistoryOutlined,
   ThunderboltOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -225,6 +226,11 @@ export default function Notifications() {
                       <Tag style={{ marginInlineStart: 0 }}>{ch.type}</Tag>
                       {!ch.active && (
                         <Tag color="default">{t("common.disabled")}</Tag>
+                      )}
+                      {ch.verified_at ? (
+                        <Tag color="success" icon={<CheckCircleOutlined />}>{t("settings.notifications.verified")}</Tag>
+                      ) : (
+                        <Tag color="warning">{t("settings.notifications.unverified")}</Tag>
                       )}
                     </span>
                   }

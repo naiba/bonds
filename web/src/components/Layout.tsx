@@ -270,6 +270,7 @@ export default function Layout() {
       >
         © {new Date().getFullYear()}{" "}
         <a href="https://github.com/naiba/bonds" target="_blank" rel="noopener noreferrer" style={{ color: token.colorTextTertiary }}>Bonds</a>
+        {import.meta.env.VITE_APP_VERSION ? ` v${import.meta.env.VITE_APP_VERSION}` : ""}
         {" by "}
         <a href="https://nai.ba" target="_blank" rel="noopener noreferrer" style={{ color: token.colorTextTertiary }}>naiba</a>
       </div>

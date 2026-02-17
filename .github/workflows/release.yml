@@ -71,6 +71,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
+          build-args: |
+            VERSION=${{ needs.check.outputs.tag }}
 
   merge-manifests:
     name: Merge Docker Manifests

@@ -411,6 +411,7 @@
       "labels": {
         "title": "标签",
         "add": "添加标签",
+        "edit": "更换标签",
         "added": "标签已添加",
         "updated": "标签已更新",
         "removed": "标签已移除",
@@ -766,7 +767,13 @@
       "move_down": "下移",
       "post_templates": "文章模板",
       "group_types": "群组类型",
-      "name_reverse": "反向关系名称"
+      "name_reverse": "反向关系名称",
+      "enable_all": "全部启用",
+      "disable_all": "全部禁用",
+      "search_currencies": "搜索货币...",
+      "currency_toggled": "货币已切换",
+      "all_enabled": "所有货币已启用",
+      "all_disabled": "所有货币已禁用"
     },
     "users": {
       "title": "用户",

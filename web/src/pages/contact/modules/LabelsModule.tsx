@@ -11,7 +11,7 @@ import {
   Modal,
   Spin
 } from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
@@ -29,6 +29,7 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingLabel, setEditingLabel] = useState<{ id: number; label_id: number } | null>(null);
   const [form] = Form.useForm();
 
   const { data: labels = [], isLoading } = useQuery({
@@ -45,7 +46,7 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
       const res = await api.vaultSettings.settingsLabelsList(String(vaultId));
       return res.data ?? [];
     },
-    enabled: isModalOpen,
+    enabled: isModalOpen || editingLabel !== null,
   });
 
   const addMutation = useMutation({
@@ -58,6 +59,21 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
       message.success(t("contact.detail.labels.added"));
       setIsModalOpen(false);
       form.resetFields();
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: { id: number; label_id: number }) =>
+      api.contactLabels.contactsLabelsUpdate(String(vaultId), String(contactId), values.id, { label_id: values.label_id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId, "labels"],
+      });
+      message.success(t("contact.detail.labels.updated"));
+      setEditingLabel(null);
     },
     onError: (err: APIError) => {
       message.error(err.message || t("common.error"));
@@ -82,6 +98,11 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (l: any) => !labels.some((cl: any) => cl.label_id === l.id)
   );
+
+  const editAvailableLabels = editingLabel
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? allLabels.filter((l: any) => l.id !== editingLabel.label_id && !labels.some((cl: any) => cl.label_id === l.id))
+    : [];
 
   return (
     <Card
@@ -128,6 +149,10 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
               }}
             >
               {label.name}
+              <EditOutlined
+                style={{ cursor: "pointer", opacity: 0.6 }}
+                onClick={() => setEditingLabel({ id: label.id, label_id: label.label_id })}
+              />
               <DeleteOutlined
                 style={{ cursor: "pointer", opacity: 0.6 }}
                 onClick={() => removeMutation.mutate(label.id)}
@@ -176,6 +201,54 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
               htmlType="submit" 
               loading={addMutation.isPending}
               disabled={availableLabels.length === 0}
+            >
+              {t("common.save")}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+      <Modal
+        title={t("contact.detail.labels.edit")}
+        open={editingLabel !== null}
+        onCancel={() => setEditingLabel(null)}
+        footer={null}
+        destroyOnClose={true}
+      >
+        <Form
+          layout="vertical"
+          onFinish={(values: { label_id: number }) => {
+            if (editingLabel) {
+              updateMutation.mutate({ id: editingLabel.id, label_id: values.label_id });
+            }
+          }}
+        >
+          <Form.Item
+            name="label_id"
+            label={t("contact.detail.labels.select_placeholder")}
+            rules={[{ required: true }]}
+          >
+            <Select
+              placeholder={t("contact.detail.labels.select_placeholder")}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              options={editAvailableLabels.map((l: any) => ({
+                label: l.name,
+                value: l.id,
+              }))}
+              disabled={editAvailableLabels.length === 0}
+            />
+          </Form.Item>
+          {editAvailableLabels.length === 0 && (
+            <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+              {t("contact.detail.labels.no_labels_available")}
+            </Text>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => setEditingLabel(null)}>{t("common.cancel")}</Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={updateMutation.isPending}
+              disabled={editAvailableLabels.length === 0}
             >
               {t("common.save")}
             </Button>

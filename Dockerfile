@@ -10,6 +10,8 @@ COPY server/ .
 RUN swag init -g cmd/server/main.go -o docs --parseDependency --parseInternal
 
 FROM oven/bun:1.3-alpine AS frontend
+ARG VERSION=dev
+ENV VITE_APP_VERSION=${VERSION}
 
 WORKDIR /build/web
 COPY web/package.json web/bun.lock ./

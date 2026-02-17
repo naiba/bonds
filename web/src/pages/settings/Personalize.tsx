@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Card,
   Typography,
@@ -14,12 +14,13 @@ import {
   theme,
   Tag,
   Select,
+  Switch,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined, RightOutlined, DownOutlined, AppstoreOutlined, ArrowUpOutlined, ArrowDownOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
-import type { PersonalizeItem, APIError } from "@/api";
+import type { PersonalizeItem, APIError, Currency } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -69,6 +70,7 @@ const subItemConfigs: Record<string, SubItemConfig> = {
     create: (id, b) => api.templatePages.personalizeTemplatesPagesCreate(id, { name: b.name, slug: b.name.toLowerCase().replace(/\s+/g, "-") }),
     update: (id, itemId, b) => api.templatePages.personalizeTemplatesPagesUpdate(id, itemId, { name: b.name }),
     remove: (id, itemId) => api.templatePages.personalizeTemplatesPagesDelete(id, itemId),
+    position: (id, itemId, pos) => api.templatePages.personalizeTemplatesPagesPositionCreate(id, itemId, { position: pos }),
   },
   "post-templates": {
     labelKey: "settings.personalize.sections",
@@ -401,6 +403,140 @@ function ModulesPanel({ templateId, pageId }: { templateId: number; pageId: numb
   );
 }
 
+function CurrenciesPanel() {
+  const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
+  const { message } = App.useApp();
+  const { t } = useTranslation();
+
+  const allQk = ["settings", "currencies", "all"];
+  const activeQk = ["settings", "personalize", "currencies"];
+
+  const { data: allCurrencies = [], isLoading: loadingAll } = useQuery({
+    queryKey: allQk,
+    queryFn: async () => {
+      const res = await api.currencies.currenciesList();
+      return (res.data ?? []) as Currency[];
+    },
+  });
+
+  const { data: activeCurrencies = [] } = useQuery({
+    queryKey: activeQk,
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("currencies");
+      return (res.data ?? []) as PersonalizeItem[];
+    },
+  });
+
+  const activeIds = useMemo(
+    () => new Set(activeCurrencies.map((c) => c.id)),
+    [activeCurrencies],
+  );
+
+  const filtered = useMemo(
+    () =>
+      search.trim()
+        ? allCurrencies.filter((c) =>
+            (c.code ?? "").toLowerCase().includes(search.trim().toLowerCase()),
+          )
+        : allCurrencies,
+    [allCurrencies, search],
+  );
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: allQk });
+    queryClient.invalidateQueries({ queryKey: activeQk });
+  };
+
+  const toggleMutation = useMutation({
+    mutationFn: (currencyId: number) =>
+      api.personalize.personalizeCurrenciesToggleUpdate(currencyId),
+    onSuccess: () => {
+      invalidateAll();
+      message.success(t("settings.personalize.currency_toggled"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const enableAllMutation = useMutation({
+    mutationFn: () => api.personalize.personalizeCurrenciesEnableAllCreate(),
+    onSuccess: () => {
+      invalidateAll();
+      message.success(t("settings.personalize.all_enabled"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const disableAllMutation = useMutation({
+    mutationFn: () => api.personalize.personalizeCurrenciesDisableAllDelete(),
+    onSuccess: () => {
+      invalidateAll();
+      message.success(t("settings.personalize.all_disabled"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  return (
+    <div>
+      <Space style={{ width: "100%", marginBottom: 12 }} direction="vertical" size={8}>
+        <Input.Search
+          placeholder={t("settings.personalize.search_currencies")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          allowClear
+        />
+        <Space>
+          <Button
+            size="small"
+            onClick={() => enableAllMutation.mutate()}
+            loading={enableAllMutation.isPending}
+          >
+            {t("settings.personalize.enable_all")}
+          </Button>
+          <Button
+            size="small"
+            danger
+            onClick={() => disableAllMutation.mutate()}
+            loading={disableAllMutation.isPending}
+          >
+            {t("settings.personalize.disable_all")}
+          </Button>
+        </Space>
+      </Space>
+
+      <List
+        loading={loadingAll}
+        dataSource={filtered}
+        locale={{
+          emptyText: (
+            <Empty
+              description={t("settings.personalize.no_items")}
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+          ),
+        }}
+        size="small"
+        renderItem={(item: Currency) => (
+          <List.Item
+            style={{ padding: "6px 0" }}
+            actions={[
+              <Switch
+                key="toggle"
+                size="small"
+                checked={activeIds.has(item.id)}
+                loading={toggleMutation.isPending}
+                onChange={() => item.id != null && toggleMutation.mutate(item.id)}
+              />,
+            ]}
+          >
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{item.code}</span>
+          </List.Item>
+        )}
+      />
+    </div>
+  );
+}
+
 function SectionPanel({ sectionKey }: { sectionKey: string }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -597,7 +733,7 @@ export default function Personalize() {
         label={t(sectionI18nMap[key])}
       />
     ),
-    children: <SectionPanel sectionKey={key} />,
+    children: key === "currencies" ? <CurrenciesPanel /> : <SectionPanel sectionKey={key} />,
   }));
 
   return (

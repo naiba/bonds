@@ -411,6 +411,7 @@
       "labels": {
         "title": "Labels",
         "add": "Add Label",
+        "edit": "Change Label",
         "added": "Label added",
         "updated": "Label updated",
         "removed": "Label removed",
@@ -766,7 +767,13 @@
       "move_down": "Move Down",
       "post_templates": "Post Templates",
       "group_types": "Group Types",
-      "name_reverse": "Reverse Relationship Name"
+      "name_reverse": "Reverse Relationship Name",
+      "enable_all": "Enable All",
+      "disable_all": "Disable All",
+      "search_currencies": "Search currencies...",
+      "currency_toggled": "Currency toggled",
+      "all_enabled": "All currencies enabled",
+      "all_disabled": "All currencies disabled"
     },
     "users": {
       "title": "Users",

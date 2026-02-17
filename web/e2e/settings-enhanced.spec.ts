@@ -76,4 +76,61 @@ test.describe('Enhanced Settings', () => {
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('button').filter({ has: page.locator('.anticon-plus') })).toBeVisible({ timeout: 10000 });
   });
+
+  test('should show notification channel with verification status', async ({ page }) => {
+    await registerUser(page);
+    await page.goto('/settings/notifications');
+    await page.waitForLoadState('networkidle');
+
+    const seedChannel = page.locator('.ant-list-item').first();
+    await expect(seedChannel).toBeVisible({ timeout: 10000 });
+    await expect(
+      seedChannel.getByText(/Verified|Unverified/)
+    ).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should navigate to personalize page and show currencies section', async ({ page }) => {
+    await registerUser(page);
+    await page.goto('/settings/personalize');
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('heading', { level: 4 }).first()).toBeVisible({ timeout: 10000 });
+
+    const currenciesHeader = page.getByText('Currencies').first();
+    await expect(currenciesHeader).toBeVisible({ timeout: 10000 });
+    await currenciesHeader.click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByPlaceholder(/search currencies/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /enable all/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /disable all/i })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should search and filter currencies', async ({ page }) => {
+    await registerUser(page);
+    await page.goto('/settings/personalize');
+    await page.waitForLoadState('networkidle');
+
+    const currenciesHeader = page.getByText('Currencies').first();
+    await currenciesHeader.click();
+    await page.waitForLoadState('networkidle');
+
+    const searchInput = page.getByPlaceholder(/search currencies/i);
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+
+    await searchInput.fill('USD');
+    await expect(page.getByText('USD')).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should show currency toggle switches', async ({ page }) => {
+    await registerUser(page);
+    await page.goto('/settings/personalize');
+    await page.waitForLoadState('networkidle');
+
+    const currenciesHeader = page.getByText('Currencies').first();
+    await currenciesHeader.click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.ant-switch').first()).toBeVisible({ timeout: 10000 });
+  });
 });
