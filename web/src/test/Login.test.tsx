@@ -17,6 +17,14 @@ vi.mock("@/stores/auth", () => ({
   }),
 }));
 
+vi.mock("@/stores/theme", () => ({
+  useTheme: () => ({
+    themeMode: "system" as const,
+    resolvedTheme: "light" as const,
+    setThemeMode: vi.fn(),
+  }),
+}));
+
 function renderLogin() {
   return render(
     <ConfigProvider>
