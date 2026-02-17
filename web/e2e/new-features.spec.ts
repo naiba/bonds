@@ -45,7 +45,7 @@ test.describe('New Features', () => {
     await goToContacts(page);
     await createContact(page, 'EditTest', 'User');
 
-    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Edit' }).first().click();
 
     const modal = page.locator('.ant-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
@@ -76,10 +76,11 @@ test.describe('New Features', () => {
     await goToContacts(page);
     await createContact(page, 'FeedTest', 'User');
 
-    await page.getByRole('tab', { name: 'Activity Feed' }).click();
+    const feedTab = page.getByRole('tab', { name: /feed/i });
+    await feedTab.click();
 
     await expect(
-      page.locator('.ant-card').filter({ hasText: 'Activity Feed' })
+      page.locator('.ant-card').filter({ hasText: /Activity Feed/i })
     ).toBeVisible({ timeout: 10000 });
   });
 

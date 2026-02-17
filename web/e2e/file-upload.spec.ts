@@ -43,9 +43,9 @@ test.describe('File Upload', () => {
     await registerUser(page, email);
     await setupVaultAndContact(page);
 
-    const photosTab = page.getByRole('tab', { name: /photos/i });
-    await expect(photosTab).toBeVisible({ timeout: 10000 });
-    await photosTab.click();
+    const infoTab = page.getByRole('tab', { name: 'Information', exact: true });
+    await expect(infoTab).toBeVisible({ timeout: 10000 });
+    await infoTab.click();
     await expect(
       page.getByText('Photos', { exact: true }).first(),
     ).toBeVisible({ timeout: 5000 });
