@@ -80,6 +80,36 @@ vi.mock("@/api/contacts", () => ({
   },
 }));
 
+// Mock @/api to prevent real HTTP calls (AvatarImageLoader uses httpClient.instance.get directly)
+vi.mock("@/api", () => ({
+  api: {
+    contacts: {
+      contactsDetail: vi.fn(),
+      contactsUpdate: vi.fn(),
+      contactsDelete: vi.fn(),
+      contactsFavoriteUpdate: vi.fn(),
+      contactsArchiveUpdate: vi.fn(),
+      contactsAvatarUpdate: vi.fn(),
+      contactsAvatarDelete: vi.fn(),
+      contactsMoveCreate: vi.fn(),
+      contactsTemplateUpdate: vi.fn(),
+      contactsTabsList: vi.fn(),
+    },
+    vaults: { vaultsList: vi.fn() },
+    personalize: { personalizeDetail: vi.fn() },
+    vcard: { contactsVcardList: vi.fn() },
+  },
+  httpClient: {
+    instance: {
+      get: vi.fn().mockRejectedValue(new Error("mocked")),
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+    },
+  },
+}));
+
 const mockContactQuery = vi.fn();
 const defaultQuery = { data: undefined, isLoading: false };
 vi.mock("@tanstack/react-query", () => ({
