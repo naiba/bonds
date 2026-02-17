@@ -2,8 +2,10 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
@@ -15,11 +17,18 @@ var (
 )
 
 type NotificationService struct {
-	db *gorm.DB
+	db     *gorm.DB
+	mailer Mailer
+	appURL string
 }
 
 func NewNotificationService(db *gorm.DB) *NotificationService {
 	return &NotificationService{db: db}
+}
+
+func (s *NotificationService) SetMailer(mailer Mailer, appURL string) {
+	s.mailer = mailer
+	s.appURL = appURL
 }
 
 func (s *NotificationService) List(userID string) ([]dto.NotificationChannelResponse, error) {
@@ -35,16 +44,25 @@ func (s *NotificationService) List(userID string) ([]dto.NotificationChannelResp
 }
 
 func (s *NotificationService) Create(userID string, req dto.CreateNotificationChannelRequest) (*dto.NotificationChannelResponse, error) {
+	token := uuid.New().String()
 	ch := models.UserNotificationChannel{
-		UserID:        &userID,
-		Type:          req.Type,
-		Label:         strPtrOrNil(req.Label),
-		Content:       req.Content,
-		PreferredTime: strPtrOrNil(req.PreferredTime),
+		UserID:            &userID,
+		Type:              req.Type,
+		Label:             strPtrOrNil(req.Label),
+		Content:           req.Content,
+		PreferredTime:     strPtrOrNil(req.PreferredTime),
+		VerificationToken: &token,
 	}
 	if err := s.db.Create(&ch).Error; err != nil {
 		return nil, err
 	}
+
+	if req.Type == "email" && s.mailer != nil {
+		link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.appURL, ch.ID, token)
+		body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
+		_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
+	}
+
 	resp := toNotificationChannelResponse(&ch)
 	return &resp, nil
 }
@@ -60,6 +78,9 @@ func (s *NotificationService) Toggle(id uint, userID string) (*dto.NotificationC
 	ch.Active = !ch.Active
 	if err := s.db.Save(&ch).Error; err != nil {
 		return nil, err
+	}
+	if ch.Active {
+		_ = s.ScheduleAllContactReminders(ch.ID, userID)
 	}
 	resp := toNotificationChannelResponse(&ch)
 	return &resp, nil
@@ -90,7 +111,10 @@ func (s *NotificationService) Verify(id uint, userID, token string) error {
 	now := time.Now()
 	ch.VerifiedAt = &now
 	ch.Active = true
-	return s.db.Save(&ch).Error
+	if err := s.db.Save(&ch).Error; err != nil {
+		return err
+	}
+	return s.ScheduleAllContactReminders(ch.ID, *ch.UserID)
 }
 
 func (s *NotificationService) SendTest(id uint, userID string) error {
@@ -133,6 +157,101 @@ func (s *NotificationService) ListLogs(id uint, userID string) ([]dto.Notificati
 		}
 	}
 	return result, nil
+}
+
+func (s *NotificationService) ScheduleAllContactReminders(channelID uint, userID string) error {
+	var channel models.UserNotificationChannel
+	if err := s.db.Preload("User").First(&channel, channelID).Error; err != nil {
+		return fmt.Errorf("channel load: %w", err)
+	}
+
+	var user models.User
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
+		return fmt.Errorf("user load: %w", err)
+	}
+
+	var vaultIDs []string
+	if err := s.db.Model(&models.UserVault{}).
+		Where("user_id = ?", userID).
+		Pluck("vault_id", &vaultIDs).Error; err != nil {
+		return fmt.Errorf("vault pluck: %w", err)
+	}
+	if len(vaultIDs) == 0 {
+		return fmt.Errorf("no vaultIDs for user %s", userID)
+	}
+
+	var contactIDs []string
+	if err := s.db.Model(&models.Contact{}).
+		Where("vault_id IN ?", vaultIDs).
+		Pluck("id", &contactIDs).Error; err != nil {
+		return err
+	}
+	if len(contactIDs) == 0 {
+		return nil
+	}
+
+	var reminders []models.ContactReminder
+	if err := s.db.Where("contact_id IN ?", contactIDs).Find(&reminders).Error; err != nil {
+		return err
+	}
+
+	now := time.Now()
+	tz := "UTC"
+	if user.Timezone != nil && *user.Timezone != "" {
+		tz = *user.Timezone
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+
+	for _, r := range reminders {
+		var existing models.ContactReminderScheduled
+		err := s.db.Where("user_notification_channel_id = ? AND contact_reminder_id = ? AND triggered_at IS NULL",
+			channelID, r.ID).First(&existing).Error
+		if err == nil {
+			continue
+		}
+
+		var upcomingDate time.Time
+		month := 1
+		day := 1
+		if r.Month != nil {
+			month = *r.Month
+		}
+		if r.Day != nil {
+			day = *r.Day
+		}
+		if r.Year == nil || *r.Year == 0 {
+			upcomingDate = time.Date(now.Year(), time.Month(month), day, 0, 0, 0, 0, loc)
+		} else {
+			upcomingDate = time.Date(*r.Year, time.Month(month), day, 0, 0, 0, 0, loc)
+		}
+
+		if upcomingDate.Before(now) {
+			upcomingDate = time.Date(now.Year(), time.Month(month), day, 0, 0, 0, 0, loc)
+			if upcomingDate.Before(now) {
+				upcomingDate = upcomingDate.AddDate(1, 0, 0)
+			}
+		}
+
+		hour, minute := 9, 0
+		if channel.PreferredTime != nil {
+			fmt.Sscanf(*channel.PreferredTime, "%d:%d", &hour, &minute)
+		}
+		upcomingDate = time.Date(upcomingDate.Year(), upcomingDate.Month(), upcomingDate.Day(), hour, minute, 0, 0, loc)
+
+		scheduled := models.ContactReminderScheduled{
+			UserNotificationChannelID: channelID,
+			ContactReminderID:         r.ID,
+			ScheduledAt:               upcomingDate.UTC(),
+		}
+		if err := s.db.Create(&scheduled).Error; err != nil {
+			return fmt.Errorf("create scheduled reminder: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func toNotificationChannelResponse(ch *models.UserNotificationChannel) dto.NotificationChannelResponse {

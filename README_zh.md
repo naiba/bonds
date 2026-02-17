@@ -202,4 +202,11 @@ Bonds 是受 [Monica](https://github.com/monicahq/monica)（AGPL-3.0）启发的
 
 ## 许可证
 
-[AGPL-3.0](LICENSE) — 与原版 Monica 项目相同的许可证。
+[Business Source License 1.1](LICENSE) (BSL 1.1) — 源码可见许可证，条款如下：
+
+- **个人用户**：非商业使用完全免费
+- **组织/企业**：商业使用需向 Licensor 购买许可
+- **禁止行为**：转售、再许可、作为托管/管理服务提供
+- **转换日期**：2030年2月17日 — 届时自动转为 [AGPL-3.0](LICENSE)（与原版 Monica 相同）
+
+转换日期后，软件将以 AGPL-3.0 完全开源。

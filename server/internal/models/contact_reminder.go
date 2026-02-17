@@ -20,8 +20,7 @@ type ContactReminder struct {
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 
-	Contact                  Contact                   `json:"contact,omitempty" gorm:"foreignKey:ContactID"`
-	UserNotificationChannels []UserNotificationChannel `json:"user_notification_channels,omitempty" gorm:"many2many:contact_reminder_scheduled"`
+	Contact Contact `json:"contact,omitempty" gorm:"foreignKey:ContactID"`
 }
 
 type ContactReminderScheduled struct {

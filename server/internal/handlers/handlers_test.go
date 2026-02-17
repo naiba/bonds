@@ -14,6 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/handlers"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 	"gorm.io/gorm"
 )
@@ -67,13 +68,26 @@ type vaultData struct {
 }
 
 type contactData struct {
-	ID         string `json:"id"`
-	VaultID    string `json:"vault_id"`
-	FirstName  string `json:"first_name"`
-	LastName   string `json:"last_name"`
-	Nickname   string `json:"nickname"`
-	IsArchived bool   `json:"is_archived"`
-	IsFavorite bool   `json:"is_favorite"`
+	ID             string `json:"id"`
+	VaultID        string `json:"vault_id"`
+	FirstName      string `json:"first_name"`
+	LastName       string `json:"last_name"`
+	MiddleName     string `json:"middle_name"`
+	Nickname       string `json:"nickname"`
+	MaidenName     string `json:"maiden_name"`
+	Prefix         string `json:"prefix"`
+	Suffix         string `json:"suffix"`
+	GenderID       *uint  `json:"gender_id"`
+	PronounID      *uint  `json:"pronoun_id"`
+	TemplateID     *uint  `json:"template_id"`
+	CompanyID      *uint  `json:"company_id"`
+	ReligionID     *uint  `json:"religion_id"`
+	FileID         *uint  `json:"file_id"`
+	JobPosition    string `json:"job_position"`
+	Listed         bool   `json:"listed"`
+	ShowQuickFacts bool   `json:"show_quick_facts"`
+	IsArchived     bool   `json:"is_archived"`
+	IsFavorite     bool   `json:"is_favorite"`
 }
 
 func setupTestServer(t *testing.T) *testServer {
@@ -646,7 +660,7 @@ func TestContactCreate_Success(t *testing.T) {
 	vault := ts.createTestVault(t, token, "Create Contact Vault")
 
 	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
-		`{"first_name":"Jane","last_name":"Smith","nickname":"Janey"}`, token)
+		`{"first_name":"Jane","last_name":"Smith","middle_name":"Marie","nickname":"Janey","maiden_name":"Jones","prefix":"Ms.","suffix":"PhD"}`, token)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
@@ -665,14 +679,32 @@ func TestContactCreate_Success(t *testing.T) {
 	if data.LastName != "Smith" {
 		t.Errorf("expected last_name=Smith, got %s", data.LastName)
 	}
+	if data.MiddleName != "Marie" {
+		t.Errorf("expected middle_name=Marie, got %s", data.MiddleName)
+	}
 	if data.Nickname != "Janey" {
 		t.Errorf("expected nickname=Janey, got %s", data.Nickname)
+	}
+	if data.MaidenName != "Jones" {
+		t.Errorf("expected maiden_name=Jones, got %s", data.MaidenName)
+	}
+	if data.Prefix != "Ms." {
+		t.Errorf("expected prefix=Ms., got %s", data.Prefix)
+	}
+	if data.Suffix != "PhD" {
+		t.Errorf("expected suffix=PhD, got %s", data.Suffix)
 	}
 	if data.VaultID != vault.ID {
 		t.Errorf("expected vault_id=%s, got %s", vault.ID, data.VaultID)
 	}
 	if data.ID == "" {
 		t.Error("expected non-empty contact ID")
+	}
+	if !data.Listed {
+		t.Error("expected listed=true by default")
+	}
+	if data.IsArchived {
+		t.Error("expected is_archived=false by default")
 	}
 }
 
@@ -756,7 +788,7 @@ func TestContactUpdate_Success(t *testing.T) {
 	contact := ts.createTestContact(t, token, vault.ID, "OldName")
 
 	rec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID,
-		`{"first_name":"NewName","last_name":"Updated"}`, token)
+		`{"first_name":"NewName","last_name":"Updated","middle_name":"Mid","maiden_name":"OldFamily","prefix":"Dr.","suffix":"Sr."}`, token)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -774,6 +806,18 @@ func TestContactUpdate_Success(t *testing.T) {
 	}
 	if data.LastName != "Updated" {
 		t.Errorf("expected last_name=Updated, got %s", data.LastName)
+	}
+	if data.MiddleName != "Mid" {
+		t.Errorf("expected middle_name=Mid, got %s", data.MiddleName)
+	}
+	if data.MaidenName != "OldFamily" {
+		t.Errorf("expected maiden_name=OldFamily, got %s", data.MaidenName)
+	}
+	if data.Prefix != "Dr." {
+		t.Errorf("expected prefix=Dr., got %s", data.Prefix)
+	}
+	if data.Suffix != "Sr." {
+		t.Errorf("expected suffix=Sr., got %s", data.Suffix)
 	}
 }
 
@@ -2428,6 +2472,206 @@ func TestTaskListCompleted_Success(t *testing.T) {
 	}
 }
 
+func TestCurrencyToggle_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	if err := models.SeedCurrencies(ts.db); err != nil {
+		t.Fatalf("seed currencies: %v", err)
+	}
+	token, _ := ts.registerTestUser(t, "cur-toggle@test.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/currencies", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var currencies []struct {
+		ID   uint   `json:"id"`
+		Code string `json:"code"`
+	}
+	json.Unmarshal(resp.Data, &currencies)
+	if len(currencies) == 0 {
+		t.Fatal("expected currencies to exist after seed")
+	}
+	currID := currencies[0].ID
+
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/settings/personalize/currencies/%d/toggle", currID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on first toggle, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/settings/personalize/currencies/%d/toggle", currID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 on second toggle, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCurrencyEnableAll_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	if err := models.SeedCurrencies(ts.db); err != nil {
+		t.Fatalf("seed currencies: %v", err)
+	}
+	token, _ := ts.registerTestUser(t, "cur-enable@test.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/personalize/currencies/enable-all", "", token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCurrencyDisableAll_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	if err := models.SeedCurrencies(ts.db); err != nil {
+		t.Fatalf("seed currencies: %v", err)
+	}
+	token, _ := ts.registerTestUser(t, "cur-disable@test.com")
+
+	rec := ts.doRequest(http.MethodDelete, "/api/settings/personalize/currencies/disable-all", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestPostGet_ViewCount(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "post-view@test.com")
+	vault := ts.createTestVault(t, token, "View Vault")
+	journalID := ts.createTestJournal(t, token, vault.ID, "View Journal")
+	postID := ts.createTestPost(t, token, vault.ID, journalID, "View Post")
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%d/posts/%d", vault.ID, journalID, postID)
+
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var post struct {
+		ViewCount int `json:"view_count"`
+	}
+	json.Unmarshal(resp.Data, &post)
+	if post.ViewCount < 1 {
+		t.Fatalf("expected view_count >= 1, got %d", post.ViewCount)
+	}
+	firstCount := post.ViewCount
+
+	rec = ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	json.Unmarshal(resp.Data, &post)
+	if post.ViewCount != firstCount+1 {
+		t.Fatalf("expected view_count %d, got %d", firstCount+1, post.ViewCount)
+	}
+}
+
+func TestPostUpdate_WithContacts(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "post-contacts@test.com")
+	vault := ts.createTestVault(t, token, "PC Vault")
+	journalID := ts.createTestJournal(t, token, vault.ID, "PC Journal")
+	postID := ts.createTestPost(t, token, vault.ID, journalID, "PC Post")
+	contact1 := ts.createTestContact(t, token, vault.ID, "Alice")
+	contact2 := ts.createTestContact(t, token, vault.ID, "Bob")
+
+	path := fmt.Sprintf("/api/vaults/%s/journals/%d/posts/%d", vault.ID, journalID, postID)
+
+	body := fmt.Sprintf(`{"title":"Updated","written_at":"2024-01-01T00:00:00Z","contact_ids":["%s","%s"]}`, contact1.ID, contact2.ID)
+	rec := ts.doRequest(http.MethodPut, path, body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var postResp struct {
+		Contacts []struct {
+			ID string `json:"id"`
+		} `json:"contacts"`
+	}
+	json.Unmarshal(resp.Data, &postResp)
+	if len(postResp.Contacts) != 2 {
+		t.Fatalf("expected 2 contacts, got %d", len(postResp.Contacts))
+	}
+
+	body = fmt.Sprintf(`{"title":"Updated Again","written_at":"2024-01-01T00:00:00Z","contact_ids":["%s"]}`, contact1.ID)
+	rec = ts.doRequest(http.MethodPut, path, body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	json.Unmarshal(resp.Data, &postResp)
+	if len(postResp.Contacts) != 1 {
+		t.Fatalf("expected 1 contact, got %d", len(postResp.Contacts))
+	}
+}
+
+func TestNotificationCreate_HasToken(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "notif-create@test.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/notifications",
+		`{"type":"email","label":"Test","content":"test@example.com"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var channel struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &channel)
+	if channel.ID == 0 {
+		t.Fatal("expected channel ID > 0")
+	}
+
+	var dbChannel models.UserNotificationChannel
+	if err := ts.db.Where("id = ? AND user_id = ?", channel.ID, auth.User.ID).First(&dbChannel).Error; err != nil {
+		t.Fatalf("failed to query channel from DB: %v", err)
+	}
+	if dbChannel.VerificationToken == nil || *dbChannel.VerificationToken == "" {
+		t.Fatal("expected VerificationToken to be set, got nil/empty")
+	}
+}
+
+func TestNotificationVerify_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "notif-verify@test.com")
+	ts.createTestVault(t, token, "Notif Vault")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/notifications",
+		`{"type":"email","label":"Verify Me","content":"verify@example.com"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var channel struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &channel)
+
+	var dbChannel models.UserNotificationChannel
+	if err := ts.db.Where("id = ? AND user_id = ?", channel.ID, auth.User.ID).First(&dbChannel).Error; err != nil {
+		t.Fatalf("failed to query channel: %v", err)
+	}
+	if dbChannel.VerificationToken == nil {
+		t.Fatal("expected VerificationToken to be set")
+	}
+	verifyToken := *dbChannel.VerificationToken
+
+	rec = ts.doRequest(http.MethodGet, fmt.Sprintf("/api/settings/notifications/%d/verify/%s", channel.ID, verifyToken), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	if err := ts.db.Where("id = ?", channel.ID).First(&dbChannel).Error; err != nil {
+		t.Fatalf("failed to reload channel: %v", err)
+	}
+	if dbChannel.VerifiedAt == nil {
+		t.Fatal("expected VerifiedAt to be set after verification")
+	}
+	if !dbChannel.Active {
+		t.Fatal("expected channel to be active after verification")
+	}
+}
+
 func (ts *testServer) createTestJournal(t *testing.T, token, vaultID, name string) uint {
 	t.Helper()
 	body := `{"name":"` + name + `"}`
@@ -2522,5 +2766,65 @@ func TestPostMetricList_Success(t *testing.T) {
 	}
 	if metrics[0].Value != 7 {
 		t.Errorf("expected value 7, got %d", metrics[0].Value)
+	}
+}
+
+func TestContactTabs_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	_, auth := ts.registerTestUser(t, "tabs@example.com")
+	vault := ts.createTestVault(t, auth.Token, "Tabs Vault")
+	contact := ts.createTestContact(t, auth.Token, vault.ID, "Jane")
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/tabs", vault.ID, contact.ID),
+		"", auth.Token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatalf("expected success=true")
+	}
+
+	var tabs struct {
+		TemplateID   uint   `json:"template_id"`
+		TemplateName string `json:"template_name"`
+		Pages        []struct {
+			ID      uint   `json:"id"`
+			Slug    string `json:"slug"`
+			Modules []struct {
+				ID   uint   `json:"id"`
+				Type string `json:"type"`
+			} `json:"modules"`
+		} `json:"pages"`
+	}
+	if err := json.Unmarshal(resp.Data, &tabs); err != nil {
+		t.Fatalf("failed to parse tabs: %v", err)
+	}
+	if tabs.TemplateName != "Default template" {
+		t.Errorf("expected 'Default template', got '%s'", tabs.TemplateName)
+	}
+	if len(tabs.Pages) != 5 {
+		t.Fatalf("expected 5 pages, got %d", len(tabs.Pages))
+	}
+	if tabs.Pages[0].Slug != "contact" {
+		t.Errorf("expected first page slug 'contact', got '%s'", tabs.Pages[0].Slug)
+	}
+	if len(tabs.Pages[0].Modules) != 8 {
+		t.Errorf("expected 8 modules on contact page, got %d", len(tabs.Pages[0].Modules))
+	}
+}
+
+func TestContactTabs_ContactNotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	_, auth := ts.registerTestUser(t, "tabs404@example.com")
+	vault := ts.createTestVault(t, auth.Token, "Tabs404 Vault")
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/tabs", vault.ID, "nonexistent-id"),
+		"", auth.Token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

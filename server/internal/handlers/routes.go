@@ -60,6 +60,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	contactJobService := services.NewContactJobService(db)
 	contactMoveService := services.NewContactMoveService(db)
 	contactTemplateService := services.NewContactTemplateService(db)
+	contactTabService := services.NewContactTabService(db)
 	contactSortService := services.NewContactSortService(db)
 	journalMetricService := services.NewJournalMetricService(db)
 	postMetricService := services.NewPostMetricService(db)
@@ -92,6 +93,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 		mailer = &services.NoopMailer{}
 	}
 	invitationService := services.NewInvitationService(db, mailer, cfg.App.URL)
+	notificationService.SetMailer(mailer, cfg.App.URL)
 
 	if cfg.Geocoding.Provider != "" {
 		geocoder := services.NewGeocoder(cfg.Geocoding.Provider, cfg.Geocoding.APIKey)
@@ -179,6 +181,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	contactJobHandler := NewContactJobHandler(contactJobService)
 	contactMoveHandler := NewContactMoveHandler(contactMoveService)
 	contactTemplateHandler := NewContactTemplateHandler(contactTemplateService)
+	contactTabHandler := NewContactTabHandler(contactTabService)
 	contactSortHandler := NewContactSortHandler(contactSortService)
 	journalMetricHandler := NewJournalMetricHandler(journalMetricService)
 	postMetricHandler := NewPostMetricHandler(postMetricService)
@@ -274,6 +277,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	contactSub.GET("/feed", feedHandler.GetContactFeed)
 	contactSub.POST("/move", contactMoveHandler.Move, requireEditor)
 	contactSub.PUT("/template", contactTemplateHandler.Update, requireEditor)
+	contactSub.GET("/tabs", contactTabHandler.GetTabs)
 	contactSub.PUT("/avatar", avatarHandler.UpdateAvatar, requireEditor)
 	contactSub.DELETE("/avatar", avatarHandler.DeleteAvatar, requireEditor)
 
@@ -497,6 +501,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	notifGroup.GET("/:id/logs", notificationHandler.ListLogs)
 
 	personalizeGroup := settingsGroup.Group("/personalize", authMiddleware.RequireAdmin)
+	personalizeGroup.PUT("/currencies/:currencyId/toggle", currencyHandler.Toggle)
+	personalizeGroup.POST("/currencies/enable-all", currencyHandler.EnableAll)
+	personalizeGroup.DELETE("/currencies/disable-all", currencyHandler.DisableAll)
 	personalizeGroup.GET("/:entity", personalizeHandler.List)
 	personalizeGroup.POST("/:entity", personalizeHandler.Create)
 	personalizeGroup.PUT("/:entity/:id", personalizeHandler.Update)

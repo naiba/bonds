@@ -18,7 +18,6 @@ type UserNotificationChannel struct {
 
 	User                 *User                  `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	UserNotificationSent []UserNotificationSent `json:"user_notification_sent,omitempty" gorm:"foreignKey:UserNotificationChannelID"`
-	ContactReminders     []ContactReminder      `json:"contact_reminders,omitempty" gorm:"many2many:contact_reminder_scheduled"`
 }
 
 type UserNotificationSent struct {

@@ -240,6 +240,9 @@ export type { GithubComNaibaBondsInternalDtoUpdateContactRequest as UpdateContac
 export type { GithubComNaibaBondsInternalDtoUpdateContactReligionRequest as UpdateContactReligionRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactLabelResponse as ContactLabel } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactSearchItem as SearchResult } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoContactTabsResponse as ContactTabsResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoContactTabPage as ContactTabPage } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoContactTabModule as ContactTabModule } from "./generated/data-contracts";
 
 // Vault
 export type { GithubComNaibaBondsInternalDtoVaultResponse as Vault } from "./generated/data-contracts";

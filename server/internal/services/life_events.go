@@ -125,6 +125,7 @@ func (s *LifeEventService) AddLifeEvent(timelineEventID uint, vaultID string, re
 		FromPlace:         strPtrOrNil(req.FromPlace),
 		ToPlace:           strPtrOrNil(req.ToPlace),
 		Place:             strPtrOrNil(req.Place),
+		EmotionID:         req.EmotionID,
 	}
 	if err := s.db.Create(&le).Error; err != nil {
 		return nil, err
@@ -158,6 +159,7 @@ func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, va
 	le.FromPlace = strPtrOrNil(req.FromPlace)
 	le.ToPlace = strPtrOrNil(req.ToPlace)
 	le.Place = strPtrOrNil(req.Place)
+	le.EmotionID = req.EmotionID
 
 	if err := s.db.Save(&le).Error; err != nil {
 		return nil, err
@@ -253,6 +255,7 @@ func toLifeEventResponse(le *models.LifeEvent) dto.LifeEventResponse {
 		ID:                le.ID,
 		TimelineEventID:   le.TimelineEventID,
 		LifeEventTypeID:   le.LifeEventTypeID,
+		EmotionID:         le.EmotionID,
 		HappenedAt:        le.HappenedAt,
 		Collapsed:         le.Collapsed,
 		Summary:           ptrToStr(le.Summary),

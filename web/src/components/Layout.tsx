@@ -258,6 +258,21 @@ export default function Layout() {
           <Outlet />
         </div>
       </Content>
+
+      <div
+        style={{
+          textAlign: "center",
+          padding: "16px 24px",
+          background: token.colorBgLayout,
+          color: token.colorTextQuaternary,
+          fontSize: 12,
+        }}
+      >
+        © {new Date().getFullYear()}{" "}
+        <a href="https://github.com/naiba/bonds" target="_blank" rel="noopener noreferrer" style={{ color: token.colorTextTertiary }}>Bonds</a>
+        {" by "}
+        <a href="https://nai.ba" target="_blank" rel="noopener noreferrer" style={{ color: token.colorTextTertiary }}>naiba</a>
+      </div>
     </AntLayout>
   );
 }

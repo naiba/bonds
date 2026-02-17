@@ -21,6 +21,7 @@ type CreateLifeEventRequest struct {
 	FromPlace         string    `json:"from_place" example:"San Francisco"`
 	ToPlace           string    `json:"to_place" example:"Los Angeles"`
 	Place             string    `json:"place" example:"Downtown Office"`
+	EmotionID         *uint     `json:"emotion_id" example:"1"`
 }
 
 type UpdateLifeEventRequest struct {
@@ -36,6 +37,7 @@ type UpdateLifeEventRequest struct {
 	FromPlace         string    `json:"from_place" example:"San Francisco"`
 	ToPlace           string    `json:"to_place" example:"Los Angeles"`
 	Place             string    `json:"place" example:"Downtown Office"`
+	EmotionID         *uint     `json:"emotion_id" example:"1"`
 }
 
 type TimelineEventResponse struct {
@@ -53,6 +55,7 @@ type LifeEventResponse struct {
 	ID                uint      `json:"id" example:"1"`
 	TimelineEventID   uint      `json:"timeline_event_id" example:"1"`
 	LifeEventTypeID   uint      `json:"life_event_type_id" example:"1"`
+	EmotionID         *uint     `json:"emotion_id" example:"1"`
 	HappenedAt        time.Time `json:"happened_at" example:"2026-01-15T10:30:00Z"`
 	Collapsed         bool      `json:"collapsed" example:"false"`
 	Summary           string    `json:"summary" example:"Got promoted at work"`

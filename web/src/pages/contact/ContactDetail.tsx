@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -34,7 +34,7 @@ import {
 } from "@ant-design/icons";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { api, httpClient } from "@/api";
-import type { APIError, UpdateContactRequest, Vault, PersonalizeItem } from "@/api";
+import type { APIError, UpdateContactRequest, Vault, PersonalizeItem, ContactTabsResponse, ContactTabPage } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -59,6 +59,33 @@ import FeedModule from "./modules/FeedModule";
 import ExtraInfoModule from "./modules/ExtraInfoModule";
 
 const { Title, Text } = Typography;
+
+// Module type → component mapping for dynamic tab rendering.
+// Modules like avatar, contact_names, family_summary, gender_pronoun, company,
+// religions are handled by the contact header card and ExtraInfoModule, not here.
+const MODULE_COMPONENT_MAP: Record<
+  string,
+  React.ComponentType<{ vaultId: string; contactId: string; [key: string]: unknown }>
+> = {
+  notes: NotesModule,
+  labels: LabelsModule,
+  quick_facts: QuickFactsModule,
+  relationships: RelationshipsModule,
+  contact_information: ContactInfoModule,
+  addresses: AddressesModule,
+  important_dates: ImportantDatesModule,
+  pets: PetsModule,
+  tasks: TasksModule,
+  calls: CallsModule,
+  reminders: RemindersModule,
+  loans: LoansModule,
+  goals: GoalsModule,
+  life_events: LifeEventsModule,
+  mood_tracking: MoodTrackingModule,
+  photos: PhotosModule,
+  documents: DocumentsModule,
+  feed: FeedModule,
+};
 
 export default function ContactDetail() {
   const { id, contactId } = useParams<{ id: string; contactId: string }>();
@@ -101,6 +128,15 @@ export default function ContactDetail() {
       return res.data ?? [];
     },
     enabled: isTemplateModalOpen,
+  });
+
+  const { data: tabsData } = useQuery<ContactTabsResponse>({
+    queryKey: ["vaults", vaultId, "contacts", cId, "tabs"],
+    queryFn: async () => {
+      const res = await api.contacts.contactsTabsList(String(vaultId), String(cId));
+      return res.data!;
+    },
+    enabled: !!vaultId && !!cId && !!contact,
   });
 
   const updateContactMutation = useMutation({
@@ -237,38 +273,99 @@ export default function ContactDetail() {
   const initials = `${contact.first_name?.charAt(0) ?? ""}${contact.last_name?.charAt(0) ?? ""}`.toUpperCase();
   const moduleProps = { vaultId, contactId: cId };
 
-  const tabItems = [
+  const overviewCard = (
+    <Card>
+      <Descriptions column={{ xs: 1, sm: 2 }}>
+        <Descriptions.Item label={t("contact.detail.first_name")}>
+          {contact.first_name}
+        </Descriptions.Item>
+        <Descriptions.Item label={t("contact.detail.last_name")}>
+          {contact.last_name || "\u2014"}
+        </Descriptions.Item>
+        <Descriptions.Item label={t("contact.detail.nickname")}>
+          {contact.nickname || "\u2014"}
+        </Descriptions.Item>
+        <Descriptions.Item label={t("contact.detail.status")}>
+          {contact.is_archived ? (
+            <Tag color="default">{t("common.archived")}</Tag>
+          ) : (
+            <Tag color="green">{t("common.active")}</Tag>
+          )}
+        </Descriptions.Item>
+        <Descriptions.Item label={t("common.created")}>
+          {dayjs(contact.created_at).format("MMMM D, YYYY")}
+        </Descriptions.Item>
+        <Descriptions.Item label={t("common.last_updated")}>
+          {dayjs(contact.updated_at).format("MMMM D, YYYY")}
+        </Descriptions.Item>
+      </Descriptions>
+    </Card>
+  );
+
+  function renderModulesForPage(page: ContactTabPage): React.ReactNode {
+    const modules = page.modules ?? [];
+    const isContactPage = page.type === "contact";
+
+    const children: React.ReactNode[] = [];
+
+    if (isContactPage) {
+      children.push(<React.Fragment key="overview-card">{overviewCard}</React.Fragment>);
+    }
+
+    for (const mod of modules) {
+      const moduleType = mod.type ?? "";
+
+      if (isContactPage && moduleType === "labels") {
+        children.push(<LabelsModule key={`mod-${mod.id}`} {...moduleProps} />);
+        continue;
+      }
+      if (isContactPage && moduleType === "quick_facts") {
+        children.push(
+          <QuickFactsModule key={`mod-${mod.id}`} {...moduleProps} templateId={tabsData?.template_id ?? 1} />,
+        );
+        continue;
+      }
+      if (moduleType === "gender_pronoun" || moduleType === "religions" || moduleType === "company") {
+        children.push(
+          <ExtraInfoModule key={`mod-${mod.id}`} {...moduleProps} contact={contact} />,
+        );
+        continue;
+      }
+
+      const Component = MODULE_COMPONENT_MAP[moduleType];
+      if (Component) {
+        children.push(<Component key={`mod-${mod.id}`} {...moduleProps} />);
+      }
+    }
+
+    if (children.length === 0) {
+      return null;
+    }
+    if (children.length === 1) {
+      return children[0];
+    }
+    return (
+      <Space direction="vertical" style={{ width: "100%" }} size={16}>
+        {children}
+      </Space>
+    );
+  }
+
+  function buildDynamicTabs(data: ContactTabsResponse) {
+    return (data.pages ?? []).map((page) => ({
+      key: page.slug ?? String(page.id),
+      label: page.name ?? page.slug ?? "",
+      children: renderModulesForPage(page),
+    }));
+  }
+
+  const fallbackTabItems = [
     {
       key: "overview",
       label: t("contact.detail.tabs.overview"),
       children: (
-        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
-          <Card>
-            <Descriptions column={{ xs: 1, sm: 2 }}>
-              <Descriptions.Item label={t("contact.detail.first_name")}>
-                {contact.first_name}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contact.detail.last_name")}>
-                {contact.last_name || "—"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contact.detail.nickname")}>
-                {contact.nickname || "—"}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("contact.detail.status")}>
-                {contact.is_archived ? (
-                  <Tag color="default">{t("common.archived")}</Tag>
-                ) : (
-                  <Tag color="green">{t("common.active")}</Tag>
-                )}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("common.created")}>
-                {dayjs(contact.created_at).format("MMMM D, YYYY")}
-              </Descriptions.Item>
-              <Descriptions.Item label={t("common.last_updated")}>
-                {dayjs(contact.updated_at).format("MMMM D, YYYY")}
-              </Descriptions.Item>
-            </Descriptions>
-          </Card>
+        <Space direction="vertical" style={{ width: "100%" }} size={16}>
+          {overviewCard}
           <LabelsModule {...moduleProps} />
           <QuickFactsModule {...moduleProps} templateId={1} />
           <NotesModule {...moduleProps} />
@@ -284,7 +381,7 @@ export default function ContactDetail() {
       key: "information",
       label: t("contact.detail.tabs.information"),
       children: (
-        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+        <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <ContactInfoModule {...moduleProps} />
           <AddressesModule {...moduleProps} />
           <ImportantDatesModule {...moduleProps} />
@@ -297,7 +394,7 @@ export default function ContactDetail() {
       key: "activities",
       label: t("contact.detail.tabs.activities"),
       children: (
-        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+        <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <TasksModule {...moduleProps} />
           <CallsModule {...moduleProps} />
           <RemindersModule {...moduleProps} />
@@ -310,7 +407,7 @@ export default function ContactDetail() {
       key: "life",
       label: t("contact.detail.tabs.life"),
       children: (
-        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+        <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <LifeEventsModule {...moduleProps} />
           <MoodTrackingModule {...moduleProps} />
         </Space>
@@ -320,7 +417,7 @@ export default function ContactDetail() {
       key: "photos",
       label: t("contact.detail.tabs.photos_docs"),
       children: (
-        <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+        <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <PhotosModule {...moduleProps} />
           <DocumentsModule {...moduleProps} />
         </Space>
@@ -332,6 +429,8 @@ export default function ContactDetail() {
       children: <FeedModule {...moduleProps} />,
     },
   ];
+
+  const tabItems = tabsData ? buildDynamicTabs(tabsData) : fallbackTabItems;
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
@@ -527,7 +626,7 @@ export default function ContactDetail() {
 
       <Tabs
         items={tabItems}
-        defaultActiveKey="overview"
+        defaultActiveKey={tabItems[0]?.key ?? "overview"}
         style={{
           marginTop: 4,
         }}

@@ -159,6 +159,43 @@ func TestDeleteCall(t *testing.T) {
 	}
 }
 
+func TestCreateCallWithEmotion(t *testing.T) {
+	svc, contactID, vaultID, userID := setupCallTest(t)
+
+	var eid uint
+	svc.db.Raw("SELECT id FROM emotions LIMIT 1").Scan(&eid)
+	if eid == 0 {
+		t.Fatal("Expected at least one seeded emotion")
+	}
+
+	calledAt := time.Now()
+	call, err := svc.Create(contactID, vaultID, userID, dto.CreateCallRequest{
+		CalledAt:     calledAt,
+		Type:         "phone",
+		WhoInitiated: "me",
+		EmotionID:    &eid,
+	})
+	if err != nil {
+		t.Fatalf("Create with emotion failed: %v", err)
+	}
+	if call.EmotionID == nil || *call.EmotionID != eid {
+		t.Errorf("Expected emotion_id %d, got %v", eid, call.EmotionID)
+	}
+
+	updated, err := svc.Update(call.ID, contactID, vaultID, dto.UpdateCallRequest{
+		CalledAt:     calledAt,
+		Type:         "phone",
+		WhoInitiated: "me",
+		EmotionID:    nil,
+	})
+	if err != nil {
+		t.Fatalf("Update emotion to nil failed: %v", err)
+	}
+	if updated.EmotionID != nil {
+		t.Errorf("Expected emotion_id nil after update, got %v", updated.EmotionID)
+	}
+}
+
 func TestCallNotFound(t *testing.T) {
 	svc, contactID, vaultID, _ := setupCallTest(t)
 

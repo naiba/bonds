@@ -81,14 +81,15 @@ vi.mock("@/api/contacts", () => ({
 }));
 
 const mockContactQuery = vi.fn();
-const mockVaultsQuery = { data: [], isLoading: false };
-let useQueryCallIndex = 0;
+const defaultQuery = { data: undefined, isLoading: false };
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (...args: unknown[]) => {
-    // First call is the contact query, second is the vaults query
-    const idx = useQueryCallIndex++;
-    if (idx === 0) return mockContactQuery(...args);
-    return mockVaultsQuery;
+  useQuery: (opts: Record<string, unknown>) => {
+    const key = Array.isArray(opts?.queryKey) ? opts.queryKey : [];
+    // Contact detail query: ["vaults", ..., "contacts", cId]
+    if (key.includes("contacts") && !key.includes("tabs")) {
+      return mockContactQuery(opts);
+    }
+    return defaultQuery;
   },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
@@ -129,7 +130,7 @@ const mockContact = {
 
 describe("ContactDetail", () => {
   beforeEach(() => {
-    useQueryCallIndex = 0;
+    mockContactQuery.mockReset();
   });
 
   it("renders loading spinner when loading", () => {

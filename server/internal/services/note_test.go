@@ -127,6 +127,38 @@ func TestDeleteNote(t *testing.T) {
 	}
 }
 
+func TestCreateNoteWithEmotion(t *testing.T) {
+	svc, contactID, vaultID, userID := setupNoteTest(t)
+
+	var eid uint
+	svc.db.Raw("SELECT id FROM emotions LIMIT 1").Scan(&eid)
+	if eid == 0 {
+		t.Fatal("Expected at least one seeded emotion")
+	}
+
+	note, err := svc.Create(contactID, vaultID, userID, dto.CreateNoteRequest{
+		Body:      "Note with emotion",
+		EmotionID: &eid,
+	})
+	if err != nil {
+		t.Fatalf("Create with emotion failed: %v", err)
+	}
+	if note.EmotionID == nil || *note.EmotionID != eid {
+		t.Errorf("Expected emotion_id %d, got %v", eid, note.EmotionID)
+	}
+
+	updated, err := svc.Update(note.ID, contactID, vaultID, dto.UpdateNoteRequest{
+		Body:      "Updated note",
+		EmotionID: nil,
+	})
+	if err != nil {
+		t.Fatalf("Update emotion to nil failed: %v", err)
+	}
+	if updated.EmotionID != nil {
+		t.Errorf("Expected emotion_id nil after update, got %v", updated.EmotionID)
+	}
+}
+
 func TestNoteNotFound(t *testing.T) {
 	svc, contactID, vaultID, _ := setupNoteTest(t)
 

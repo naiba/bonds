@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -148,5 +149,84 @@ func TestNotificationNotFound(t *testing.T) {
 	_, err = svc.Toggle(9999, userID)
 	if err != ErrNotificationChannelNotFound {
 		t.Errorf("Toggle: expected ErrNotificationChannelNotFound, got %v", err)
+	}
+}
+
+func TestNotificationCreateGeneratesVerificationToken(t *testing.T) {
+	svc, userID := setupNotificationTest(t)
+
+	ch, err := svc.Create(userID, dto.CreateNotificationChannelRequest{
+		Type:    "email",
+		Content: "verify@example.com",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var dbCh models.UserNotificationChannel
+	if err := svc.db.First(&dbCh, ch.ID).Error; err != nil {
+		t.Fatalf("Failed to load channel: %v", err)
+	}
+	if dbCh.VerificationToken == nil || *dbCh.VerificationToken == "" {
+		t.Error("Expected VerificationToken to be set")
+	}
+}
+
+func TestNotificationVerifySchedulesReminders(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test", LastName: "User",
+		Email: "verify-schedule@example.com", Password: "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "V"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "John"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	reminderSvc := NewReminderService(db)
+	day, month := 15, 6
+	_, err = reminderSvc.Create(contact.ID, vault.ID, dto.CreateReminderRequest{
+		Label: "Birthday", Day: &day, Month: &month, Type: "one_time",
+	})
+	if err != nil {
+		t.Fatalf("Create reminder failed: %v", err)
+	}
+
+	notifSvc := NewNotificationService(db)
+	ch, err := notifSvc.Create(resp.User.ID, dto.CreateNotificationChannelRequest{
+		Type: "email", Content: "verify-sched@example.com", PreferredTime: "09:00",
+	})
+	if err != nil {
+		t.Fatalf("Create notification channel failed: %v", err)
+	}
+
+	var dbCh models.UserNotificationChannel
+	db.First(&dbCh, ch.ID)
+	token := *dbCh.VerificationToken
+
+	if err := notifSvc.Verify(ch.ID, resp.User.ID, token); err != nil {
+		t.Fatalf("Verify failed: %v", err)
+	}
+
+	var scheduledCount int64
+	db.Model(&models.ContactReminderScheduled{}).
+		Where("user_notification_channel_id = ?", ch.ID).
+		Count(&scheduledCount)
+	if scheduledCount == 0 {
+		t.Error("Expected at least 1 scheduled reminder after Verify")
 	}
 }

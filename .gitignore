@@ -1,3 +1,4 @@
+.DS_Store
 server/bin/
 server/server
 server/bonds.db

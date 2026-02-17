@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -235,6 +236,158 @@ func TestContactNotFound(t *testing.T) {
 	_, err = svc.ToggleFavorite("nonexistent-id", "some-user", "some-vault")
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
+	}
+}
+
+func ptrBool(b bool) *bool { return &b }
+func ptrUint(u uint) *uint { return &u }
+
+func TestCreateContact_WithAllFields(t *testing.T) {
+	svc, vaultID, userID, accountID := setupContactTest(t)
+
+	db := svc.db
+	gender := models.Gender{AccountID: accountID, Name: strPtrOrNil("Custom")}
+	db.Create(&gender)
+	pronoun := models.Pronoun{AccountID: accountID, Name: strPtrOrNil("they/them/custom")}
+	db.Create(&pronoun)
+
+	var tmpl models.Template
+	db.Where("account_id = ?", accountID).First(&tmpl)
+
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:  "John",
+		LastName:   "Doe",
+		MiddleName: "Michael",
+		Nickname:   "Johnny",
+		MaidenName: "Smith",
+		Prefix:     "Mr.",
+		Suffix:     "Jr.",
+		GenderID:   ptrUint(gender.ID),
+		PronounID:  ptrUint(pronoun.ID),
+		TemplateID: ptrUint(tmpl.ID),
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	if contact.FirstName != "John" {
+		t.Errorf("Expected first_name 'John', got '%s'", contact.FirstName)
+	}
+	if contact.LastName != "Doe" {
+		t.Errorf("Expected last_name 'Doe', got '%s'", contact.LastName)
+	}
+	if contact.MiddleName != "Michael" {
+		t.Errorf("Expected middle_name 'Michael', got '%s'", contact.MiddleName)
+	}
+	if contact.Nickname != "Johnny" {
+		t.Errorf("Expected nickname 'Johnny', got '%s'", contact.Nickname)
+	}
+	if contact.MaidenName != "Smith" {
+		t.Errorf("Expected maiden_name 'Smith', got '%s'", contact.MaidenName)
+	}
+	if contact.Prefix != "Mr." {
+		t.Errorf("Expected prefix 'Mr.', got '%s'", contact.Prefix)
+	}
+	if contact.Suffix != "Jr." {
+		t.Errorf("Expected suffix 'Jr.', got '%s'", contact.Suffix)
+	}
+	if contact.GenderID == nil || *contact.GenderID != gender.ID {
+		t.Errorf("Expected gender_id %d, got %v", gender.ID, contact.GenderID)
+	}
+	if contact.PronounID == nil || *contact.PronounID != pronoun.ID {
+		t.Errorf("Expected pronoun_id %d, got %v", pronoun.ID, contact.PronounID)
+	}
+	if contact.TemplateID == nil || *contact.TemplateID != tmpl.ID {
+		t.Errorf("Expected template_id %d, got %v", tmpl.ID, contact.TemplateID)
+	}
+	if !contact.Listed {
+		t.Error("Expected listed to be true by default")
+	}
+	if contact.IsArchived {
+		t.Error("Expected is_archived to be false by default")
+	}
+}
+
+func TestCreateContact_WithListedFalse(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "Unlisted",
+		Listed:    ptrBool(false),
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	if contact.Listed {
+		t.Error("Expected listed to be false")
+	}
+	if !contact.IsArchived {
+		t.Error("Expected is_archived to be true when listed is false")
+	}
+}
+
+func TestUpdateContact_WithAllFields(t *testing.T) {
+	svc, vaultID, userID, accountID := setupContactTest(t)
+
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "Original",
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	db := svc.db
+	gender := models.Gender{AccountID: accountID, Name: strPtrOrNil("NonBinary")}
+	db.Create(&gender)
+	pronoun := models.Pronoun{AccountID: accountID, Name: strPtrOrNil("ze/zir")}
+	db.Create(&pronoun)
+
+	var tmpl models.Template
+	db.Where("account_id = ?", accountID).First(&tmpl)
+
+	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:  "Updated",
+		LastName:   "NewLast",
+		MiddleName: "NewMiddle",
+		Nickname:   "NewNick",
+		MaidenName: "NewMaiden",
+		Prefix:     "Dr.",
+		Suffix:     "III",
+		GenderID:   ptrUint(gender.ID),
+		PronounID:  ptrUint(pronoun.ID),
+		TemplateID: ptrUint(tmpl.ID),
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact failed: %v", err)
+	}
+	if updated.FirstName != "Updated" {
+		t.Errorf("Expected first_name 'Updated', got '%s'", updated.FirstName)
+	}
+	if updated.LastName != "NewLast" {
+		t.Errorf("Expected last_name 'NewLast', got '%s'", updated.LastName)
+	}
+	if updated.MiddleName != "NewMiddle" {
+		t.Errorf("Expected middle_name 'NewMiddle', got '%s'", updated.MiddleName)
+	}
+	if updated.Nickname != "NewNick" {
+		t.Errorf("Expected nickname 'NewNick', got '%s'", updated.Nickname)
+	}
+	if updated.MaidenName != "NewMaiden" {
+		t.Errorf("Expected maiden_name 'NewMaiden', got '%s'", updated.MaidenName)
+	}
+	if updated.Prefix != "Dr." {
+		t.Errorf("Expected prefix 'Dr.', got '%s'", updated.Prefix)
+	}
+	if updated.Suffix != "III" {
+		t.Errorf("Expected suffix 'III', got '%s'", updated.Suffix)
+	}
+	if updated.GenderID == nil || *updated.GenderID != gender.ID {
+		t.Errorf("Expected gender_id %d, got %v", gender.ID, updated.GenderID)
+	}
+	if updated.PronounID == nil || *updated.PronounID != pronoun.ID {
+		t.Errorf("Expected pronoun_id %d, got %v", pronoun.ID, updated.PronounID)
+	}
+	if updated.TemplateID == nil || *updated.TemplateID != tmpl.ID {
+		t.Errorf("Expected template_id %d, got %v", tmpl.ID, updated.TemplateID)
 	}
 }
 

@@ -53,6 +53,7 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 		AuthorID:  strPtrOrNil(authorID),
 		Title:     strPtrOrNil(req.Title),
 		Body:      req.Body,
+		EmotionID: req.EmotionID,
 	}
 	if err := s.db.Create(&note).Error; err != nil {
 		return nil, err
@@ -84,6 +85,7 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 	}
 	note.Title = strPtrOrNil(req.Title)
 	note.Body = req.Body
+	note.EmotionID = req.EmotionID
 	if err := s.db.Save(&note).Error; err != nil {
 		return nil, err
 	}
@@ -133,6 +135,7 @@ func toNoteResponse(n *models.Note) dto.NoteResponse {
 		AuthorID:  ptrToStr(n.AuthorID),
 		Title:     ptrToStr(n.Title),
 		Body:      n.Body,
+		EmotionID: n.EmotionID,
 		CreatedAt: n.CreatedAt,
 		UpdatedAt: n.UpdatedAt,
 	}

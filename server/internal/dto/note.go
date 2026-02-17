@@ -3,13 +3,15 @@ package dto
 import "time"
 
 type CreateNoteRequest struct {
-	Title string `json:"title" example:"Meeting Notes"`
-	Body  string `json:"body" validate:"required" example:"Discussed project timeline and deliverables"`
+	Title     string `json:"title" example:"Meeting Notes"`
+	Body      string `json:"body" validate:"required" example:"Discussed project timeline and deliverables"`
+	EmotionID *uint  `json:"emotion_id" example:"1"`
 }
 
 type UpdateNoteRequest struct {
-	Title string `json:"title" example:"Meeting Notes"`
-	Body  string `json:"body" validate:"required" example:"Discussed project timeline and deliverables"`
+	Title     string `json:"title" example:"Meeting Notes"`
+	Body      string `json:"body" validate:"required" example:"Discussed project timeline and deliverables"`
+	EmotionID *uint  `json:"emotion_id" example:"1"`
 }
 
 type NoteResponse struct {
@@ -19,6 +21,7 @@ type NoteResponse struct {
 	AuthorID  string    `json:"author_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Title     string    `json:"title" example:"Meeting Notes"`
 	Body      string    `json:"body" example:"Discussed project timeline and deliverables"`
+	EmotionID *uint     `json:"emotion_id" example:"1"`
 	CreatedAt time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }

@@ -10,6 +10,7 @@ type CreateCallRequest struct {
 	Duration     *int      `json:"duration" example:"30"`
 	Answered     *bool     `json:"answered" example:"true"`
 	CallReasonID *uint     `json:"call_reason_id" example:"1"`
+	EmotionID    *uint     `json:"emotion_id" example:"1"`
 }
 
 type UpdateCallRequest struct {
@@ -20,6 +21,7 @@ type UpdateCallRequest struct {
 	Duration     *int      `json:"duration" example:"30"`
 	Answered     *bool     `json:"answered" example:"true"`
 	CallReasonID *uint     `json:"call_reason_id" example:"1"`
+	EmotionID    *uint     `json:"emotion_id" example:"1"`
 }
 
 type CallResponse struct {
@@ -28,6 +30,7 @@ type CallResponse struct {
 	AuthorID     string    `json:"author_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	AuthorName   string    `json:"author_name" example:"John Doe"`
 	CallReasonID *uint     `json:"call_reason_id" example:"1"`
+	EmotionID    *uint     `json:"emotion_id" example:"1"`
 	CalledAt     time.Time `json:"called_at" example:"2026-01-15T10:30:00Z"`
 	Duration     *int      `json:"duration" example:"30"`
 	Type         string    `json:"type" example:"phone"`

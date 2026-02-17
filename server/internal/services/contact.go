@@ -98,7 +98,14 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		VaultID:       vaultID,
 		FirstName:     &req.FirstName,
 		LastName:      strPtrOrNil(req.LastName),
+		MiddleName:    strPtrOrNil(req.MiddleName),
 		Nickname:      strPtrOrNil(req.Nickname),
+		MaidenName:    strPtrOrNil(req.MaidenName),
+		Prefix:        strPtrOrNil(req.Prefix),
+		Suffix:        strPtrOrNil(req.Suffix),
+		GenderID:      req.GenderID,
+		PronounID:     req.PronounID,
+		TemplateID:    req.TemplateID,
 		LastUpdatedAt: &now,
 	}
 
@@ -115,6 +122,13 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle GORM SQLite zero-value bool quirk: Listed defaults to true via gorm tag,
+	// so we must explicitly update to false after Create if requested.
+	if req.Listed != nil && !*req.Listed {
+		s.db.Model(&contact).Update("listed", false)
+		contact.Listed = false
 	}
 
 	if s.feedRecorder != nil {
@@ -162,7 +176,14 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 	now := time.Now()
 	contact.FirstName = &req.FirstName
 	contact.LastName = strPtrOrNil(req.LastName)
+	contact.MiddleName = strPtrOrNil(req.MiddleName)
 	contact.Nickname = strPtrOrNil(req.Nickname)
+	contact.MaidenName = strPtrOrNil(req.MaidenName)
+	contact.Prefix = strPtrOrNil(req.Prefix)
+	contact.Suffix = strPtrOrNil(req.Suffix)
+	contact.GenderID = req.GenderID
+	contact.PronounID = req.PronounID
+	contact.TemplateID = req.TemplateID
 	contact.LastUpdatedAt = &now
 
 	if err := s.db.Save(&contact).Error; err != nil {
@@ -377,14 +398,27 @@ func strPtrOrNil(s string) *string {
 
 func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
 	return dto.ContactResponse{
-		ID:         c.ID,
-		VaultID:    c.VaultID,
-		FirstName:  ptrToStr(c.FirstName),
-		LastName:   ptrToStr(c.LastName),
-		Nickname:   ptrToStr(c.Nickname),
-		IsArchived: !c.Listed,
-		IsFavorite: isFavorite,
-		CreatedAt:  c.CreatedAt,
-		UpdatedAt:  c.UpdatedAt,
+		ID:             c.ID,
+		VaultID:        c.VaultID,
+		FirstName:      ptrToStr(c.FirstName),
+		LastName:       ptrToStr(c.LastName),
+		MiddleName:     ptrToStr(c.MiddleName),
+		Nickname:       ptrToStr(c.Nickname),
+		MaidenName:     ptrToStr(c.MaidenName),
+		Prefix:         ptrToStr(c.Prefix),
+		Suffix:         ptrToStr(c.Suffix),
+		GenderID:       c.GenderID,
+		PronounID:      c.PronounID,
+		TemplateID:     c.TemplateID,
+		CompanyID:      c.CompanyID,
+		ReligionID:     c.ReligionID,
+		FileID:         c.FileID,
+		JobPosition:    ptrToStr(c.JobPosition),
+		Listed:         c.Listed,
+		ShowQuickFacts: c.ShowQuickFacts,
+		IsArchived:     !c.Listed,
+		IsFavorite:     isFavorite,
+		CreatedAt:      c.CreatedAt,
+		UpdatedAt:      c.UpdatedAt,
 	}
 }

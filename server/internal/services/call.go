@@ -83,6 +83,7 @@ func (s *CallService) Create(contactID, vaultID, authorID string, req dto.Create
 		Duration:     req.Duration,
 		Answered:     answered,
 		CallReasonID: req.CallReasonID,
+		EmotionID:    req.EmotionID,
 	}
 	if err := s.db.Create(&call).Error; err != nil {
 		return nil, err
@@ -114,6 +115,7 @@ func (s *CallService) Update(id uint, contactID, vaultID string, req dto.UpdateC
 	call.Description = strPtrOrNil(req.Description)
 	call.Duration = req.Duration
 	call.CallReasonID = req.CallReasonID
+	call.EmotionID = req.EmotionID
 	if req.Answered != nil {
 		call.Answered = *req.Answered
 	}
@@ -145,6 +147,7 @@ func toCallResponse(c *models.Call) dto.CallResponse {
 		AuthorID:     ptrToStr(c.AuthorID),
 		AuthorName:   c.AuthorName,
 		CallReasonID: c.CallReasonID,
+		EmotionID:    c.EmotionID,
 		CalledAt:     c.CalledAt,
 		Duration:     c.Duration,
 		Type:         c.Type,

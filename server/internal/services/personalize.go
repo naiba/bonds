@@ -41,6 +41,7 @@ var entityConfigs = map[string]entityConfig{
 	"templates":          {table: "templates", hasName: true},
 	"modules":            {table: "modules", hasName: true},
 	"currencies":         {table: "currencies"},
+	"emotions":           {table: "emotions"},
 }
 
 func (s *PersonalizeService) List(accountID, entity string) ([]dto.PersonalizeEntityResponse, error) {
@@ -60,6 +61,13 @@ func (s *PersonalizeService) List(accountID, entity string) ([]dto.PersonalizeEn
 	if entity == "currencies" {
 		query = fmt.Sprintf(
 			"SELECT c.id, c.code as label, c.code as name, c.created_at, c.updated_at FROM %s c JOIN account_currency ac ON ac.currency_id = c.id WHERE ac.account_id = ? ORDER BY c.code ASC",
+			cfg.table,
+		)
+	}
+
+	if entity == "emotions" {
+		query = fmt.Sprintf(
+			"SELECT id, COALESCE(name, '') as label, type as name, created_at, updated_at FROM %s WHERE account_id = ? ORDER BY id ASC",
 			cfg.table,
 		)
 	}

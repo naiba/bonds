@@ -220,11 +220,14 @@ func TestTemplatePageModuleAdd(t *testing.T) {
 		t.Fatalf("Create module failed: %v", err)
 	}
 
-	pages, err := svc.List(templateID, accountID)
+	// Create a fresh page to avoid seed module interference
+	freshPage, err := svc.Create(templateID, accountID, dto.CreateTemplatePageRequest{
+		Name: "Module Test Page",
+	})
 	if err != nil {
-		t.Fatalf("List failed: %v", err)
+		t.Fatalf("Create page failed: %v", err)
 	}
-	pageID := pages[0].ID
+	pageID := freshPage.ID
 
 	if err := svc.AddModule(pageID, accountID, dto.AddModuleToPageRequest{
 		ModuleID: mod.ID, Position: 1,
@@ -257,11 +260,13 @@ func TestTemplatePageModuleRemove(t *testing.T) {
 		t.Fatalf("Create module failed: %v", err)
 	}
 
-	pages, err := svc.List(templateID, accountID)
+	freshPage, err := svc.Create(templateID, accountID, dto.CreateTemplatePageRequest{
+		Name: "Remove Test Page",
+	})
 	if err != nil {
-		t.Fatalf("List failed: %v", err)
+		t.Fatalf("Create page failed: %v", err)
 	}
-	pageID := pages[0].ID
+	pageID := freshPage.ID
 
 	if err := svc.AddModule(pageID, accountID, dto.AddModuleToPageRequest{
 		ModuleID: mod.ID, Position: 1,
@@ -292,11 +297,13 @@ func TestTemplatePageModuleUpdatePosition(t *testing.T) {
 		t.Fatalf("Create module failed: %v", err)
 	}
 
-	pages, err := svc.List(templateID, accountID)
+	freshPage, err := svc.Create(templateID, accountID, dto.CreateTemplatePageRequest{
+		Name: "Position Test Page",
+	})
 	if err != nil {
-		t.Fatalf("List failed: %v", err)
+		t.Fatalf("Create page failed: %v", err)
 	}
-	pageID := pages[0].ID
+	pageID := freshPage.ID
 
 	if err := svc.AddModule(pageID, accountID, dto.AddModuleToPageRequest{
 		ModuleID: mod.ID, Position: 1,

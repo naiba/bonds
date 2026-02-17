@@ -66,12 +66,15 @@ func (s *PostService) Get(id uint, journalID uint) (*dto.PostResponse, error) {
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", id, journalID).Preload("PostSections", func(db *gorm.DB) *gorm.DB {
 		return db.Order("position ASC")
-	}).First(&post).Error; err != nil {
+	}).Preload("Contacts").First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
 		}
 		return nil, err
 	}
+	s.db.Model(&post).Update("view_count", post.ViewCount+1)
+	post.ViewCount++
+
 	resp := toPostResponseWithSections(&post)
 	return &resp, nil
 }
@@ -106,6 +109,20 @@ func (s *PostService) Update(id uint, journalID uint, req dto.UpdatePostRequest)
 					Content:  strPtrOrNil(sec.Content),
 				}
 				if err := tx.Create(&section).Error; err != nil {
+					return err
+				}
+			}
+		}
+		if req.ContactIDs != nil {
+			if err := tx.Where("post_id = ?", id).Delete(&models.ContactPost{}).Error; err != nil {
+				return err
+			}
+			for _, contactID := range req.ContactIDs {
+				cp := models.ContactPost{
+					PostID:    post.ID,
+					ContactID: contactID,
+				}
+				if err := tx.Create(&cp).Error; err != nil {
 					return err
 				}
 			}
@@ -159,5 +176,14 @@ func toPostResponseWithSections(p *models.Post) dto.PostResponse {
 		}
 	}
 	resp.Sections = sections
+	contacts := make([]dto.PostContactResponse, len(p.Contacts))
+	for i, c := range p.Contacts {
+		contacts[i] = dto.PostContactResponse{
+			ID:        c.ID,
+			FirstName: ptrToStr(c.FirstName),
+			LastName:  ptrToStr(c.LastName),
+		}
+	}
+	resp.Contacts = contacts
 	return resp
 }

@@ -25,6 +25,7 @@ func SeedAccountDefaults(tx *gorm.DB, accountID, userID, userEmail string) error
 		seedGiftStates,
 		seedPostTemplates,
 		seedDefaultTemplate,
+		seedDefaultModules,
 		seedAccountCurrencies,
 	}
 	for _, fn := range seeders {
@@ -363,6 +364,106 @@ func seedDefaultTemplate(tx *gorm.DB, accountID string) error {
 			}
 		}
 	}
+	return nil
+}
+
+func seedDefaultModules(tx *gorm.DB, accountID string) error {
+	var tmpl Template
+	if err := tx.Where("account_id = ? AND can_be_deleted = ?", accountID, false).First(&tmpl).Error; err != nil {
+		return err
+	}
+
+	var pages []TemplatePage
+	if err := tx.Where("template_id = ?", tmpl.ID).Order("position ASC").Find(&pages).Error; err != nil {
+		return err
+	}
+
+	pageBySlug := make(map[string]TemplatePage)
+	for _, p := range pages {
+		pageBySlug[p.Slug] = p
+	}
+
+	type moduleDef struct {
+		name                         string
+		typ                          string
+		reservedToContactInformation bool
+	}
+
+	pageModules := map[string][]moduleDef{
+		"contact": {
+			{"Avatar", "avatar", true},
+			{"Contact name", "contact_names", true},
+			{"Family summary", "family_summary", true},
+			{"Important dates", "important_dates", true},
+			{"Gender and pronoun", "gender_pronoun", true},
+			{"Labels", "labels", true},
+			{"Job information", "company", true},
+			{"Religions", "religions", true},
+		},
+		"feed": {
+			{"Contact feed", "feed", false},
+		},
+		"social": {
+			{"Relationships", "relationships", false},
+			{"Pets", "pets", false},
+			{"Groups", "groups", false},
+			{"Addresses", "addresses", false},
+			{"Contact information", "contact_information", false},
+		},
+		"life-goals": {
+			{"Life events", "life_events", false},
+			{"Goals", "goals", false},
+		},
+		"information": {
+			{"Documents", "documents", false},
+			{"Photos", "photos", false},
+			{"Notes", "notes", false},
+			{"Reminders", "reminders", false},
+			{"Loans", "loans", false},
+			{"Tasks", "tasks", false},
+			{"Calls", "calls", false},
+			{"Posts", "posts", false},
+		},
+	}
+
+	var undeletableModuleIDs []uint
+
+	for _, slug := range []string{"contact", "feed", "social", "life-goals", "information"} {
+		page, ok := pageBySlug[slug]
+		if !ok {
+			continue
+		}
+		defs := pageModules[slug]
+		for i, def := range defs {
+			mod := Module{
+				AccountID:                    accountID,
+				Name:                         strPtr(def.name),
+				Type:                         strPtr(def.typ),
+				ReservedToContactInformation: def.reservedToContactInformation,
+			}
+			if err := tx.Create(&mod).Error; err != nil {
+				return err
+			}
+			undeletableModuleIDs = append(undeletableModuleIDs, mod.ID)
+
+			pos := i + 1
+			pivot := ModuleTemplatePage{
+				TemplatePageID: page.ID,
+				ModuleID:       mod.ID,
+				Position:       intPtr(pos),
+			}
+			if err := tx.Create(&pivot).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(undeletableModuleIDs) > 0 {
+		if err := tx.Model(&Module{}).Where("id IN ?", undeletableModuleIDs).Update("can_be_deleted", false).Error; err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

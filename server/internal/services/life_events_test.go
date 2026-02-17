@@ -233,6 +233,48 @@ func TestTimelineEventNotFound(t *testing.T) {
 	}
 }
 
+func TestAddLifeEventWithEmotion(t *testing.T) {
+	svc, contactID, vaultID := setupLifeEventTest(t)
+
+	te, err := svc.CreateTimelineEvent(contactID, vaultID, dto.CreateTimelineEventRequest{
+		StartedAt: time.Now(),
+		Label:     "Timeline",
+	})
+	if err != nil {
+		t.Fatalf("CreateTimelineEvent failed: %v", err)
+	}
+
+	var eid uint
+	svc.db.Raw("SELECT id FROM emotions LIMIT 1").Scan(&eid)
+	if eid == 0 {
+		t.Fatal("Expected at least one seeded emotion")
+	}
+
+	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: 1,
+		HappenedAt:      time.Now(),
+		Summary:         "With emotion",
+		EmotionID:       &eid,
+	})
+	if err != nil {
+		t.Fatalf("AddLifeEvent with emotion failed: %v", err)
+	}
+	if le.EmotionID == nil || *le.EmotionID != eid {
+		t.Errorf("Expected emotion_id %d, got %v", eid, le.EmotionID)
+	}
+
+	updated, err := svc.UpdateLifeEvent(te.ID, le.ID, vaultID, dto.UpdateLifeEventRequest{
+		Summary:   "Updated",
+		EmotionID: nil,
+	})
+	if err != nil {
+		t.Fatalf("UpdateLifeEvent emotion to nil failed: %v", err)
+	}
+	if updated.EmotionID != nil {
+		t.Errorf("Expected emotion_id nil after update, got %v", updated.EmotionID)
+	}
+}
+
 func TestToggleTimelineEvent(t *testing.T) {
 	svc, contactID, vaultID := setupLifeEventTest(t)
 
