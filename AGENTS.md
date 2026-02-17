@@ -90,7 +90,7 @@ web/                       # React 前端（Vite + TypeScript）
     components/             # 共享组件（Layout.tsx、SearchBar.tsx、CalendarDatePicker.tsx）
     locales/                # 前端 i18n：en.json、zh.json（react-i18next）
     pages/                  # 按领域组织的路由页面（含 TwoFactor/Invitations/AcceptInvite/OAuthCallback）
-    stores/                 # AuthProvider 上下文
+    stores/                 # AuthProvider 上下文 + ThemeProvider（dark/light/system）
     types/                  # TypeScript 类型声明（仅 lunar-javascript.d.ts），DTO 类型统一从 @/api 导入
     utils/                  # 工具函数（calendar.ts — 前端多历法抽象 + 注册表）
     test/                   # Vitest 单元测试 + setup.ts
@@ -153,8 +153,16 @@ docker-compose.yml         # 单容器部署
 - CallReasonType（2 类 7 条原因）、Religion（9）、GroupType（5 + roles）
 - Emotion（3）、GiftOccasion（5）、GiftState（5）、PostTemplate（2）
 - Template（1 默认模板 + 5 TemplatePage）
+- Module（24 个默认模块） + ModuleTemplatePage（模块绑定到模板页的 pivot）
 - UserNotificationChannel（用户 email 通知）
 - AccountCurrency（关联所有货币到账户）
+
+**默认模板页 → 模块映射**（`seedDefaultModules`）：
+- "Contact information" (slug: `contact`) → avatar, contact_names, family_summary, important_dates, gender_pronoun, labels, company, religions
+- "Feed" (slug: `feed`) → feed
+- "Social" (slug: `social`) → relationships, pets, groups, addresses, contact_information
+- "Life & goals" (slug: `life-goals`) → life_events, goals
+- "Information" (slug: `information`) → documents, photos, notes, reminders, loans, tasks, calls, posts
 
 **Vault 级种子**（`seed_vault.go`）— 创建 Vault 时在事务内调用 `SeedVaultDefaults(tx, vaultID)`：
 - ContactImportantDateType（2：Birthdate、Deceased date，不可删除）
@@ -212,15 +220,17 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 - 测试文件在 `src/test/` 下，命名为 `Xxx.test.tsx`。
 - 需要 auth 上下文的组件使用 `vi.mock("@/stores/auth", ...)` 模拟。
+- 使用 `useTheme()` 的组件（Login/Register/AcceptInvite 等 auth 页面）需要 `vi.mock("@/stores/theme", ...)` 模拟，返回 `{ themeMode: "system", resolvedTheme: "light", setThemeMode: vi.fn() }`。
 - 渲染包裹：`<ConfigProvider><AntApp><MemoryRouter>...</MemoryRouter></AntApp></ConfigProvider>`。
 - 使用 `@testing-library/react` + `@testing-library/user-event`。
 - Setup 文件：`src/test/setup.ts` — 为 Ant Design 填充 `matchMedia` polyfill。
 
 ### E2E（Playwright）
 
-- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`file-upload.spec.ts`。
+- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`file-upload.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`new-features.spec.ts`、`vault-features.spec.ts`、`vault-files.spec.ts`。
 - Playwright 自动启动 Go 服务器（端口 8080）和 Vite 开发服务器（端口 5173）。
 - Ant Design 表单：使用 `page.getByPlaceholder(...)` 而非 `getByLabel(...)`。
+- **E2E 前必须清理旧 DB**：如果本地有残留的 `server/bonds.db`，schema 不兼容会导致 migration 失败（`Cannot add a PRIMARY KEY column`）。运行前 `rm -f server/bonds.db*`。
 
 ### Cron 调度器
 
@@ -347,10 +357,10 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 | 维度 | 数量 |
 |------|------|
 | Go Model 文件 | 49 |
-| Go Handler 文件 | 39 |
-| Go Service 文件 | 44 |
-| Go DTO 文件 | 30 |
-| API 路由 | ~143 |
+| Go Handler 文件 | 67（含 swag 注解） |
+| Go Service 文件 | 89（非测试） |
+| Go DTO 文件 | 44（含 example 标签） |
+| API 路由（Swagger 统计） | 194 paths / 286 operations |
 | React 页面组件 | 43 |
 | 前端 API 客户端 | 23 |
 | i18n 翻译键 | ~576（en + zh 各一份） |
@@ -359,17 +369,17 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 | 层级 | 文件数 | 测试函数数 |
 |------|--------|-----------|
-| Go Service 测试 | 41 | ~254 |
-| Go Handler 集成测试 | 1 | 73 |
+| Go Service 测试 | 84 | ~425 |
+| Go Handler 集成测试 | 1 | 109 |
 | Go Cron 测试 | 1 | 7 |
 | Go DAV 测试 | 2 | 20 |
 | Go Search 测试 | 1 | 4 |
 | Go Avatar 测试 | 1 | 7 |
 | Go Calendar 测试 | 1 | 13 |
-| **Go 后端总计** | **48** | **~378** |
-| React Vitest | 22 | 78 |
-| Playwright E2E | 9 | 41 |
-| **全部总计** | **79** | **497+** |
+| **Go 后端总计** | **91** | **~585** |
+| React Vitest | 25 | 85 |
+| Playwright E2E | 13 | 64 |
+| **全部总计** | **129** | **734+** |
 
 ## 已知坑和注意事项
 
@@ -448,15 +458,17 @@ defer cleanup()
 - Ant Design 组件在 Playwright strict mode 下容易因多个元素匹配而失败（如 `.ant-card` 匹配多个卡片、`getByText` 在导航栏和内容区同时匹配）。解决：使用 `.first()`、`getByRole('table').getByText(...)` 等更精确的选择器。
 - 联系人创建后会自动跳转到详情页，测试中应先 `await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/)` 等待导航完成，再断言页面内容。
 - `calendar.spec.ts` 的 lunar reminder 测试存在 Ant Design 下拉遮挡问题（"四月" 选项遮挡 frequency 选择器），属于已知 flaky test。
+- **Contact Detail 动态 Tab 名称**：Tab 名来自后端 seed 数据的 `TemplatePage.Name`（"Contact information"、"Feed"、"Social"、"Life & goals"、"Information"），与前端 fallback tabs 的 i18n 翻译名不同。E2E 选择 tab 时必须用 seed 数据中的名称，且注意 "Contact information" 和 "Information" 两个 tab 共存，用 `{ name: 'Information', exact: true }` 精确匹配。
+- **Contact Detail 页面多个同名按钮**：动态 tabs 加载后，第一个 tab 默认展开所有模块，每个模块可能有 "Edit" 按钮。选择顶部操作栏的 Edit 按钮时用 `.first()`。
 
 ### 项目规模（供参考）
 
 | 维度 | 数量 |
 |------|------|
 | Go Model 文件 | 49 |
-| Go Handler 文件 | 64（含 swag 注解） |
-| Go Service 文件 | 44 |
-| Go DTO 文件 | 43（含 example 标签） |
+| Go Handler 文件 | 67（含 swag 注解） |
+| Go Service 文件 | 89（非测试） |
+| Go DTO 文件 | 44（含 example 标签） |
 | API 路由（Swagger 统计） | 194 paths / 286 operations |
 | React 页面组件 | 43 |
 | 前端 API 客户端 | 23 |
