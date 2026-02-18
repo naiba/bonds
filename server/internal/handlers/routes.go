@@ -605,10 +605,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	vaultSettings.PUT("/tags/:id", vaultSettingsHandler.UpdateTag)
 	vaultSettings.DELETE("/tags/:id", vaultSettingsHandler.DeleteTag)
 
-	vaultSettings.GET("/contactImportantDateTypes", vaultSettingsHandler.ListDateTypes)
-	vaultSettings.POST("/contactImportantDateTypes", vaultSettingsHandler.CreateDateType)
-	vaultSettings.PUT("/contactImportantDateTypes/:id", vaultSettingsHandler.UpdateDateType)
-	vaultSettings.DELETE("/contactImportantDateTypes/:id", vaultSettingsHandler.DeleteDateType)
+	vaultSettings.GET("/dateTypes", vaultSettingsHandler.ListDateTypes)
+	vaultSettings.POST("/dateTypes", vaultSettingsHandler.CreateDateType)
+	vaultSettings.PUT("/dateTypes/:id", vaultSettingsHandler.UpdateDateType)
+	vaultSettings.DELETE("/dateTypes/:id", vaultSettingsHandler.DeleteDateType)
 
 	vaultSettings.GET("/moodTrackingParameters", vaultSettingsHandler.ListMoodParams)
 	vaultSettings.POST("/moodTrackingParameters", vaultSettingsHandler.CreateMoodParam)

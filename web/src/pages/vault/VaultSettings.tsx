@@ -45,7 +45,7 @@ const { Option } = Select;
 
 export default function VaultSettings() {
   const { id } = useParams<{ id: string }>();
-  const vaultId = parseInt(id!, 10);
+  const vaultId = id!;
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -501,10 +501,10 @@ export default function VaultSettings() {
     positionEntityType,
   }: {
     queryKeySuffix: string;
-    apiList: (vid: number) => Promise<{ data?: T[] }>;
-    apiCreate: (vid: number, data: Record<string, unknown>) => Promise<unknown>;
-    apiUpdate: (vid: number, id: number, data: Record<string, unknown>) => Promise<unknown>;
-    apiDelete: (vid: number, id: number) => Promise<unknown>;
+    apiList: (vid: string) => Promise<{ data?: T[] }>;
+    apiCreate: (vid: string, data: Record<string, unknown>) => Promise<unknown>;
+    apiUpdate: (vid: string, id: number, data: Record<string, unknown>) => Promise<unknown>;
+    apiDelete: (vid: string, id: number) => Promise<unknown>;
     title: string;
     itemNameKey?: "label" | "name";
     extraFields?: ExtraField[];

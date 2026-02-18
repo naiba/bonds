@@ -226,7 +226,7 @@ export default function JournalDetail() {
     mutationFn: (values: { title: string; written_at: dayjs.Dayjs }) =>
       api.posts.journalsPostsCreate(String(vaultId), Number(jId), {
         title: values.title,
-        written_at: values.written_at.format("YYYY-MM-DD"),
+        written_at: values.written_at.toISOString(),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
