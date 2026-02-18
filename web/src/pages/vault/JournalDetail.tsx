@@ -382,7 +382,7 @@ export default function JournalDetail() {
                   slice.file_cover_image_id ? (
                     <img
                       alt={slice.name}
-                      src={`/api/vaults/${vaultId}/files/${slice.file_cover_image_id}/download`}
+                      src={`/api/vaults/${vaultId}/files/${slice.file_cover_image_id}/download?token=${localStorage.getItem("token")}`}
                       style={{ height: 120, objectFit: "cover" }}
                     />
                   ) : undefined
@@ -539,7 +539,7 @@ export default function JournalDetail() {
                     key={photo.id}
                     width={120}
                     height={120}
-                    src={`/api/vaults/${vaultId}/files/${photo.id}/download`}
+                    src={`/api/vaults/${vaultId}/files/${photo.id}/download?token=${localStorage.getItem("token")}`}
                     style={{ objectFit: "cover", borderRadius: token.borderRadius }}
                   />
                 ))}
@@ -632,7 +632,7 @@ export default function JournalDetail() {
                 >
                   <img
                     alt={file.name}
-                    src={`/api/vaults/${vaultId}/files/${file.id}/download`}
+                    src={`/api/vaults/${vaultId}/files/${file.id}/download?token=${localStorage.getItem("token")}`}
                     style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 4 }}
                   />
                   <Text

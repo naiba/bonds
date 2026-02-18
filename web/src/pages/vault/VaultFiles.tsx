@@ -158,7 +158,7 @@ export default function VaultFiles() {
             type="text"
             size="small"
             icon={<DownloadOutlined />}
-            href={`/api/vaults/${vaultId}/files/${record.id}/download`}
+            href={`/api/vaults/${vaultId}/files/${record.id}/download?token=${localStorage.getItem("token")}`}
             target="_blank"
           />
           <Popconfirm

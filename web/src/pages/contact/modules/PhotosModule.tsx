@@ -84,7 +84,7 @@ export default function PhotosModule({
                 <Image
                   width={120}
                   height={120}
-                  src={`/api/vaults/${vaultId}/files/${photo.id}/download`}
+                  src={`/api/vaults/${vaultId}/files/${photo.id}/download?token=${localStorage.getItem("token")}`}
                   style={{ objectFit: "cover", borderRadius: token.borderRadius }}
                 />
                 <Popconfirm

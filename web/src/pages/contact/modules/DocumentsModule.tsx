@@ -105,7 +105,7 @@ export default function DocumentsModule({
                 type="text"
                 size="small"
                 icon={<DownloadOutlined />}
-                href={`/api/vaults/${vaultId}/files/${doc.id}/download`}
+                href={`/api/vaults/${vaultId}/files/${doc.id}/download?token=${localStorage.getItem("token")}`}
                 target="_blank"
               />,
               <Popconfirm

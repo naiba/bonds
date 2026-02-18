@@ -27,14 +27,18 @@ func NewAuthMiddleware(secret string) *AuthMiddleware {
 
 func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		authHeader := c.Request().Header.Get("Authorization")
-		if authHeader == "" {
-			return response.Unauthorized(c, "err.missing_authorization_header")
-		}
+		var tokenString string
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
-			return response.Unauthorized(c, "err.invalid_authorization_format")
+		authHeader := c.Request().Header.Get("Authorization")
+		if authHeader != "" {
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenString == authHeader {
+				return response.Unauthorized(c, "err.invalid_authorization_format")
+			}
+		} else if qt := c.QueryParam("token"); qt != "" {
+			tokenString = qt
+		} else {
+			return response.Unauthorized(c, "err.missing_authorization_header")
 		}
 
 		claims := &JWTClaims{}
