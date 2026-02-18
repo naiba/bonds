@@ -695,7 +695,11 @@
       "save": "保存更改",
       "saved": "偏好设置已保存",
       "name_first_last": "名 姓",
-      "name_last_first": "姓 名"
+      "name_last_first": "姓 名",
+      "default_map_site": "默认地图服务",
+      "distance_format": "距离单位",
+      "number_format": "数字格式",
+      "help_shown": "显示帮助信息"
     },
     "notifications": {
       "title": "通知",
@@ -725,7 +729,11 @@
       "log_error": "错误",
       "no_logs": "暂无日志",
       "unverified": "未验证",
-      "verified": "已验证"
+      "verified": "已验证",
+      "verify_action": "验证",
+      "verify_modal_title": "验证通知渠道",
+      "verify_token_placeholder": "输入验证令牌",
+      "verify_success": "渠道验证成功"
     },
     "personalize": {
       "title": "个性化",

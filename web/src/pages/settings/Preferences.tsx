@@ -3,6 +3,7 @@ import {
   Typography,
   Form,
   Select,
+  Switch,
   Button,
   App,
   Spin,
@@ -46,6 +47,22 @@ const locales = [
   { value: "pt", label: "Português" },
   { value: "zh", label: "中文" },
   { value: "ja", label: "日本語" },
+];
+
+const mapSites = [
+  { value: "google_maps", label: "Google Maps" },
+  { value: "open_street_maps", label: "OpenStreetMap" },
+];
+
+const distanceFormats = [
+  { value: "km", label: "Kilometers (km)" },
+  { value: "mi", label: "Miles (mi)" },
+];
+
+const numberFormats = [
+  { value: "1,234.56", label: "1,234.56" },
+  { value: "1.234,56", label: "1.234,56" },
+  { value: "1 234,56", label: "1 234,56" },
 ];
 
 export default function Preferences() {
@@ -139,6 +156,37 @@ export default function Preferences() {
             label={<span style={labelStyle}>{t("settings.preferences.language")}</span>}
           >
             <Select options={locales} />
+          </Form.Item>
+
+          <Divider style={{ margin: "8px 0 24px" }} />
+
+          <Form.Item
+            name="default_map_site"
+            label={<span style={labelStyle}>{t("settings.preferences.default_map_site")}</span>}
+          >
+            <Select options={mapSites} />
+          </Form.Item>
+          <Form.Item
+            name="distance_format"
+            label={<span style={labelStyle}>{t("settings.preferences.distance_format")}</span>}
+          >
+            <Select options={distanceFormats} />
+          </Form.Item>
+          <Form.Item
+            name="number_format"
+            label={<span style={labelStyle}>{t("settings.preferences.number_format")}</span>}
+          >
+            <Select options={numberFormats} />
+          </Form.Item>
+
+          <Divider style={{ margin: "8px 0 24px" }} />
+
+          <Form.Item
+            name="help_shown"
+            label={<span style={labelStyle}>{t("settings.preferences.help_shown")}</span>}
+            valuePropName="checked"
+          >
+            <Switch />
           </Form.Item>
 
           <Divider style={{ margin: "8px 0 24px" }} />

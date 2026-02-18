@@ -695,7 +695,11 @@
       "save": "Save Changes",
       "saved": "Preferences saved",
       "name_first_last": "First name Last name",
-      "name_last_first": "Last name First name"
+      "name_last_first": "Last name First name",
+      "default_map_site": "Default map service",
+      "distance_format": "Distance unit",
+      "number_format": "Number format",
+      "help_shown": "Show help sections"
     },
     "notifications": {
       "title": "Notifications",
@@ -725,7 +729,11 @@
       "log_error": "Error",
       "no_logs": "No logs found",
       "unverified": "Unverified",
-      "verified": "Verified"
+      "verified": "Verified",
+      "verify_action": "Verify",
+      "verify_modal_title": "Verify Notification Channel",
+      "verify_token_placeholder": "Enter verification token",
+      "verify_success": "Channel verified successfully"
     },
     "personalize": {
       "title": "Personalize",

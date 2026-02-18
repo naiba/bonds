@@ -32,14 +32,25 @@ export default function TasksModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [showCompleted, setShowCompleted] = useState(false);
   const qk = ["vaults", vaultId, "contacts", contactId, "tasks"];
+  const qkCompleted = ["vaults", vaultId, "contacts", contactId, "tasks-completed"];
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: pending = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
       const res = await api.tasks.contactsTasksList(String(vaultId), String(contactId));
       return res.data ?? [];
     },
+  });
+
+  const { data: completed = [], isLoading: isLoadingCompleted } = useQuery({
+    queryKey: qkCompleted,
+    queryFn: async () => {
+      const res = await api.tasks.contactsTasksCompletedList(String(vaultId), String(contactId));
+      return res.data ?? [];
+    },
+    enabled: showCompleted,
   });
 
   const createMutation = useMutation({
@@ -51,6 +62,7 @@ export default function TasksModule({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: qkCompleted });
       setAdding(false);
       setEditingId(null);
       setLabel("");
@@ -62,7 +74,10 @@ export default function TasksModule({
   const toggleMutation = useMutation({
     mutationFn: (task: Task) =>
       api.tasks.contactsTasksToggleUpdate(String(vaultId), String(contactId), task.id!),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: qkCompleted });
+    },
     onError: (e: APIError) => message.error(e.message),
   });
 
@@ -70,13 +85,11 @@ export default function TasksModule({
     mutationFn: (taskId: number) => api.tasks.contactsTasksDelete(String(vaultId), String(contactId), taskId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: qkCompleted });
       message.success(t("modules.tasks.deleted"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
-
-  const pending = tasks.filter((t: Task) => !t.completed);
-  const completed = tasks.filter((t: Task) => t.completed);
 
   function renderItem(task: Task) {
     if (editingId === task.id) {
@@ -203,13 +216,25 @@ export default function TasksModule({
         renderItem={renderItem}
       />
 
-      {completed.length > 0 && (
-        <>
-          <Divider orientationMargin={0} plain style={{ fontSize: 12, color: token.colorTextQuaternary }}>
-            {t("modules.tasks.completed", { count: completed.length })}
-          </Divider>
-          <List dataSource={completed} split={false} renderItem={renderItem} />
-        </>
+      <Divider orientationMargin={0} plain style={{ fontSize: 12, color: token.colorTextQuaternary }}>
+        <Button
+          type="text"
+          size="small"
+          onClick={() => setShowCompleted(!showCompleted)}
+          style={{ fontSize: 12, color: token.colorTextQuaternary }}
+        >
+          {showCompleted ? t("modules.tasks.hide_completed") : t("modules.tasks.show_completed")}
+        </Button>
+      </Divider>
+
+      {showCompleted && (
+        <List
+          loading={isLoadingCompleted}
+          dataSource={completed}
+          split={false}
+          renderItem={renderItem}
+          locale={{ emptyText: <Empty description={t("modules.tasks.completed", { count: 0 })} /> }}
+        />
       )}
     </Card>
   );

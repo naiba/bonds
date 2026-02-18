@@ -27,6 +27,7 @@ import {
   HistoryOutlined,
   ThunderboltOutlined,
   CheckCircleOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -52,6 +53,8 @@ const channelIconMap: Record<
 export default function Notifications() {
   const [open, setOpen] = useState(false);
   const [logsChannelId, setLogsChannelId] = useState<number | null>(null);
+  const [verifyingChannelId, setVerifyingChannelId] = useState<number | null>(null);
+  const [verifyToken, setVerifyToken] = useState("");
   const [form] = Form.useForm();
   const selectedType = Form.useWatch("type", form) as string | undefined;
   const queryClient = useQueryClient();
@@ -99,6 +102,18 @@ export default function Notifications() {
   const testMutation = useMutation({
     mutationFn: (id: number) => api.notifications.notificationsTestCreate(id),
     onSuccess: () => message.success(t("settings.notifications.test_success")),
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: ({ id, token }: { id: number; token: string }) =>
+      api.notifications.notificationsVerifyDetail(id, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      setVerifyingChannelId(null);
+      setVerifyToken("");
+      message.success(t("settings.notifications.verify_success"));
+    },
     onError: (e: APIError) => message.error(e.message),
   });
 
@@ -171,6 +186,21 @@ export default function Notifications() {
                     checked={ch.active}
                     onChange={() => toggleMutation.mutate(ch)}
                   />,
+                  ...(!ch.verified_at
+                    ? [
+                        <Button
+                          key="verify"
+                          type="text"
+                          size="small"
+                          icon={<SafetyCertificateOutlined />}
+                          onClick={() => {
+                            setVerifyingChannelId(ch.id!);
+                            setVerifyToken("");
+                          }}
+                          title={t("settings.notifications.verify_action")}
+                        />,
+                      ]
+                    : []),
                   <Button
                     key="test"
                     type="text"
@@ -289,6 +319,34 @@ export default function Notifications() {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title={t("settings.notifications.verify_modal_title")}
+        open={verifyingChannelId !== null}
+        onCancel={() => {
+          setVerifyingChannelId(null);
+          setVerifyToken("");
+        }}
+        onOk={() => {
+          if (verifyToken.trim() && verifyingChannelId) {
+            verifyMutation.mutate({ id: verifyingChannelId, token: verifyToken.trim() });
+          }
+        }}
+        confirmLoading={verifyMutation.isPending}
+        okButtonProps={{ disabled: !verifyToken.trim() }}
+      >
+        <Input
+          placeholder={t("settings.notifications.verify_token_placeholder")}
+          value={verifyToken}
+          onChange={(e) => setVerifyToken(e.target.value)}
+          onPressEnter={() => {
+            if (verifyToken.trim() && verifyingChannelId) {
+              verifyMutation.mutate({ id: verifyingChannelId, token: verifyToken.trim() });
+            }
+          }}
+          autoFocus
+        />
       </Modal>
 
       <Drawer
