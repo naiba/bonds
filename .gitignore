@@ -1,11 +1,11 @@
 .DS_Store
 server/bin/
 server/server
-server/bonds.db
-server/bonds.db-wal
-server/bonds.db-shm
-server/data/
-server/uploads/
+bonds.db
+bonds.db-wal
+bonds.db-shm
+data/
+uploads/
 server/internal/frontend/dist/*
 !server/internal/frontend/dist/.gitkeep
 .env
