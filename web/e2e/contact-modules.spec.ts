@@ -223,3 +223,135 @@ test.describe('Contact Modules - Pets', () => {
     await expect(petsCard.getByText('Buddy')).toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Contact Modules - Calls', () => {
+  test('should log a call', async ({ page }) => {
+    await setupVault(page, 'call-create');
+    await goToContacts(page);
+    await createContact(page, 'CallTest', 'User');
+
+    await navigateToTab(page, 'Information', true);
+
+    const callsCard = page.locator('.ant-card').filter({ hasText: /^Calls/ });
+    await expect(callsCard).toBeVisible({ timeout: 10000 });
+    await callsCard.getByRole('button', { name: /log call/i }).click();
+
+    const modal = page.locator('.ant-modal').filter({ hasText: /log a call/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    await modal.locator('.ant-picker').click();
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell-today .ant-picker-cell-inner');
+    await dateCell.click();
+    const timeOk = page.locator('.ant-picker-dropdown:visible .ant-picker-ok button');
+    if (await timeOk.isVisible().catch(() => false)) {
+      await timeOk.click();
+    }
+
+    await modal.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /outgoing/i }).click();
+
+    await modal.locator('.ant-input-number-input').fill('15');
+
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/calls') && resp.request().method() === 'POST'
+    );
+    await page.locator('.ant-modal-footer .ant-btn-primary').click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(callsCard.getByText('outgoing')).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Loans', () => {
+  test('should create a loan and toggle settled', async ({ page }) => {
+    await setupVault(page, 'loan-create');
+    await goToContacts(page);
+    await createContact(page, 'LoanTest', 'User');
+
+    await navigateToTab(page, 'Information', true);
+
+    const loansCard = page.locator('.ant-card').filter({ hasText: /^Loans/ });
+    await expect(loansCard).toBeVisible({ timeout: 10000 });
+    await loansCard.getByRole('button', { name: /add/i }).click();
+
+    const modal = page.locator('.ant-modal').filter({ hasText: /add loan/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    await modal.locator('.ant-form-item').filter({ hasText: /name/i }).first().locator('input').fill('Dinner money');
+
+    await modal.locator('.ant-input-number-input').fill('50');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/loans') && resp.request().method() === 'POST'
+    );
+    await page.locator('.ant-modal-footer .ant-btn-primary').click();
+    const resp = await createResp;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(loansCard.getByText('Dinner money')).toBeVisible({ timeout: 10000 });
+
+    const toggleResp = page.waitForResponse(
+      (resp) => resp.url().includes('/toggle') && resp.request().method() === 'PUT'
+    );
+    await loansCard.getByRole('button', { name: /settle/i }).click();
+    const toggleResult = await toggleResp;
+    expect(toggleResult.status()).toBeLessThan(400);
+
+    await expect(loansCard.getByText('Settled', { exact: true })).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Goals', () => {
+  test('should create a goal', async ({ page }) => {
+    await setupVault(page, 'goal-create');
+    await goToContacts(page);
+    await createContact(page, 'GoalTest', 'User');
+
+    await navigateToTab(page, 'Life & goals');
+
+    const goalsCard = page.locator('.ant-card').filter({ hasText: /^Goals/ });
+    await expect(goalsCard).toBeVisible({ timeout: 10000 });
+    await goalsCard.getByRole('button', { name: /add/i }).click();
+
+    const input = goalsCard.getByPlaceholder(/goal name/i);
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill('Learn Spanish');
+
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/goals') && resp.request().method() === 'POST'
+    );
+    await goalsCard.getByRole('button', { name: /^add$/i }).click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(goalsCard.getByText('Learn Spanish')).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Contact Information', () => {
+  test('should create a contact info entry', async ({ page }) => {
+    await setupVault(page, 'cinfo-create');
+    await goToContacts(page);
+    await createContact(page, 'CInfoTest', 'User');
+
+    await navigateToTab(page, 'Social');
+
+    const infoCard = page.locator('.ant-card').filter({ hasText: 'Contact Information' });
+    await expect(infoCard).toBeVisible({ timeout: 10000 });
+    await infoCard.getByRole('button', { name: /add/i }).click();
+
+    const valueInput = infoCard.getByPlaceholder(/value/i);
+    await expect(valueInput).toBeVisible({ timeout: 5000 });
+    await valueInput.fill('test@example.com');
+
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/contactInformation') && resp.request().method() === 'POST'
+    );
+    await infoCard.getByRole('button', { name: /save/i }).click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(infoCard.getByText('test@example.com')).toBeVisible({ timeout: 10000 });
+  });
+});
