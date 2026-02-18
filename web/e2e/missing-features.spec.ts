@@ -92,7 +92,7 @@ test.describe('Tasks - Completed Tasks Toggle', () => {
 
     await tasksCard.getByText(/show completed/i).click();
     await expect(tasksCard.getByText(/hide completed/i)).toBeVisible({ timeout: 10000 });
-    await expect(tasksCard.getByText('Complete me')).toBeVisible({ timeout: 10000 });
+    await expect(tasksCard.getByText('Complete me').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
