@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Card,
   Button,
@@ -26,7 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { TimelineEvent as TEvent, APIError } from "@/api";
+import type { TimelineEvent as TEvent, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -43,6 +43,9 @@ export default function LifeEventsModule({
   const [leOpen, setLeOpen] = useState(false);
   const [selectedTimeline, setSelectedTimeline] = useState<number | null>(null);
   const [editingLeId, setEditingLeId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [allTimelines, setAllTimelines] = useState<TEvent[]>([]);
+  const [hasMore, setHasMore] = useState(true);
   const [tlForm] = Form.useForm();
   const [leForm] = Form.useForm();
   const queryClient = useQueryClient();
@@ -51,11 +54,20 @@ export default function LifeEventsModule({
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "timelineEvents"];
 
-  const { data: timelines = [], isLoading } = useQuery({
-    queryKey: qk,
+  const resetPagination = useCallback(() => {
+    setPage(1);
+    setAllTimelines([]);
+  }, []);
+
+  const { isLoading, isFetching } = useQuery({
+    queryKey: [...qk, page],
     queryFn: async () => {
-      const res = await api.lifeEvents.contactsTimelineEventsList(String(vaultId), String(contactId));
-      return res.data ?? [];
+      const res = await api.lifeEvents.contactsTimelineEventsList(String(vaultId), String(contactId), { page, per_page: 15 });
+      const newItems = (res.data ?? []) as TEvent[];
+      const meta = res.meta as PaginationMeta | undefined;
+      setAllTimelines(prev => page === 1 ? newItems : [...prev, ...newItems]);
+      setHasMore(meta ? meta.page! < meta.total_pages! : newItems.length >= 15);
+      return newItems;
     },
   });
 
@@ -66,6 +78,7 @@ export default function LifeEventsModule({
         started_at: values.started_at.format("YYYY-MM-DD"),
       }),
     onSuccess: () => {
+      resetPagination();
       queryClient.invalidateQueries({ queryKey: qk });
       setTlOpen(false);
       tlForm.resetFields();
@@ -77,6 +90,7 @@ export default function LifeEventsModule({
   const deleteTimelineMutation = useMutation({
     mutationFn: (id: number) => api.lifeEvents.contactsTimelineEventsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
+      resetPagination();
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.life_events.timeline_deleted"));
     },
@@ -98,6 +112,7 @@ export default function LifeEventsModule({
       return api.lifeEvents.contactsTimelineEventsLifeEventsCreate(String(vaultId), String(contactId), selectedTimeline, data);
     },
     onSuccess: () => {
+      resetPagination();
       queryClient.invalidateQueries({ queryKey: qk });
       setLeOpen(false);
       setEditingLeId(null);
@@ -111,6 +126,7 @@ export default function LifeEventsModule({
     mutationFn: ({ timelineId, lifeEventId }: { timelineId: number; lifeEventId: number }) =>
       api.lifeEvents.contactsTimelineEventsLifeEventsDelete(String(vaultId), String(contactId), timelineId, lifeEventId),
     onSuccess: () => {
+      resetPagination();
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.life_events.event_deleted"));
     },
@@ -137,9 +153,9 @@ export default function LifeEventsModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
-  if (isLoading) return <Card loading />;
+  if (isLoading && page === 1) return <Card loading />;
 
-  const collapseItems = timelines.map((tl: TEvent) => ({
+  const collapseItems = allTimelines.map((tl: TEvent) => ({
     key: tl.id,
     label: (
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -270,10 +286,19 @@ export default function LifeEventsModule({
         </Button>
       }
     >
-      {timelines.length === 0 ? (
+      {allTimelines.length === 0 ? (
         <Empty description={t("modules.life_events.no_timelines")} />
       ) : (
-        <Collapse items={collapseItems} />
+        <>
+          <Collapse items={collapseItems} />
+          {hasMore && allTimelines.length > 0 && (
+            <div style={{ textAlign: "center", marginTop: 12 }}>
+              <Button onClick={() => setPage(p => p + 1)} loading={isFetching}>
+                {t("common.load_more")}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       <Modal

@@ -31,7 +31,8 @@
     "deleted": "已删除",
     "error": "错误",
     "saved": "已保存",
-    "updated": "已更新"
+    "updated": "已更新",
+    "load_more": "加载更多"
   },
   "nav": {
     "vaults": "保险库",

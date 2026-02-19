@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Card,
   List,
@@ -23,7 +23,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Call, APIError } from "@/api";
+import type { Call, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -42,6 +42,9 @@ export default function CallsModule({
 }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [allCalls, setAllCalls] = useState<Call[]>([]);
+  const [hasMore, setHasMore] = useState(true);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -49,17 +52,26 @@ export default function CallsModule({
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "calls"];
 
+  const resetPagination = useCallback(() => {
+    setPage(1);
+    setAllCalls([]);
+  }, []);
+
   const callTypes = [
     { value: "incoming", label: t("modules.calls.type_incoming") },
     { value: "outgoing", label: t("modules.calls.type_outgoing") },
     { value: "missed", label: t("modules.calls.type_missed") },
   ];
 
-  const { data: calls = [], isLoading } = useQuery({
-    queryKey: qk,
+  const { isLoading, isFetching } = useQuery({
+    queryKey: [...qk, page],
     queryFn: async () => {
-      const res = await api.calls.contactsCallsList(String(vaultId), String(contactId));
-      return res.data ?? [];
+      const res = await api.calls.contactsCallsList(String(vaultId), String(contactId), { page, per_page: 15 });
+      const newItems = (res.data ?? []) as Call[];
+      const meta = res.meta as PaginationMeta | undefined;
+      setAllCalls(prev => page === 1 ? newItems : [...prev, ...newItems]);
+      setHasMore(meta ? meta.page! < meta.total_pages! : newItems.length >= 15);
+      return newItems;
     },
   });
 
@@ -84,6 +96,7 @@ export default function CallsModule({
       return api.calls.contactsCallsCreate(String(vaultId), String(contactId), data);
     },
     onSuccess: () => {
+      resetPagination();
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
       setEditingId(null);
@@ -96,6 +109,7 @@ export default function CallsModule({
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.calls.contactsCallsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
+      resetPagination();
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.calls.deleted"));
     },
@@ -125,8 +139,8 @@ export default function CallsModule({
       }
     >
       <List
-        loading={isLoading}
-        dataSource={calls}
+        loading={isLoading && page === 1}
+        dataSource={allCalls}
         locale={{ emptyText: <Empty description={t("modules.calls.no_calls")} /> }}
         split={false}
         renderItem={(c: Call) => (
@@ -177,6 +191,13 @@ export default function CallsModule({
           </List.Item>
         )}
       />
+      {hasMore && allCalls.length > 0 && (
+        <div style={{ textAlign: "center", marginTop: 12 }}>
+          <Button onClick={() => setPage(p => p + 1)} loading={isFetching}>
+            {t("common.load_more")}
+          </Button>
+        </div>
+      )}
 
       <Modal
         title={editingId ? t("modules.calls.edit_call") : t("modules.calls.modal_title")}

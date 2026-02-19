@@ -1,8 +1,9 @@
-import { Card, Upload, Image, Empty, App, theme, Button, Popconfirm } from "antd";
+import { useState } from "react";
+import { Card, Upload, Image, Empty, App, theme, Button, Popconfirm, Pagination } from "antd";
 import { InboxOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Photo, APIError } from "@/api";
+import type { Photo, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Dragger } = Upload;
@@ -14,19 +15,23 @@ export default function PhotosModule({
   vaultId: string | number;
   contactId: string | number;
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(30);
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "photos"];
 
-  const { data: photos = [], isLoading } = useQuery({
-    queryKey: qk,
+  const { data: photosResponse, isLoading } = useQuery({
+    queryKey: [...qk, currentPage, pageSize],
     queryFn: async () => {
-      const res = await api.contactPhotos.contactsPhotosList(String(vaultId), String(contactId));
-      return res.data ?? [];
+      const res = await api.contactPhotos.contactsPhotosList(String(vaultId), String(contactId), { page: currentPage, per_page: pageSize });
+      return { items: res.data ?? [], meta: res.meta as PaginationMeta | undefined };
     },
   });
+  const photos = photosResponse?.items ?? [];
+  const total = photosResponse?.meta?.total ?? photos.length;
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.contactPhotos.contactsPhotosDelete(String(vaultId), String(contactId), id),
@@ -54,6 +59,7 @@ export default function PhotosModule({
         }}
         onChange={(info) => {
           if (info.file.status === "done") {
+            setCurrentPage(1);
             queryClient.invalidateQueries({ queryKey: qk });
             message.success(t("modules.photos.uploaded"));
           } else if (info.file.status === "error") {
@@ -79,7 +85,7 @@ export default function PhotosModule({
       ) : (
         <Image.PreviewGroup>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {photos.map((photo: Photo) => (
+            {(photos as Photo[]).map((photo: Photo) => (
               <div key={photo.id} style={{ position: 'relative', display: 'inline-block' }}>
                 <Image
                   width={120}
@@ -112,6 +118,15 @@ export default function PhotosModule({
           </div>
         </Image.PreviewGroup>
       )}
+      <Pagination
+        current={currentPage}
+        pageSize={pageSize}
+        total={total}
+        onChange={(page) => setCurrentPage(page)}
+        size="small"
+        style={{ marginTop: 12, textAlign: "center" }}
+        hideOnSinglePage
+      />
     </Card>
   );
 }

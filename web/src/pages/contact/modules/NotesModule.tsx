@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Card, List, Button, Input, Space, Popconfirm, App, Empty, theme } from "antd";
+import { Card, List, Button, Input, Space, Popconfirm, App, Empty, theme, Pagination } from "antd";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Note, APIError } from "@/api";
+import type { Note, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -20,24 +20,29 @@ export default function NotesModule({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(15);
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "notes"];
 
-  const { data: notes = [], isLoading } = useQuery({
-    queryKey: qk,
+  const { data: notesResponse, isLoading } = useQuery({
+    queryKey: [...qk, currentPage, pageSize],
     queryFn: async () => {
-      const res = await api.notes.contactsNotesList(String(vaultId), String(contactId));
-      return res.data ?? [];
+      const res = await api.notes.contactsNotesList(String(vaultId), String(contactId), { page: currentPage, per_page: pageSize });
+      return { items: res.data ?? [], meta: res.meta as PaginationMeta | undefined };
     },
   });
+  const notes = notesResponse?.items ?? [];
+  const total = notesResponse?.meta?.total ?? notes.length;
 
   const createMutation = useMutation({
     mutationFn: (data: { title: string; body: string }) =>
       api.notes.contactsNotesCreate(String(vaultId), String(contactId), data),
     onSuccess: () => {
+      setCurrentPage(1);
       queryClient.invalidateQueries({ queryKey: qk });
       resetForm();
       message.success(t("modules.notes.added"));
@@ -151,7 +156,7 @@ export default function NotesModule({
 
       <List
         loading={isLoading}
-        dataSource={notes}
+        dataSource={notes as Note[]}
         locale={{ emptyText: <Empty description={t("modules.notes.no_notes")} /> }}
         split={false}
         renderItem={(note: Note) => (
@@ -195,6 +200,15 @@ export default function NotesModule({
             />
           </List.Item>
         )}
+      />
+      <Pagination
+        current={currentPage}
+        pageSize={pageSize}
+        total={total}
+        onChange={(page) => setCurrentPage(page)}
+        size="small"
+        style={{ marginTop: 12, textAlign: "center" }}
+        hideOnSinglePage
       />
     </Card>
   );

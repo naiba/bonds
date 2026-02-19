@@ -31,7 +31,8 @@
     "deleted": "Deleted",
     "error": "Error",
     "saved": "Saved",
-    "updated": "Updated"
+    "updated": "Updated",
+    "load_more": "Load more"
   },
   "nav": {
     "vaults": "Vaults",

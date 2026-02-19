@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Typography,
@@ -15,7 +16,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { FeedItem } from "@/api";
+import type { FeedItem, PaginationMeta } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -30,6 +31,9 @@ export default function VaultFeed() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [page, setPage] = useState(1);
+  const [allItems, setAllItems] = useState<FeedItem[]>([]);
+  const [hasMore, setHasMore] = useState(true);
 
   function getActionColor(action: string): string {
     if (action.includes("created")) return "green";
@@ -38,16 +42,24 @@ export default function VaultFeed() {
     return "default";
   }
 
-  const { data: feed = [], isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "feed"],
+  const { isLoading, isFetching } = useQuery({
+    queryKey: ["vaults", vaultId, "feed", page],
     queryFn: async () => {
-      const res = await api.feed.feedList(String(vaultId));
-      return (res.data ?? []) as FeedItem[];
+      const res = await api.feed.feedList(String(vaultId), { page, per_page: 15 });
+      const newItems = (res.data ?? []) as FeedItem[];
+      const meta = res.meta as PaginationMeta | undefined;
+      setAllItems(prev => page === 1 ? newItems : [...prev, ...newItems]);
+      setHasMore(meta ? meta.page! < meta.total_pages! : newItems.length >= 15);
+      return newItems;
     },
     enabled: !!vaultId,
   });
 
-  if (isLoading) {
+  const handleLoadMore = useCallback(() => {
+    setPage(p => p + 1);
+  }, []);
+
+  if (isLoading && page === 1) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
         <Spin size="large" />
@@ -77,7 +89,7 @@ export default function VaultFeed() {
         }}
       >
         <List
-          dataSource={feed}
+          dataSource={allItems}
           locale={{ emptyText: <Empty description={t("vault.feed.no_activity")} style={{ padding: 32 }} /> }}
           renderItem={(item: FeedItem, index: number) => (
             <List.Item
@@ -141,6 +153,13 @@ export default function VaultFeed() {
             </List.Item>
           )}
         />
+        {hasMore && allItems.length > 0 && (
+          <div style={{ textAlign: "center", padding: "12px 0" }}>
+            <Button onClick={handleLoadMore} loading={isFetching}>
+              {t("common.load_more")}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import {
   List,
   Typography,
@@ -6,6 +7,7 @@ import {
   theme,
   Card,
   Spin,
+  Button,
 } from "antd";
 import {
   HistoryOutlined,
@@ -13,7 +15,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { FeedItem } from "@/api";
+import type { FeedItem, PaginationMeta } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -30,6 +32,9 @@ interface FeedModuleProps {
 export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const [page, setPage] = useState(1);
+  const [allItems, setAllItems] = useState<FeedItem[]>([]);
+  const [hasMore, setHasMore] = useState(true);
 
   function getActionColor(action: string): string {
     if (action.includes("created")) return "green";
@@ -38,15 +43,23 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
     return "default";
   }
 
-  const { data: feed = [], isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", contactId, "feed"],
+  const { isLoading, isFetching } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", contactId, "feed", page],
     queryFn: async () => {
-      const res = await api.feed.contactsFeedList(String(vaultId), String(contactId));
-      return res.data ?? [];
+      const res = await api.feed.contactsFeedList(String(vaultId), String(contactId), { page, per_page: 15 });
+      const newItems = (res.data ?? []) as FeedItem[];
+      const meta = res.meta as PaginationMeta | undefined;
+      setAllItems(prev => page === 1 ? newItems : [...prev, ...newItems]);
+      setHasMore(meta ? meta.page! < meta.total_pages! : newItems.length >= 15);
+      return newItems;
     },
   });
 
-  if (isLoading) {
+  const handleLoadMore = useCallback(() => {
+    setPage(p => p + 1);
+  }, []);
+
+  if (isLoading && page === 1) {
     return (
       <div style={{ textAlign: "center", padding: 40 }}>
         <Spin />
@@ -66,7 +79,7 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
       }
     >
       <List
-        dataSource={feed}
+        dataSource={allItems}
         locale={{ emptyText: <Empty description={t("contact.detail.feed.no_activity")} /> }}
         renderItem={(item: FeedItem, index: number) => (
           <List.Item
@@ -116,6 +129,13 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
           </List.Item>
         )}
       />
+      {hasMore && allItems.length > 0 && (
+        <div style={{ textAlign: "center", marginTop: 12 }}>
+          <Button onClick={handleLoadMore} loading={isFetching}>
+            {t("common.load_more")}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

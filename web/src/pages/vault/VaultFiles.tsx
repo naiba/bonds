@@ -26,7 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Document, APIError } from "@/api";
+import type { Document, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -48,11 +48,14 @@ export default function VaultFiles() {
   const { message } = App.useApp();
   const [uploading, setUploading] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(25);
 
   const deleteMutation = useMutation({
     mutationFn: (fileId: number) => api.files.filesDelete(String(vaultId), fileId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files", filterType] });
+      setCurrentPage(1);
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files"] });
       message.success(t("vault.files.deleted"));
     },
     onError: (e: APIError) => message.error(e.message),
@@ -62,7 +65,8 @@ export default function VaultFiles() {
     setUploading(true);
     try {
       await api.files.filesCreate(String(vaultId), { file });
-      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files", filterType] });
+      setCurrentPage(1);
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "files"] });
       message.success(t("vault.files.upload_success"));
     } catch (e: unknown) {
       const err = e as APIError;
@@ -81,21 +85,24 @@ export default function VaultFiles() {
     return <FileOutlined style={{ fontSize: 18, color: token.colorPrimary }} />;
   }
 
-  const { data: files = [], isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "files", filterType],
+  const { data: filesResponse, isLoading } = useQuery({
+    queryKey: ["vaults", vaultId, "files", filterType, currentPage, pageSize],
     queryFn: async () => {
+      const params = { page: currentPage, per_page: pageSize };
       let res;
       if (filterType === "photos") {
-        res = await api.files.filesPhotosList(String(vaultId));
+        res = await api.files.filesPhotosList(String(vaultId), params);
       } else if (filterType === "documents") {
-        res = await api.files.filesDocumentsList(String(vaultId));
+        res = await api.files.filesDocumentsList(String(vaultId), params);
       } else {
         res = await api.files.filesList(String(vaultId));
       }
-      return (res.data ?? []) as Document[];
+      return { items: (res.data ?? []) as Document[], meta: res.meta as PaginationMeta | undefined };
     },
     enabled: !!vaultId,
   });
+  const files = filesResponse?.items ?? [];
+  const totalFiles = filesResponse?.meta?.total ?? files.length;
 
   const columns = [
     {
@@ -199,7 +206,7 @@ export default function VaultFiles() {
       <div style={{ marginBottom: 16 }}>
         <Segmented
           value={filterType}
-          onChange={(val) => setFilterType(val as string)}
+          onChange={(val) => { setFilterType(val as string); setCurrentPage(1); }}
           options={[
             { label: t("vault.files.filter_all"), value: "all" },
             { label: t("vault.files.filter_photos"), value: "photos" },
@@ -221,7 +228,14 @@ export default function VaultFiles() {
             dataSource={files}
             columns={columns}
             rowKey="id"
-            pagination={false}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalFiles,
+              onChange: (page) => setCurrentPage(page),
+              hideOnSinglePage: true,
+              size: "small",
+            }}
             style={{ marginTop: -8 }}
             locale={{ emptyText: <Empty description={t("vault.files.no_files")} /> }}
           />

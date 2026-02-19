@@ -1,4 +1,5 @@
-import { Card, List, Upload, Button, App, Empty, Tag, theme, Popconfirm } from "antd";
+import { useState } from "react";
+import { Card, List, Upload, Button, App, Empty, Tag, theme, Popconfirm, Pagination } from "antd";
 import {
   InboxOutlined,
   FileOutlined,
@@ -7,7 +8,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Document, APIError } from "@/api";
+import type { Document, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 
 const { Dragger } = Upload;
@@ -25,19 +26,23 @@ export default function DocumentsModule({
   vaultId: string | number;
   contactId: string | number;
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(15);
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "documents"];
 
-  const { data: documents = [], isLoading } = useQuery({
-    queryKey: qk,
+  const { data: documentsResponse, isLoading } = useQuery({
+    queryKey: [...qk, currentPage, pageSize],
     queryFn: async () => {
-      const res = await api.contactDocuments.contactsDocumentsList(String(vaultId), String(contactId));
-      return res.data ?? [];
+      const res = await api.contactDocuments.contactsDocumentsList(String(vaultId), String(contactId), { page: currentPage, per_page: pageSize });
+      return { items: res.data ?? [], meta: res.meta as PaginationMeta | undefined };
     },
   });
+  const documents = documentsResponse?.items ?? [];
+  const total = documentsResponse?.meta?.total ?? documents.length;
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.contactDocuments.contactsDocumentsDelete(String(vaultId), String(contactId), id),
@@ -65,6 +70,7 @@ export default function DocumentsModule({
         }}
         onChange={(info) => {
           if (info.file.status === "done") {
+            setCurrentPage(1);
             queryClient.invalidateQueries({ queryKey: qk });
             message.success(t("modules.documents.uploaded"));
           } else if (info.file.status === "error") {
@@ -86,7 +92,7 @@ export default function DocumentsModule({
       </Dragger>
 
       <List
-        dataSource={documents}
+        dataSource={documents as Document[]}
         locale={{ emptyText: <Empty description={t("modules.documents.no_documents")} /> }}
         split={false}
         renderItem={(doc: Document) => (
@@ -128,6 +134,15 @@ export default function DocumentsModule({
             />
           </List.Item>
         )}
+      />
+      <Pagination
+        current={currentPage}
+        pageSize={pageSize}
+        total={total}
+        onChange={(page) => setCurrentPage(page)}
+        size="small"
+        style={{ marginTop: 12, textAlign: "center" }}
+        hideOnSinglePage
       />
     </Card>
   );
