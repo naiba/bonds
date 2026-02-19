@@ -46,7 +46,7 @@ export default function RelationshipsModule({
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts"],
     queryFn: async () => {
-      const res = await api.contacts.contactsList(String(vaultId));
+      const res = await api.contacts.contactsList(String(vaultId), { per_page: 9999 });
       return res.data ?? [];
     },
   });

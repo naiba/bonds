@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Table, Button, Typography, Input, Tag, Space, App, Upload, theme, Select } from "antd";
 import {
@@ -9,9 +9,9 @@ import {
   UploadOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Contact, LabelResponse } from "@/api";
+import type { Contact, PaginationMeta, LabelResponse } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -33,33 +33,52 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+// Map frontend sort values to backend sort param values
+const SORT_MAP: Record<string, string> = {
+  name: "first_name",
+  updated_at: "updated_at",
+};
+
 export default function ContactList() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const vaultId = id!;
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<string>("name");
-  // const [, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [labelFilter, setLabelFilter] = useState<number | null>(null);
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const queryClient = useQueryClient();
-
   const { data: labels = [] } = useQuery({
     queryKey: ["vault", vaultId, "labels"],
     queryFn: async () => (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
   });
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", labelFilter],
+  const { data: contactsResponse, isLoading } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", labelFilter, currentPage, pageSize, sortBy, search],
     queryFn: async () => {
       if (labelFilter) {
-        const res = await api.contacts.contactsLabelsDetail(String(vaultId), labelFilter);
-        return res.data?.contacts ?? [];
+        const res = await api.contacts.contactsLabelsDetail(String(vaultId), labelFilter, {
+          page: currentPage,
+          per_page: pageSize,
+        });
+        return {
+          contacts: (res.data as { contacts?: Contact[] })?.contacts ?? [],
+          meta: res.meta as PaginationMeta | undefined,
+        };
       }
-      const res = await api.contacts.contactsList(String(vaultId));
-      return res.data ?? [];
+      const res = await api.contacts.contactsList(String(vaultId), {
+        page: currentPage,
+        per_page: pageSize,
+        sort: SORT_MAP[sortBy] ?? "updated_at",
+        ...(search.length > 2 ? { search } : {}),
+      });
+      return {
+        contacts: res.data ?? [],
+        meta: res.meta as PaginationMeta | undefined,
+      };
     },
     enabled: !!vaultId,
     meta: {
@@ -67,57 +86,28 @@ export default function ContactList() {
     },
   });
 
-  const searchMutation = useMutation({
-    mutationFn: (query: string) => api.contacts.searchContactsCreate(String(vaultId), { search_term: query }),
-    onSuccess: (res) => {
-        if (res.data) {
-             queryClient.setQueryData(["vaults", vaultId, "contacts", labelFilter], res.data);
-        }
-    },
-    onError: (e: { message?: string }) => message.error(e.message)
-  });
+  const contacts = contactsResponse?.contacts ?? [];
+  const paginationMeta = contactsResponse?.meta;
 
   const sortMutation = useMutation({
       mutationFn: (data: { sort_by: string; sort_order: "asc" | "desc" }) => 
         api.contacts.contactsSortUpdate(String(vaultId), data),
       onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "contacts"] });
           message.success(t("contact.list.sort_updated"));
       }
   });
 
   const handleSortChange = (value: string) => {
       setSortBy(value);
-      const order = "asc";
-      // setSortOrder(order);
-      sortMutation.mutate({ sort_by: value, sort_order: order });
+      setCurrentPage(1);
+      // Save user preference as side effect
+      sortMutation.mutate({ sort_by: value, sort_order: "asc" });
   };
 
   const handleSearch = (val: string) => {
       setSearch(val);
-      if (val.length > 2) {
-          searchMutation.mutate(val);
-      } else if (val.length === 0) {
-          queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "contacts"] });
-      }
-  }
-
-  const contacts = useMemo(() => {
-    let all = data ?? [];
-    if (sortBy === 'name') {
-        all = [...all].sort((a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''));
-    } else if (sortBy === 'updated_at') {
-        all = [...all].sort((a, b) => dayjs(b.updated_at).unix() - dayjs(a.updated_at).unix());
-    }
-
-    if (!search) return all;
-    const q = search.toLowerCase();
-    return all.filter((c: Contact) =>
-      (c.first_name ?? '').toLowerCase().includes(q) ||
-      (c.last_name ?? '').toLowerCase().includes(q) ||
-      c.nickname?.toLowerCase().includes(q)
-    );
-  }, [data, search, sortBy]);
+      setCurrentPage(1);
+  };
 
   const columns: ColumnsType<Contact> = [
     {
@@ -233,7 +223,7 @@ export default function ContactList() {
               </Title>
               {!isLoading && (
                 <Text type="secondary" style={{ fontSize: 13 }}>
-                  {t("contact.list.total", { count: data?.length ?? 0 })}
+                  {t("contact.list.total", { count: paginationMeta?.total ?? contacts.length })}
                 </Text>
               )}
             </div>
@@ -309,7 +299,7 @@ export default function ContactList() {
         <Select
             placeholder={t("contact.list.filter_label")}
             value={labelFilter}
-            onChange={setLabelFilter}
+            onChange={(v) => { setLabelFilter(v); setCurrentPage(1); }}
             style={{ width: 200 }}
             allowClear
         >
@@ -332,8 +322,11 @@ export default function ContactList() {
         })}
         style={{ borderRadius: token.borderRadius }}
         pagination={{
-          pageSize: 20,
-          showSizeChanger: false,
+          current: currentPage,
+          pageSize: pageSize,
+          total: paginationMeta?.total ?? contacts.length,
+          onChange: (page, size) => { setCurrentPage(page); setPageSize(size); },
+          showSizeChanger: true,
           showTotal: (total) => t("contact.list.total", { count: total }),
         }}
         locale={{
