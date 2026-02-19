@@ -86,6 +86,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	storageInfoService := services.NewStorageInfoService(db)
 	currencyService := services.NewCurrencyService(db)
 	templatePageService := services.NewTemplatePageService(db)
+	davClientService := services.NewDavClientService(db, cfg.JWT.Secret)
+	davSyncService := services.NewDavSyncService(db, davClientService, vcardService)
+	davPushService := services.NewDavPushService(db, davClientService, vcardService)
 
 	mailer, mErr := services.NewSMTPMailer(&cfg.SMTP)
 	if mErr != nil {
@@ -132,6 +135,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	relationshipService.SetFeedRecorder(feedRecorder)
 
 	contactService.SetSearchService(searchService)
+	contactService.SetDavPushService(davPushService)
 	noteService.SetSearchService(searchService)
 
 	postPhotoHandler := NewPostPhotoHandler(vaultFileService)
@@ -204,6 +208,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	currencyHandler := NewCurrencyHandler(currencyService)
 	templatePageHandler := NewTemplatePageHandler(templatePageService)
 	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
+	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
 
 	e.Use(middleware.CORS())
 
@@ -472,6 +477,16 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	vaultScoped.POST("/lifeMetrics/:id/contacts", lifeMetricHandler.AddContact, requireEditor)
 
 	vaultScoped.PUT("/defaultTab", vaultHandler.UpdateDefaultTab, requireEditor)
+
+	davSubs := vaultScoped.Group("/dav/subscriptions")
+	davSubs.GET("", davClientHandler.List)
+	davSubs.POST("", davClientHandler.Create, requireEditor)
+	davSubs.POST("/test", davClientHandler.TestConnection, requireEditor)
+	davSubs.GET("/:sub_id", davClientHandler.Get)
+	davSubs.PUT("/:sub_id", davClientHandler.Update, requireEditor)
+	davSubs.DELETE("/:sub_id", davClientHandler.Delete, requireEditor)
+	davSubs.POST("/:sub_id/sync", davClientHandler.TriggerSync, requireEditor)
+	davSubs.GET("/:sub_id/logs", davClientHandler.GetSyncLogs)
 
 	vaultScoped.GET("/feed", feedHandler.Get)
 	vaultScoped.GET("/search", searchHandler.Search)

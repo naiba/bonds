@@ -25,6 +25,29 @@ func NewVCardService(db *gorm.DB) *VCardService {
 	return &VCardService{db: db}
 }
 
+func (s *VCardService) ExportContactToVCard(contactID, vaultID string) (vcard.Card, error) {
+	var contact models.Contact
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		return nil, ErrContactNotFound
+	}
+
+	var contactInfos []models.ContactInformation
+	s.db.Preload("ContactInformationType").Where("contact_id = ?", contactID).Find(&contactInfos)
+
+	var addresses []models.Address
+	var pivots []models.ContactAddress
+	s.db.Where("contact_id = ?", contactID).Find(&pivots)
+	if len(pivots) > 0 {
+		addressIDs := make([]uint, len(pivots))
+		for i, p := range pivots {
+			addressIDs[i] = p.AddressID
+		}
+		s.db.Where("id IN ?", addressIDs).Find(&addresses)
+	}
+
+	return buildVCard(&contact, contactInfos, addresses), nil
+}
+
 func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
@@ -353,4 +376,94 @@ func buildFullName(firstName, lastName string) string {
 		return firstName
 	}
 	return lastName
+}
+
+// UpsertContactFromVCard creates or updates a contact from a vCard.
+// If distantURI is non-empty, it looks up an existing contact by DistantURI in the vault.
+// Returns the contact ID and whether it was created (true) or updated (false).
+func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID string, distantURI, distantEtag string) (contactID string, created bool, err error) {
+	if distantURI != "" {
+		var existing models.Contact
+		if findErr := tx.Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error; findErr == nil {
+			if existing.DistantEtag != nil && *existing.DistantEtag == distantEtag {
+				return existing.ID, false, nil
+			}
+
+			firstName, lastName := extractNameFromCard(card)
+			nickname := card.Value(vcard.FieldNickname)
+			title := card.Value(vcard.FieldTitle)
+			now := time.Now()
+
+			existing.FirstName = strPtrOrNil(firstName)
+			existing.LastName = strPtrOrNil(lastName)
+			existing.Nickname = strPtrOrNil(nickname)
+			existing.JobPosition = strPtrOrNil(title)
+			existing.DistantEtag = strPtrOrNil(distantEtag)
+			existing.LastUpdatedAt = &now
+			if err := tx.Save(&existing).Error; err != nil {
+				return "", false, err
+			}
+
+			if err := replaceVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
+				return "", false, err
+			}
+			return existing.ID, false, nil
+		}
+	}
+
+	firstName, lastName := extractNameFromCard(card)
+	nickname := card.Value(vcard.FieldNickname)
+	title := card.Value(vcard.FieldTitle)
+	now := time.Now()
+
+	uid := card.Value("UID")
+
+	contact := models.Contact{
+		VaultID:       vaultID,
+		FirstName:     strPtrOrNil(firstName),
+		LastName:      strPtrOrNil(lastName),
+		Nickname:      strPtrOrNil(nickname),
+		JobPosition:   strPtrOrNil(title),
+		DistantUUID:   strPtrOrNil(uid),
+		DistantURI:    strPtrOrNil(distantURI),
+		DistantEtag:   strPtrOrNil(distantEtag),
+		LastUpdatedAt: &now,
+	}
+	if err := tx.Create(&contact).Error; err != nil {
+		return "", false, err
+	}
+
+	cvu := models.ContactVaultUser{
+		ContactID: contact.ID,
+		UserID:    userID,
+		VaultID:   vaultID,
+	}
+	if err := tx.Create(&cvu).Error; err != nil {
+		return "", false, err
+	}
+
+	if err := importVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
+		return "", false, err
+	}
+
+	return contact.ID, true, nil
+}
+
+func replaceVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
+	tx.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{})
+
+	var pivots []models.ContactAddress
+	tx.Where("contact_id = ?", contactID).Find(&pivots)
+	if len(pivots) > 0 {
+		addressIDs := make([]uint, len(pivots))
+		for i, p := range pivots {
+			addressIDs[i] = p.AddressID
+		}
+		tx.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{})
+		tx.Where("id IN ?", addressIDs).Delete(&models.Address{})
+	}
+
+	tx.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{})
+
+	return importVCardFields(tx, card, contactID, vaultID, accountID)
 }

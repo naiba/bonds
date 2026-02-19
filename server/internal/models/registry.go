@@ -86,6 +86,8 @@ func AllModels() []interface{} {
 		&UserToken{},
 		&SyncToken{},
 		&AddressBookSubscription{},
+		&ContactSubscriptionState{},
+		&DavSyncLog{},
 		&Cron{},
 		&Log{},
 

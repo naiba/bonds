@@ -18,6 +18,7 @@ import (
 	"github.com/naiba/bonds/internal/handlers"
 	appMiddleware "github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/services"
 )
 
 //	@title			Bonds API
@@ -55,6 +56,19 @@ func main() {
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
+
+	vcardService := services.NewVCardService(db)
+	davClientService := services.NewDavClientService(db, cfg.JWT.Secret)
+	davSyncService := services.NewDavSyncService(db, davClientService, vcardService)
+	if err := scheduler.RegisterJob("0 */5 * * * *", "sync_address_books", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+		defer cancel()
+		if err := davSyncService.SyncAllDue(ctx); err != nil {
+			log.Printf("[cron] sync_address_books error: %v", err)
+		}
+	}); err != nil {
+		log.Printf("WARNING: Failed to register DAV sync cron job: %v", err)
+	}
 
 	e := echo.New()
 	e.HideBanner = true

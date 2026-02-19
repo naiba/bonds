@@ -17,9 +17,10 @@ var (
 )
 
 type ContactService struct {
-	db            *gorm.DB
-	feedRecorder  *FeedRecorder
-	searchService *SearchService
+	db             *gorm.DB
+	feedRecorder   *FeedRecorder
+	searchService  *SearchService
+	davPushService *DavPushService
 }
 
 func NewContactService(db *gorm.DB) *ContactService {
@@ -32,6 +33,10 @@ func (s *ContactService) SetFeedRecorder(fr *FeedRecorder) {
 
 func (s *ContactService) SetSearchService(ss *SearchService) {
 	s.searchService = ss
+}
+
+func (s *ContactService) SetDavPushService(ps *DavPushService) {
+	s.davPushService = ps
 }
 
 func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort string) ([]dto.ContactResponse, response.Meta, error) {
@@ -142,6 +147,10 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		s.searchService.IndexContact(&contact)
 	}
 
+	if s.davPushService != nil {
+		go s.davPushService.PushContactChange(contact.ID, vaultID)
+	}
+
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
 }
@@ -201,6 +210,10 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 		s.searchService.IndexContact(&contact)
 	}
 
+	if s.davPushService != nil {
+		go s.davPushService.PushContactChange(contactID, vaultID)
+	}
+
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
 }
@@ -213,6 +226,11 @@ func (s *ContactService) DeleteContact(contactID, vaultID string) error {
 		}
 		return err
 	}
+
+	if s.davPushService != nil {
+		go s.davPushService.PushContactDelete(contactID, vaultID)
+	}
+
 	if err := s.db.Delete(&contact).Error; err != nil {
 		return err
 	}
