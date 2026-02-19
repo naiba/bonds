@@ -57,6 +57,7 @@ import DocumentsModule from "./modules/DocumentsModule";
 import LabelsModule from "./modules/LabelsModule";
 import FeedModule from "./modules/FeedModule";
 import ExtraInfoModule from "./modules/ExtraInfoModule";
+import GroupsModule from "./modules/GroupsModule";
 
 const { Title, Text } = Typography;
 
@@ -81,6 +82,7 @@ const MODULE_COMPONENT_MAP: Record<
   loans: LoansModule,
   goals: GoalsModule,
   life_events: LifeEventsModule,
+  groups: GroupsModule,
   mood_tracking: MoodTrackingModule,
   photos: PhotosModule,
   documents: DocumentsModule,
@@ -99,6 +101,7 @@ export default function ContactDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [avatarKey, setAvatarKey] = useState(0);
   const [editForm] = Form.useForm();
   const [moveForm] = Form.useForm();
   const [templateForm] = Form.useForm();
@@ -219,9 +222,7 @@ export default function ContactDetail() {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts", cId],
       });
-      // Force avatar refresh by updating timestamp or key in state if needed,
-      // but invalidateQueries should handle it if URL has a timestamp or unique param,
-      // which it usually doesn't. We might need a key on the avatar to force re-render.
+      setAvatarKey((k) => k + 1);
       message.success(t("contact.detail.avatar_updated"));
     },
     onError: (err: APIError) => {
@@ -235,6 +236,7 @@ export default function ContactDetail() {
       queryClient.invalidateQueries({
         queryKey: ["vaults", vaultId, "contacts", cId],
       });
+      setAvatarKey((k) => k + 1);
       message.success(t("contact.detail.avatar_deleted"));
     },
     onError: (err: APIError) => {
@@ -475,7 +477,7 @@ export default function ContactDetail() {
               }}
             >
               <AvatarImageLoader 
-                url={`/api/vaults/${vaultId}/contacts/${cId}/avatar`} 
+                url={`/api/vaults/${vaultId}/contacts/${cId}/avatar?k=${avatarKey}`} 
                 updatedAt={contact.updated_at ?? ""}
                 initials={initials}
                 token={token}
