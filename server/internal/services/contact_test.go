@@ -73,7 +73,7 @@ func TestListContacts(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	contacts, meta, err := svc.ListContacts(vaultID, userID, 1, 15, "")
+	contacts, meta, err := svc.ListContacts(vaultID, userID, 1, 15, "", "")
 	if err != nil {
 		t.Fatalf("ListContacts failed: %v", err)
 	}
@@ -82,6 +82,31 @@ func TestListContacts(t *testing.T) {
 	}
 	if meta.Total != 2 {
 		t.Errorf("Expected total 2, got %d", meta.Total)
+	}
+}
+
+func TestListContactsSortByFirstName(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Charlie"})
+	svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Alice"})
+	svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Bob"})
+
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "first_name")
+	if err != nil {
+		t.Fatalf("ListContacts failed: %v", err)
+	}
+	if len(contacts) != 3 {
+		t.Fatalf("Expected 3 contacts, got %d", len(contacts))
+	}
+	if contacts[0].FirstName != "Alice" {
+		t.Errorf("Expected first contact 'Alice', got '%s'", contacts[0].FirstName)
+	}
+	if contacts[1].FirstName != "Bob" {
+		t.Errorf("Expected second contact 'Bob', got '%s'", contacts[1].FirstName)
+	}
+	if contacts[2].FirstName != "Charlie" {
+		t.Errorf("Expected third contact 'Charlie', got '%s'", contacts[2].FirstName)
 	}
 }
 
@@ -120,7 +145,7 @@ func TestDeleteContact(t *testing.T) {
 		t.Fatalf("DeleteContact failed: %v", err)
 	}
 
-	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "")
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "")
 	if err != nil {
 		t.Fatalf("ListContacts failed: %v", err)
 	}

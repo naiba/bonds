@@ -34,7 +34,7 @@ func (s *ContactService) SetSearchService(ss *SearchService) {
 	s.searchService = ss
 }
 
-func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search string) ([]dto.ContactResponse, response.Meta, error) {
+func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort string) ([]dto.ContactResponse, response.Meta, error) {
 	query := s.db.Where("vault_id = ?", vaultID)
 
 	if search != "" {
@@ -58,8 +58,10 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 	}
 	offset := (page - 1) * perPage
 
+	orderClause := contactSortOrder(sort)
+
 	var contacts []models.Contact
-	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&contacts).Error; err != nil {
+	if err := query.Offset(offset).Limit(perPage).Order(orderClause).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -278,7 +280,7 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 	return &resp, nil
 }
 
-func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uint, page, perPage int) ([]dto.ContactResponse, response.Meta, error) {
+func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uint, page, perPage int, sort string) ([]dto.ContactResponse, response.Meta, error) {
 	query := s.db.Where("vault_id = ? AND id IN (SELECT contact_id FROM contact_label WHERE label_id = ?)", vaultID, labelID)
 
 	var total int64
@@ -294,8 +296,10 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	}
 	offset := (page - 1) * perPage
 
+	orderClause := contactSortOrder(sort)
+
 	var contacts []models.Contact
-	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&contacts).Error; err != nil {
+	if err := query.Offset(offset).Limit(perPage).Order(orderClause).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -394,6 +398,19 @@ func strPtrOrNil(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func contactSortOrder(sort string) string {
+	switch sort {
+	case "first_name":
+		return "first_name ASC, last_name ASC"
+	case "last_name":
+		return "last_name ASC, first_name ASC"
+	case "created_at":
+		return "created_at DESC"
+	default:
+		return "updated_at DESC"
+	}
 }
 
 func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {

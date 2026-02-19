@@ -30,6 +30,7 @@ func NewContactHandler(contactService *services.ContactService) *ContactHandler 
 //	@Param			page		query		integer	false	"Page number"
 //	@Param			per_page	query		integer	false	"Items per page"
 //	@Param			search		query		string	false	"Search term"
+//	@Param			sort		query		string	false	"Sort order: first_name, last_name, created_at, updated_at (default)"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.ContactResponse}
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
@@ -40,8 +41,9 @@ func (h *ContactHandler) List(c echo.Context) error {
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 	search := c.QueryParam("search")
+	sort := c.QueryParam("sort")
 
-	contacts, meta, err := h.contactService.ListContacts(vaultID, userID, page, perPage, search)
+	contacts, meta, err := h.contactService.ListContacts(vaultID, userID, page, perPage, search, sort)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_contacts")
 	}
@@ -73,8 +75,9 @@ func (h *ContactHandler) ListByLabel(c echo.Context) error {
 	}
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	sort := c.QueryParam("sort")
 
-	contacts, meta, err := h.contactService.ListContactsByLabel(vaultID, userID, uint(labelID), page, perPage)
+	contacts, meta, err := h.contactService.ListContactsByLabel(vaultID, userID, uint(labelID), page, perPage, sort)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_contacts")
 	}

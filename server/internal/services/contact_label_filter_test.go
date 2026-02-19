@@ -50,7 +50,7 @@ func setupContactLabelFilterTest(t *testing.T) (*ContactService, string, string,
 func TestListContactsByLabel_Success(t *testing.T) {
 	svc, vaultID, userID, contactID, labelID := setupContactLabelFilterTest(t)
 
-	contacts, meta, err := svc.ListContactsByLabel(vaultID, userID, labelID, 1, 15)
+	contacts, meta, err := svc.ListContactsByLabel(vaultID, userID, labelID, 1, 15, "")
 	if err != nil {
 		t.Fatalf("ListContactsByLabel failed: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestListContactsByLabel_Success(t *testing.T) {
 func TestListContactsByLabel_NoResults(t *testing.T) {
 	svc, vaultID, userID, _, _ := setupContactLabelFilterTest(t)
 
-	contacts, meta, err := svc.ListContactsByLabel(vaultID, userID, 9999, 1, 15)
+	contacts, meta, err := svc.ListContactsByLabel(vaultID, userID, 9999, 1, 15, "")
 	if err != nil {
 		t.Fatalf("ListContactsByLabel failed: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestListContactsByLabel_Pagination(t *testing.T) {
 		}
 	}
 
-	page1, meta1, err := contactSvc.ListContactsByLabel(vault.ID, resp.User.ID, label.ID, 1, 2)
+	page1, meta1, err := contactSvc.ListContactsByLabel(vault.ID, resp.User.ID, label.ID, 1, 2, "")
 	if err != nil {
 		t.Fatalf("ListContactsByLabel page 1 failed: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestListContactsByLabel_Pagination(t *testing.T) {
 		t.Errorf("Expected 2 total pages, got %d", meta1.TotalPages)
 	}
 
-	page2, _, err := contactSvc.ListContactsByLabel(vault.ID, resp.User.ID, label.ID, 2, 2)
+	page2, _, err := contactSvc.ListContactsByLabel(vault.ID, resp.User.ID, label.ID, 2, 2, "")
 	if err != nil {
 		t.Fatalf("ListContactsByLabel page 2 failed: %v", err)
 	}
