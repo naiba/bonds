@@ -291,7 +291,8 @@
       "created_success": "群组已创建",
       "deleted_success": "群组已删除",
       "modal_title": "新建群组",
-      "members_count": "{{count}} 位成员"
+      "members_count": "{{count}} 位成员",
+      "group_type": "群组类型"
     },
     "companies": {
       "title": "公司",
@@ -418,6 +419,15 @@
         "no_labels": "暂无标签",
         "no_labels_available": "暂无可用标签",
         "select_placeholder": "选择标签"
+      },
+      "groups": {
+        "title": "群组",
+        "add": "添加到群组",
+        "remove_confirm": "确定从该群组移除？",
+        "added": "已添加到群组",
+        "removed": "已从群组移除",
+        "no_groups": "未加入任何群组",
+        "select_group": "选择群组"
       }
     }
   },
@@ -468,7 +478,9 @@
       "type_anniversary": "纪念日",
       "type_death": "逝世日期",
       "type_first_met": "初次见面",
-      "type_other": "其他"
+      "type_other": "其他",
+      "date_type": "日期类型",
+      "select_type": "选择日期类型"
     },
     "tasks": {
       "title": "任务",
@@ -699,7 +711,8 @@
       "default_map_site": "默认地图服务",
       "distance_format": "距离单位",
       "number_format": "数字格式",
-      "help_shown": "显示帮助信息"
+      "help_shown": "显示帮助信息",
+      "enable_alternative_calendar": "启用多历法（如农历）"
     },
     "notifications": {
       "title": "通知",

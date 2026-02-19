@@ -291,7 +291,8 @@
       "created_success": "Group created",
       "deleted_success": "Group deleted",
       "modal_title": "New Group",
-      "members_count": "{{count}} members"
+      "members_count": "{{count}} members",
+      "group_type": "Group Type"
     },
     "companies": {
       "title": "Companies",
@@ -418,6 +419,15 @@
         "no_labels": "No labels assigned",
         "no_labels_available": "No labels available",
         "select_placeholder": "Select a label"
+      },
+      "groups": {
+        "title": "Groups",
+        "add": "Add to Group",
+        "remove_confirm": "Remove from this group?",
+        "added": "Added to group",
+        "removed": "Removed from group",
+        "no_groups": "Not in any group",
+        "select_group": "Select a group"
       }
     }
   },
@@ -468,7 +478,9 @@
       "type_anniversary": "Anniversary",
       "type_death": "Deceased date",
       "type_first_met": "First met",
-      "type_other": "Other"
+      "type_other": "Other",
+      "date_type": "Date Type",
+      "select_type": "Select date type"
     },
     "tasks": {
       "title": "Tasks",
@@ -699,7 +711,8 @@
       "default_map_site": "Default map service",
       "distance_format": "Distance unit",
       "number_format": "Number format",
-      "help_shown": "Show help sections"
+      "help_shown": "Show help sections",
+      "enable_alternative_calendar": "Enable alternative calendars (e.g. Lunar)"
     },
     "notifications": {
       "title": "Notifications",
