@@ -16,7 +16,7 @@ import {
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { ImportantDate, CreateImportantDateRequest, APIError } from "@/api";
+import type { ImportantDate, CreateImportantDateRequest, APIError, UserPreferences, ImportantDateTypeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
@@ -56,13 +56,26 @@ export default function ImportantDatesModule({
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "important-dates"];
 
-  const dateTypes = [
-    { value: "birthday", label: t("modules.important_dates.type_birthday") },
-    { value: "anniversary", label: t("modules.important_dates.type_anniversary") },
-    { value: "death", label: t("modules.important_dates.type_death") },
-    { value: "first_met", label: t("modules.important_dates.type_first_met") },
-    { value: "other", label: t("modules.important_dates.type_other") },
-  ];
+  const { data: prefs } = useQuery({
+    queryKey: ["settings", "preferences"],
+    queryFn: async () => {
+      const res = await api.preferences.preferencesList();
+      return res.data as UserPreferences | undefined;
+    },
+  });
+  const altCalendar = prefs?.enable_alternative_calendar ?? false;
+
+  const { data: dateTypes = [] } = useQuery<ImportantDateTypeResponse[]>({
+    queryKey: ["vaults", vaultId, "settings", "date-types"],
+    queryFn: async () => {
+      const res = await api.vaultSettings.settingsDateTypesList(String(vaultId));
+      return res.data ?? [];
+    },
+  });
+
+  const selectedTypeId = Form.useWatch("contact_important_date_type_id", form);
+  const selectedType = dateTypes.find((dt) => dt.id === selectedTypeId);
+  const isLabelRequired = !selectedType?.internal_type;
 
   const { data: dates = [], isLoading } = useQuery({
     queryKey: qk,
@@ -73,17 +86,21 @@ export default function ImportantDatesModule({
   });
 
   const saveMutation = useMutation({
-    mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; type: string }) => {
+    mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; contact_important_date_type_id?: number }) => {
       const { calendarDate } = values;
       const sys = getCalendarSystem(calendarDate.calendarType);
       const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
 
+      const matchedType = dateTypes.find((dt) => dt.id === values.contact_important_date_type_id);
+      const label = values.label || matchedType?.label || "";
+
       const data: CreateImportantDateRequest = {
-        label: values.label,
+        label,
         day: gd.day,
         month: gd.month,
         year: gd.year,
         calendar_type: calendarDate.calendarType,
+        contact_important_date_type_id: values.contact_important_date_type_id,
       };
 
       if (calendarDate.calendarType !== "gregorian") {
@@ -121,7 +138,7 @@ export default function ImportantDatesModule({
       ct !== "gregorian" && d.original_day != null && d.original_month != null
         ? { calendarType: ct, day: d.original_day, month: d.original_month, year: d.original_year ?? new Date().getFullYear() }
         : { calendarType: "gregorian", day: d.day ?? 1, month: d.month ?? 1, year: d.year ?? new Date().getFullYear() };
-    form.setFieldsValue({ label: d.label, calendarDate: pickerVal, type: "other" });
+    form.setFieldsValue({ label: d.label, calendarDate: pickerVal, contact_important_date_type_id: d.contact_important_date_type_id });
     setOpen(true);
   }
 
@@ -171,7 +188,7 @@ export default function ImportantDatesModule({
               description={
                 <>
                   <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d)}</span>{" "}
-                  {d.calendar_type && d.calendar_type !== "gregorian" && (
+                  {altCalendar && d.calendar_type && d.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{d.calendar_type}</Tag>
                   )}
                 </>
@@ -189,14 +206,33 @@ export default function ImportantDatesModule({
         confirmLoading={saveMutation.isPending}
       >
         <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}>
-          <Form.Item name="label" label={t("modules.important_dates.label")} rules={[{ required: true }]}>
+          <Form.Item name="contact_important_date_type_id" label={t("modules.important_dates.date_type")}>
+            <Select
+              allowClear
+              placeholder={t("modules.important_dates.select_type")}
+              options={dateTypes.map((dt) => ({
+                label: dt.label,
+                value: dt.id,
+              }))}
+              onChange={(value: number | undefined) => {
+                if (value) {
+                  const matched = dateTypes.find((dt) => dt.id === value);
+                  if (matched?.internal_type) {
+                    form.setFieldValue("label", matched.label);
+                  }
+                }
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            name="label"
+            label={t("modules.important_dates.label")}
+            rules={[{ required: isLabelRequired }]}
+          >
             <Input />
           </Form.Item>
           <Form.Item name="calendarDate" label={t("modules.important_dates.date")} rules={[{ required: true }]}>
-            <CalendarDatePicker />
-          </Form.Item>
-          <Form.Item name="type" label={t("modules.important_dates.type")} rules={[{ required: true }]}>
-            <Select options={dateTypes} />
+            <CalendarDatePicker enableAlternativeCalendar={altCalendar} />
           </Form.Item>
         </Form>
       </Modal>

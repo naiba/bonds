@@ -80,6 +80,9 @@ func (h *ImportantDateHandler) Create(c echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
+		if errors.Is(err, services.ErrImportantDateLabelRequired) {
+			return response.BadRequest(c, "err.label_required_without_type", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_important_date")
 	}
 	return response.Created(c, date)
@@ -127,6 +130,9 @@ func (h *ImportantDateHandler) Update(c echo.Context) error {
 		}
 		if errors.Is(err, services.ErrImportantDateNotFound) {
 			return response.NotFound(c, "err.important_date_not_found")
+		}
+		if errors.Is(err, services.ErrImportantDateLabelRequired) {
+			return response.BadRequest(c, "err.label_required_without_type", nil)
 		}
 		return response.InternalError(c, "err.failed_to_update_important_date")
 	}

@@ -3,7 +3,7 @@ package dto
 import "time"
 
 type CreateImportantDateRequest struct {
-	Label                      string `json:"label" validate:"required" example:"Birthday"`
+	Label                      string `json:"label" example:"Birthday"`
 	Day                        *int   `json:"day" example:"15"`
 	Month                      *int   `json:"month" example:"6"`
 	Year                       *int   `json:"year" example:"1990"`
@@ -15,7 +15,7 @@ type CreateImportantDateRequest struct {
 }
 
 type UpdateImportantDateRequest struct {
-	Label                      string `json:"label" validate:"required" example:"Birthday"`
+	Label                      string `json:"label" example:"Birthday"`
 	Day                        *int   `json:"day" example:"15"`
 	Month                      *int   `json:"month" example:"6"`
 	Year                       *int   `json:"year" example:"1990"`

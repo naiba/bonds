@@ -1,13 +1,23 @@
 package services
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
+	"gorm.io/gorm"
 )
 
-func setupImportantDateTest(t *testing.T) (*ImportantDateService, string, string) {
+type importantDateTestCtx struct {
+	svc       *ImportantDateService
+	contactID string
+	vaultID   string
+	db        *gorm.DB
+}
+
+func setupImportantDateTest(t *testing.T) importantDateTestCtx {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,16 +45,21 @@ func setupImportantDateTest(t *testing.T) (*ImportantDateService, string, string
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewImportantDateService(db), contact.ID, vault.ID
+	return importantDateTestCtx{
+		svc:       NewImportantDateService(db),
+		contactID: contact.ID,
+		vaultID:   vault.ID,
+		db:        db,
+	}
 }
 
 func TestCreateImportantDate(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
 	day := 15
 	month := 6
 	year := 1990
-	date, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
 		Label: "Birthday",
 		Day:   &day,
 		Month: &month,
@@ -56,8 +71,8 @@ func TestCreateImportantDate(t *testing.T) {
 	if date.Label != "Birthday" {
 		t.Errorf("Expected label 'Birthday', got '%s'", date.Label)
 	}
-	if date.ContactID != contactID {
-		t.Errorf("Expected contact_id '%s', got '%s'", contactID, date.ContactID)
+	if date.ContactID != ctx.contactID {
+		t.Errorf("Expected contact_id '%s', got '%s'", ctx.contactID, date.ContactID)
 	}
 	if date.Day == nil || *date.Day != 15 {
 		t.Errorf("Expected day 15, got %v", date.Day)
@@ -74,18 +89,18 @@ func TestCreateImportantDate(t *testing.T) {
 }
 
 func TestListImportantDates(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
-	_, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Birthday"})
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{Label: "Birthday"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Anniversary"})
+	_, err = ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{Label: "Anniversary"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	dates, err := svc.List(contactID, vaultID)
+	dates, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -95,16 +110,16 @@ func TestListImportantDates(t *testing.T) {
 }
 
 func TestUpdateImportantDate(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
-	created, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Original"})
+	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{Label: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	day := 25
 	month := 12
-	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateImportantDateRequest{
+	updated, err := ctx.svc.Update(created.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
 		Label: "Updated",
 		Day:   &day,
 		Month: &month,
@@ -124,18 +139,18 @@ func TestUpdateImportantDate(t *testing.T) {
 }
 
 func TestDeleteImportantDate(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
-	created, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "To delete"})
+	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{Label: "To delete"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := svc.Delete(created.ID, contactID, vaultID); err != nil {
+	if err := ctx.svc.Delete(created.ID, ctx.contactID, ctx.vaultID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	dates, err := svc.List(contactID, vaultID)
+	dates, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -145,21 +160,21 @@ func TestDeleteImportantDate(t *testing.T) {
 }
 
 func TestDeleteImportantDateNotFound(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
-	err := svc.Delete(9999, contactID, vaultID)
+	err := ctx.svc.Delete(9999, ctx.contactID, ctx.vaultID)
 	if err != ErrImportantDateNotFound {
 		t.Errorf("Expected ErrImportantDateNotFound, got %v", err)
 	}
 }
 
 func TestCreateImportantDateLunar(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
 	origDay := 15
 	origMonth := 1
 	origYear := 2025
-	date, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
 		Label:         "Lunar New Year",
 		CalendarType:  "lunar",
 		OriginalDay:   &origDay,
@@ -196,9 +211,9 @@ func TestCreateImportantDateLunar(t *testing.T) {
 }
 
 func TestUpdateImportantDateLunar(t *testing.T) {
-	svc, contactID, vaultID := setupImportantDateTest(t)
+	ctx := setupImportantDateTest(t)
 
-	created, err := svc.Create(contactID, vaultID, dto.CreateImportantDateRequest{Label: "Original"})
+	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{Label: "Original"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -206,7 +221,7 @@ func TestUpdateImportantDateLunar(t *testing.T) {
 	origDay := 8
 	origMonth := 8
 	origYear := 2025
-	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateImportantDateRequest{
+	updated, err := ctx.svc.Update(created.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
 		Label:         "Mid-Autumn",
 		CalendarType:  "lunar",
 		OriginalDay:   &origDay,
@@ -224,5 +239,69 @@ func TestUpdateImportantDateLunar(t *testing.T) {
 	}
 	if updated.Day == nil || updated.Month == nil {
 		t.Fatal("Expected gregorian day/month to be set")
+	}
+}
+
+func TestCreateImportantDate_LabelAutoFilledFromType(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	var birthdateType models.ContactImportantDateType
+	if err := ctx.db.Where("vault_id = ? AND label = ?", ctx.vaultID, "Birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("Failed to find Birthdate type: %v", err)
+	}
+
+	day := 1
+	month := 1
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Day:                        &day,
+		Month:                      &month,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if date.Label != "Birthdate" {
+		t.Errorf("Expected label 'Birthdate' (auto-filled from type), got '%s'", date.Label)
+	}
+	if date.ContactImportantDateTypeID == nil || *date.ContactImportantDateTypeID != birthdateType.ID {
+		t.Errorf("Expected type ID %d, got %v", birthdateType.ID, date.ContactImportantDateTypeID)
+	}
+}
+
+func TestCreateImportantDate_LabelRequiredWithoutType(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	day := 1
+	month := 1
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Day:   &day,
+		Month: &month,
+	})
+	if !errors.Is(err, ErrImportantDateLabelRequired) {
+		t.Errorf("Expected ErrImportantDateLabelRequired, got %v", err)
+	}
+}
+
+func TestCreateImportantDate_ExplicitLabelOverridesType(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	var birthdateType models.ContactImportantDateType
+	if err := ctx.db.Where("vault_id = ? AND label = ?", ctx.vaultID, "Birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("Failed to find Birthdate type: %v", err)
+	}
+
+	day := 1
+	month := 1
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "My Custom Birthday",
+		Day:                        &day,
+		Month:                      &month,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if date.Label != "My Custom Birthday" {
+		t.Errorf("Expected label 'My Custom Birthday', got '%s'", date.Label)
 	}
 }

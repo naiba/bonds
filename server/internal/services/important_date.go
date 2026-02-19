@@ -9,6 +9,7 @@ import (
 )
 
 var ErrImportantDateNotFound = errors.New("important date not found")
+var ErrImportantDateLabelRequired = errors.New("label is required when no type is selected")
 
 type ImportantDateService struct {
 	db *gorm.DB
@@ -37,9 +38,16 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
+	label := req.Label
+	if label == "" && req.ContactImportantDateTypeID != nil {
+		label = s.resolveTypeLabel(*req.ContactImportantDateTypeID)
+	}
+	if label == "" {
+		return nil, ErrImportantDateLabelRequired
+	}
 	date := models.ContactImportantDate{
 		ContactID:                  contactID,
-		Label:                      req.Label,
+		Label:                      label,
 		Day:                        req.Day,
 		Month:                      req.Month,
 		Year:                       req.Year,
@@ -66,7 +74,14 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 		}
 		return nil, err
 	}
-	date.Label = req.Label
+	label := req.Label
+	if label == "" && req.ContactImportantDateTypeID != nil {
+		label = s.resolveTypeLabel(*req.ContactImportantDateTypeID)
+	}
+	if label == "" {
+		return nil, ErrImportantDateLabelRequired
+	}
+	date.Label = label
 	date.Day = req.Day
 	date.Month = req.Month
 	date.Year = req.Year
@@ -93,6 +108,14 @@ func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error 
 		return ErrImportantDateNotFound
 	}
 	return nil
+}
+
+func (s *ImportantDateService) resolveTypeLabel(typeID uint) string {
+	var dateType models.ContactImportantDateType
+	if err := s.db.First(&dateType, typeID).Error; err != nil {
+		return ""
+	}
+	return dateType.Label
 }
 
 func toImportantDateResponse(d *models.ContactImportantDate) dto.ImportantDateResponse {

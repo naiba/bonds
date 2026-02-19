@@ -25,9 +25,14 @@ vi.mock("@/components/CalendarDatePicker", () => ({
   default: () => <div data-testid="calendar-date-picker" />,
 }));
 
-const mockUseQuery = vi.fn();
+let mockDatesReturn: unknown = { data: [], isLoading: false };
+let mockPrefsReturn: unknown = { data: undefined };
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQuery: (opts: { queryKey: unknown[] }) => {
+    const key = JSON.stringify(opts.queryKey);
+    if (key.includes("preferences")) return mockPrefsReturn;
+    return mockDatesReturn;
+  },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
@@ -79,36 +84,35 @@ const mockDates = [
 
 describe("ImportantDatesModule", () => {
   it("renders title and add button", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    mockDatesReturn = { data: [], isLoading: false };
     renderModule();
     expect(screen.getByText("Important Dates")).toBeInTheDocument();
     expect(screen.getByText("Add")).toBeInTheDocument();
   });
 
   it("renders empty state", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    mockDatesReturn = { data: [], isLoading: false };
     renderModule();
     expect(screen.getByText("No important dates")).toBeInTheDocument();
   });
 
   it("renders important dates list", () => {
-    mockUseQuery.mockReturnValue({ data: mockDates, isLoading: false });
+    mockDatesReturn = { data: mockDates, isLoading: false };
     renderModule();
     expect(screen.getByText("Birthday")).toBeInTheDocument();
     expect(screen.getByText("Lunar NY")).toBeInTheDocument();
   });
 
-  it("renders lunar date with tag", () => {
-    mockUseQuery.mockReturnValue({ data: mockDates, isLoading: false });
+  it("renders lunar date with tag when alternative calendar enabled", () => {
+    mockDatesReturn = { data: mockDates, isLoading: false };
+    mockPrefsReturn = { data: { enable_alternative_calendar: true } };
     renderModule();
     expect(screen.getByText("lunar")).toBeInTheDocument();
   });
 
   it("renders gregorian date without tag", () => {
-    mockUseQuery.mockReturnValue({
-      data: [mockDates[0]],
-      isLoading: false,
-    });
+    mockDatesReturn = { data: [mockDates[0]], isLoading: false };
+    mockPrefsReturn = { data: undefined };
     renderModule();
     expect(screen.getByText("Birthday")).toBeInTheDocument();
     expect(screen.queryByText("gregorian")).not.toBeInTheDocument();
