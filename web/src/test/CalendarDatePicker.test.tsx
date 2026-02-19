@@ -22,14 +22,23 @@ function renderPicker(props: Parameters<typeof CalendarDatePicker>[0] = {}) {
 }
 
 describe("CalendarDatePicker", () => {
-  it("renders with default gregorian mode", () => {
+  it("renders plain date picker when alternative calendar disabled", () => {
     renderPicker();
+    expect(document.querySelector(".ant-picker")).toBeInTheDocument();
+    expect(screen.queryByText("Gregorian")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chinese Lunar")).not.toBeInTheDocument();
+  });
+
+  it("renders with segmented calendar switcher when enabled", () => {
+    renderPicker({ enableAlternativeCalendar: true });
     expect(screen.getByText("Gregorian")).toBeInTheDocument();
+    expect(screen.getByText("Chinese Lunar")).toBeInTheDocument();
     expect(document.querySelector(".ant-picker")).toBeInTheDocument();
   });
 
-  it("renders with lunar mode", () => {
+  it("renders with lunar mode when enabled", () => {
     renderPicker({
+      enableAlternativeCalendar: true,
       value: { calendarType: "lunar", day: 15, month: 1, year: 2025 },
     });
     expect(screen.getByText("Chinese Lunar")).toBeInTheDocument();
@@ -38,22 +47,18 @@ describe("CalendarDatePicker", () => {
     expect(selects.length).toBe(3);
   });
 
-  it("shows preview text", () => {
+  it("shows preview text when alternative calendar enabled", () => {
     const { unmount } = renderPicker({
+      enableAlternativeCalendar: true,
       value: { calendarType: "gregorian", day: 15, month: 3, year: 2025 },
     });
     expect(screen.getByText(/Chinese Lunar:/)).toBeInTheDocument();
     unmount();
 
     renderPicker({
+      enableAlternativeCalendar: true,
       value: { calendarType: "lunar", day: 15, month: 1, year: 2025 },
     });
     expect(screen.getByText(/Gregorian:/)).toBeInTheDocument();
-  });
-
-  it("renders both calendar type options", () => {
-    renderPicker();
-    expect(screen.getByText("Gregorian")).toBeInTheDocument();
-    expect(screen.getByText("Chinese Lunar")).toBeInTheDocument();
   });
 });

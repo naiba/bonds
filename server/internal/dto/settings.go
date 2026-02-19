@@ -3,14 +3,15 @@ package dto
 import "time"
 
 type PreferencesResponse struct {
-	NameOrder      string `json:"name_order" example:"first_last"`
-	DateFormat     string `json:"date_format" example:"YYYY-MM-DD"`
-	Timezone       string `json:"timezone" example:"America/New_York"`
-	Locale         string `json:"locale" example:"en"`
-	NumberFormat   string `json:"number_format" example:"1,234.56"`
-	DistanceFormat string `json:"distance_format" example:"km"`
-	DefaultMapSite string `json:"default_map_site" example:"google_maps"`
-	HelpShown      bool   `json:"help_shown" example:"true"`
+	NameOrder                 string `json:"name_order" example:"first_last"`
+	DateFormat                string `json:"date_format" example:"YYYY-MM-DD"`
+	Timezone                  string `json:"timezone" example:"America/New_York"`
+	Locale                    string `json:"locale" example:"en"`
+	NumberFormat              string `json:"number_format" example:"1,234.56"`
+	DistanceFormat            string `json:"distance_format" example:"km"`
+	DefaultMapSite            string `json:"default_map_site" example:"google_maps"`
+	HelpShown                 bool   `json:"help_shown" example:"true"`
+	EnableAlternativeCalendar bool   `json:"enable_alternative_calendar" example:"false"`
 }
 
 type UpdateNameOrderRequest struct {
@@ -30,14 +31,15 @@ type UpdateLocaleRequest struct {
 }
 
 type UpdatePreferencesRequest struct {
-	NameOrder      string `json:"name_order" example:"first_last"`
-	DateFormat     string `json:"date_format" example:"YYYY-MM-DD"`
-	Timezone       string `json:"timezone" example:"America/New_York"`
-	Locale         string `json:"locale" example:"en"`
-	NumberFormat   string `json:"number_format" example:"1,234.56"`
-	DistanceFormat string `json:"distance_format" example:"km"`
-	DefaultMapSite string `json:"default_map_site" example:"google_maps"`
-	HelpShown      *bool  `json:"help_shown" example:"true"`
+	NameOrder                 string `json:"name_order" example:"first_last"`
+	DateFormat                string `json:"date_format" example:"YYYY-MM-DD"`
+	Timezone                  string `json:"timezone" example:"America/New_York"`
+	Locale                    string `json:"locale" example:"en"`
+	NumberFormat              string `json:"number_format" example:"1,234.56"`
+	DistanceFormat            string `json:"distance_format" example:"km"`
+	DefaultMapSite            string `json:"default_map_site" example:"google_maps"`
+	HelpShown                 *bool  `json:"help_shown" example:"true"`
+	EnableAlternativeCalendar *bool  `json:"enable_alternative_calendar" example:"false"`
 }
 
 type CreateNotificationChannelRequest struct {

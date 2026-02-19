@@ -29,6 +29,8 @@ const { Title } = Typography;
 interface CalendarItem {
   type: "date" | "reminder";
   label: string;
+  contactName: string;
+  contactId: string;
   dateStr: string;
   calendarType?: string;
 }
@@ -78,13 +80,13 @@ export default function VaultCalendar() {
       const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
       if (!key) continue;
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ type: "date", label: d.label ?? '', dateStr: key, calendarType: d.calendar_type });
+      map.get(key)!.push({ type: "date", label: d.label ?? '', contactName: d.contact_name ?? '', contactId: d.contact_id ?? '', dateStr: key, calendarType: d.calendar_type });
     }
     for (const r of reminders) {
       const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
       if (!key) continue;
       if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ type: "reminder", label: r.label ?? '', dateStr: key, calendarType: r.calendar_type });
+      map.get(key)!.push({ type: "reminder", label: r.label ?? '', contactName: r.contact_name ?? '', contactId: r.contact_id ?? '', dateStr: key, calendarType: r.calendar_type });
     }
     return map;
   }, [monthData]);
@@ -103,10 +105,7 @@ export default function VaultCalendar() {
                 status={item.type === "date" ? "success" : "warning"}
                 text={
                   <span style={{ fontSize: 11 }}>
-                    {item.label}
-                    {item.calendarType && item.calendarType !== "gregorian" && (
-                      <span style={{ marginLeft: 2, color: "#fa541c", fontSize: 10 }}>🌙</span>
-                    )}
+                    {item.contactName ? `${item.contactName} - ${item.label}` : item.label}
                   </span>
                 }
               />
@@ -153,13 +152,21 @@ export default function VaultCalendar() {
         {dayDetail ? (
           <div>
             {(dayDetail.important_dates ?? []).map((d: CalendarDateItem, i: number) => (
-              <div key={`d-${i}`} style={{ marginBottom: 8 }}>
-                <Badge status="success" text={d.label ?? ""} />
+              <div
+                key={`d-${i}`}
+                style={{ marginBottom: 8, cursor: d.contact_id ? "pointer" : undefined }}
+                onClick={() => d.contact_id && navigate(`/vaults/${vaultId}/contacts/${d.contact_id}`)}
+              >
+                <Badge status="success" text={d.contact_name ? `${d.contact_name} - ${d.label ?? ""}` : (d.label ?? "")} />
               </div>
             ))}
             {(dayDetail.reminders ?? []).map((r: CalendarReminderItem, i: number) => (
-              <div key={`r-${i}`} style={{ marginBottom: 8 }}>
-                <Badge status="warning" text={r.label ?? ""} />
+              <div
+                key={`r-${i}`}
+                style={{ marginBottom: 8, cursor: r.contact_id ? "pointer" : undefined }}
+                onClick={() => r.contact_id && navigate(`/vaults/${vaultId}/contacts/${r.contact_id}`)}
+              >
+                <Badge status="warning" text={r.contact_name ? `${r.contact_name} - ${r.label ?? ""}` : (r.label ?? "")} />
               </div>
             ))}
             {!(dayDetail.important_dates?.length || dayDetail.reminders?.length) && (

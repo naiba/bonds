@@ -29,14 +29,15 @@ func (s *PreferenceService) Get(userID string) (*dto.PreferencesResponse, error)
 		tz = *user.Timezone
 	}
 	return &dto.PreferencesResponse{
-		NameOrder:      user.NameOrder,
-		DateFormat:     user.DateFormat,
-		Timezone:       tz,
-		Locale:         user.Locale,
-		NumberFormat:   user.NumberFormat,
-		DistanceFormat: user.DistanceFormat,
-		DefaultMapSite: user.DefaultMapSite,
-		HelpShown:      user.HelpShown,
+		NameOrder:                 user.NameOrder,
+		DateFormat:                user.DateFormat,
+		Timezone:                  tz,
+		Locale:                    user.Locale,
+		NumberFormat:              user.NumberFormat,
+		DistanceFormat:            user.DistanceFormat,
+		DefaultMapSite:            user.DefaultMapSite,
+		HelpShown:                 user.HelpShown,
+		EnableAlternativeCalendar: user.EnableAlternativeCalendar,
 	}, nil
 }
 
@@ -97,6 +98,9 @@ func (s *PreferenceService) UpdateAll(userID string, req dto.UpdatePreferencesRe
 	}
 	if req.HelpShown != nil {
 		updates["help_shown"] = *req.HelpShown
+	}
+	if req.EnableAlternativeCalendar != nil {
+		updates["enable_alternative_calendar"] = *req.EnableAlternativeCalendar
 	}
 	if len(updates) == 0 {
 		return s.Get(userID)

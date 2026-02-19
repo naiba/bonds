@@ -1,5 +1,17 @@
 import { test, expect } from '@playwright/test';
 
+async function enableAlternativeCalendar(page: import('@playwright/test').Page) {
+  await page.goto('/settings/preferences');
+  await page.waitForLoadState('networkidle');
+  const toggle = page.locator('.ant-form-item').filter({ hasText: /alternative calendar/i }).locator('.ant-switch');
+  const isChecked = await toggle.getAttribute('aria-checked');
+  if (isChecked !== 'true') {
+    await toggle.click();
+  }
+  await page.getByRole('button', { name: /save/i }).click();
+  await page.waitForTimeout(500);
+}
+
 async function setupContactPage(page: import('@playwright/test').Page) {
   const email = `calendar-${Date.now()}@example.com`;
   await page.goto('/register');
@@ -10,6 +22,9 @@ async function setupContactPage(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /create account/i }).click();
   await expect(page).toHaveURL(/\/vaults/, { timeout: 15000 });
 
+  await enableAlternativeCalendar(page);
+
+  await page.goto('/vaults');
   await page.getByRole('button', { name: /new vault/i }).click();
   await page.getByPlaceholder(/e\.g\. family/i).fill('Cal Vault');
   await page.getByPlaceholder(/what is this vault/i).fill('Calendar testing');

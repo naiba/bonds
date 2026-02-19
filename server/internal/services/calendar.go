@@ -18,12 +18,14 @@ func NewCalendarService(db *gorm.DB) *CalendarService {
 
 func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.CalendarResponse, error) {
 	var contacts []models.Contact
-	if err := s.db.Where("vault_id = ?", vaultID).Select("id").Find(&contacts).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Select("id, first_name, last_name").Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 	contactIDs := make([]string, len(contacts))
+	contactNames := make(map[string]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
+		contactNames[c.ID] = buildContactName(&contacts[i])
 	}
 
 	resp := &dto.CalendarResponse{
@@ -52,6 +54,7 @@ func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.Cal
 		importantDates[i] = dto.CalendarDateItem{
 			ID:            d.ID,
 			ContactID:     d.ContactID,
+			ContactName:   contactNames[d.ContactID],
 			Label:         d.Label,
 			Day:           d.Day,
 			Month:         d.Month,
@@ -78,6 +81,7 @@ func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.Cal
 		reminderItems[i] = dto.CalendarReminderItem{
 			ID:            r.ID,
 			ContactID:     r.ContactID,
+			ContactName:   contactNames[r.ContactID],
 			Label:         r.Label,
 			Day:           r.Day,
 			Month:         r.Month,

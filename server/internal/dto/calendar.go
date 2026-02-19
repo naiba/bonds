@@ -10,6 +10,7 @@ type CalendarResponse struct {
 type CalendarDateItem struct {
 	ID            uint   `json:"id" example:"1"`
 	ContactID     string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ContactName   string `json:"contact_name" example:"John Doe"`
 	Label         string `json:"label" example:"Birthday"`
 	Day           *int   `json:"day" example:"15"`
 	Month         *int   `json:"month" example:"6"`
@@ -23,6 +24,7 @@ type CalendarDateItem struct {
 type CalendarReminderItem struct {
 	ID            uint      `json:"id" example:"1"`
 	ContactID     string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ContactName   string    `json:"contact_name" example:"John Doe"`
 	Label         string    `json:"label" example:"Birthday"`
 	Day           *int      `json:"day" example:"15"`
 	Month         *int      `json:"month" example:"6"`

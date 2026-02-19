@@ -21,11 +21,13 @@ export interface CalendarDatePickerValue {
 interface CalendarDatePickerProps {
   value?: CalendarDatePickerValue;
   onChange?: (value: CalendarDatePickerValue) => void;
+  enableAlternativeCalendar?: boolean;
 }
 
 export default function CalendarDatePicker({
   value,
   onChange,
+  enableAlternativeCalendar = false,
 }: CalendarDatePickerProps) {
   const { t } = useTranslation();
   const now = dayjs();
@@ -107,6 +109,16 @@ export default function CalendarDatePicker({
     value: ct,
     label: t(getCalendarSystem(ct).labelKey),
   }));
+
+  if (!enableAlternativeCalendar) {
+    return (
+      <DatePicker
+        value={dayjs(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}
+        onChange={handleGregorianChange}
+        style={{ width: "100%" }}
+      />
+    );
+  }
 
   return (
     <div>

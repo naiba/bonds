@@ -188,6 +188,13 @@ export default function Preferences() {
           >
             <Switch />
           </Form.Item>
+          <Form.Item
+            name="enable_alternative_calendar"
+            label={<span style={labelStyle}>{t("settings.preferences.enable_alternative_calendar")}</span>}
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
 
           <Divider style={{ margin: "8px 0 24px" }} />
 

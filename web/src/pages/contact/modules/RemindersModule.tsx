@@ -16,7 +16,7 @@ import {
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Reminder, CreateReminderRequest, APIError } from "@/api";
+import type { Reminder, CreateReminderRequest, APIError, UserPreferences } from "@/api";
 import { useTranslation } from "react-i18next";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
@@ -62,6 +62,15 @@ export default function RemindersModule({
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "reminders"];
+
+  const { data: prefs } = useQuery({
+    queryKey: ["settings", "preferences"],
+    queryFn: async () => {
+      const res = await api.preferences.preferencesList();
+      return res.data as UserPreferences | undefined;
+    },
+  });
+  const altCalendar = prefs?.enable_alternative_calendar ?? false;
 
   const frequencyOptions = [
     { value: "one_time", label: t("modules.reminders.freq_one_time") },
@@ -179,7 +188,7 @@ export default function RemindersModule({
                 <>
                   <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r)}</span>{" "}
                   <Tag color={freqColor[r.type!] ?? "default"}>{r.type}</Tag>
-                  {r.calendar_type && r.calendar_type !== "gregorian" && (
+                  {altCalendar && r.calendar_type && r.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{r.calendar_type}</Tag>
                   )}
                 </>
@@ -201,7 +210,7 @@ export default function RemindersModule({
             <Input />
           </Form.Item>
           <Form.Item name="calendarDate" label={t("modules.reminders.date")} rules={[{ required: true }]}>
-            <CalendarDatePicker />
+            <CalendarDatePicker enableAlternativeCalendar={altCalendar} />
           </Form.Item>
           <Form.Item name="frequency" label={t("modules.reminders.frequency")} rules={[{ required: true }]}>
             <Select options={frequencyOptions} />

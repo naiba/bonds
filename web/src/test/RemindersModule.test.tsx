@@ -25,9 +25,14 @@ vi.mock("@/components/CalendarDatePicker", () => ({
   default: () => <div data-testid="calendar-date-picker" />,
 }));
 
-const mockUseQuery = vi.fn();
+let mockRemindersReturn: unknown = { data: [], isLoading: false };
+let mockPrefsReturn: unknown = { data: undefined };
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (...args: unknown[]) => mockUseQuery(...args),
+  useQuery: (opts: { queryKey: unknown[] }) => {
+    const key = JSON.stringify(opts.queryKey);
+    if (key.includes("preferences")) return mockPrefsReturn;
+    return mockRemindersReturn;
+  },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
@@ -85,33 +90,35 @@ const mockReminders = [
 
 describe("RemindersModule", () => {
   it("renders title and add button", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    mockRemindersReturn = { data: [], isLoading: false };
     renderModule();
     expect(screen.getByText("Reminders")).toBeInTheDocument();
     expect(screen.getByText("Add")).toBeInTheDocument();
   });
 
   it("renders empty state", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    mockRemindersReturn = { data: [], isLoading: false };
     renderModule();
     expect(screen.getByText("No reminders")).toBeInTheDocument();
   });
 
   it("renders reminders list", () => {
-    mockUseQuery.mockReturnValue({ data: mockReminders, isLoading: false });
+    mockRemindersReturn = { data: mockReminders, isLoading: false };
     renderModule();
     expect(screen.getByText("Call Mom")).toBeInTheDocument();
     expect(screen.getByText("Lunar Bday")).toBeInTheDocument();
   });
 
-  it("renders lunar reminder with tag", () => {
-    mockUseQuery.mockReturnValue({ data: mockReminders, isLoading: false });
+  it("renders lunar reminder with tag when alternative calendar enabled", () => {
+    mockRemindersReturn = { data: mockReminders, isLoading: false };
+    mockPrefsReturn = { data: { enable_alternative_calendar: true } };
     renderModule();
     expect(screen.getByText("lunar")).toBeInTheDocument();
   });
 
   it("renders frequency tag", () => {
-    mockUseQuery.mockReturnValue({ data: mockReminders, isLoading: false });
+    mockRemindersReturn = { data: mockReminders, isLoading: false };
+    mockPrefsReturn = { data: undefined };
     renderModule();
     const recurringTags = screen.getAllByText("recurring_year");
     expect(recurringTags.length).toBeGreaterThanOrEqual(1);

@@ -117,11 +117,17 @@ func TestCalendarWithDates(t *testing.T) {
 	if len(cal.ImportantDates) > 0 && cal.ImportantDates[0].Label != "Birthday" {
 		t.Errorf("Expected label 'Birthday', got '%s'", cal.ImportantDates[0].Label)
 	}
+	if len(cal.ImportantDates) > 0 && cal.ImportantDates[0].ContactName != "Jane" {
+		t.Errorf("Expected contact_name 'Jane', got '%s'", cal.ImportantDates[0].ContactName)
+	}
 	if len(cal.Reminders) != 1 {
 		t.Errorf("Expected 1 reminder, got %d", len(cal.Reminders))
 	}
 	if len(cal.Reminders) > 0 && cal.Reminders[0].Label != "Call Jane" {
 		t.Errorf("Expected label 'Call Jane', got '%s'", cal.Reminders[0].Label)
+	}
+	if len(cal.Reminders) > 0 && cal.Reminders[0].ContactName != "Jane" {
+		t.Errorf("Expected contact_name 'Jane', got '%s'", cal.Reminders[0].ContactName)
 	}
 }
 
@@ -203,6 +209,9 @@ func TestCalendarWithLunarDates(t *testing.T) {
 		t.Fatalf("Expected 1 important date, got %d", len(cal.ImportantDates))
 	}
 	d := cal.ImportantDates[0]
+	if d.ContactName != "Lunar" {
+		t.Errorf("Expected contact_name 'Lunar', got '%s'", d.ContactName)
+	}
 	if d.Label != "Lunar Birthday" {
 		t.Errorf("Expected label 'Lunar Birthday', got '%s'", d.Label)
 	}

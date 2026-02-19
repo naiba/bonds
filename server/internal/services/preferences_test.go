@@ -145,3 +145,37 @@ func TestPreferenceUpdateAllPartial(t *testing.T) {
 		t.Errorf("Expected locale to remain 'de', got '%s'", prefs.Locale)
 	}
 }
+
+func TestPreferenceEnableAlternativeCalendar(t *testing.T) {
+	svc, userID := setupPreferenceTest(t)
+
+	prefs, err := svc.Get(userID)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if prefs.EnableAlternativeCalendar {
+		t.Error("Expected enable_alternative_calendar to default to false")
+	}
+
+	enabled := true
+	prefs, err = svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
+		EnableAlternativeCalendar: &enabled,
+	})
+	if err != nil {
+		t.Fatalf("UpdateAll failed: %v", err)
+	}
+	if !prefs.EnableAlternativeCalendar {
+		t.Error("Expected enable_alternative_calendar to be true after update")
+	}
+
+	disabled := false
+	prefs, err = svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
+		EnableAlternativeCalendar: &disabled,
+	})
+	if err != nil {
+		t.Fatalf("UpdateAll failed: %v", err)
+	}
+	if prefs.EnableAlternativeCalendar {
+		t.Error("Expected enable_alternative_calendar to be false after update")
+	}
+}

@@ -43,7 +43,7 @@ function renderCalendar() {
 }
 
 describe("VaultCalendar", () => {
-  it("renders lunar moon emoji for non-gregorian dates", () => {
+  it("renders contact name with label for calendar dates", () => {
     mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
       const key = opts.queryKey;
       if (Array.isArray(key) && key.includes("month")) {
@@ -53,6 +53,7 @@ describe("VaultCalendar", () => {
               {
                 id: 1,
                 contact_id: "c1",
+                contact_name: "John Doe",
                 label: "Lunar Birthday",
                 day: 15,
                 month: 2,
@@ -61,9 +62,6 @@ describe("VaultCalendar", () => {
                 original_day: 15,
                 original_month: 1,
                 original_year: 2026,
-                contact_important_date_type_id: null,
-                created_at: "2025-01-01",
-                updated_at: "2025-01-01",
               },
             ],
             reminders: [],
@@ -77,6 +75,6 @@ describe("VaultCalendar", () => {
       return { data: undefined, isLoading: false };
     });
     renderCalendar();
-    expect(document.body.textContent).toContain("🌙");
+    expect(document.body.textContent).toContain("John Doe - Lunar Birthday");
   });
 });
