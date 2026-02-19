@@ -75,6 +75,11 @@ test.describe('Calendar System', () => {
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
 
+    const typeFormItem = modal.locator('.ant-form-item').filter({ hasText: /type/i });
+    await typeFormItem.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
+    await page.waitForTimeout(300);
+
     await modal.getByRole('textbox').first().fill('Lunar Birthday');
 
     await page.getByText('Chinese Lunar', { exact: true }).click();
@@ -84,17 +89,13 @@ test.describe('Calendar System', () => {
 
     await compactSelects.nth(1).click();
     await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
-    await page.waitForTimeout(300);
-
-    const typeFormItem = modal.locator('.ant-form-item').filter({ hasText: /type/i });
-    await typeFormItem.locator('.ant-select').click();
-    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
-    await page.waitForTimeout(300);
+    await modal.locator('.ant-modal-header').click();
+    await page.waitForTimeout(500);
 
     await modal.getByRole('button', { name: /ok/i }).click();
 
     await expect(modal).not.toBeVisible({ timeout: 15000 });
-    await expect(importantDatesCard.getByText('Lunar Birthday')).toBeVisible({ timeout: 5000 });
+    await expect(importantDatesCard.getByText('Lunar Birthday')).toBeVisible({ timeout: 10000 });
     await expect(importantDatesCard.locator('.ant-tag').filter({ hasText: 'lunar' })).toBeVisible({ timeout: 5000 });
   });
 

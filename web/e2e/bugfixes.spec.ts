@@ -187,8 +187,6 @@ test.describe('Bugfixes', () => {
   test('#11: avatar area is visible on contact detail and endpoint returns 200', async ({ page }) => {
     await registerUser(page, 'bf11');
     await createVault(page, 'BF11 Vault');
-    const vaultUrl = getVaultUrl(page);
-
     await goToContacts(page);
     await createContact(page, 'Avatar', 'Test');
 
