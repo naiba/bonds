@@ -194,6 +194,15 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
             </Title>
           </div>
         }
+        extra={
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => navigate(`/vaults/${vaultId}/companies`)}
+          >
+            {t("common.edit")}
+          </Button>
+        }
       >
         {contactCompanies.length > 0 ? (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

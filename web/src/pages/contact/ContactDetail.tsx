@@ -309,6 +309,7 @@ export default function ContactDetail() {
     const isContactPage = page.type === "contact";
 
     const children: React.ReactNode[] = [];
+    let extraInfoRendered = false;
 
     if (isContactPage) {
       children.push(<React.Fragment key="overview-card">{overviewCard}</React.Fragment>);
@@ -328,9 +329,12 @@ export default function ContactDetail() {
         continue;
       }
       if (moduleType === "gender_pronoun" || moduleType === "religions" || moduleType === "company") {
-        children.push(
-          <ExtraInfoModule key={`mod-${mod.id}`} {...moduleProps} contact={contact} />,
-        );
+        if (!extraInfoRendered) {
+          extraInfoRendered = true;
+          children.push(
+            <ExtraInfoModule key="extra-info" {...moduleProps} contact={contact} />,
+          );
+        }
         continue;
       }
 
