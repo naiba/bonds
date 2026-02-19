@@ -178,16 +178,20 @@ func (h *ReportHandler) AddressesByCountry(c echo.Context) error {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/files/photos [get]
 func (h *VaultFileHandler) ListPhotos(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	files, err := h.vaultFileService.ListByType(vaultID, "photo")
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	files, meta, err := h.vaultFileService.ListByType(vaultID, "photo", page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_vault_files")
 	}
-	return response.OK(c, files)
+	return response.Paginated(c, files, meta)
 }
 
 // ListDocuments godoc
@@ -198,16 +202,20 @@ func (h *VaultFileHandler) ListPhotos(c echo.Context) error {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/files/documents [get]
 func (h *VaultFileHandler) ListDocuments(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	files, err := h.vaultFileService.ListByType(vaultID, "document")
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	files, meta, err := h.vaultFileService.ListByType(vaultID, "document", page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_vault_files")
 	}
-	return response.OK(c, files)
+	return response.Paginated(c, files, meta)
 }
 
 // ListAvatars godoc
@@ -218,16 +226,20 @@ func (h *VaultFileHandler) ListDocuments(c echo.Context) error {
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/files/avatars [get]
 func (h *VaultFileHandler) ListAvatars(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	files, err := h.vaultFileService.ListByType(vaultID, "avatar")
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	files, meta, err := h.vaultFileService.ListByType(vaultID, "avatar", page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_vault_files")
 	}
-	return response.OK(c, files)
+	return response.Paginated(c, files, meta)
 }
 
 func (h *VaultHandler) UpdateDefaultTab(c echo.Context) error {

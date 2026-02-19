@@ -2,9 +2,11 @@ package services
 
 import (
 	"errors"
+	"math"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -28,19 +30,42 @@ func (s *NoteService) SetSearchService(ss *SearchService) {
 	s.searchService = ss
 }
 
-func (s *NoteService) List(contactID, vaultID string) ([]dto.NoteResponse, error) {
+func (s *NoteService) List(contactID, vaultID string, page, perPage int) ([]dto.NoteResponse, response.Meta, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
-		return nil, err
+		return nil, response.Meta{}, err
 	}
+
+	query := s.db.Where("contact_id = ?", contactID)
+
+	var total int64
+	if err := query.Model(&models.Note{}).Count(&total).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 15
+	}
+	offset := (page - 1) * perPage
+
 	var notes []models.Note
-	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&notes).Error; err != nil {
-		return nil, err
+	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&notes).Error; err != nil {
+		return nil, response.Meta{}, err
 	}
 	result := make([]dto.NoteResponse, len(notes))
 	for i, n := range notes {
 		result[i] = toNoteResponse(&n)
 	}
-	return result, nil
+
+	meta := response.Meta{
+		Page:       page,
+		PerPage:    perPage,
+		Total:      total,
+		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
+	}
+	return result, meta, nil
 }
 
 func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.CreateNoteRequest) (*dto.NoteResponse, error) {

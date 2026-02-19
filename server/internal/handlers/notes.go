@@ -28,6 +28,8 @@ func NewNoteHandler(noteService *services.NoteService) *NoteHandler {
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
 //	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.NoteResponse}
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
@@ -36,14 +38,16 @@ func NewNoteHandler(noteService *services.NoteService) *NoteHandler {
 func (h *NoteHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
-	notes, err := h.noteService.List(contactID, vaultID)
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	notes, meta, err := h.noteService.List(contactID, vaultID, page, perPage)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_list_notes")
 	}
-	return response.OK(c, notes)
+	return response.Paginated(c, notes, meta)
 }
 
 // Create godoc

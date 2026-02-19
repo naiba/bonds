@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
@@ -29,17 +29,21 @@ func NewContactPhotoHandler(vaultFileService *services.VaultFileService) *Contac
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
 //	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/photos [get]
 func (h *ContactPhotoHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	contactID := c.Param("contact_id")
-	files, err := h.vaultFileService.ListContactPhotos(contactID, vaultID)
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	files, meta, err := h.vaultFileService.ListContactPhotos(contactID, vaultID, page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_contact_photos")
 	}
-	return response.OK(c, files)
+	return response.Paginated(c, files, meta)
 }
 
 // Get godoc
@@ -122,17 +126,21 @@ func NewContactDocumentHandler(vaultFileService *services.VaultFileService) *Con
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
 //	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.VaultFileResponse}
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/documents [get]
 func (h *ContactDocumentHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	contactID := c.Param("contact_id")
-	files, err := h.vaultFileService.ListContactDocuments(contactID, vaultID)
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	files, meta, err := h.vaultFileService.ListContactDocuments(contactID, vaultID, page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_contact_documents")
 	}
-	return response.OK(c, files)
+	return response.Paginated(c, files, meta)
 }
 
 // Delete godoc

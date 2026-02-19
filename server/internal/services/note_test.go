@@ -74,7 +74,7 @@ func TestListNotes(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	notes, err := svc.List(contactID, vaultID)
+	notes, _, err := svc.List(contactID, vaultID, 1, 15)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestDeleteNote(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	notes, err := svc.List(contactID, vaultID)
+	notes, _, err := svc.List(contactID, vaultID, 1, 15)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -156,6 +156,48 @@ func TestCreateNoteWithEmotion(t *testing.T) {
 	}
 	if updated.EmotionID != nil {
 		t.Errorf("Expected emotion_id nil after update, got %v", updated.EmotionID)
+	}
+}
+
+func TestNoteListPagination(t *testing.T) {
+	svc, contactID, vaultID, userID := setupNoteTest(t)
+
+	for i := 0; i < 3; i++ {
+		_, err := svc.Create(contactID, vaultID, userID, dto.CreateNoteRequest{Body: "Note body"})
+		if err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	notes, meta, err := svc.List(contactID, vaultID, 1, 2)
+	if err != nil {
+		t.Fatalf("List page 1 failed: %v", err)
+	}
+	if len(notes) != 2 {
+		t.Errorf("Expected 2 notes on page 1, got %d", len(notes))
+	}
+	if meta.Total != 3 {
+		t.Errorf("Expected total 3, got %d", meta.Total)
+	}
+	if meta.TotalPages != 2 {
+		t.Errorf("Expected 2 total pages, got %d", meta.TotalPages)
+	}
+	if meta.Page != 1 {
+		t.Errorf("Expected page 1, got %d", meta.Page)
+	}
+	if meta.PerPage != 2 {
+		t.Errorf("Expected per_page 2, got %d", meta.PerPage)
+	}
+
+	notes2, meta2, err := svc.List(contactID, vaultID, 2, 2)
+	if err != nil {
+		t.Fatalf("List page 2 failed: %v", err)
+	}
+	if len(notes2) != 1 {
+		t.Errorf("Expected 1 note on page 2, got %d", len(notes2))
+	}
+	if meta2.Total != 3 {
+		t.Errorf("Expected total 3 on page 2, got %d", meta2.Total)
 	}
 }
 

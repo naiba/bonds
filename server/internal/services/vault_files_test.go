@@ -241,6 +241,68 @@ func TestGetFileNotFound(t *testing.T) {
 	}
 }
 
+func TestVaultFilesListByTypePagination(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "files-type-pagination@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	svc := NewVaultFileService(db, t.TempDir())
+	for i := 0; i < 3; i++ {
+		file := models.File{
+			VaultID:  vault.ID,
+			UUID:     "type-page-uuid-" + string(rune('a'+i)),
+			Name:     "doc.pdf",
+			MimeType: "application/pdf",
+			Type:     "document",
+			Size:     1024,
+		}
+		if err := db.Create(&file).Error; err != nil {
+			t.Fatalf("Create file failed: %v", err)
+		}
+	}
+
+	files, meta, err := svc.ListByType(vault.ID, "document", 1, 2)
+	if err != nil {
+		t.Fatalf("ListByType page 1 failed: %v", err)
+	}
+	if len(files) != 2 {
+		t.Errorf("Expected 2 files on page 1, got %d", len(files))
+	}
+	if meta.Total != 3 {
+		t.Errorf("Expected total 3, got %d", meta.Total)
+	}
+	if meta.TotalPages != 2 {
+		t.Errorf("Expected 2 total pages, got %d", meta.TotalPages)
+	}
+
+	files2, meta2, err := svc.ListByType(vault.ID, "document", 2, 2)
+	if err != nil {
+		t.Fatalf("ListByType page 2 failed: %v", err)
+	}
+	if len(files2) != 1 {
+		t.Errorf("Expected 1 file on page 2, got %d", len(files2))
+	}
+	if meta2.Total != 3 {
+		t.Errorf("Expected total 3 on page 2, got %d", meta2.Total)
+	}
+}
+
 func TestDeleteFileRemovesDisk(t *testing.T) {
 	svc, vaultID, _ := setupVaultFileTest(t)
 
