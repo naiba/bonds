@@ -72,15 +72,7 @@ export default function VaultReports() {
     },
   });
 
-  const totalAddresses = addresses.reduce((acc, curr) => acc + (curr.count || 0), 0);
   const totalMoodEntries = moodEntries.reduce((acc, curr) => acc + (curr.count || 0), 0);
-  
-  // @ts-expect-error unused variable
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const totalDates = importantDates.length;
-  // @ts-expect-error unused variable
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const totalContacts = totalAddresses; 
 
   const statCards = [
     { icon: <TeamOutlined />, bg: token.colorPrimaryBg, color: token.colorPrimary, title: t("vault.reports.total_contacts"), value: reportOverview?.total_contacts ?? 0 },

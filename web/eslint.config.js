@@ -19,6 +19,13 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-ignore': true,
+        'ts-expect-error': true,
+        'ts-nocheck': true,
+      }],
+    },
   },
   {
     files: ['src/stores/**/*.{ts,tsx}'],

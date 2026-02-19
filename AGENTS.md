@@ -227,10 +227,10 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 ### E2E（Playwright）
 
-- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`file-upload.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`new-features.spec.ts`、`vault-features.spec.ts`、`vault-files.spec.ts`。
+- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`file-upload.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`new-features.spec.ts`、`vault-features.spec.ts`、`vault-files.spec.ts`、`bugfixes.spec.ts`、`contact-modules.spec.ts`、`contact-modules-extended.spec.ts`、`missing-features.spec.ts`、`vault-extended.spec.ts`。
 - Playwright 自动启动 Go 服务器（端口 8080）和 Vite 开发服务器（端口 5173）。
 - Ant Design 表单：使用 `page.getByPlaceholder(...)` 而非 `getByLabel(...)`。
-- **E2E 前必须清理旧 DB**：如果本地有残留的 `server/bonds.db`，schema 不兼容会导致 migration 失败（`Cannot add a PRIMARY KEY column`）。运行前 `rm -f server/bonds.db*`。
+- **E2E 自动清理旧 DB**：`playwright.config.ts` 的 `webServer.command` 会在启动 Go 服务器前自动删除 `server/bonds.db*`。CI 环境下始终生效；本地 `reuseExistingServer=true` 时跳过（复用已运行的服务器）。
 
 ### Cron 调度器
 
@@ -341,16 +341,18 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 ## 代码质量规则
 
-- **禁止 `as any`、`@ts-ignore`、`@ts-expect-error`。**
-- **禁止空 catch 块。**
-- TypeScript 严格模式已开启：`noUnusedLocals`、`noUnusedParameters`、`noFallthroughCasesInSwitch`。
-- Go：`go vet` 必须通过。没有正当理由禁止 `//nolint`。
+以下规则由工具链自动强制执行（ESLint、TypeScript 严格模式、CI），违反时构建/lint 会直接失败，无需人工检查：
+
+- `as any`、`@ts-ignore`、`@ts-expect-error`、空 catch 块 → ESLint 报错（`src/api/*.ts` 生成代码除外）
+- `noUnusedLocals`、`noUnusedParameters`、`noFallthroughCasesInSwitch` → TypeScript 编译报错
+- React Hooks 规则（`set-state-in-effect`、`refs`）→ ESLint 报错
+- i18n key 一致性（en.json 与 zh.json）→ `bun run lint` 自动检查
+- Go `go vet` → CI 强制
+
+**非工具强制的设计指导：**
+
 - 格式化：Go 使用 `gofmt`，前端使用 Prettier。
-- **提交前必须运行 `cd web && bun run lint`**（ESLint），CI 会检查。
-- **React Hooks ESLint 规则**（`eslint-plugin-react-hooks`）：
-  - `react-hooks/set-state-in-effect`：禁止在 `useEffect` 内同步调用 `setState`。如需同步外部 prop 到内部状态，使用纯受控模式（直接从 prop 派生）或用 `key` prop 重置组件。
-  - `react-hooks/refs`：禁止在渲染期间读写 `ref.current`。Ref 只能在事件处理器或 effect 中访问。
-  - 组件优先使用**受控模式**（状态由父组件通过 `value`/`onChange` 管理），避免内部 `useState` + `useEffect` 同步 prop 的反模式。
+- 组件优先使用**受控模式**（状态由父组件通过 `value`/`onChange` 管理），避免内部 `useState` + `useEffect` 同步 prop 的反模式。
 
 ## 项目规模（供参考）
 
@@ -377,9 +379,9 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 | Go Avatar 测试 | 1 | 7 |
 | Go Calendar 测试 | 1 | 13 |
 | **Go 后端总计** | **91** | **~585** |
-| React Vitest | 25 | 85 |
-| Playwright E2E | 13 | 64 |
-| **全部总计** | **129** | **734+** |
+| React Vitest | 24 | 82 |
+| Playwright E2E | 18 | 104 |
+| **全部总计** | **133** | **771+** |
 
 ## 已知坑和注意事项
 
@@ -443,9 +445,8 @@ defer cleanup()
 ### 前端 i18n 注意事项
 
 - 翻译文件为嵌套 JSON 结构（`src/locales/en.json`、`zh.json`），使用点号路径访问（如 `t("vault.companies.title")`）。
-- 新增页面**必须同时**在 en.json 和 zh.json 中添加对应翻译键，否则 UI 上会显示原始键路径。
+- 新增页面**必须同时**在 en.json 和 zh.json 中添加对应翻译键，否则 UI 上会显示原始键路径。（`bun run lint` 自动检查，CI 强制）
 - Vitest 单元测试中 i18n 会被真实加载（非 mock），因此测试断言应匹配**翻译后的文本**（如 `"Vault Settings"`），而非键路径（如 `"vault_settings.title"`）。
-- 可用脚本检查缺失键：`grep -rhoE 't\("[^"]+"\)' src/pages/ src/components/` 提取所有使用的键，与 en.json 的扁平化键集合做差集。
 
 ### Vitest 本地 vs CI 差异（重要）
 
@@ -464,7 +465,8 @@ defer cleanup()
 
 - Ant Design 组件在 Playwright strict mode 下容易因多个元素匹配而失败（如 `.ant-card` 匹配多个卡片、`getByText` 在导航栏和内容区同时匹配）。解决：使用 `.first()`、`getByRole('table').getByText(...)` 等更精确的选择器。
 - 联系人创建后会自动跳转到详情页，测试中应先 `await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/)` 等待导航完成，再断言页面内容。
-- `calendar.spec.ts` 的 lunar reminder 测试存在 Ant Design 下拉遮挡问题（"四月" 选项遮挡 frequency 选择器），属于已知 flaky test。
+- **Ant Design Select 下拉遮挡**：多个 Select 紧挨时，前一个 Select 的 dropdown 可能遮挡后一个。选完后点击 `modal.locator('.ant-modal-header').click()` 让 dropdown 失焦关闭。**不要用 `Escape`**——它会关闭整个 Modal。
+- **表单 auto-fill 与 E2E 操作顺序**：`ImportantDatesModule` 选择 `internal_type=true` 的 date type 时会自动覆写 label 字段。E2E 测试中必须**先选 type 再填 label**，否则用户输入的 label 会被 auto-fill 覆盖。类似的 auto-fill 逻辑在其他模块中也可能存在，写 E2E 时需注意表单字段间的联动副作用。
 - **Contact Detail 动态 Tab 名称**：Tab 名来自后端 seed 数据的 `TemplatePage.Name`（"Contact information"、"Feed"、"Social"、"Life & goals"、"Information"），与前端 fallback tabs 的 i18n 翻译名不同。E2E 选择 tab 时必须用 seed 数据中的名称，且注意 "Contact information" 和 "Information" 两个 tab 共存，用 `{ name: 'Information', exact: true }` 精确匹配。
 - **Contact Detail 页面多个同名按钮**：动态 tabs 加载后，第一个 tab 默认展开所有模块，每个模块可能有 "Edit" 按钮。选择顶部操作栏的 Edit 按钮时用 `.first()`。
 
