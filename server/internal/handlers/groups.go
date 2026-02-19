@@ -99,6 +99,32 @@ func (h *GroupHandler) Get(c echo.Context) error {
 	return response.OK(c, group)
 }
 
+// ListContactGroups godoc
+//
+//	@Summary		List contact groups
+//	@Description	Return all groups a contact belongs to
+//	@Tags			groups
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.GroupResponse}
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/groups [get]
+func (h *GroupHandler) ListContactGroups(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	groups, err := h.groupService.ListByContact(contactID, vaultID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_contact_groups")
+	}
+	return response.OK(c, groups)
+}
+
 // AddContactToGroup godoc
 //
 //	@Summary		Add contact to group

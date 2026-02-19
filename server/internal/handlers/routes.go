@@ -391,6 +391,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	vaultScoped.PUT("/groups/:id", groupHandler.Update, requireEditor)
 	vaultScoped.DELETE("/groups/:id", groupHandler.Delete, requireEditor)
 
+	contacts.GET("/:contact_id/groups", groupHandler.ListContactGroups)
 	contacts.POST("/:contact_id/groups", groupHandler.AddContactToGroup, requireEditor)
 	contacts.DELETE("/:contact_id/groups/:id", groupHandler.RemoveContactFromGroup, requireEditor)
 
