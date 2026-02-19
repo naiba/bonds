@@ -43,14 +43,6 @@ func (h *PersonalizeHandler) List(c echo.Context) error {
 		}
 		return response.OK(c, data)
 	}
-	if entity == "modules" {
-		data, err := h.personalizeService.ListModules(accountID)
-		if err != nil {
-			return response.InternalError(c, "err.failed_to_list_modules")
-		}
-		return response.OK(c, data)
-	}
-
 	items, err := h.personalizeService.List(accountID, entity)
 	if err != nil {
 		if errors.Is(err, services.ErrUnknownEntityType) {

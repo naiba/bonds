@@ -176,11 +176,3 @@ func (s *PersonalizeService) ListTemplates(accountID string) ([]map[string]inter
 	}
 	return results, nil
 }
-
-func (s *PersonalizeService) ListModules(accountID string) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	if err := s.db.Table("modules").Where("account_id = ?", accountID).Order("id ASC").Find(&results).Error; err != nil {
-		return nil, err
-	}
-	return results, nil
-}
