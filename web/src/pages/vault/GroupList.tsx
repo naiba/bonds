@@ -7,6 +7,7 @@ import {
   Modal,
   Form,
   Input,
+  Select,
   Popconfirm,
   App,
   Empty,
@@ -48,8 +49,17 @@ export default function GroupList() {
     enabled: !!vaultId,
   });
 
+  const { data: groupTypes = [] } = useQuery({
+    queryKey: ["settings", "personalize", "group-types"],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("group-types");
+      return res.data ?? [];
+    },
+    enabled: open,
+  });
+
   const createMutation = useMutation({
-    mutationFn: (values: { name: string }) => api.groups.groupsCreate(vaultId, values),
+    mutationFn: (values: { name: string; group_type_id?: number }) => api.groups.groupsCreate(vaultId, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
@@ -189,6 +199,16 @@ export default function GroupList() {
         <Form form={form} layout="vertical" onFinish={(v) => createMutation.mutate(v)}>
           <Form.Item name="name" label={t("common.name")} rules={[{ required: true }]}>
             <Input />
+          </Form.Item>
+          <Form.Item name="group_type_id" label={t("vault.group_list.group_type")}>
+            <Select
+              allowClear
+              placeholder={t("vault.group_list.group_type")}
+              options={groupTypes.map((gt: { id?: number; label?: string; name?: string }) => ({
+                label: gt.label || gt.name,
+                value: gt.id,
+              }))}
+            />
           </Form.Item>
         </Form>
       </Modal>

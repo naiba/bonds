@@ -20,8 +20,9 @@ func NewGroupService(db *gorm.DB) *GroupService {
 
 func (s *GroupService) Create(vaultID string, req dto.CreateGroupRequest) (*dto.GroupResponse, error) {
 	group := models.Group{
-		VaultID: vaultID,
-		Name:    req.Name,
+		VaultID:     vaultID,
+		Name:        req.Name,
+		GroupTypeID: req.GroupTypeID,
 	}
 	if err := s.db.Create(&group).Error; err != nil {
 		return nil, err
@@ -32,12 +33,12 @@ func (s *GroupService) Create(vaultID string, req dto.CreateGroupRequest) (*dto.
 
 func (s *GroupService) List(vaultID string) ([]dto.GroupResponse, error) {
 	var groups []models.Group
-	if err := s.db.Where("vault_id = ?", vaultID).Order("created_at DESC").Find(&groups).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Preload("Contacts").Order("created_at DESC").Find(&groups).Error; err != nil {
 		return nil, err
 	}
 	result := make([]dto.GroupResponse, len(groups))
 	for i, g := range groups {
-		result[i] = toGroupResponse(&g)
+		result[i] = toGroupResponseWithContacts(&g)
 	}
 	return result, nil
 }
@@ -52,6 +53,23 @@ func (s *GroupService) Get(id uint, vaultID string) (*dto.GroupResponse, error) 
 	}
 	resp := toGroupResponseWithContacts(&group)
 	return &resp, nil
+}
+
+func (s *GroupService) ListByContact(contactID, vaultID string) ([]dto.GroupResponse, error) {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
+	var groups []models.Group
+	if err := s.db.Joins("JOIN contact_group ON contact_group.group_id = groups.id").
+		Where("contact_group.contact_id = ? AND groups.vault_id = ?", contactID, vaultID).
+		Order("groups.created_at DESC").Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	result := make([]dto.GroupResponse, len(groups))
+	for i, g := range groups {
+		result[i] = toGroupResponse(&g)
+	}
+	return result, nil
 }
 
 func (s *GroupService) AddContactToGroup(contactID string, req dto.AddContactToGroupRequest) error {

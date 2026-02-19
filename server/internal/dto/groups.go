@@ -8,7 +8,8 @@ type AddContactToGroupRequest struct {
 }
 
 type CreateGroupRequest struct {
-	Name string `json:"name" validate:"required" example:"Close Friends"`
+	Name        string `json:"name" validate:"required" example:"Close Friends"`
+	GroupTypeID *uint  `json:"group_type_id" example:"1"`
 }
 
 type UpdateGroupRequest struct {
