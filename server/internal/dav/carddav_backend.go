@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -123,11 +124,12 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, _ *c
 	}
 
 	var contact models.Contact
-	if err := b.db.Preload("ContactInformations.ContactInformationType").First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := b.db.Preload("ContactInformations.ContactInformationType").
+		Preload("Addresses").
+		First(&contact, "id = ?", contactID).Error; err != nil {
 		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 	}
 
-	// Verify user has access to vault
 	if err := b.verifyVaultAccess(userID, contact.VaultID); err != nil {
 		return nil, err
 	}
@@ -152,6 +154,7 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, _ 
 
 	var contacts []models.Contact
 	if err := b.db.Preload("ContactInformations.ContactInformationType").
+		Preload("Addresses").
 		Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
@@ -205,36 +208,51 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 	contactID := extractObjectIDFromPath(path, ".vcf")
 	now := time.Now()
 
+	var vault models.Vault
+	if err := b.db.First(&vault, "id = ?", vaultID).Error; err != nil {
+		return nil, fmt.Errorf("vault not found: %w", err)
+	}
+	accountID := AccountIDFromContext(ctx)
+	if accountID == "" {
+		accountID = vault.AccountID
+	}
+
+	title := card.Value(vcard.FieldTitle)
+
 	var contact models.Contact
 	if contactID != "" {
-		// Try to find existing contact
 		err := b.db.First(&contact, "id = ?", contactID).Error
 		if err == nil {
-			// Update existing
 			contact.FirstName = strPtrOrNil(firstName)
 			contact.LastName = strPtrOrNil(lastName)
 			contact.Nickname = strPtrOrNil(nickname)
+			contact.JobPosition = strPtrOrNil(title)
 			contact.LastUpdatedAt = &now
 			if err := b.db.Save(&contact).Error; err != nil {
 				return nil, err
 			}
+
+			if err := replaceContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+				return nil, err
+			}
+
+			b.db.Preload("ContactInformations.ContactInformationType").First(&contact, "id = ?", contact.ID)
 			return contactToAddressObject(&contact, userID), nil
 		}
 	}
 
-	// Create new contact
 	contact = models.Contact{
 		VaultID:       vaultID,
 		FirstName:     strPtrOrNil(firstName),
 		LastName:      strPtrOrNil(lastName),
 		Nickname:      strPtrOrNil(nickname),
+		JobPosition:   strPtrOrNil(title),
 		LastUpdatedAt: &now,
 	}
 	if err := b.db.Create(&contact).Error; err != nil {
 		return nil, err
 	}
 
-	// Create ContactVaultUser pivot
 	cvu := models.ContactVaultUser{
 		ContactID: contact.ID,
 		UserID:    userID,
@@ -244,6 +262,11 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 		return nil, err
 	}
 
+	if err := saveContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+		return nil, err
+	}
+
+	b.db.Preload("ContactInformations.ContactInformationType").First(&contact, "id = ?", contact.ID)
 	return contactToAddressObject(&contact, userID), nil
 }
 
@@ -349,7 +372,16 @@ func contactToVCard(c *models.Contact) vcard.Card {
 		}
 	}
 
-	// Set UID to contact ID
+	for _, addr := range c.Addresses {
+		card.AddAddress(&vcard.Address{
+			StreetAddress: ptrToStr(addr.Line1),
+			Locality:      ptrToStr(addr.City),
+			Region:        ptrToStr(addr.Province),
+			PostalCode:    ptrToStr(addr.PostalCode),
+			Country:       ptrToStr(addr.Country),
+		})
+	}
+
 	card.SetValue("UID", c.ID)
 
 	return card
@@ -415,6 +447,144 @@ func textMatchField(value string, tm carddav.TextMatch) bool {
 		return !result
 	}
 	return result
+}
+
+// saveContactVCardFields creates TEL, EMAIL, ADR, BDAY records from a vCard.
+func saveContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
+	// TEL
+	if fields := card[vcard.FieldTelephone]; len(fields) > 0 {
+		var phoneType models.ContactInformationType
+		if err := db.Where("account_id = ? AND type = ?", accountID, "phone").First(&phoneType).Error; err == nil {
+			for _, f := range fields {
+				if f.Value == "" {
+					continue
+				}
+				if err := db.Create(&models.ContactInformation{
+					ContactID: contactID,
+					TypeID:    phoneType.ID,
+					Data:      f.Value,
+				}).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// EMAIL
+	if fields := card[vcard.FieldEmail]; len(fields) > 0 {
+		var emailType models.ContactInformationType
+		if err := db.Where("account_id = ? AND type = ?", accountID, "email").First(&emailType).Error; err == nil {
+			for _, f := range fields {
+				if f.Value == "" {
+					continue
+				}
+				if err := db.Create(&models.ContactInformation{
+					ContactID: contactID,
+					TypeID:    emailType.ID,
+					Data:      f.Value,
+				}).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// ADR
+	if addrs := card.Addresses(); len(addrs) > 0 {
+		for _, addr := range addrs {
+			if addr.StreetAddress == "" && addr.Locality == "" && addr.Region == "" && addr.PostalCode == "" && addr.Country == "" {
+				continue
+			}
+			a := models.Address{
+				VaultID:    vaultID,
+				Line1:      strPtrOrNil(addr.StreetAddress),
+				City:       strPtrOrNil(addr.Locality),
+				Province:   strPtrOrNil(addr.Region),
+				PostalCode: strPtrOrNil(addr.PostalCode),
+				Country:    strPtrOrNil(addr.Country),
+			}
+			if err := db.Create(&a).Error; err != nil {
+				return err
+			}
+			if err := db.Create(&models.ContactAddress{
+				ContactID: contactID,
+				AddressID: a.ID,
+			}).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	// BDAY
+	if bday := card.Value(vcard.FieldBirthday); bday != "" {
+		year, month, day := parseBirthdayString(bday)
+		if month > 0 && day > 0 {
+			var bdayType models.ContactImportantDateType
+			if err := db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&bdayType).Error; err == nil {
+				cid := models.ContactImportantDate{
+					ContactID:                  contactID,
+					ContactImportantDateTypeID: &bdayType.ID,
+					Label:                      "Birthdate",
+					Day:                        &day,
+					Month:                      &month,
+				}
+				if year > 0 {
+					cid.Year = &year
+				}
+				if err := db.Create(&cid).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// replaceContactVCardFields deletes existing records and recreates from vCard.
+func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
+	db.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{})
+
+	var pivots []models.ContactAddress
+	db.Where("contact_id = ?", contactID).Find(&pivots)
+	if len(pivots) > 0 {
+		addressIDs := make([]uint, len(pivots))
+		for i, p := range pivots {
+			addressIDs[i] = p.AddressID
+		}
+		db.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{})
+		db.Where("id IN ?", addressIDs).Delete(&models.Address{})
+	}
+
+	db.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{})
+
+	return saveContactVCardFields(db, card, contactID, vaultID, accountID)
+}
+
+// parseBirthdayString parses vCard BDAY formats: "19900115", "1990-01-15", "--0115" (no year)
+func parseBirthdayString(bday string) (year, month, day int) {
+	bday = strings.TrimSpace(bday)
+	if t, err := time.Parse("2006-01-02", bday); err == nil {
+		return t.Year(), int(t.Month()), t.Day()
+	}
+	if len(bday) == 8 {
+		if y, err := strconv.Atoi(bday[0:4]); err == nil {
+			if m, err := strconv.Atoi(bday[4:6]); err == nil {
+				if d, err := strconv.Atoi(bday[6:8]); err == nil {
+					return y, m, d
+				}
+			}
+		}
+	}
+	if strings.HasPrefix(bday, "--") && len(bday) >= 6 {
+		s := bday[2:]
+		if m, err := strconv.Atoi(s[0:2]); err == nil {
+			if d, err := strconv.Atoi(s[2:4]); err == nil {
+				return 0, m, d
+			}
+		}
+	}
+	return 0, 0, 0
 }
 
 // Path parsing helpers

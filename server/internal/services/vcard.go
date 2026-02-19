@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emersion/go-vcard"
@@ -93,19 +95,31 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 	dec := vcard.NewDecoder(data)
 
 	var imported []dto.ContactResponse
+	var skippedCount int
+	var importErrors []string
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var vault models.Vault
+		if err := tx.First(&vault, "id = ?", vaultID).Error; err != nil {
+			return fmt.Errorf("vault not found: %w", err)
+		}
+		accountID := vault.AccountID
+
 		for {
 			card, err := dec.Decode()
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrVCardInvalidData, err)
+				skippedCount++
+				importErrors = append(importErrors, fmt.Sprintf("decode error: %v", err))
+				continue
 			}
 
 			firstName, lastName := extractNameFromCard(card)
 			nickname := card.Value(vcard.FieldNickname)
+
+			title := card.Value(vcard.FieldTitle)
 
 			now := time.Now()
 			contact := models.Contact{
@@ -113,6 +127,7 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 				FirstName:     strPtrOrNil(firstName),
 				LastName:      strPtrOrNil(lastName),
 				Nickname:      strPtrOrNil(nickname),
+				JobPosition:   strPtrOrNil(title),
 				LastUpdatedAt: &now,
 			}
 			if err := tx.Create(&contact).Error; err != nil {
@@ -128,6 +143,10 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 				return err
 			}
 
+			if err := importVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
+				return err
+			}
+
 			imported = append(imported, toContactResponse(&contact, false))
 		}
 		return nil
@@ -138,8 +157,134 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 
 	return &dto.VCardImportResponse{
 		ImportedCount: len(imported),
+		SkippedCount:  skippedCount,
+		Errors:        importErrors,
 		Contacts:      imported,
 	}, nil
+}
+
+// importVCardFields parses TEL, EMAIL, ADR, BDAY from a vCard and stores them.
+func importVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
+	// TEL → ContactInformation
+	if fields := card[vcard.FieldTelephone]; len(fields) > 0 {
+		var phoneType models.ContactInformationType
+		if err := tx.Where("account_id = ? AND type = ?", accountID, "phone").First(&phoneType).Error; err == nil {
+			for _, f := range fields {
+				if f.Value == "" {
+					continue
+				}
+				ci := models.ContactInformation{
+					ContactID: contactID,
+					TypeID:    phoneType.ID,
+					Data:      f.Value,
+				}
+				if err := tx.Create(&ci).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// EMAIL → ContactInformation
+	if fields := card[vcard.FieldEmail]; len(fields) > 0 {
+		var emailType models.ContactInformationType
+		if err := tx.Where("account_id = ? AND type = ?", accountID, "email").First(&emailType).Error; err == nil {
+			for _, f := range fields {
+				if f.Value == "" {
+					continue
+				}
+				ci := models.ContactInformation{
+					ContactID: contactID,
+					TypeID:    emailType.ID,
+					Data:      f.Value,
+				}
+				if err := tx.Create(&ci).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// ADR → Address + ContactAddress
+	if addrs := card.Addresses(); len(addrs) > 0 {
+		for _, addr := range addrs {
+			if addr.StreetAddress == "" && addr.Locality == "" && addr.Region == "" && addr.PostalCode == "" && addr.Country == "" {
+				continue
+			}
+			a := models.Address{
+				VaultID:    vaultID,
+				Line1:      strPtrOrNil(addr.StreetAddress),
+				City:       strPtrOrNil(addr.Locality),
+				Province:   strPtrOrNil(addr.Region),
+				PostalCode: strPtrOrNil(addr.PostalCode),
+				Country:    strPtrOrNil(addr.Country),
+			}
+			if err := tx.Create(&a).Error; err != nil {
+				return err
+			}
+			ca := models.ContactAddress{
+				ContactID: contactID,
+				AddressID: a.ID,
+			}
+			if err := tx.Create(&ca).Error; err != nil {
+				return err
+			}
+		}
+	}
+
+	// BDAY → ContactImportantDate
+	if bday := card.Value(vcard.FieldBirthday); bday != "" {
+		year, month, day := parseBirthdayString(bday)
+		if month > 0 && day > 0 {
+			var bdayType models.ContactImportantDateType
+			if err := tx.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&bdayType).Error; err == nil {
+				cid := models.ContactImportantDate{
+					ContactID:                  contactID,
+					ContactImportantDateTypeID: &bdayType.ID,
+					Label:                      "Birthdate",
+					Day:                        &day,
+					Month:                      &month,
+				}
+				if year > 0 {
+					cid.Year = &year
+				}
+				if err := tx.Create(&cid).Error; err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// parseBirthdayString parses vCard BDAY formats: "19900115", "1990-01-15", "--0115" (no year)
+func parseBirthdayString(bday string) (year, month, day int) {
+	bday = strings.TrimSpace(bday)
+	// Try "YYYY-MM-DD"
+	if t, err := time.Parse("2006-01-02", bday); err == nil {
+		return t.Year(), int(t.Month()), t.Day()
+	}
+	// Try "YYYYMMDD"
+	if len(bday) == 8 {
+		if y, err := strconv.Atoi(bday[0:4]); err == nil {
+			if m, err := strconv.Atoi(bday[4:6]); err == nil {
+				if d, err := strconv.Atoi(bday[6:8]); err == nil {
+					return y, m, d
+				}
+			}
+		}
+	}
+	// Try "--MMDD" (no year)
+	if strings.HasPrefix(bday, "--") && len(bday) >= 6 {
+		s := bday[2:]
+		if m, err := strconv.Atoi(s[0:2]); err == nil {
+			if d, err := strconv.Atoi(s[2:4]); err == nil {
+				return 0, m, d
+			}
+		}
+	}
+	return 0, 0, 0
 }
 
 func buildVCard(contact *models.Contact, infos []models.ContactInformation, addresses []models.Address) vcard.Card {
