@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav/carddav"
@@ -440,5 +441,153 @@ func TestDavSyncService_GetSyncLogs(t *testing.T) {
 	_, _, err = syncSvc.GetSyncLogs("nonexistent", vaultID, 1, 10)
 	if err != ErrSubscriptionNotFound {
 		t.Errorf("expected ErrSubscriptionNotFound, got %v", err)
+	}
+}
+
+func TestDavSyncService_SyncConflictLocalWins(t *testing.T) {
+	syncSvc, clientSvc, _, vaultID, userID, _ := setupDavSyncTest(t)
+
+	sub, err := clientSvc.Create(vaultID, userID, dto.CreateDavSubscriptionRequest{
+		URI:      "https://dav.example.com/contacts/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("Create subscription failed: %v", err)
+	}
+
+	token := "sync-token-1"
+	pastTime := time.Now().Add(-2 * time.Hour)
+	futureTime := time.Now().Add(1 * time.Hour)
+
+	syncSvc.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).Updates(map[string]interface{}{
+		"distant_sync_token":   token,
+		"last_synchronized_at": pastTime,
+	})
+
+	existingContact := models.Contact{
+		VaultID:       vaultID,
+		FirstName:     strPtrOrNil("LocalEdit"),
+		LastName:      strPtrOrNil("User"),
+		DistantURI:    strPtrOrNil("/contacts/conflict.vcf"),
+		DistantEtag:   strPtrOrNil("old-etag"),
+		LastUpdatedAt: &futureTime,
+	}
+	syncSvc.db.Create(&existingContact)
+
+	mc := &mockCardDAVClient{
+		syncCollFn: func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
+			return &carddav.SyncResponse{
+				SyncToken: "sync-token-2",
+				Updated: []carddav.AddressObject{
+					{Path: "/contacts/conflict.vcf", ETag: "new-remote-etag"},
+				},
+			}, nil
+		},
+		multiGetFn: func(ctx context.Context, path string, mg *carddav.AddressBookMultiGet) ([]carddav.AddressObject, error) {
+			return []carddav.AddressObject{
+				{
+					Path: "/contacts/conflict.vcf",
+					ETag: "new-remote-etag",
+					Card: makeVCard("RemoteOverwrite", "Name", "uid-conflict"),
+				},
+			}, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.SyncSubscription(context.Background(), sub.ID, vaultID)
+	if err != nil {
+		t.Fatalf("SyncSubscription failed: %v", err)
+	}
+
+	if result.Skipped != 1 {
+		t.Errorf("expected 1 skipped (conflict), got %d", result.Skipped)
+	}
+	if result.Updated != 0 {
+		t.Errorf("expected 0 updated, got %d", result.Updated)
+	}
+
+	var contact models.Contact
+	syncSvc.db.Where("distant_uri = ?", "/contacts/conflict.vcf").First(&contact)
+	if ptrToStr(contact.FirstName) != "LocalEdit" {
+		t.Errorf("expected local name preserved 'LocalEdit', got %q", ptrToStr(contact.FirstName))
+	}
+	if ptrToStr(contact.DistantEtag) != "old-etag" {
+		t.Errorf("expected old etag preserved, got %q", ptrToStr(contact.DistantEtag))
+	}
+
+	var logs []models.DavSyncLog
+	syncSvc.db.Where("address_book_subscription_id = ? AND action = ?", sub.ID, "conflict_local_wins").Find(&logs)
+	if len(logs) != 1 {
+		t.Errorf("expected 1 conflict_local_wins log, got %d", len(logs))
+	}
+}
+
+func TestDavSyncService_SyncNoConflictWhenNotLocallyModified(t *testing.T) {
+	syncSvc, clientSvc, _, vaultID, userID, _ := setupDavSyncTest(t)
+
+	sub, err := clientSvc.Create(vaultID, userID, dto.CreateDavSubscriptionRequest{
+		URI:      "https://dav.example.com/contacts/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("Create subscription failed: %v", err)
+	}
+
+	token := "sync-token-1"
+	syncTime := time.Now().Add(1 * time.Hour)
+	beforeSync := time.Now().Add(-2 * time.Hour)
+
+	syncSvc.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).Updates(map[string]interface{}{
+		"distant_sync_token":   token,
+		"last_synchronized_at": syncTime,
+	})
+
+	existingContact := models.Contact{
+		VaultID:       vaultID,
+		FirstName:     strPtrOrNil("Old"),
+		LastName:      strPtrOrNil("Name"),
+		DistantURI:    strPtrOrNil("/contacts/no-conflict.vcf"),
+		DistantEtag:   strPtrOrNil("old-etag"),
+		LastUpdatedAt: &beforeSync,
+	}
+	syncSvc.db.Create(&existingContact)
+
+	mc := &mockCardDAVClient{
+		syncCollFn: func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
+			return &carddav.SyncResponse{
+				SyncToken: "sync-token-2",
+				Updated: []carddav.AddressObject{
+					{Path: "/contacts/no-conflict.vcf", ETag: "new-etag"},
+				},
+			}, nil
+		},
+		multiGetFn: func(ctx context.Context, path string, mg *carddav.AddressBookMultiGet) ([]carddav.AddressObject, error) {
+			return []carddav.AddressObject{
+				{
+					Path: "/contacts/no-conflict.vcf",
+					ETag: "new-etag",
+					Card: makeVCard("Updated", "Remote", "uid-no-conflict"),
+				},
+			}, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.SyncSubscription(context.Background(), sub.ID, vaultID)
+	if err != nil {
+		t.Fatalf("SyncSubscription failed: %v", err)
+	}
+
+	if result.Updated != 1 {
+		t.Errorf("expected 1 updated, got %d", result.Updated)
+	}
+
+	var contact models.Contact
+	syncSvc.db.Where("distant_uri = ?", "/contacts/no-conflict.vcf").First(&contact)
+	if ptrToStr(contact.FirstName) != "Updated" {
+		t.Errorf("expected remote update applied 'Updated', got %q", ptrToStr(contact.FirstName))
 	}
 }

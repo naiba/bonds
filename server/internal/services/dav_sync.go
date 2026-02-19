@@ -184,7 +184,7 @@ func (s *DavSyncService) processIncrementalSync(
 				if obj.Card == nil {
 					continue
 				}
-				s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, result)
+				s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, sub.LastSynchronizedAt, result)
 			}
 		}
 	}
@@ -238,7 +238,7 @@ func (s *DavSyncService) performFullSync(
 				if obj.Card == nil {
 					continue
 				}
-				s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, result)
+				s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, sub.LastSynchronizedAt, result)
 			}
 		}
 
@@ -266,7 +266,7 @@ func (s *DavSyncService) performFullSync(
 		if obj.Card == nil {
 			continue
 		}
-		s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, result)
+		s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, sub.LastSynchronizedAt, result)
 	}
 
 	if err := s.clientService.UpdateSyncStatus(sub.ID, nil); err != nil {
@@ -277,15 +277,16 @@ func (s *DavSyncService) performFullSync(
 func (s *DavSyncService) upsertFromObject(
 	obj carddav.AddressObject,
 	subID, vaultID, userID, accountID string,
+	lastSyncAt *time.Time,
 	result *dto.TriggerSyncResponse,
 ) {
 	var contactID string
-	var created bool
+	var action string
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var upsertErr error
-		contactID, created, upsertErr = s.vcardService.UpsertContactFromVCard(
-			tx, obj.Card, vaultID, userID, accountID, obj.Path, obj.ETag,
+		contactID, action, upsertErr = s.vcardService.UpsertContactFromVCard(
+			tx, obj.Card, vaultID, userID, accountID, obj.Path, obj.ETag, lastSyncAt,
 		)
 		return upsertErr
 	})
@@ -296,13 +297,17 @@ func (s *DavSyncService) upsertFromObject(
 		return
 	}
 
-	if created {
+	switch action {
+	case "created":
 		result.Created++
 		s.logSyncAction(subID, &contactID, obj.Path, obj.ETag, "created", "")
-	} else if contactID != "" {
+	case "updated":
 		result.Updated++
 		s.logSyncAction(subID, &contactID, obj.Path, obj.ETag, "updated", "")
-	} else {
+	case "conflict_local_wins":
+		result.Skipped++
+		s.logSyncAction(subID, &contactID, obj.Path, obj.ETag, "conflict_local_wins", "local contact modified after last sync, keeping local version")
+	default:
 		result.Skipped++
 		s.logSyncAction(subID, nil, obj.Path, obj.ETag, "skipped", "")
 	}

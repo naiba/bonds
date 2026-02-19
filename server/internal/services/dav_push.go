@@ -47,6 +47,12 @@ func (s *DavPushService) PushContactChange(contactID, vaultID string) {
 		return
 	}
 
+	var contact models.Contact
+	if err := s.db.Where("id = ?", contactID).First(&contact).Error; err != nil {
+		log.Printf("[dav-push] contact %s not found: %v", contactID, err)
+		return
+	}
+
 	card, err := s.vcardService.ExportContactToVCard(contactID, vaultID)
 	if err != nil {
 		log.Printf("[dav-push] failed to export contact %s to vCard: %v", contactID, err)
@@ -54,6 +60,11 @@ func (s *DavPushService) PushContactChange(contactID, vaultID string) {
 	}
 
 	for _, sub := range subs {
+		if contact.DistantURI != nil && strings.HasPrefix(*contact.DistantURI, strings.TrimRight(sub.URI, "/")) {
+			s.logPushAction(sub.ID, &contactID, ptrToStr(contact.DistantURI), "", "skipped_push_origin", "contact was pulled from this subscription")
+			continue
+		}
+
 		func() {
 			defer func() {
 				if r := recover(); r != nil {

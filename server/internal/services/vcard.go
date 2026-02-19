@@ -380,13 +380,19 @@ func buildFullName(firstName, lastName string) string {
 
 // UpsertContactFromVCard creates or updates a contact from a vCard.
 // If distantURI is non-empty, it looks up an existing contact by DistantURI in the vault.
-// Returns the contact ID and whether it was created (true) or updated (false).
-func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID string, distantURI, distantEtag string) (contactID string, created bool, err error) {
+// lastSyncAt is used for conflict detection: if the contact was locally modified after lastSyncAt, the local version wins.
+// Returns the contact ID and an action string: "created", "updated", "skipped", or "conflict_local_wins".
+func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID string, distantURI, distantEtag string, lastSyncAt *time.Time) (contactID string, action string, err error) {
 	if distantURI != "" {
 		var existing models.Contact
 		if findErr := tx.Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error; findErr == nil {
 			if existing.DistantEtag != nil && *existing.DistantEtag == distantEtag {
-				return existing.ID, false, nil
+				return existing.ID, "skipped", nil
+			}
+
+			// Conflict detection: if contact was locally modified since last sync, local wins
+			if lastSyncAt != nil && existing.LastUpdatedAt != nil && existing.LastUpdatedAt.After(*lastSyncAt) {
+				return existing.ID, "conflict_local_wins", nil
 			}
 
 			firstName, lastName := extractNameFromCard(card)
@@ -401,13 +407,13 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 			existing.DistantEtag = strPtrOrNil(distantEtag)
 			existing.LastUpdatedAt = &now
 			if err := tx.Save(&existing).Error; err != nil {
-				return "", false, err
+				return "", "", err
 			}
 
 			if err := replaceVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
-				return "", false, err
+				return "", "", err
 			}
-			return existing.ID, false, nil
+			return existing.ID, "updated", nil
 		}
 	}
 
@@ -430,7 +436,7 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		LastUpdatedAt: &now,
 	}
 	if err := tx.Create(&contact).Error; err != nil {
-		return "", false, err
+		return "", "", err
 	}
 
 	cvu := models.ContactVaultUser{
@@ -439,14 +445,14 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		VaultID:   vaultID,
 	}
 	if err := tx.Create(&cvu).Error; err != nil {
-		return "", false, err
+		return "", "", err
 	}
 
 	if err := importVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
-		return "", false, err
+		return "", "", err
 	}
 
-	return contact.ID, true, nil
+	return contact.ID, "created", nil
 }
 
 func replaceVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {

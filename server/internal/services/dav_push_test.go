@@ -276,6 +276,82 @@ func TestDavPushService_PushContactDelete_NoState(t *testing.T) {
 	pushSvc.PushContactDelete(contact.ID, vaultID)
 }
 
+func TestDavPushService_PushSkipsPullOrigin(t *testing.T) {
+	pushSvc, clientSvc, _, _, vaultID, userID, _ := setupDavPushTest(t)
+
+	sub := createPushSubscription(t, clientSvc, vaultID, userID, SyncWayBoth)
+
+	distantURI := "https://dav.example.com/contacts/pulled-contact.vcf"
+	contact := models.Contact{
+		VaultID:    vaultID,
+		FirstName:  strPtrOrNil("Pulled"),
+		LastName:   strPtrOrNil("Contact"),
+		DistantURI: &distantURI,
+	}
+	pushSvc.db.Create(&contact)
+
+	pushSvc.db.Create(&models.ContactVaultUser{
+		ContactID: contact.ID,
+		UserID:    userID,
+		VaultID:   vaultID,
+	})
+
+	mc := &mockCardDAVClient{
+		putAddrObjFn: func(ctx context.Context, path string, card vcard.Card) (*carddav.AddressObject, error) {
+			t.Error("PutAddressObject should not be called for contact pulled from this subscription")
+			return nil, nil
+		},
+	}
+	pushSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	pushSvc.PushContactChange(contact.ID, vaultID)
+
+	var logs []models.DavSyncLog
+	pushSvc.db.Where("address_book_subscription_id = ? AND action = ?", sub.ID, "skipped_push_origin").Find(&logs)
+	if len(logs) != 1 {
+		t.Errorf("expected 1 skipped_push_origin log, got %d", len(logs))
+	}
+}
+
+func TestDavPushService_PushDoesNotSkipDifferentOrigin(t *testing.T) {
+	pushSvc, clientSvc, _, _, vaultID, userID, _ := setupDavPushTest(t)
+
+	createPushSubscription(t, clientSvc, vaultID, userID, SyncWayPush)
+
+	distantURI := "https://other-server.example.com/contacts/other-contact.vcf"
+	contact := models.Contact{
+		VaultID:    vaultID,
+		FirstName:  strPtrOrNil("Other"),
+		LastName:   strPtrOrNil("Origin"),
+		DistantURI: &distantURI,
+	}
+	pushSvc.db.Create(&contact)
+
+	pushSvc.db.Create(&models.ContactVaultUser{
+		ContactID: contact.ID,
+		UserID:    userID,
+		VaultID:   vaultID,
+	})
+
+	var putCalled bool
+	mc := &mockCardDAVClient{
+		putAddrObjFn: func(ctx context.Context, path string, card vcard.Card) (*carddav.AddressObject, error) {
+			putCalled = true
+			return &carddav.AddressObject{
+				Path: path,
+				ETag: "new-etag",
+			}, nil
+		},
+	}
+	pushSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	pushSvc.PushContactChange(contact.ID, vaultID)
+
+	if !putCalled {
+		t.Error("expected PutAddressObject to be called for contact from different origin")
+	}
+}
+
 func TestDavPushService_PushContactChange_RemoteError(t *testing.T) {
 	pushSvc, clientSvc, _, contactSvc, vaultID, userID, _ := setupDavPushTest(t)
 
