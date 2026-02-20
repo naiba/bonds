@@ -27,7 +27,7 @@ build-web:
 build-all: gen-api build-web
 	rm -rf server/internal/frontend/dist/*
 	cp -r web/dist/* server/internal/frontend/dist/
-	cd server && CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o bin/bonds-server cmd/server/main.go
+	cd server && CGO_ENABLED=1 go build -trimpath -ldflags="-s -w -X main.Version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)" -o bin/bonds-server cmd/server/main.go
 
 test: test-server test-web
 

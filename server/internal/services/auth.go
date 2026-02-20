@@ -39,14 +39,20 @@ func (s *AuthService) Register(req dto.RegisterRequest) (*dto.AuthResponse, erro
 		return nil, err
 	}
 
+	// First registered user becomes instance administrator
+	var userCount int64
+	s.db.Model(&models.User{}).Count(&userCount)
+	isFirstUser := userCount == 0
+
 	hashedStr := string(hashedPassword)
 	account := models.Account{}
 	user := models.User{
-		FirstName:              &req.FirstName,
-		LastName:               &req.LastName,
-		Email:                  req.Email,
-		Password:               &hashedStr,
-		IsAccountAdministrator: true,
+		FirstName:               &req.FirstName,
+		LastName:                &req.LastName,
+		Email:                   req.Email,
+		Password:                &hashedStr,
+		IsAccountAdministrator:  true,
+		IsInstanceAdministrator: isFirstUser,
 	}
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
@@ -73,6 +79,10 @@ func (s *AuthService) Login(req dto.LoginRequest) (*dto.AuthResponse, error) {
 			return nil, ErrInvalidCredentials
 		}
 		return nil, err
+	}
+
+	if user.Disabled {
+		return nil, ErrUserDisabled
 	}
 
 	if user.Password == nil {
@@ -111,6 +121,7 @@ func (s *AuthService) generateTempAuthResponse(user *models.User) (*dto.AuthResp
 		AccountID:        user.AccountID,
 		Email:            user.Email,
 		IsAdmin:          user.IsAccountAdministrator,
+		IsInstanceAdmin:  user.IsInstanceAdministrator,
 		TwoFactorPending: true,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
@@ -139,6 +150,9 @@ func (s *AuthService) RefreshToken(claims *middleware.JWTClaims) (*dto.AuthRespo
 		}
 		return nil, err
 	}
+	if user.Disabled {
+		return nil, ErrUserDisabled
+	}
 	return s.generateAuthResponse(&user)
 }
 
@@ -156,10 +170,11 @@ func (s *AuthService) GetCurrentUser(userID string) (*dto.UserResponse, error) {
 func (s *AuthService) generateAuthResponse(user *models.User) (*dto.AuthResponse, error) {
 	expiresAt := time.Now().Add(time.Duration(s.cfg.ExpiryHrs) * time.Hour)
 	claims := &middleware.JWTClaims{
-		UserID:    user.ID,
-		AccountID: user.AccountID,
-		Email:     user.Email,
-		IsAdmin:   user.IsAccountAdministrator,
+		UserID:          user.ID,
+		AccountID:       user.AccountID,
+		Email:           user.Email,
+		IsAdmin:         user.IsAccountAdministrator,
+		IsInstanceAdmin: user.IsInstanceAdministrator,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -188,12 +203,13 @@ func ptrToStr(s *string) string {
 
 func toUserResponse(user *models.User) *dto.UserResponse {
 	return &dto.UserResponse{
-		ID:        user.ID,
-		AccountID: user.AccountID,
-		FirstName: ptrToStr(user.FirstName),
-		LastName:  ptrToStr(user.LastName),
-		Email:     user.Email,
-		IsAdmin:   user.IsAccountAdministrator,
-		CreatedAt: user.CreatedAt,
+		ID:                      user.ID,
+		AccountID:               user.AccountID,
+		FirstName:               ptrToStr(user.FirstName),
+		LastName:                ptrToStr(user.LastName),
+		Email:                   user.Email,
+		IsAdmin:                 user.IsAccountAdministrator,
+		IsInstanceAdministrator: user.IsInstanceAdministrator,
+		CreatedAt:               user.CreatedAt,
 	}
 }

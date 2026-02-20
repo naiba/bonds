@@ -10,6 +10,7 @@ import {
   App,
   Space,
   theme,
+  QRCode,
 } from "antd";
 import {
   SafetyCertificateOutlined,
@@ -29,6 +30,7 @@ export default function TwoFactor() {
   const [setupData, setSetupData] = useState<{
     secret: string;
     recovery_codes: string[];
+    qr_code_url: string;
   } | null>(null);
   const [disableModalOpen, setDisableModalOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -52,6 +54,7 @@ export default function TwoFactor() {
       const data = res.data as {
         secret: string;
         recovery_codes: string[];
+        qr_code_url: string;
       };
       setSetupData(data);
     },
@@ -141,6 +144,10 @@ export default function TwoFactor() {
             <Paragraph type="secondary">
               {t("twoFactor.scanQR")}
             </Paragraph>
+
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+              <QRCode value={setupData.qr_code_url} size={200} />
+            </div>
 
             <Card
               size="small"

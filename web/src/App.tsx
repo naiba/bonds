@@ -51,6 +51,10 @@ const OAuthProviders = lazy(() => import("@/pages/settings/OAuthProviders"));
 const StorageInfo = lazy(() => import("@/pages/settings/StorageInfo"));
 const Backups = lazy(() => import("@/pages/settings/Backups"));
 
+// Admin pages
+const AdminUsers = lazy(() => import("@/pages/admin/Users"));
+const AdminSettings = lazy(() => import("@/pages/admin/Settings"));
+
 // Public auth pages
 const AcceptInvite = lazy(() => import("@/pages/auth/AcceptInvite"));
 const OAuthCallback = lazy(() => import("@/pages/auth/OAuthCallback"));
@@ -171,6 +175,8 @@ export default function App() {
             <Route path="/settings/oauth" element={<OAuthProviders />} />
             <Route path="/settings/storage" element={<StorageInfo />} />
             <Route path="/settings/backups" element={<Backups />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
           </Route>
 
           <Route path="/" element={<Navigate to="/vaults" replace />} />

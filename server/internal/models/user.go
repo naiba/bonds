@@ -20,6 +20,7 @@ type User struct {
 	TwoFactorConfirmedAt      *time.Time `json:"two_factor_confirmed_at"`
 	IsAccountAdministrator    bool       `json:"is_account_administrator" gorm:"default:false"`
 	IsInstanceAdministrator   bool       `json:"is_instance_administrator" gorm:"default:false"`
+	Disabled                  bool       `json:"disabled" gorm:"default:false"`
 	HelpShown                 bool       `json:"help_shown" gorm:"default:true"`
 	InvitationCode            *string    `json:"invitation_code"`
 	InvitationAcceptedAt      *time.Time `json:"invitation_accepted_at"`

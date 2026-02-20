@@ -7,10 +7,11 @@ import logoImg from "@/assets/logo.svg";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/stores/theme";
 import type { ThemeMode } from "@/stores/theme";
-import { api, httpClient } from "@/api";
-import type { LoginRequest, APIError } from "@/api";
+import { api } from "@/api";
+import type { LoginRequest, APIError, InstanceInfo } from "@/api";
 import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
+import { httpClient } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -24,7 +25,7 @@ export default function Login() {
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
   const [isWebAuthnSupported, setIsWebAuthnSupported] = useState(false);
-  const [providers, setProviders] = useState<Array<{name: string; display_name?: string}>>([]);
+  const [instanceInfo, setInstanceInfo] = useState<InstanceInfo | null>(null);
 
   const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
   const themeModeIcons: Record<ThemeMode, React.ReactNode> = {
@@ -48,9 +49,9 @@ export default function Login() {
 
   useEffect(() => {
     setIsWebAuthnSupported(browserSupportsWebAuthn());
-    httpClient.instance.get<{success: boolean; data: Array<{name: string; display_name?: string}>}>("/auth/providers")
-      .then(res => setProviders(res.data.data ?? []))
-      .catch(() => { /* providers won't show if endpoint unavailable */ });
+    api.instance.infoList()
+      .then(res => setInstanceInfo((res.data ?? null) as InstanceInfo | null))
+      .catch(() => {});
   }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from
@@ -171,7 +172,7 @@ export default function Login() {
           </Form.Item>
         </Form>
 
-        {isWebAuthnSupported && (
+        {isWebAuthnSupported && instanceInfo?.webauthn_enabled && (
           <div style={{ marginBottom: 24 }}>
             <Button 
               block 
@@ -184,18 +185,18 @@ export default function Login() {
           </div>
         )}
 
-        {providers.length > 0 && (
+        {(instanceInfo?.oauth_providers ?? []).length > 0 && (
           <>
             <Divider>{t("oauth.continueWith")}</Divider>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {providers.map(p => {
-                const icon = p.name === "github" ? <GithubOutlined /> : p.name === "google" ? <GoogleOutlined /> : <LinkOutlined />;
-                const label = p.display_name || (p.name === "github" ? t("oauth.github") : p.name === "google" ? t("oauth.google") : p.name === "openid-connect" ? t("oauth.sso") : p.name);
+              {(instanceInfo?.oauth_providers ?? []).map(name => {
+                const icon = name === "github" ? <GithubOutlined /> : name === "google" ? <GoogleOutlined /> : <LinkOutlined />;
+                const label = name === "github" ? t("oauth.github") : name === "google" ? t("oauth.google") : name === "openid-connect" ? t("oauth.sso") : name;
                 return (
                   <Button
-                    key={p.name}
+                    key={name}
                     icon={icon}
-                    href={`/api/auth/${p.name}`}
+                    href={`/api/auth/${name}`}
                     style={{ flex: 1, minWidth: 120, borderColor: token.colorBorderSecondary }}
                   >
                     {label}
@@ -206,16 +207,19 @@ export default function Login() {
           </>
         )}
 
-        <div style={{ textAlign: "center", marginTop: 16 }}>
-          <Text type="secondary">
-            {t("auth.login.no_account")}{" "}
-            <Link to="/register">{t("auth.login.create_one")}</Link>
-          </Text>
-        </div>
+        {(instanceInfo?.registration_enabled !== false) && (
+          <div style={{ textAlign: "center", marginTop: 16 }}>
+            <Text type="secondary">
+              {t("auth.login.no_account")}{" "}
+              <Link to="/register">{t("auth.login.create_one")}</Link>
+            </Text>
+          </div>
+        )}
       </Card>
       <div style={{ textAlign: "center", marginTop: 24, color: token.colorTextQuaternary, fontSize: 12 }}>
         © {new Date().getFullYear()}{" "}
         <a href="https://github.com/naiba/bonds" target="_blank" rel="noopener noreferrer" style={{ color: token.colorTextTertiary }}>Bonds</a>
+        {instanceInfo?.version && ` ${instanceInfo.version}`}
         {" by "}
         <a href="https://nai.ba" target="_blank" rel="noopener noreferrer" style={{ color: token.colorTextTertiary }}>naiba</a>
       </div>

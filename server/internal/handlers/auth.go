@@ -80,6 +80,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		if errors.Is(err, services.ErrInvalidCredentials) {
 			return response.Unauthorized(c, "err.invalid_email_or_password")
 		}
+		if errors.Is(err, services.ErrUserDisabled) {
+			return response.Forbidden(c, "err.user_account_disabled")
+		}
 		return response.InternalError(c, "err.failed_to_login")
 	}
 
@@ -107,6 +110,9 @@ func (h *AuthHandler) Refresh(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, services.ErrUserNotFound) {
 			return response.Unauthorized(c, "err.user_not_found")
+		}
+		if errors.Is(err, services.ErrUserDisabled) {
+			return response.Forbidden(c, "err.user_account_disabled")
 		}
 		return response.InternalError(c, "err.failed_to_refresh_token")
 	}

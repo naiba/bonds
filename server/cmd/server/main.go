@@ -21,6 +21,8 @@ import (
 	"github.com/naiba/bonds/internal/services"
 )
 
+var Version = "dev"
+
 //	@title			Bonds API
 //	@version		1.0
 //	@description	Personal relationship manager RESTful API.
@@ -106,7 +108,7 @@ func main() {
 	e.Use(echoMiddleware.Recover())
 	e.Use(appMiddleware.Locale())
 
-	handlers.RegisterRoutes(e, db, cfg)
+	handlers.RegisterRoutes(e, db, cfg, Version)
 
 	dav.SetupDAVRoutes(e, db)
 

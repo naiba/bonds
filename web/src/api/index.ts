@@ -12,6 +12,7 @@
 import type { GithubComNaibaBondsPkgResponseAPIResponse } from "./generated/data-contracts";
 import { HttpClient } from "./generated/http-client";
 import { Account } from "./generated/Account";
+import { Admin } from "./generated/Admin";
 import { Addresses } from "./generated/Addresses";
 import { Auth } from "./generated/Auth";
 import { Calendar } from "./generated/Calendar";
@@ -31,6 +32,7 @@ import { Groups } from "./generated/Groups";
 import { GroupTypeRoles } from "./generated/GroupTypeRoles";
 import { ImportantDates } from "./generated/ImportantDates";
 import { Invitations } from "./generated/Invitations";
+import { Instance } from "./generated/Instance";
 import { JournalMetrics } from "./generated/JournalMetrics";
 import { Journals } from "./generated/Journals";
 import { LifeEvents } from "./generated/LifeEvents";
@@ -159,6 +161,7 @@ httpClient.instance.interceptors.response.use(
 
 export const api = {
   account: new Account(httpClient),
+  admin: new Admin(httpClient),
   addresses: new Addresses(httpClient),
   auth: new Auth(httpClient),
   calendar: new Calendar(httpClient),
@@ -179,6 +182,7 @@ export const api = {
   groupTypeRoles: new GroupTypeRoles(httpClient),
   importantDates: new ImportantDates(httpClient),
   invitations: new Invitations(httpClient),
+  instance: new Instance(httpClient),
   journalMetrics: new JournalMetrics(httpClient),
   journals: new Journals(httpClient),
   lifeEvents: new LifeEvents(httpClient),
@@ -335,3 +339,9 @@ export interface OAuthProvider {
   avatar_url?: string;
   created_at: string;
 }
+
+// Admin
+export type { GithubComNaibaBondsInternalDtoAdminUserResponse as AdminUser } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoSystemSettingsResponse as SystemSettings } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoSystemSettingItem as SystemSettingItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoInstanceInfoResponse as InstanceInfo } from "./generated/data-contracts";

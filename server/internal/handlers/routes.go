@@ -17,7 +17,7 @@ import (
 	_ "github.com/naiba/bonds/docs"
 )
 
-func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
+func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string) {
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret)
 
 	services.SetupOAuthProviders(&cfg.OAuth, cfg.App.URL)
@@ -91,6 +91,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	davClientService := services.NewDavClientService(db, cfg.JWT.Secret)
 	davSyncService := services.NewDavSyncService(db, davClientService, vcardService)
 	davPushService := services.NewDavPushService(db, davClientService, vcardService)
+	adminService := services.NewAdminService(db, cfg.Storage.UploadDir)
+	systemSettingService := services.NewSystemSettingService(db)
 
 	mailer, mErr := services.NewSMTPMailer(&cfg.SMTP)
 	if mErr != nil {
@@ -213,6 +215,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	templatePageHandler := NewTemplatePageHandler(templatePageService)
 	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
 	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
+	adminHandler := NewAdminHandler(adminService, systemSettingService)
+	instanceHandler := NewInstanceHandler(systemSettingService, oauthService, webauthnService, version)
 
 	e.Use(middleware.CORS())
 
@@ -246,6 +250,16 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	}
 
 	api.POST("/invitations/accept", invitationHandler.Accept)
+
+	api.GET("/instance/info", instanceHandler.GetInfo)
+
+	adminGroup := api.Group("/admin", authMiddleware.Authenticate, authMiddleware.RequireInstanceAdmin)
+	adminGroup.GET("/users", adminHandler.ListUsers)
+	adminGroup.PUT("/users/:id/toggle", adminHandler.ToggleUser)
+	adminGroup.PUT("/users/:id/admin", adminHandler.SetAdmin)
+	adminGroup.DELETE("/users/:id", adminHandler.DeleteUser)
+	adminGroup.GET("/settings", adminHandler.GetSettings)
+	adminGroup.PUT("/settings", adminHandler.UpdateSettings)
 
 	protected := api.Group("", authMiddleware.Authenticate)
 

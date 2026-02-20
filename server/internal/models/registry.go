@@ -103,5 +103,7 @@ func AllModels() []interface{} {
 		&Invitation{},
 
 		&WebAuthnCredential{},
+
+		&SystemSetting{},
 	}
 }

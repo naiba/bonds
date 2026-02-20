@@ -105,7 +105,7 @@ func setupTestServer(t *testing.T) *testServer {
 	}
 
 	e := echo.New()
-	handlers.RegisterRoutes(e, db, cfg)
+	handlers.RegisterRoutes(e, db, cfg, "test")
 
 	return &testServer{e: e, db: db, cfg: cfg}
 }
@@ -1730,7 +1730,7 @@ func setupTestServerWithStorage(t *testing.T) *testServer {
 		Storage: config.StorageConfig{UploadDir: t.TempDir(), MaxSize: 10 * 1024 * 1024},
 	}
 	e := echo.New()
-	handlers.RegisterRoutes(e, db, cfg)
+	handlers.RegisterRoutes(e, db, cfg, "test")
 	return &testServer{e: e, db: db, cfg: cfg}
 }
 
@@ -2090,7 +2090,7 @@ func setupTestServerWithTelegram(t *testing.T) *testServer {
 		Telegram: config.TelegramConfig{BotToken: "test-bot-token"},
 	}
 	e := echo.New()
-	handlers.RegisterRoutes(e, db, cfg)
+	handlers.RegisterRoutes(e, db, cfg, "test")
 	return &testServer{e: e, db: db, cfg: cfg}
 }
 
@@ -3251,5 +3251,259 @@ func TestReportOverviewHandler(t *testing.T) {
 	}
 	if overview.TotalImportantDates < 1 {
 		t.Errorf("total_important_dates: expected >= 1, got %d", overview.TotalImportantDates)
+	}
+}
+
+func TestInstanceInfo(t *testing.T) {
+	ts := setupTestServer(t)
+
+	rec := ts.doRequest(http.MethodGet, "/api/instance/info", "", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var info struct {
+		Version             string   `json:"version"`
+		RegistrationEnabled bool     `json:"registration_enabled"`
+		PasswordAuthEnabled bool     `json:"password_auth_enabled"`
+		OAuthProviders      []string `json:"oauth_providers"`
+		WebAuthnEnabled     bool     `json:"webauthn_enabled"`
+		AppName             string   `json:"app_name"`
+	}
+	if err := json.Unmarshal(resp.Data, &info); err != nil {
+		t.Fatalf("failed to parse info: %v", err)
+	}
+	if info.Version != "test" {
+		t.Errorf("expected version 'test', got '%s'", info.Version)
+	}
+	if !info.RegistrationEnabled {
+		t.Error("expected registration_enabled=true by default")
+	}
+	if !info.PasswordAuthEnabled {
+		t.Error("expected password_auth_enabled=true by default")
+	}
+	if info.AppName != "Bonds" {
+		t.Errorf("expected app_name 'Bonds', got '%s'", info.AppName)
+	}
+}
+
+func TestAdminListUsers_Success(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "admin-h-list@example.com")
+	ts.registerTestUser(t, "admin-h-list2@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/users", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var users []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &users); err != nil {
+		t.Fatalf("failed to parse users: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users, got %d", len(users))
+	}
+}
+
+func TestAdminListUsers_NonAdminForbidden(t *testing.T) {
+	ts := setupTestServer(t)
+
+	ts.registerTestUser(t, "admin-h-first@example.com")
+	token2, _ := ts.registerTestUser(t, "admin-h-nonadmin@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/users", "", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminListUsers_Unauthenticated(t *testing.T) {
+	ts := setupTestServer(t)
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/users", "", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminToggleUser_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-h-toggle@example.com")
+	_, target := ts.registerTestUser(t, "admin-h-toggle-target@example.com")
+
+	rec := ts.doRequest(http.MethodPut,
+		"/api/admin/users/"+target.User.ID+"/toggle",
+		`{"disabled":true}`, adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var user models.User
+	ts.db.First(&user, "id = ?", target.User.ID)
+	if !user.Disabled {
+		t.Error("expected user to be disabled")
+	}
+}
+
+func TestAdminToggleUser_CannotDisableSelf(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, adminData := ts.registerTestUser(t, "admin-h-self@example.com")
+
+	rec := ts.doRequest(http.MethodPut,
+		"/api/admin/users/"+adminData.User.ID+"/toggle",
+		`{"disabled":true}`, adminToken)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminSetAdmin_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-h-setadmin@example.com")
+	_, target := ts.registerTestUser(t, "admin-h-setadmin-target@example.com")
+
+	rec := ts.doRequest(http.MethodPut,
+		"/api/admin/users/"+target.User.ID+"/admin",
+		`{"is_instance_administrator":true}`, adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var user models.User
+	ts.db.First(&user, "id = ?", target.User.ID)
+	if !user.IsInstanceAdministrator {
+		t.Error("expected user to be instance admin")
+	}
+}
+
+func TestAdminDeleteUser_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-h-delete@example.com")
+	_, target := ts.registerTestUser(t, "admin-h-del-target@example.com")
+
+	rec := ts.doRequest(http.MethodDelete,
+		"/api/admin/users/"+target.User.ID, "", adminToken)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var userCount int64
+	ts.db.Model(&models.User{}).Where("id = ?", target.User.ID).Count(&userCount)
+	if userCount != 0 {
+		t.Error("expected user to be deleted")
+	}
+}
+
+func TestAdminDeleteUser_CannotDeleteSelf(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, adminData := ts.registerTestUser(t, "admin-h-delself@example.com")
+
+	rec := ts.doRequest(http.MethodDelete,
+		"/api/admin/users/"+adminData.User.ID, "", adminToken)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminSettings_GetAndUpdate(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-h-settings@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/settings", "", adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var getResp struct {
+		Settings []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"settings"`
+	}
+	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
+		t.Fatalf("failed to parse settings: %v", err)
+	}
+	if len(getResp.Settings) != 0 {
+		t.Errorf("expected 0 settings initially, got %d", len(getResp.Settings))
+	}
+
+	rec = ts.doRequest(http.MethodPut, "/api/admin/settings",
+		`{"settings":[{"key":"app.name","value":"TestApp"},{"key":"registration.enabled","value":"false"}]}`,
+		adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update settings: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
+		t.Fatalf("failed to parse settings: %v", err)
+	}
+	if len(getResp.Settings) != 2 {
+		t.Errorf("expected 2 settings after update, got %d", len(getResp.Settings))
+	}
+}
+
+func TestAdminSettings_NonAdminForbidden(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.registerTestUser(t, "admin-h-settings-first@example.com")
+	token2, _ := ts.registerTestUser(t, "admin-h-settings-nonadmin@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/settings", "", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestLoginDisabledUser_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	_, data := ts.registerTestUser(t, "disabled-h@example.com")
+
+	ts.db.Model(&models.User{}).Where("id = ?", data.User.ID).Update("disabled", true)
+
+	rec := ts.doRequest(http.MethodPost, "/api/auth/login",
+		`{"email":"disabled-h@example.com","password":"password123"}`, "")
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+}
+
+func TestRegisterFirstUserIsInstanceAdmin_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/auth/register",
+		`{"first_name":"First","last_name":"User","email":"first-h@example.com","password":"password123"}`, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var firstUser models.User
+	ts.db.Where("email = ?", "first-h@example.com").First(&firstUser)
+	if !firstUser.IsInstanceAdministrator {
+		t.Error("expected first user to be instance administrator")
+	}
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/register",
+		`{"first_name":"Second","last_name":"User","email":"second-h@example.com","password":"password123"}`, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var secondUser models.User
+	ts.db.Where("email = ?", "second-h@example.com").First(&secondUser)
+	if secondUser.IsInstanceAdministrator {
+		t.Error("expected second user NOT to be instance administrator")
 	}
 }

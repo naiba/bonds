@@ -13,6 +13,7 @@ type JWTClaims struct {
 	AccountID        string `json:"account_id"`
 	Email            string `json:"email"`
 	IsAdmin          bool   `json:"is_admin"`
+	IsInstanceAdmin  bool   `json:"is_instance_admin"`
 	TwoFactorPending bool   `json:"two_factor_pending,omitempty"`
 	jwt.RegisteredClaims
 }
@@ -63,6 +64,7 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 		c.Set("account_id", claims.AccountID)
 		c.Set("email", claims.Email)
 		c.Set("is_admin", claims.IsAdmin)
+		c.Set("is_instance_admin", claims.IsInstanceAdmin)
 		c.Set("claims", claims)
 
 		return next(c)
@@ -74,6 +76,16 @@ func (m *AuthMiddleware) RequireAdmin(next echo.HandlerFunc) echo.HandlerFunc {
 		isAdmin, ok := c.Get("is_admin").(bool)
 		if !ok || !isAdmin {
 			return response.Forbidden(c, "err.administrator_access_required")
+		}
+		return next(c)
+	}
+}
+
+func (m *AuthMiddleware) RequireInstanceAdmin(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		isInstanceAdmin, ok := c.Get("is_instance_admin").(bool)
+		if !ok || !isInstanceAdmin {
+			return response.Forbidden(c, "err.instance_admin_access_required")
 		}
 		return next(c)
 	}

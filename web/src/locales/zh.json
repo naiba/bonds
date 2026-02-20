@@ -54,7 +54,8 @@
     "users": "用户",
     "twoFactor": "双因素认证",
     "invitations": "邀请管理",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "admin": "系统管理"
   },
   "auth": {
     "login": {
@@ -1030,5 +1031,60 @@
     "backup_dir": "备份目录",
     "cron_disabled": "未启用",
     "cron_enabled_label": "已启用"
+  },
+  "admin": {
+    "users": {
+      "title": "用户管理",
+      "description": "管理此实例上的所有注册用户",
+      "name": "姓名",
+      "email": "邮箱",
+      "contacts": "联系人",
+      "vaults": "空间",
+      "storage": "存储",
+      "role": "角色",
+      "status": "状态",
+      "joined": "注册时间",
+      "actions": "操作",
+      "admin": "管理员",
+      "user": "普通用户",
+      "active": "正常",
+      "disabled": "已禁用",
+      "enable": "启用",
+      "disable": "禁用",
+      "set_admin": "设为管理员",
+      "remove_admin": "取消管理员",
+      "delete": "删除",
+      "delete_confirm": "确定要删除此用户吗？所有数据将被永久删除。",
+      "enabled": "用户已启用",
+      "disabled_success": "用户已禁用",
+      "admin_set": "已设为管理员",
+      "admin_removed": "已取消管理员权限",
+      "deleted": "用户已删除",
+      "cannot_delete_self": "不能删除自己的账户",
+      "cannot_disable_self": "不能禁用自己的账户"
+    },
+    "settings": {
+      "title": "系统设置",
+      "description": "管理实例全局配置",
+      "key": "设置项",
+      "value": "值",
+      "save": "保存设置",
+      "saved": "设置保存成功",
+      "empty": "暂无系统设置",
+      "add": "添加设置",
+      "remove": "删除",
+      "oauth_github_key": "GitHub OAuth Key",
+      "oauth_github_secret": "GitHub OAuth Secret",
+      "oauth_google_key": "Google OAuth Key",
+      "oauth_google_secret": "Google OAuth Secret",
+      "oidc_client_id": "OIDC Client ID",
+      "oidc_client_secret": "OIDC Client Secret",
+      "oidc_discovery_url": "OIDC Discovery URL",
+      "oidc_name": "OIDC 显示名称",
+      "password_auth_enabled": "密码登录",
+      "registration_enabled": "用户注册",
+      "true": "已启用",
+      "false": "未启用"
+    }
   }
 }

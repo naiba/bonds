@@ -30,6 +30,7 @@ import {
   CheckSquareOutlined,
   DashboardOutlined,
   RightOutlined,
+  CrownOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/stores/auth";
@@ -90,6 +91,12 @@ export default function Layout() {
     { key: "/settings/users", icon: <UserSwitchOutlined />, label: t("nav.users") },
     { key: "/settings/2fa", icon: <LockOutlined />, label: t("nav.twoFactor") },
     { key: "/settings/invitations", icon: <MailOutlined />, label: t("nav.invitations") },
+    ...(user?.is_instance_administrator
+      ? [
+          { type: "divider" as const },
+          { key: "/admin/users", icon: <CrownOutlined />, label: t("nav.admin") },
+        ]
+      : []),
     { type: "divider" as const },
     { key: "logout", icon: <LogoutOutlined />, label: t("nav.logout"), danger: true },
   ];

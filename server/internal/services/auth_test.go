@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
@@ -218,5 +219,87 @@ func TestLoginScenarios(t *testing.T) {
 				t.Error("expected non-empty token")
 			}
 		})
+	}
+}
+
+func TestRegisterFirstUserIsInstanceAdmin(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	svc := NewAuthService(db, cfg)
+
+	first, err := svc.Register(dto.RegisterRequest{
+		FirstName: "First",
+		LastName:  "User",
+		Email:     "first@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register first user failed: %v", err)
+	}
+	if !first.User.IsInstanceAdministrator {
+		t.Error("expected first user to be instance administrator")
+	}
+
+	second, err := svc.Register(dto.RegisterRequest{
+		FirstName: "Second",
+		LastName:  "User",
+		Email:     "second@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register second user failed: %v", err)
+	}
+	if second.User.IsInstanceAdministrator {
+		t.Error("expected second user to NOT be instance administrator")
+	}
+}
+
+func TestLoginDisabledUser(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	svc := NewAuthService(db, cfg)
+
+	resp, err := svc.Register(dto.RegisterRequest{
+		FirstName: "Disabled",
+		LastName:  "User",
+		Email:     "disabled@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	db.Model(&models.User{}).Where("id = ?", resp.User.ID).Update("disabled", true)
+
+	_, err = svc.Login(dto.LoginRequest{Email: "disabled@example.com", Password: "password123"})
+	if err != ErrUserDisabled {
+		t.Errorf("expected ErrUserDisabled, got %v", err)
+	}
+}
+
+func TestRefreshTokenDisabledUser(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	svc := NewAuthService(db, cfg)
+
+	resp, err := svc.Register(dto.RegisterRequest{
+		FirstName: "Refresh",
+		LastName:  "Disabled",
+		Email:     "refresh-disabled@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	db.Model(&models.User{}).Where("id = ?", resp.User.ID).Update("disabled", true)
+
+	_, err = svc.RefreshToken(&middleware.JWTClaims{
+		UserID:    resp.User.ID,
+		AccountID: resp.User.AccountID,
+		Email:     resp.User.Email,
+	})
+	if err != ErrUserDisabled {
+		t.Errorf("expected ErrUserDisabled, got %v", err)
 	}
 }

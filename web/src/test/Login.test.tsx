@@ -8,6 +8,17 @@ import Login from "@/pages/auth/Login";
 vi.mock("@/api", () => ({
   api: {
     webauthn: { webauthnLoginBeginCreate: vi.fn() },
+    instance: {
+      infoList: vi.fn().mockResolvedValue({
+        data: {
+          version: "v0.1.5",
+          password_auth_enabled: true,
+          registration_enabled: true,
+          webauthn_enabled: false,
+          oauth_providers: [],
+        },
+      }),
+    },
   },
   httpClient: {
     instance: {
