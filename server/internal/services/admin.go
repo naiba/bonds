@@ -128,8 +128,24 @@ func (s *AdminService) DeleteUser(actorID, targetID string) error {
 		return err
 	}
 
+	// Count how many users share this account (invitation system allows multiple users per account).
+	var accountUserCount int64
+	if err := s.db.Model(&models.User{}).Where("account_id = ?", user.AccountID).Count(&accountUserCount).Error; err != nil {
+		return err
+	}
+
+	if accountUserCount <= 1 {
+		// This is the only user on the account — delete the entire account and all its data.
+		return s.deleteEntireAccount(user)
+	}
+
+	// Other users still share this account — only remove this user's personal data.
+	return s.deleteUserOnly(user)
+}
+
+// deleteEntireAccount removes the user, the account, and all associated data (vaults, contacts, files, etc.).
+func (s *AdminService) deleteEntireAccount(user models.User) error {
 	// Delete physical files BEFORE the transaction to avoid SQLite lock contention.
-	// deleteUserFiles uses s.db (outside tx) to query file paths, then removes from disk.
 	if err := s.deleteUserFiles(user.AccountID); err != nil {
 		return fmt.Errorf("delete user files: %w", err)
 	}
@@ -205,11 +221,22 @@ func (s *AdminService) DeleteUser(actorID, targetID string) error {
 			return err
 		}
 
-		if err := tx.Where("account_id = ?", user.AccountID).Delete(&models.User{}).Error; err != nil {
+		if err := tx.Delete(&user).Error; err != nil {
 			return err
 		}
 
 		return tx.Where("id = ?", user.AccountID).Delete(&models.Account{}).Error
+	})
+}
+
+// deleteUserOnly removes only the user record and their personal data (notification channels,
+// WebAuthn credentials, etc.) without touching the shared account, vaults, or contacts.
+func (s *AdminService) deleteUserOnly(user models.User) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := s.deleteUserDirectData(tx, user.ID); err != nil {
+			return err
+		}
+		return tx.Delete(&user).Error
 	})
 }
 

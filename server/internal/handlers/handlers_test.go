@@ -1852,6 +1852,123 @@ func TestInvitationAccept_InvalidToken(t *testing.T) {
 
 // ==================== Contact Photo Delete ====================
 
+func TestContactPhotoList_IncludesAvatar(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "photo-list-avatar@example.com")
+	vault := ts.createTestVault(t, token, "Photo List Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "PhotoListAvatar")
+
+	// 1) Upload a regular photo via POST
+	pngData := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("x", 100))
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos",
+		token, "file", "photo.png", "image/png", pngData)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload photo failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// 2) Upload avatar via PUT (multipart)
+	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	fakeAvatar := make([]byte, 100)
+	copy(fakeAvatar, pngHeader)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	mh := make(textproto.MIMEHeader)
+	mh.Set("Content-Disposition", `form-data; name="file"; filename="avatar.png"`)
+	mh.Set("Content-Type", "image/png")
+	part, err := mw.CreatePart(mh)
+	if err != nil {
+		t.Fatalf("create part: %v", err)
+	}
+	part.Write(fakeAvatar)
+	mw.Close()
+	avatarPath := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/avatar"
+	req := httptest.NewRequest(http.MethodPut, avatarPath, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	ts.e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT avatar: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// 3) List photos — should include both the regular photo AND the avatar
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list photos: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var photos []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &photos); err != nil {
+		t.Fatalf("failed to parse photos: %v", err)
+	}
+	if len(photos) != 2 {
+		t.Fatalf("expected 2 photos (1 photo + 1 avatar), got %d", len(photos))
+	}
+
+	// Verify we have both types
+	typeSet := map[string]bool{}
+	for _, p := range photos {
+		if ft, ok := p["type"].(string); ok {
+			typeSet[ft] = true
+		}
+	}
+	if !typeSet["photo"] {
+		t.Error("expected a photo-type file in list")
+	}
+	if !typeSet["avatar"] {
+		t.Error("expected an avatar-type file in list")
+	}
+
+	// 4) Delete the avatar via photo delete endpoint — should also unset contact.FileID
+	avatarID := ""
+	for _, p := range photos {
+		if ft, ok := p["type"].(string); ok && ft == "avatar" {
+			avatarID = fmt.Sprintf("%.0f", p["id"].(float64))
+		}
+	}
+	if avatarID == "" {
+		t.Fatal("could not find avatar ID in photos list")
+	}
+	rec = ts.doRequest(http.MethodDelete,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos/"+avatarID, "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete avatar photo: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// 5) List photos again — should only have the regular photo
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list photos after delete: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var photosAfter []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &photosAfter); err != nil {
+		t.Fatalf("failed to parse photos after delete: %v", err)
+	}
+	if len(photosAfter) != 1 {
+		t.Fatalf("expected 1 photo after avatar delete, got %d", len(photosAfter))
+	}
+	if ft, ok := photosAfter[0]["type"].(string); !ok || ft != "photo" {
+		t.Errorf("expected remaining photo to be type 'photo', got '%v'", photosAfter[0]["type"])
+	}
+
+	// 6) Verify avatar is unset on the contact
+	var contactAfter models.Contact
+	if err := ts.db.First(&contactAfter, "id = ?", contact.ID).Error; err != nil {
+		t.Fatalf("query contact: %v", err)
+	}
+	if contactAfter.FileID != nil {
+		t.Error("expected contact.FileID to be nil after avatar deletion")
+	}
+}
+
 func TestContactPhotoDelete_Success(t *testing.T) {
 	ts := setupTestServerWithStorage(t)
 	token, _ := ts.registerTestUser(t, "photo-del@example.com")

@@ -13,7 +13,7 @@ import (
 )
 
 func (s *VaultFileService) ListContactPhotos(contactID, vaultID string, page, perPage int) ([]dto.VaultFileResponse, response.Meta, error) {
-	query := s.db.Where("ufileable_id = ? AND type = ? AND vault_id = ?", contactID, "photo", vaultID)
+	query := s.db.Where("ufileable_id = ? AND type IN (?, ?) AND vault_id = ?", contactID, "photo", "avatar", vaultID)
 
 	var total int64
 	if err := query.Model(&models.File{}).Count(&total).Error; err != nil {
@@ -48,8 +48,8 @@ func (s *VaultFileService) ListContactPhotos(contactID, vaultID string, page, pe
 
 func (s *VaultFileService) GetContactPhoto(fileID uint, contactID, vaultID string) (*dto.VaultFileResponse, error) {
 	var file models.File
-	if err := s.db.Where("id = ? AND ufileable_id = ? AND type = ? AND vault_id = ?",
-		fileID, contactID, "photo", vaultID).First(&file).Error; err != nil {
+	if err := s.db.Where("id = ? AND ufileable_id = ? AND type IN (?, ?) AND vault_id = ?",
+		fileID, contactID, "photo", "avatar", vaultID).First(&file).Error; err != nil {
 		if err.Error() == "record not found" {
 			return nil, ErrFileNotFound
 		}
@@ -61,12 +61,20 @@ func (s *VaultFileService) GetContactPhoto(fileID uint, contactID, vaultID strin
 
 func (s *VaultFileService) DeleteContactPhoto(fileID uint, contactID, vaultID string) error {
 	var file models.File
-	if err := s.db.Where("id = ? AND ufileable_id = ? AND type = ? AND vault_id = ?",
-		fileID, contactID, "photo", vaultID).First(&file).Error; err != nil {
+	if err := s.db.Where("id = ? AND ufileable_id = ? AND type IN (?, ?) AND vault_id = ?",
+		fileID, contactID, "photo", "avatar", vaultID).First(&file).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrFileNotFound
 		}
 		return err
+	}
+
+	// If this file is the contact's avatar, unset the reference first.
+	if file.Type == "avatar" {
+		if err := s.db.Model(&models.Contact{}).Where("id = ? AND file_id = ?", contactID, file.ID).
+			Update("file_id", nil).Error; err != nil {
+			return err
+		}
 	}
 
 	destPath := filepath.Join(s.uploadDir, file.UUID)

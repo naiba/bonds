@@ -270,3 +270,79 @@ func TestAdminDeleteUser_NotFound(t *testing.T) {
 		t.Errorf("expected ErrAdminUserNotFound, got %v", err)
 	}
 }
+
+func TestAdminDeleteUser_SharedAccount_OnlyDeletesTargetUser(t *testing.T) {
+	adminSvc, authSvc, vaultSvc := setupAdminTest(t)
+
+	owner := registerTestUser(t, authSvc, "shared-owner@example.com")
+
+	vault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Shared Vault"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(adminSvc.db)
+	_, err = contactSvc.CreateContact(vault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "SharedContact"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	invitedUser := models.User{
+		AccountID:              owner.User.AccountID,
+		Email:                  "shared-invited@example.com",
+		IsAccountAdministrator: false,
+	}
+	if err := adminSvc.db.Create(&invitedUser).Error; err != nil {
+		t.Fatalf("Create invited user failed: %v", err)
+	}
+	invitedUserVault := models.UserVault{
+		UserID:     invitedUser.ID,
+		VaultID:    vault.ID,
+		Permission: 200,
+	}
+	if err := adminSvc.db.Create(&invitedUserVault).Error; err != nil {
+		t.Fatalf("Create UserVault failed: %v", err)
+	}
+
+	admin := registerTestUser(t, authSvc, "shared-admin@example.com")
+	err = adminSvc.DeleteUser(admin.User.ID, invitedUser.ID)
+	if err != nil {
+		t.Fatalf("DeleteUser (shared account) failed: %v", err)
+	}
+
+	var deletedCount int64
+	adminSvc.db.Model(&models.User{}).Where("id = ?", invitedUser.ID).Count(&deletedCount)
+	if deletedCount != 0 {
+		t.Error("expected invited user to be deleted")
+	}
+
+	var ownerCount int64
+	adminSvc.db.Model(&models.User{}).Where("id = ?", owner.User.ID).Count(&ownerCount)
+	if ownerCount != 1 {
+		t.Error("expected owner user to still exist")
+	}
+
+	var accountCount int64
+	adminSvc.db.Model(&models.Account{}).Where("id = ?", owner.User.AccountID).Count(&accountCount)
+	if accountCount != 1 {
+		t.Error("expected shared account to still exist")
+	}
+
+	var vaultCount int64
+	adminSvc.db.Model(&models.Vault{}).Where("id = ?", vault.ID).Count(&vaultCount)
+	if vaultCount != 1 {
+		t.Error("expected vault to still exist")
+	}
+
+	var contactCount int64
+	adminSvc.db.Model(&models.Contact{}).Where("vault_id = ?", vault.ID).Count(&contactCount)
+	if contactCount != 1 {
+		t.Error("expected contacts to still exist")
+	}
+
+	var uvCount int64
+	adminSvc.db.Model(&models.UserVault{}).Where("user_id = ?", invitedUser.ID).Count(&uvCount)
+	if uvCount != 0 {
+		t.Error("expected deleted user's UserVault to be removed")
+	}
+}
