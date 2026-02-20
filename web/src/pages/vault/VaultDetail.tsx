@@ -230,17 +230,16 @@ export default function VaultDetail() {
               renderItem={(item: any) => (
                 <List.Item
                   style={{ cursor: "pointer", padding: "8px 0" }}
-                  onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.id}`)}
+                  onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.contact_id}`)}
                 >
                   <List.Item.Meta
                     avatar={
                       <ContactAvatar
                         vaultId={vaultId}
-                        contactId={item.id}
+                        contactId={item.contact_id}
                         firstName={item.first_name}
                         lastName={item.last_name}
                         size={32}
-                        updatedAt={item.updated_at}
                       />
                     }
                     title={`${item.first_name} ${item.last_name}`}
