@@ -1,11 +1,14 @@
 .PHONY: dev dev-server dev-web build build-server build-web build-all test test-server test-web test-e2e lint clean setup swagger gen-api
 
+GIT_VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -X main.Version=$(GIT_VERSION)
+
 dev:
-	@cd server && go run cmd/server/main.go & \
+	@cd server && go run -ldflags='$(LDFLAGS)' cmd/server/main.go & \
 	cd web && bun dev
 
 dev-server:
-	cd server && go run cmd/server/main.go
+	cd server && go run -ldflags='$(LDFLAGS)' cmd/server/main.go
 
 dev-web:
 	cd web && bun dev
@@ -19,7 +22,7 @@ gen-api: swagger
 build: build-server build-web
 
 build-server:
-	cd server && CGO_ENABLED=1 go build -o bin/bonds-server cmd/server/main.go
+	cd server && CGO_ENABLED=1 go build -ldflags='$(LDFLAGS)' -o bin/bonds-server cmd/server/main.go
 
 build-web:
 	cd web && bun run build
@@ -27,7 +30,7 @@ build-web:
 build-all: gen-api build-web
 	rm -rf server/internal/frontend/dist/*
 	cp -r web/dist/* server/internal/frontend/dist/
-	cd server && CGO_ENABLED=1 go build -trimpath -ldflags="-s -w -X main.Version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)" -o bin/bonds-server cmd/server/main.go
+	cd server && CGO_ENABLED=1 go build -trimpath -ldflags="-s -w $(LDFLAGS)" -o bin/bonds-server cmd/server/main.go
 
 test: test-server test-web
 

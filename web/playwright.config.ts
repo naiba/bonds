@@ -19,7 +19,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'rm -f ../server/bonds.db ../server/bonds.db-shm ../server/bonds.db-wal && cd ../server && go run cmd/server/main.go',
+      command: 'rm -f ../server/bonds.db ../server/bonds.db-shm ../server/bonds.db-wal && cd ../server && go run -ldflags="-X main.Version=e2e-test" cmd/server/main.go',
       port: 8080,
       reuseExistingServer: !process.env.CI,
     },

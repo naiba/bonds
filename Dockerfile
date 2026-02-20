@@ -21,6 +21,7 @@ COPY --from=swagger /build/docs/swagger.json /build/server/docs/swagger.json
 RUN bun run gen:api && bun run build
 
 FROM golang:1.25-alpine AS backend
+ARG VERSION=dev
 
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 
@@ -31,7 +32,7 @@ COPY server/ .
 COPY --from=swagger /build/docs ./docs/
 COPY --from=frontend /build/web/dist ./internal/frontend/dist/
 
-RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w" -o bonds-server cmd/server/main.go
+RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o bonds-server cmd/server/main.go
 
 FROM alpine:3.21
 
