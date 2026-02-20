@@ -56,14 +56,16 @@ func main() {
 		log.Fatalf("Failed to seed currencies: %v", err)
 	}
 
+	systemSettingService := services.NewSystemSettingService(db)
+	if err := services.SeedSettingsFromEnv(systemSettingService, cfg); err != nil {
+		log.Fatalf("Failed to seed system settings: %v", err)
+	}
+	services.SetupOAuthProvidersFromDB(systemSettingService)
+
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
 
-	mailer, mErr := services.NewSMTPMailer(&cfg.SMTP)
-	if mErr != nil {
-		log.Printf("WARNING: Failed to initialize mailer for cron: %v", mErr)
-		mailer = &services.NoopMailer{}
-	}
+	mailer := services.NewDynamicMailer(systemSettingService)
 	notificationSender := services.NewShoutrrrSender()
 	reminderScheduler := services.NewReminderSchedulerService(db, mailer, notificationSender)
 	if err := scheduler.RegisterJob("0 * * * * *", "process_reminders", func() {
@@ -86,8 +88,10 @@ func main() {
 	}
 
 	backupService := services.NewBackupService(db, cfg)
-	if cfg.Backup.Cron != "" {
-		if err := scheduler.RegisterJob(cfg.Backup.Cron, "create_backup", func() {
+	backupService.SetSystemSettings(systemSettingService)
+	backupCron := systemSettingService.GetWithDefault("backup.cron", cfg.Backup.Cron)
+	if backupCron != "" {
+		if err := scheduler.RegisterJob(backupCron, "create_backup", func() {
 			if _, err := backupService.Create(); err != nil {
 				log.Printf("WARNING: Backup cron failed: %v", err)
 			}
