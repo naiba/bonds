@@ -4,7 +4,7 @@
 [![Release](https://github.com/naiba/bonds/actions/workflows/release.yml/badge.svg)](https://github.com/naiba/bonds/actions/workflows/release.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/naiba/bonds)](https://github.com/naiba/bonds/releases)
 
-> [中文文档](README_zh.md)
+📖 [Documentation](https://naiba.github.io/bonds/) | [中文文档](README_zh.md)
 
 A modern, community-driven personal relationship manager — inspired by [Monica](https://github.com/monicahq/monica), rebuilt with **Go** and **React**.
 
@@ -93,11 +93,18 @@ export JWT_SECRET=your-secret-key-here
 
 ## Configuration
 
-Bonds is configured via environment variables. Copy the example file to get started:
+Bonds uses a **hybrid configuration** approach:
+
+- **Environment variables** — For essential infrastructure settings (database, server, security)
+- **Admin UI** — For all runtime settings (SMTP, OAuth, Telegram, WebAuthn, etc.)
+
+On first startup, environment variables are seeded into the database. After that, manage settings from **Admin > System Settings** in the web UI.
 
 ```bash
 cp server/.env.example server/.env
 ```
+
+### Environment Variables (Required)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -107,37 +114,25 @@ cp server/.env.example server/.env
 | `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
 | `DB_DSN` | `bonds.db` | Database connection string. SQLite: file path; PostgreSQL: `host=... port=5432 user=... password=... dbname=... sslmode=disable` |
 | `DB_DRIVER` | `sqlite` | Database driver (`sqlite` or `postgres`) |
-| `APP_NAME` | `Bonds` | Application name (used in emails, WebAuthn, etc.) |
 | `APP_ENV` | `development` | Set to `production` for production use |
-| `APP_URL` | `http://localhost:8080` | Public URL (used in emails and OAuth callbacks) |
-| `JWT_EXPIRY_HRS` | `24` | JWT token expiry in hours |
-| `JWT_REFRESH_HRS` | `168` | JWT refresh window in hours (default 7 days) |
-| `SMTP_HOST` | — | SMTP server for sending emails |
-| `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_USERNAME` | — | SMTP username |
-| `SMTP_PASSWORD` | — | SMTP password |
-| `SMTP_FROM` | — | Sender email address |
 | `STORAGE_UPLOAD_DIR` | `uploads` | File upload directory |
-| `STORAGE_MAX_SIZE` | `10485760` | Max upload size in bytes (10 MB) |
-| `TELEGRAM_BOT_TOKEN` | — | Telegram bot token for notifications |
 | `BLEVE_INDEX_PATH` | `data/bonds.bleve` | Full-text search index directory |
-| `OAUTH_GITHUB_KEY` | — | GitHub OAuth App client ID |
-| `OAUTH_GITHUB_SECRET` | — | GitHub OAuth App client secret |
-| `OAUTH_GOOGLE_KEY` | — | Google OAuth client ID |
-| `OAUTH_GOOGLE_SECRET` | — | Google OAuth client secret |
-| `OIDC_CLIENT_ID` | — | OIDC client ID (Authentik, Keycloak, etc.) |
-| `OIDC_CLIENT_SECRET` | — | OIDC client secret |
-| `OIDC_DISCOVERY_URL` | — | OIDC discovery URL (e.g. `https://auth.example.com/.well-known/openid-configuration`) |
-| `OIDC_NAME` | `SSO` | Display name for OIDC provider on login page |
-| `GEOCODING_PROVIDER` | `nominatim` | Geocoding provider (`nominatim` or `locationiq`) |
-| `GEOCODING_API_KEY` | — | API key for LocationIQ |
-| `WEBAUTHN_RP_ID` | — | WebAuthn Relying Party ID (e.g. `bonds.example.com`) |
-| `WEBAUTHN_RP_DISPLAY_NAME` | `Bonds` | WebAuthn display name |
-| `WEBAUTHN_RP_ORIGINS` | — | Allowed WebAuthn origins (comma-separated) |
-| `ANNOUNCEMENT` | — | Announcement banner text displayed to all users |
 | `BACKUP_DIR` | `data/backups` | Directory to store backup files |
-| `BACKUP_CRON` | — | Cron schedule for automatic backups (e.g. `0 0 2 * * *` for 2 AM daily). Uses 6-field format with seconds. |
-| `BACKUP_RETENTION` | `30` | Days to keep old backups before auto-cleanup |
+
+### Admin UI Settings
+
+The following are managed from the **Admin > System Settings** page after login:
+
+- **Application** — Name, URL, Announcement banner
+- **Authentication** — Password auth toggle, User registration toggle
+- **JWT** — Token expiry, Refresh window
+- **SMTP** — Host, Port, Username, Password, Sender email
+- **OAuth / OIDC** — GitHub, Google, and OIDC/SSO credentials
+- **WebAuthn** — Relying Party ID, Display Name, Origins
+- **Telegram** — Bot token for notifications
+- **Geocoding** — Provider (Nominatim/LocationIQ), API key
+- **Storage** — Max upload size
+- **Backup** — Cron schedule, Retention days
 
 ## Development
 

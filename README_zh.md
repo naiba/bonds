@@ -4,7 +4,7 @@
 [![Release](https://github.com/naiba/bonds/actions/workflows/release.yml/badge.svg)](https://github.com/naiba/bonds/actions/workflows/release.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/naiba/bonds)](https://github.com/naiba/bonds/releases)
 
-> [English](README.md)
+📖 [文档](https://naiba.github.io/bonds/zh/) | [English](README.md)
 
 现代化的社区驱动个人关系管理器 — 受 [Monica](https://github.com/monicahq/monica) 启发，使用 **Go** 和 **React** 全新重写。
 
@@ -94,11 +94,18 @@ export JWT_SECRET=你的密钥
 
 ## 配置
 
-Bonds 通过环境变量配置。复制示例文件开始：
+Bonds 采用**混合配置**方式：
+
+- **环境变量** — 基础设施设置（数据库、服务器、安全）
+- **管理后台** — 所有运行时设置（SMTP、OAuth、Telegram、WebAuthn 等）
+
+首次启动时，环境变量会自动导入数据库。之后，请在 Web 界面的 **管理员 > 系统设置** 中管理设置。
 
 ```bash
 cp server/.env.example server/.env
 ```
+
+### 环境变量（必须）
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
@@ -106,32 +113,27 @@ cp server/.env.example server/.env
 | `JWT_SECRET` | — | **生产环境必填。** 认证令牌签名密钥 |
 | `SERVER_PORT` | `8080` | 服务端口 |
 | `SERVER_HOST` | `0.0.0.0` | 服务器监听地址 |
-| `DB_DSN` | `bonds.db` | SQLite 数据库文件路径 |
-| `DB_DRIVER` | `sqlite` | 数据库驱动 |
-| `APP_NAME` | `Bonds` | 应用名称（用于邮件、WebAuthn 等） |
+| `DB_DSN` | `bonds.db` | 数据库连接字符串。SQLite：文件路径；PostgreSQL：`host=... port=5432 user=... password=... dbname=... sslmode=disable` |
+| `DB_DRIVER` | `sqlite` | 数据库驱动（`sqlite` 或 `postgres`） |
 | `APP_ENV` | `development` | 生产环境设置为 `production` |
-| `APP_URL` | `http://localhost:8080` | 公开 URL（用于邮件链接和 OAuth 回调） |
-| `JWT_EXPIRY_HRS` | `24` | JWT 令牌过期时间（小时） |
-| `JWT_REFRESH_HRS` | `168` | JWT 刷新窗口（小时，默认 7 天） |
-| `SMTP_HOST` | — | SMTP 邮件服务器 |
-| `SMTP_PORT` | `587` | SMTP 端口 |
-| `SMTP_USERNAME` | — | SMTP 用户名 |
-| `SMTP_PASSWORD` | — | SMTP 密码 |
-| `SMTP_FROM` | — | 发件人邮箱 |
 | `STORAGE_UPLOAD_DIR` | `uploads` | 文件上传目录 |
-| `STORAGE_MAX_SIZE` | `10485760` | 最大上传大小（字节，默认 10 MB） |
-| `TELEGRAM_BOT_TOKEN` | — | Telegram Bot Token（用于发送通知） |
 | `BLEVE_INDEX_PATH` | `data/bonds.bleve` | 全文搜索索引目录 |
-| `OAUTH_GITHUB_KEY` | — | GitHub OAuth App Client ID |
-| `OAUTH_GITHUB_SECRET` | — | GitHub OAuth App Client Secret |
-| `OAUTH_GOOGLE_KEY` | — | Google OAuth Client ID |
-| `OAUTH_GOOGLE_SECRET` | — | Google OAuth Client Secret |
-| `GEOCODING_PROVIDER` | `nominatim` | 地理编码服务（`nominatim` 或 `locationiq`） |
-| `GEOCODING_API_KEY` | — | LocationIQ API Key |
-| `WEBAUTHN_RP_ID` | — | WebAuthn Relying Party ID（如 `bonds.example.com`） |
-| `WEBAUTHN_RP_DISPLAY_NAME` | `Bonds` | WebAuthn 显示名称 |
-| `WEBAUTHN_RP_ORIGINS` | — | WebAuthn 允许的来源（逗号分隔） |
-| `ANNOUNCEMENT` | — | 公告横幅内容（显示给所有用户） |
+| `BACKUP_DIR` | `data/backups` | 数据库备份存储目录 |
+
+### 管理后台设置
+
+以下设置在登录后通过 **管理员 > 系统设置** 页面管理：
+
+- **应用** — 名称、URL、公告横幅
+- **认证** — 密码登录开关、用户注册开关
+- **JWT** — 令牌过期时间、刷新窗口
+- **SMTP** — 主机、端口、用户名、密码、发件人邮箱
+- **OAuth / OIDC** — GitHub、Google 和 OIDC/SSO 凭据
+- **WebAuthn** — 依赖方 ID、显示名称、允许来源
+- **Telegram** — Bot Token（通知推送）
+- **地理编码** — 服务商（Nominatim/LocationIQ）、API Key
+- **存储** — 最大上传大小
+- **备份** — Cron 定时计划、保留天数
 
 ## 开发
 
