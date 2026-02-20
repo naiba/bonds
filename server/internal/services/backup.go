@@ -28,12 +28,31 @@ var (
 var validBackupFilename = regexp.MustCompile(`^bonds-\d{4}-\d{2}-\d{2}-\d{6}\.zip$`)
 
 type BackupService struct {
-	db  *gorm.DB
-	cfg *config.Config
+	db       *gorm.DB
+	cfg      *config.Config
+	settings *SystemSettingService
 }
 
 func NewBackupService(db *gorm.DB, cfg *config.Config) *BackupService {
 	return &BackupService{db: db, cfg: cfg}
+}
+
+func (s *BackupService) SetSystemSettings(settings *SystemSettingService) {
+	s.settings = settings
+}
+
+func (s *BackupService) getCronSpec() string {
+	if s.settings != nil {
+		return s.settings.GetWithDefault("backup.cron", s.cfg.Backup.Cron)
+	}
+	return s.cfg.Backup.Cron
+}
+
+func (s *BackupService) getRetention() int {
+	if s.settings != nil {
+		return s.settings.GetInt("backup.retention", s.cfg.Backup.Retention)
+	}
+	return s.cfg.Backup.Retention
 }
 
 // Create creates a new backup zip containing the database and uploads directory.
@@ -451,7 +470,8 @@ func (s *BackupService) restoreUploads(tmpDir string) error {
 
 // CleanOldBackups removes backups older than the configured retention days.
 func (s *BackupService) CleanOldBackups() error {
-	if s.cfg.Backup.Retention <= 0 {
+	retention := s.getRetention()
+	if retention <= 0 {
 		return nil
 	}
 
@@ -463,7 +483,7 @@ func (s *BackupService) CleanOldBackups() error {
 		return fmt.Errorf("read backup dir: %w", err)
 	}
 
-	cutoff := time.Now().Add(-time.Duration(s.cfg.Backup.Retention) * 24 * time.Hour)
+	cutoff := time.Now().Add(-time.Duration(retention) * 24 * time.Hour)
 
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".zip") {
@@ -483,10 +503,11 @@ func (s *BackupService) CleanOldBackups() error {
 
 // GetConfig returns the current backup configuration.
 func (s *BackupService) GetConfig() dto.BackupConfigResponse {
+	cronSpec := s.getCronSpec()
 	return dto.BackupConfigResponse{
-		CronEnabled:   s.cfg.Backup.Cron != "",
-		CronSpec:      s.cfg.Backup.Cron,
-		RetentionDays: s.cfg.Backup.Retention,
+		CronEnabled:   cronSpec != "",
+		CronSpec:      cronSpec,
+		RetentionDays: s.getRetention(),
 		BackupDir:     s.cfg.Backup.Dir,
 		DBDriver:      s.cfg.Database.Driver,
 	}

@@ -19,13 +19,25 @@ var (
 )
 
 type InvitationService struct {
-	db     *gorm.DB
-	mailer Mailer
-	appURL string
+	db       *gorm.DB
+	mailer   Mailer
+	appURL   string
+	settings *SystemSettingService
 }
 
 func NewInvitationService(db *gorm.DB, mailer Mailer, appURL string) *InvitationService {
 	return &InvitationService{db: db, mailer: mailer, appURL: appURL}
+}
+
+func (s *InvitationService) SetSystemSettings(settings *SystemSettingService) {
+	s.settings = settings
+}
+
+func (s *InvitationService) getAppURL() string {
+	if s.settings != nil {
+		return s.settings.GetWithDefault("app.url", s.appURL)
+	}
+	return s.appURL
 }
 
 func (s *InvitationService) Create(accountID, createdBy string, req dto.CreateInvitationRequest) (*dto.InvitationResponse, error) {
@@ -54,7 +66,7 @@ func (s *InvitationService) Create(accountID, createdBy string, req dto.CreateIn
 		return nil, err
 	}
 
-	inviteLink := fmt.Sprintf("%s/accept-invite?token=%s", s.appURL, token)
+	inviteLink := fmt.Sprintf("%s/accept-invite?token=%s", s.getAppURL(), token)
 	subject := "You've been invited to Bonds"
 	body := fmt.Sprintf(
 		`<h2>You've been invited!</h2>

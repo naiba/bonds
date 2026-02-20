@@ -25,13 +25,17 @@ type WebAuthnService struct {
 	db       *gorm.DB
 	webauthn *webauthn.WebAuthn
 	sessions sync.Map // map[string]*webauthn.SessionData
+	settings *SystemSettingService
 }
 
 // NewWebAuthnService creates a new WebAuthnService.
-// Returns nil, nil if RPID is empty (WebAuthn disabled).
+// Always returns a non-nil service. If RPID is empty, the service is created
+// in disabled mode (webauthn field is nil) — use IsEnabled() to check.
 func NewWebAuthnService(db *gorm.DB, cfg *config.WebAuthnConfig) (*WebAuthnService, error) {
+	svc := &WebAuthnService{db: db}
+
 	if cfg.RPID == "" {
-		return nil, nil
+		return svc, nil
 	}
 
 	wconfig := &webauthn.Config{
@@ -42,16 +46,83 @@ func NewWebAuthnService(db *gorm.DB, cfg *config.WebAuthnConfig) (*WebAuthnServi
 
 	w, err := webauthn.New(wconfig)
 	if err != nil {
-		return nil, err
+		return svc, err
+	}
+	svc.webauthn = w
+
+	return svc, nil
+}
+
+func (s *WebAuthnService) SetSystemSettings(settings *SystemSettingService) {
+	s.settings = settings
+}
+
+// IsEnabled returns true if WebAuthn is configured (either via constructor or DB settings).
+func (s *WebAuthnService) IsEnabled() bool {
+	if s == nil {
+		return false
+	}
+	if s.webauthn != nil {
+		return true
+	}
+	// Check DB settings — may have been configured after startup
+	if s.settings != nil {
+		rpID := s.settings.GetWithDefault("webauthn.rp_id", "")
+		return rpID != ""
+	}
+	return false
+}
+
+func (s *WebAuthnService) ReloadConfig() error {
+	if s.settings == nil {
+		return nil
+	}
+	rpID := s.settings.GetWithDefault("webauthn.rp_id", "")
+	if rpID == "" {
+		return nil
+	}
+	displayName := s.settings.GetWithDefault("webauthn.rp_display_name", "Bonds")
+	originsStr := s.settings.GetWithDefault("webauthn.rp_origins", "")
+	var origins []string
+	if originsStr != "" {
+		for _, o := range splitComma(originsStr) {
+			if o != "" {
+				origins = append(origins, o)
+			}
+		}
 	}
 
-	return &WebAuthnService{
-		db:       db,
-		webauthn: w,
-	}, nil
+	wconfig := &webauthn.Config{
+		RPDisplayName: displayName,
+		RPID:          rpID,
+		RPOrigins:     origins,
+	}
+
+	w, err := webauthn.New(wconfig)
+	if err != nil {
+		return err
+	}
+	s.webauthn = w
+	return nil
+}
+
+func splitComma(s string) []string {
+	var result []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == ',' {
+			result = append(result, s[start:i])
+			start = i + 1
+		}
+	}
+	result = append(result, s[start:])
+	return result
 }
 
 func (s *WebAuthnService) BeginRegistration(userID string) (*protocol.CredentialCreation, error) {
+	if !s.IsEnabled() {
+		return nil, ErrWebAuthnNotConfigured
+	}
 	user, creds, err := s.loadUserWithCredentials(userID)
 	if err != nil {
 		return nil, err
@@ -70,6 +141,9 @@ func (s *WebAuthnService) BeginRegistration(userID string) (*protocol.Credential
 }
 
 func (s *WebAuthnService) FinishRegistration(userID string, r *http.Request) error {
+	if !s.IsEnabled() {
+		return ErrWebAuthnNotConfigured
+	}
 	user, creds, err := s.loadUserWithCredentials(userID)
 	if err != nil {
 		return err
@@ -100,6 +174,9 @@ func (s *WebAuthnService) FinishRegistration(userID string, r *http.Request) err
 }
 
 func (s *WebAuthnService) BeginLogin(email string) (*protocol.CredentialAssertion, error) {
+	if !s.IsEnabled() {
+		return nil, ErrWebAuthnNotConfigured
+	}
 	var user models.User
 	if err := s.db.Where("email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -126,8 +203,10 @@ func (s *WebAuthnService) BeginLogin(email string) (*protocol.CredentialAssertio
 	return options, nil
 }
 
-// FinishLogin completes the WebAuthn login ceremony and returns the userID.
 func (s *WebAuthnService) FinishLogin(email string, r *http.Request) (string, error) {
+	if !s.IsEnabled() {
+		return "", ErrWebAuthnNotConfigured
+	}
 	var user models.User
 	if err := s.db.Where("email = ?", email).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

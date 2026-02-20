@@ -17,23 +17,33 @@ var (
 )
 
 type NotificationService struct {
-	db     *gorm.DB
-	mailer Mailer
-	sender NotificationSender
-	appURL string
+	db       *gorm.DB
+	mailer   Mailer
+	sender   NotificationSender
+	settings *SystemSettingService
 }
 
 func NewNotificationService(db *gorm.DB) *NotificationService {
 	return &NotificationService{db: db}
 }
 
-func (s *NotificationService) SetMailer(mailer Mailer, appURL string) {
+func (s *NotificationService) SetMailer(mailer Mailer) {
 	s.mailer = mailer
-	s.appURL = appURL
 }
 
 func (s *NotificationService) SetSender(sender NotificationSender) {
 	s.sender = sender
+}
+
+func (s *NotificationService) SetSystemSettings(settings *SystemSettingService) {
+	s.settings = settings
+}
+
+func (s *NotificationService) getAppURL() string {
+	if s.settings != nil {
+		return s.settings.GetWithDefault("app.url", "http://localhost:8080")
+	}
+	return "http://localhost:8080"
 }
 
 func (s *NotificationService) List(userID string) ([]dto.NotificationChannelResponse, error) {
@@ -64,7 +74,7 @@ func (s *NotificationService) Create(userID string, req dto.CreateNotificationCh
 
 	if req.Type == "email" {
 		if s.mailer != nil {
-			link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.appURL, ch.ID, token)
+			link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.getAppURL(), ch.ID, token)
 			body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
 			_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
 		}
