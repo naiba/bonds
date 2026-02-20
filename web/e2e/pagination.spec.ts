@@ -274,8 +274,8 @@ test.describe('Notes Module Pagination', () => {
     await page.getByRole('tab', { name: 'Information', exact: true }).click();
     await page.waitForLoadState('networkidle');
 
-    // Find the Notes card
-    const notesCard = page.locator('.ant-card').filter({ hasText: /^Notes/ });
+    // Find the Notes card by its header title to avoid matching cards containing "NotesTest"
+    const notesCard = page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: 'Notes' }) });
     await expect(notesCard).toBeVisible({ timeout: 10000 });
 
     // Notes list items should be present
@@ -316,8 +316,8 @@ test.describe('Calls Module Pagination', () => {
     await page.getByRole('tab', { name: 'Information', exact: true }).click();
     await page.waitForLoadState('networkidle');
 
-    // Find the Calls card
-    const callsCard = page.locator('.ant-card').filter({ hasText: /^Calls/ });
+    // Find the Calls card by its header title to avoid matching cards containing "CallsTest"
+    const callsCard = page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: 'Calls' }) });
     await expect(callsCard).toBeVisible({ timeout: 10000 });
 
     // Call list items should be present

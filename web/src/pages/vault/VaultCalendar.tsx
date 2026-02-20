@@ -82,13 +82,14 @@ export default function VaultCalendar() {
     enabled: selectedDate !== null,
   });
 
-  function toDateKey(year: number | null, month: number | null, day: number | null): string | null {
-    if (!year || !month || !day) return null;
-    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-  }
-
   const itemsByDate = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
+
+    function dateKey(year: number | null, month: number | null, day: number | null): string | null {
+      if (!month || !day) return null;
+      const y = year ?? panelYear;
+      return `${y}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
 
     const sources: MonthPayload[] =
       calendarMode === "year" && yearData
@@ -102,22 +103,48 @@ export default function VaultCalendar() {
       const reminders = src?.reminders ?? [];
 
       for (const d of dates) {
-        const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
+        const key = dateKey(d.year ?? null, d.month ?? null, d.day ?? null);
         if (!key) continue;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push({ type: "date", label: d.label ?? '', contactName: d.contact_name ?? '', contactId: d.contact_id ?? '', dateStr: key, calendarType: d.calendar_type });
       }
       for (const r of reminders) {
-        const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
+        const key = dateKey(r.year ?? null, r.month ?? null, r.day ?? null);
         if (!key) continue;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push({ type: "reminder", label: r.label ?? '', contactName: r.contact_name ?? '', contactId: r.contact_id ?? '', dateStr: key, calendarType: r.calendar_type });
       }
     }
     return map;
-  }, [calendarMode, monthData, yearData]);
+  }, [calendarMode, monthData, yearData, panelYear]);
 
-  function cellRender(date: Dayjs) {
+  const itemsByMonth = useMemo(() => {
+    const map = new Map<number, CalendarItem[]>();
+    for (const [, items] of itemsByDate) {
+      for (const item of items) {
+        const m = parseInt(item.dateStr.split("-")[1], 10);
+        if (!map.has(m)) map.set(m, []);
+        map.get(m)!.push(item);
+      }
+    }
+    return map;
+  }, [itemsByDate]);
+
+  function cellRender(date: Dayjs, info: { type: "date" | "month" }) {
+    if (info.type === "month") {
+      const month = date.month() + 1;
+      const items = itemsByMonth.get(month);
+      if (!items?.length) return null;
+      const dateCount = items.filter(i => i.type === "date").length;
+      const reminderCount = items.filter(i => i.type === "reminder").length;
+      return (
+        <div>
+          {dateCount > 0 && <Badge status="success" text={`${dateCount} ${t("vault.calendar.important_dates")}`} />}
+          {reminderCount > 0 && <Badge status="warning" text={`${reminderCount} ${t("vault.calendar.reminders")}`} />}
+        </div>
+      );
+    }
+
     const key = date.format("YYYY-MM-DD");
     const items = itemsByDate.get(key);
     if (!items?.length) return null;
@@ -163,7 +190,7 @@ export default function VaultCalendar() {
         }}
       >
         <Calendar
-          cellRender={(date) => cellRender(date as Dayjs)}
+          cellRender={(date, info) => cellRender(date as Dayjs, info as { type: "date" | "month" })}
           onSelect={(date) => setSelectedDate((date as Dayjs).format("YYYY-MM-DD"))}
           onPanelChange={(date, mode) => { setPanelDate(date as Dayjs); setCalendarMode(mode); }}
         />

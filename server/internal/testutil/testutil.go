@@ -19,6 +19,13 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("Failed to connect to test database: %v", err)
 	}
+	// SQLite :memory: creates a separate database per connection.
+	// Limit to 1 open connection so all queries hit the same in-memory DB.
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("Failed to get underlying sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 	if err := database.AutoMigrate(db); err != nil {
 		t.Fatalf("Failed to migrate test database: %v", err)
 	}
