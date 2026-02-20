@@ -59,9 +59,14 @@ describe("AdminSettings", () => {
       isLoading: false,
     });
     renderAdminSettings();
-    expect(screen.getByText("GitHub OAuth Key")).toBeInTheDocument();
-    expect(screen.getByText("OIDC Discovery URL")).toBeInTheDocument();
+    // Collapse panels: app and auth are expanded by default
+    expect(screen.getByText("Application Name")).toBeInTheDocument();
+    expect(screen.getByText("Application URL")).toBeInTheDocument();
     expect(screen.getByText("Password Authentication")).toBeInTheDocument();
     expect(screen.getByText("User Registration")).toBeInTheDocument();
+    // Collapsed section headers should also be visible
+    expect(screen.getByText("SMTP Email")).toBeInTheDocument();
+    expect(screen.getByText("OAuth / OIDC")).toBeInTheDocument();
+    expect(screen.getByText("WebAuthn")).toBeInTheDocument();
   });
 });

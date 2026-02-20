@@ -1073,6 +1073,36 @@
       "empty": "No system settings configured",
       "add": "Add Setting",
       "remove": "Remove",
+      "true": "Enabled",
+      "false": "Disabled",
+      "section_app": "Application",
+      "section_auth": "Authentication",
+      "section_jwt": "JWT",
+      "section_smtp": "SMTP Email",
+      "section_oauth": "OAuth / OIDC",
+      "section_webauthn": "WebAuthn",
+      "section_telegram": "Telegram",
+      "section_geocoding": "Geocoding",
+      "section_storage": "Storage",
+      "section_backup": "Backup",
+      "app": {
+        "name": "Application Name",
+        "url": "Application URL"
+      },
+      "announcement": "Announcement Banner",
+      "password_auth_enabled": "Password Authentication",
+      "registration_enabled": "User Registration",
+      "jwt": {
+        "expiry_hrs": "Token Expiry (hours)",
+        "refresh_hrs": "Refresh Window (hours)"
+      },
+      "smtp": {
+        "host": "SMTP Host",
+        "port": "SMTP Port",
+        "username": "SMTP Username",
+        "password": "SMTP Password",
+        "from": "Sender Email"
+      },
       "oauth_github_key": "GitHub OAuth Key",
       "oauth_github_secret": "GitHub OAuth Secret",
       "oauth_google_key": "Google OAuth Key",
@@ -1081,10 +1111,28 @@
       "oidc_client_secret": "OIDC Client Secret",
       "oidc_discovery_url": "OIDC Discovery URL",
       "oidc_name": "OIDC Display Name",
-      "password_auth_enabled": "Password Authentication",
-      "registration_enabled": "User Registration",
-      "true": "Enabled",
-      "false": "Disabled"
+      "webauthn": {
+        "rp_id": "Relying Party ID",
+        "rp_display_name": "Relying Party Display Name",
+        "rp_origins": "Allowed Origins (comma-separated)"
+      },
+      "telegram": {
+        "bot_token": "Bot Token"
+      },
+      "geocoding": {
+        "provider": "Provider",
+        "api_key": "API Key",
+        "none": "None",
+        "nominatim": "Nominatim",
+        "locationiq": "LocationIQ"
+      },
+      "storage": {
+        "max_size": "Max Upload Size (bytes)"
+      },
+      "backup": {
+        "cron": "Backup Schedule (cron)",
+        "retention": "Retention (days)"
+      }
     }
   }
 }

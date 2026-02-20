@@ -1,4 +1,4 @@
-import { Card, Typography, Button, App, Spin, Form, Input, Select, Divider } from "antd";
+import { Card, Typography, Button, App, Spin, Form, Input, Select, Collapse, InputNumber } from "antd";
 import { SettingOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -7,18 +7,85 @@ import type { SystemSettingItem, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
-const KNOWN_SETTINGS = [
-  { key: "oauth_github_key", secret: false },
-  { key: "oauth_github_secret", secret: true },
-  { key: "oauth_google_key", secret: false },
-  { key: "oauth_google_secret", secret: true },
-  { key: "oidc_client_id", secret: false },
-  { key: "oidc_client_secret", secret: true },
-  { key: "oidc_discovery_url", secret: false },
-  { key: "oidc_name", secret: false },
-  { key: "password_auth_enabled", type: "boolean" as const },
-  { key: "registration_enabled", type: "boolean" as const },
+interface SettingDef {
+  key: string;
+  type?: "boolean" | "password" | "number" | "textarea" | "select";
+  options?: { value: string; label: string }[];
+  section: string;
+}
+
+const KNOWN_SETTINGS: SettingDef[] = [
+  // Application
+  { key: "app.name", section: "app" },
+  { key: "app.url", section: "app" },
+  { key: "announcement", type: "textarea", section: "app" },
+
+  // Authentication
+  { key: "password_auth_enabled", type: "boolean", section: "auth" },
+  { key: "registration_enabled", type: "boolean", section: "auth" },
+
+  // JWT
+  { key: "jwt.expiry_hrs", type: "number", section: "jwt" },
+  { key: "jwt.refresh_hrs", type: "number", section: "jwt" },
+
+  // SMTP
+  { key: "smtp.host", section: "smtp" },
+  { key: "smtp.port", section: "smtp" },
+  { key: "smtp.username", section: "smtp" },
+  { key: "smtp.password", type: "password", section: "smtp" },
+  { key: "smtp.from", section: "smtp" },
+
+  // OAuth / OIDC
+  { key: "oauth_github_key", section: "oauth" },
+  { key: "oauth_github_secret", type: "password", section: "oauth" },
+  { key: "oauth_google_key", section: "oauth" },
+  { key: "oauth_google_secret", type: "password", section: "oauth" },
+  { key: "oidc_client_id", section: "oauth" },
+  { key: "oidc_client_secret", type: "password", section: "oauth" },
+  { key: "oidc_discovery_url", section: "oauth" },
+  { key: "oidc_name", section: "oauth" },
+
+  // WebAuthn
+  { key: "webauthn.rp_id", section: "webauthn" },
+  { key: "webauthn.rp_display_name", section: "webauthn" },
+  { key: "webauthn.rp_origins", section: "webauthn" },
+
+  // Telegram
+  { key: "telegram.bot_token", type: "password", section: "telegram" },
+
+  // Geocoding
+  {
+    key: "geocoding.provider",
+    type: "select",
+    section: "geocoding",
+    options: [
+      { value: "", label: "admin.settings.geocoding.none" },
+      { value: "nominatim", label: "admin.settings.geocoding.nominatim" },
+      { value: "locationiq", label: "admin.settings.geocoding.locationiq" },
+    ],
+  },
+  { key: "geocoding.api_key", type: "password", section: "geocoding" },
+
+  // Storage
+  { key: "storage.max_size", type: "number", section: "storage" },
+
+  // Backup
+  { key: "backup.cron", section: "backup" },
+  { key: "backup.retention", type: "number", section: "backup" },
 ];
+
+const SECTIONS = [
+  "app",
+  "auth",
+  "jwt",
+  "smtp",
+  "oauth",
+  "webauthn",
+  "telegram",
+  "geocoding",
+  "storage",
+  "backup",
+] as const;
 
 export default function AdminSettings() {
   const { t } = useTranslation();
@@ -55,9 +122,64 @@ export default function AdminSettings() {
     const values = form.getFieldsValue();
     const settings: SystemSettingItem[] = KNOWN_SETTINGS.map((ks) => ({
       key: ks.key,
-      value: (values[ks.key] as string) ?? "",
+      value: values[ks.key] != null ? String(values[ks.key]) : "",
     }));
     saveMutation.mutate(settings);
+  }
+
+  function renderField(def: SettingDef) {
+    const label = t(`admin.settings.${def.key}`);
+    switch (def.type) {
+      case "boolean":
+        return (
+          <Form.Item key={def.key} name={def.key} label={label}>
+            <Select>
+              <Select.Option value="true">
+                {t("admin.settings.true")}
+              </Select.Option>
+              <Select.Option value="false">
+                {t("admin.settings.false")}
+              </Select.Option>
+            </Select>
+          </Form.Item>
+        );
+      case "password":
+        return (
+          <Form.Item key={def.key} name={def.key} label={label}>
+            <Input.Password placeholder={label} />
+          </Form.Item>
+        );
+      case "number":
+        return (
+          <Form.Item key={def.key} name={def.key} label={label}>
+            <InputNumber style={{ width: "100%" }} min={0} placeholder={label} />
+          </Form.Item>
+        );
+      case "textarea":
+        return (
+          <Form.Item key={def.key} name={def.key} label={label}>
+            <Input.TextArea rows={3} placeholder={label} />
+          </Form.Item>
+        );
+      case "select":
+        return (
+          <Form.Item key={def.key} name={def.key} label={label}>
+            <Select>
+              {def.options?.map((opt) => (
+                <Select.Option key={opt.value} value={opt.value}>
+                  {t(opt.label)}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+        );
+      default:
+        return (
+          <Form.Item key={def.key} name={def.key} label={label}>
+            <Input placeholder={label} />
+          </Form.Item>
+        );
+    }
   }
 
   if (isLoading) {
@@ -67,6 +189,16 @@ export default function AdminSettings() {
       </div>
     );
   }
+
+  const collapseItems = SECTIONS.map((section) => ({
+    key: section,
+    label: t(`admin.settings.section_${section}`),
+    children: (
+      <>
+        {KNOWN_SETTINGS.filter((s) => s.section === section).map(renderField)}
+      </>
+    ),
+  }));
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto" }}>
@@ -80,39 +212,11 @@ export default function AdminSettings() {
 
       <Card>
         <Form form={form} layout="vertical">
-          <Title level={5}>OAuth / OIDC</Title>
-          {KNOWN_SETTINGS.filter((ks) => !ks.type).map((ks) => (
-            <Form.Item
-              key={ks.key}
-              name={ks.key}
-              label={t(`admin.settings.${ks.key}`)}
-            >
-              {ks.secret ? (
-                <Input.Password placeholder={t(`admin.settings.${ks.key}`)} />
-              ) : (
-                <Input placeholder={t(`admin.settings.${ks.key}`)} />
-              )}
-            </Form.Item>
-          ))}
-
-          <Divider />
-          <Title level={5}>{t("auth.login.title")}</Title>
-          {KNOWN_SETTINGS.filter((ks) => ks.type === "boolean").map((ks) => (
-            <Form.Item
-              key={ks.key}
-              name={ks.key}
-              label={t(`admin.settings.${ks.key}`)}
-            >
-              <Select>
-                <Select.Option value="true">
-                  {t("admin.settings.true")}
-                </Select.Option>
-                <Select.Option value="false">
-                  {t("admin.settings.false")}
-                </Select.Option>
-              </Select>
-            </Form.Item>
-          ))}
+          <Collapse
+            defaultActiveKey={["app", "auth"]}
+            items={collapseItems}
+            style={{ marginBottom: 24 }}
+          />
 
           <Form.Item>
             <Button
