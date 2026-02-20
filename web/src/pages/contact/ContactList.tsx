@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Table, Button, Typography, Input, Tag, Space, App, Upload, theme, Select } from "antd";
+import { Table, Button, Typography, Input, Tag, Space, App, Upload, theme, Select, Checkbox, Popover } from "antd";
 import {
   PlusOutlined,
   SearchOutlined,
@@ -8,11 +8,13 @@ import {
   DownloadOutlined,
   UploadOutlined,
   TeamOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Contact, PaginationMeta, LabelResponse } from "@/api";
 import type { ColumnsType } from "antd/es/table";
+import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import ContactAvatar from "@/components/ContactAvatar";
@@ -20,11 +22,24 @@ import ContactAvatar from "@/components/ContactAvatar";
 const { Title, Text } = Typography;
 const { Option } = Select;
 
-// Map frontend sort values to backend sort param values
 const SORT_MAP: Record<string, string> = {
   name: "first_name",
   updated_at: "updated_at",
 };
+
+const COLUMNS_STORAGE_KEY = "bonds_contact_list_columns";
+const DEFAULT_VISIBLE_COLUMNS = ["name", "nickname", "status", "updated_at"];
+
+function loadVisibleColumns(): string[] {
+  try {
+    const saved = localStorage.getItem(COLUMNS_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved) as string[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch { /* fallback */ }
+  return DEFAULT_VISIBLE_COLUMNS;
+}
 
 export default function ContactList() {
   const { id } = useParams<{ id: string }>();
@@ -35,6 +50,7 @@ export default function ContactList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [labelFilter, setLabelFilter] = useState<number | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(loadVisibleColumns);
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
@@ -96,10 +112,19 @@ export default function ContactList() {
       setCurrentPage(1);
   };
 
-  const columns: ColumnsType<Contact> = [
+  const handleColumnToggle = (key: string, checked: boolean) => {
+    const next = checked
+      ? [...visibleColumns, key]
+      : visibleColumns.filter((k) => k !== key);
+    setVisibleColumns(next);
+    localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(next));
+  };
+
+  const allColumns: (ColumnsType<Contact>[number] & { key: string; alwaysVisible?: boolean; responsive?: Breakpoint[] })[] = [
     {
       title: t("contact.list.col_name"),
       key: "name",
+      alwaysVisible: true,
       render: (_, record) => (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <ContactAvatar
@@ -124,7 +149,7 @@ export default function ContactList() {
       title: t("contact.list.col_nickname"),
       dataIndex: "nickname",
       key: "nickname",
-      responsive: ["md"],
+      responsive: ["md"] as Breakpoint[],
       render: (val: string) =>
         val ? (
           <Text type="secondary" style={{ fontStyle: "italic" }}>
@@ -135,9 +160,52 @@ export default function ContactList() {
         ),
     },
     {
+      title: t("contact.list.col_birthday"),
+      key: "birthday",
+      responsive: ["md"] as Breakpoint[],
+      render: (_, record) => {
+        const bday = (record as Contact & { birthday?: string }).birthday;
+        return bday ? (
+          <Text type="secondary">{bday}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        );
+      },
+    },
+    {
+      title: t("contact.list.col_age"),
+      key: "age",
+      responsive: ["lg"] as Breakpoint[],
+      render: (_, record) => {
+        const age = (record as Contact & { age?: number }).age;
+        return age != null ? (
+          <Text type="secondary">{age}</Text>
+        ) : (
+          <Text type="secondary">—</Text>
+        );
+      },
+    },
+    {
+      title: t("contact.list.col_groups"),
+      key: "groups",
+      responsive: ["lg"] as Breakpoint[],
+      render: (_, record) => {
+        const groups = (record as Contact & { groups?: { id: number; name: string }[] }).groups;
+        return groups && groups.length > 0 ? (
+          <Space size={4} wrap>
+            {groups.map((g) => (
+              <Tag key={g.id} color="blue">{g.name}</Tag>
+            ))}
+          </Space>
+        ) : (
+          <Text type="secondary">—</Text>
+        );
+      },
+    },
+    {
       title: t("contact.list.col_status"),
       key: "status",
-      responsive: ["lg"],
+      responsive: ["lg"] as Breakpoint[],
       render: (_, record) =>
         record.is_archived ? (
           <Tag color="default">{t("common.archived")}</Tag>
@@ -149,7 +217,7 @@ export default function ContactList() {
       title: t("contact.list.col_updated"),
       dataIndex: "updated_at",
       key: "updated_at",
-      responsive: ["md"],
+      responsive: ["md"] as Breakpoint[],
       render: (val: string) => (
         <Text type="secondary">{dayjs(val).format("MMM D, YYYY")}</Text>
       ),
@@ -157,6 +225,12 @@ export default function ContactList() {
         dayjs(a.updated_at).unix() - dayjs(b.updated_at).unix(),
     },
   ];
+
+  const filteredColumns = allColumns.filter(
+    (col) => col.alwaysVisible || visibleColumns.includes(col.key),
+  );
+
+  const toggleableColumns = allColumns.filter((col) => !col.alwaysVisible);
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
@@ -269,6 +343,25 @@ export default function ContactList() {
             <Option value="name">{t("contact.list.sort_name")}</Option>
             <Option value="updated_at">{t("contact.list.sort_updated")}</Option>
         </Select>
+        <Popover
+          trigger="click"
+          placement="bottomRight"
+          content={
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 160 }}>
+              {toggleableColumns.map((col) => (
+                <Checkbox
+                  key={col.key}
+                  checked={visibleColumns.includes(col.key)}
+                  onChange={(e) => handleColumnToggle(col.key, e.target.checked)}
+                >
+                  {String(col.title)}
+                </Checkbox>
+              ))}
+            </div>
+          }
+        >
+          <Button icon={<SettingOutlined />}>{t("contact.list.columns")}</Button>
+        </Popover>
         <Select
             placeholder={t("contact.list.filter_label")}
             value={labelFilter}
@@ -284,7 +377,7 @@ export default function ContactList() {
       </div>
 
       <Table<Contact>
-        columns={columns}
+        columns={filteredColumns}
         dataSource={contacts}
         rowKey="id"
         loading={isLoading}

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 
+	"github.com/markbates/goth"
 	"github.com/naiba/bonds/internal/models"
 )
 
@@ -32,4 +33,18 @@ func (s *OAuthService) UnlinkProvider(userID, driver string) error {
 		return ErrOAuthTokenNotFound
 	}
 	return nil
+}
+
+func (s *OAuthService) ListAvailableProviders() []map[string]string {
+	result := []map[string]string{}
+	for _, p := range goth.GetProviders() {
+		entry := map[string]string{
+			"name": p.Name(),
+		}
+		if p.Name() == "openid-connect" && s.oidcName != "" {
+			entry["display_name"] = s.oidcName
+		}
+		result = append(result, entry)
+	}
+	return result
 }

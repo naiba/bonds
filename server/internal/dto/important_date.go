@@ -12,6 +12,7 @@ type CreateImportantDateRequest struct {
 	OriginalMonth              *int   `json:"original_month" example:"6"`
 	OriginalYear               *int   `json:"original_year" example:"1990"`
 	ContactImportantDateTypeID *uint  `json:"contact_important_date_type_id" example:"1"`
+	RemindMe                   *bool  `json:"remind_me" example:"true"`
 }
 
 type UpdateImportantDateRequest struct {
@@ -24,6 +25,7 @@ type UpdateImportantDateRequest struct {
 	OriginalMonth              *int   `json:"original_month" example:"6"`
 	OriginalYear               *int   `json:"original_year" example:"1990"`
 	ContactImportantDateTypeID *uint  `json:"contact_important_date_type_id" example:"1"`
+	RemindMe                   *bool  `json:"remind_me" example:"true"`
 }
 
 type ImportantDateResponse struct {
@@ -38,6 +40,7 @@ type ImportantDateResponse struct {
 	OriginalMonth              *int      `json:"original_month" example:"6"`
 	OriginalYear               *int      `json:"original_year" example:"1990"`
 	ContactImportantDateTypeID *uint     `json:"contact_important_date_type_id" example:"1"`
+	RemindMe                   bool      `json:"remind_me" example:"false"`
 	CreatedAt                  time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt                  time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }

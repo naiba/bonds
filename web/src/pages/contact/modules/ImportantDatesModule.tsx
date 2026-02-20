@@ -12,6 +12,7 @@ import {
   Tag,
   Empty,
   theme,
+  Switch,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -86,7 +87,7 @@ export default function ImportantDatesModule({
   });
 
   const saveMutation = useMutation({
-    mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; contact_important_date_type_id?: number }) => {
+    mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; contact_important_date_type_id?: number; remind_me?: boolean }) => {
       const { calendarDate } = values;
       const sys = getCalendarSystem(calendarDate.calendarType);
       const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
@@ -101,6 +102,7 @@ export default function ImportantDatesModule({
         year: gd.year,
         calendar_type: calendarDate.calendarType,
         contact_important_date_type_id: values.contact_important_date_type_id,
+        remind_me: values.remind_me ?? false,
       };
 
       if (calendarDate.calendarType !== "gregorian") {
@@ -138,7 +140,7 @@ export default function ImportantDatesModule({
       ct !== "gregorian" && d.original_day != null && d.original_month != null
         ? { calendarType: ct, day: d.original_day, month: d.original_month, year: d.original_year ?? new Date().getFullYear() }
         : { calendarType: "gregorian", day: d.day ?? 1, month: d.month ?? 1, year: d.year ?? new Date().getFullYear() };
-    form.setFieldsValue({ label: d.label, calendarDate: pickerVal, contact_important_date_type_id: d.contact_important_date_type_id });
+    form.setFieldsValue({ label: d.label, calendarDate: pickerVal, contact_important_date_type_id: d.contact_important_date_type_id, remind_me: (d as ImportantDate & { remind_me?: boolean }).remind_me ?? false });
     setOpen(true);
   }
 
@@ -220,6 +222,9 @@ export default function ImportantDatesModule({
                   if (matched?.internal_type) {
                     form.setFieldValue("label", matched.label);
                   }
+                  if (matched?.internal_type === "birthdate") {
+                    form.setFieldValue("remind_me", true);
+                  }
                 }
               }}
             />
@@ -233,6 +238,9 @@ export default function ImportantDatesModule({
           </Form.Item>
           <Form.Item name="calendarDate" label={t("modules.important_dates.date")} rules={[{ required: true }]}>
             <CalendarDatePicker enableAlternativeCalendar={altCalendar} />
+          </Form.Item>
+          <Form.Item name="remind_me" label={t("modules.important_dates.remind_me")} valuePropName="checked">
+            <Switch />
           </Form.Item>
         </Form>
       </Modal>

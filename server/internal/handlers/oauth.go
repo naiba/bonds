@@ -93,3 +93,16 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 	return c.Redirect(http.StatusTemporaryRedirect,
 		fmt.Sprintf("%s/auth/callback?token=%s", h.appURL, authResp.Token))
 }
+
+// AvailableProviders godoc
+//
+//	@Summary		List available OAuth providers
+//	@Description	Return all configured OAuth providers (public, no auth required)
+//	@Tags			oauth
+//	@Produce		json
+//	@Success		200	{object}	response.APIResponse
+//	@Router			/auth/providers [get]
+func (h *OAuthHandler) AvailableProviders(c echo.Context) error {
+	providers := h.oauthService.ListAvailableProviders()
+	return response.OK(c, providers)
+}

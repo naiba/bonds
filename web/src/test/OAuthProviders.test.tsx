@@ -69,7 +69,7 @@ describe("OAuthProviders", () => {
       isLoading: false,
     });
     renderOAuthProviders();
-    expect(screen.getByText("github")).toBeInTheDocument();
+    expect(screen.getByText("GitHub")).toBeInTheDocument();
     expect(screen.getByText("octocat")).toBeInTheDocument();
   });
 });

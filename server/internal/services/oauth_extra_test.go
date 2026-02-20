@@ -24,7 +24,7 @@ func setupOAuthExtraTest(t *testing.T) (*OAuthService, string) {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	svc := NewOAuthService(db, cfg, "http://localhost:8080")
+	svc := NewOAuthService(db, cfg, "http://localhost:8080", "")
 
 	tokens := []models.UserToken{
 		{UserID: resp.User.ID, Driver: "github", DriverID: "gh-123", Token: "token1"},
@@ -80,7 +80,7 @@ func TestListProvidersEmpty(t *testing.T) {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	svc := NewOAuthService(db, cfg, "http://localhost:8080")
+	svc := NewOAuthService(db, cfg, "http://localhost:8080", "")
 	providers, err := svc.ListProviders(resp.User.ID)
 	if err != nil {
 		t.Fatalf("ListProviders failed: %v", err)
@@ -125,5 +125,14 @@ func TestUnlinkProviderWrongUser(t *testing.T) {
 	err := svc.UnlinkProvider("non-existent-user-id", "github")
 	if err != ErrOAuthTokenNotFound {
 		t.Errorf("Expected ErrOAuthTokenNotFound, got %v", err)
+	}
+}
+
+func TestListAvailableProviders(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	svc := NewOAuthService(db, testutil.TestJWTConfig(), "http://localhost:8080", "")
+	providers := svc.ListAvailableProviders()
+	if len(providers) != 0 {
+		t.Errorf("expected 0 available providers, got %d", len(providers))
 	}
 }

@@ -17,6 +17,7 @@ type ContactReminder struct {
 	FrequencyNumber      *int       `json:"frequency_number"`
 	LastTriggeredAt      *time.Time `json:"last_triggered_at"`
 	NumberTimesTriggered int        `json:"number_times_triggered" gorm:"default:0"`
+	ImportantDateID      *uint      `json:"important_date_id" gorm:"index"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 

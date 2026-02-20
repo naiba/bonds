@@ -28,6 +28,8 @@ import {
   ThunderboltOutlined,
   CheckCircleOutlined,
   SafetyCertificateOutlined,
+  NotificationOutlined,
+  BellOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -40,6 +42,9 @@ const { Title, Text } = Typography;
 const channelTypes = [
   { label: "Email", value: "email" },
   { label: "Telegram", value: "telegram" },
+  { label: "Ntfy", value: "ntfy" },
+  { label: "Gotify", value: "gotify" },
+  { label: "Webhook", value: "webhook" },
 ];
 
 const channelIconMap: Record<
@@ -48,6 +53,9 @@ const channelIconMap: Record<
 > = {
   email: { icon: <MailOutlined />, color: "#1677ff", bg: "#e6f4ff" },
   telegram: { icon: <SendOutlined />, color: "#0088cc", bg: "#e6f7ff" },
+  ntfy: { icon: <NotificationOutlined />, color: "#52c41a", bg: "#f6ffed" },
+  gotify: { icon: <BellOutlined />, color: "#fa8c16", bg: "#fff7e6" },
+  webhook: { icon: <ApiOutlined />, color: "#722ed1", bg: "#f9f0ff" },
 };
 
 export default function Notifications() {
@@ -72,7 +80,7 @@ export default function Notifications() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { type: string; label: string; content: string }) =>
+    mutationFn: (values: { type: "email" | "telegram" | "ntfy" | "gotify" | "webhook"; label: string; content: string }) =>
       api.notifications.notificationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -305,17 +313,37 @@ export default function Notifications() {
           <Form.Item
             name="content"
             label={
-              selectedType === "telegram"
-                ? t("settings.notifications.telegram_chat_id")
-                : t("settings.notifications.destination")
+              selectedType === "email"
+                ? t("settings.notifications.destination")
+                : t("settings.notifications.shoutrrr_url")
             }
             extra={
-              selectedType === "telegram" ? t("settings.notifications.telegram_help") : null
+              selectedType === "telegram"
+                ? t("settings.notifications.telegram_help")
+                : selectedType === "ntfy"
+                  ? t("settings.notifications.ntfy_help")
+                  : selectedType === "gotify"
+                    ? t("settings.notifications.gotify_help")
+                    : selectedType === "webhook"
+                      ? t("settings.notifications.webhook_help")
+                      : null
             }
             rules={[{ required: true }]}
           >
             <Input
-              placeholder={t("settings.notifications.destination_placeholder")}
+              placeholder={
+                selectedType === "email"
+                  ? "user@example.com"
+                  : selectedType === "telegram"
+                    ? "telegram://token@telegram?channels=chatid"
+                    : selectedType === "ntfy"
+                      ? "ntfy://ntfy.sh/your-topic"
+                      : selectedType === "gotify"
+                        ? "gotify://your-server/apptoken"
+                        : selectedType === "webhook"
+                          ? "generic+https://example.com/webhook"
+                          : t("settings.notifications.destination_placeholder")
+              }
             />
           </Form.Item>
         </Form>

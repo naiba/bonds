@@ -35,6 +35,7 @@ type ContactImportantDate struct {
 	OriginalDay                *int           `json:"original_day"`
 	OriginalMonth              *int           `json:"original_month"`
 	OriginalYear               *int           `json:"original_year"`
+	RemindMe                   bool           `json:"remind_me" gorm:"default:false"`
 	DeletedAt                  gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 	CreatedAt                  time.Time      `json:"created_at"`
 	UpdatedAt                  time.Time      `json:"updated_at"`

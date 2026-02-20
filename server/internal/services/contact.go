@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -84,10 +85,14 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 		}
 	}
 
+	birthdayMap, groupMap := s.fetchBirthdayAndGroupMaps(contactIDs)
+
 	result := make([]dto.ContactResponse, len(contacts))
 	for i, c := range contacts {
 		result[i] = toContactResponse(&c, favoriteMap[c.ID])
 	}
+
+	enrichContactsWithBirthdayAndGroups(result, contacts, birthdayMap, groupMap)
 
 	meta := response.Meta{
 		Page:       page,
@@ -335,10 +340,14 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 		}
 	}
 
+	birthdayMap, groupMap := s.fetchBirthdayAndGroupMaps(contactIDs)
+
 	result := make([]dto.ContactResponse, len(contacts))
 	for i, c := range contacts {
 		result[i] = toContactResponse(&c, favoriteMap[c.ID])
 	}
+
+	enrichContactsWithBirthdayAndGroups(result, contacts, birthdayMap, groupMap)
 
 	meta := response.Meta{
 		Page:       page,
@@ -456,4 +465,79 @@ func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
 		CreatedAt:      c.CreatedAt,
 		UpdatedAt:      c.UpdatedAt,
 	}
+}
+
+func (s *ContactService) fetchBirthdayAndGroupMaps(contactIDs []string) (map[string]*models.ContactImportantDate, map[string][]dto.ContactGroupBrief) {
+	birthdayMap := make(map[string]*models.ContactImportantDate)
+	if len(contactIDs) > 0 {
+		var dates []models.ContactImportantDate
+		s.db.Joins("JOIN contact_important_date_types ON contact_important_date_types.id = contact_important_dates.contact_important_date_type_id").
+			Where("contact_important_dates.contact_id IN ? AND contact_important_date_types.internal_type = ?", contactIDs, "birthdate").
+			Where("contact_important_dates.deleted_at IS NULL").
+			Find(&dates)
+		for i := range dates {
+			birthdayMap[dates[i].ContactID] = &dates[i]
+		}
+	}
+
+	groupMap := make(map[string][]dto.ContactGroupBrief)
+	if len(contactIDs) > 0 {
+		type groupRow struct {
+			ContactID string
+			GroupID   uint
+			GroupName string
+		}
+		var rows []groupRow
+		s.db.Table("contact_group").
+			Select("contact_group.contact_id, groups.id as group_id, groups.name as group_name").
+			Joins("JOIN groups ON groups.id = contact_group.group_id").
+			Where("contact_group.contact_id IN ?", contactIDs).
+			Where("groups.deleted_at IS NULL").
+			Scan(&rows)
+		for _, r := range rows {
+			groupMap[r.ContactID] = append(groupMap[r.ContactID], dto.ContactGroupBrief{ID: r.GroupID, Name: r.GroupName})
+		}
+	}
+
+	return birthdayMap, groupMap
+}
+
+func enrichContactsWithBirthdayAndGroups(result []dto.ContactResponse, contacts []models.Contact, birthdayMap map[string]*models.ContactImportantDate, groupMap map[string][]dto.ContactGroupBrief) {
+	for i, c := range contacts {
+		if bd, ok := birthdayMap[c.ID]; ok {
+			result[i].Birthday = formatBirthdayStr(bd)
+			result[i].Age = calculateAgeFromDate(bd)
+		}
+		if groups, ok := groupMap[c.ID]; ok {
+			result[i].Groups = groups
+		}
+	}
+}
+
+func formatBirthdayStr(d *models.ContactImportantDate) *string {
+	if d.Month == nil || d.Day == nil {
+		return nil
+	}
+	var s string
+	if d.Year != nil {
+		s = fmt.Sprintf("%04d-%02d-%02d", *d.Year, *d.Month, *d.Day)
+	} else {
+		s = fmt.Sprintf("--%02d-%02d", *d.Month, *d.Day)
+	}
+	return &s
+}
+
+func calculateAgeFromDate(d *models.ContactImportantDate) *int {
+	if d.Year == nil || d.Month == nil || d.Day == nil {
+		return nil
+	}
+	now := time.Now()
+	age := now.Year() - *d.Year
+	if int(now.Month()) < *d.Month || (int(now.Month()) == *d.Month && now.Day() < *d.Day) {
+		age--
+	}
+	if age < 0 {
+		return nil
+	}
+	return &age
 }

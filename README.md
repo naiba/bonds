@@ -105,8 +105,8 @@ cp server/.env.example server/.env
 | `JWT_SECRET` | — | **Required in production.** Signing key for auth tokens |
 | `SERVER_PORT` | `8080` | Port the server listens on |
 | `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
-| `DB_DSN` | `bonds.db` | SQLite database file path |
-| `DB_DRIVER` | `sqlite` | Database driver |
+| `DB_DSN` | `bonds.db` | Database connection string. SQLite: file path; PostgreSQL: `host=... port=5432 user=... password=... dbname=... sslmode=disable` |
+| `DB_DRIVER` | `sqlite` | Database driver (`sqlite` or `postgres`) |
 | `APP_NAME` | `Bonds` | Application name (used in emails, WebAuthn, etc.) |
 | `APP_ENV` | `development` | Set to `production` for production use |
 | `APP_URL` | `http://localhost:8080` | Public URL (used in emails and OAuth callbacks) |
@@ -125,12 +125,19 @@ cp server/.env.example server/.env
 | `OAUTH_GITHUB_SECRET` | — | GitHub OAuth App client secret |
 | `OAUTH_GOOGLE_KEY` | — | Google OAuth client ID |
 | `OAUTH_GOOGLE_SECRET` | — | Google OAuth client secret |
+| `OIDC_CLIENT_ID` | — | OIDC client ID (Authentik, Keycloak, etc.) |
+| `OIDC_CLIENT_SECRET` | — | OIDC client secret |
+| `OIDC_DISCOVERY_URL` | — | OIDC discovery URL (e.g. `https://auth.example.com/.well-known/openid-configuration`) |
+| `OIDC_NAME` | `SSO` | Display name for OIDC provider on login page |
 | `GEOCODING_PROVIDER` | `nominatim` | Geocoding provider (`nominatim` or `locationiq`) |
 | `GEOCODING_API_KEY` | — | API key for LocationIQ |
 | `WEBAUTHN_RP_ID` | — | WebAuthn Relying Party ID (e.g. `bonds.example.com`) |
 | `WEBAUTHN_RP_DISPLAY_NAME` | `Bonds` | WebAuthn display name |
 | `WEBAUTHN_RP_ORIGINS` | — | Allowed WebAuthn origins (comma-separated) |
 | `ANNOUNCEMENT` | — | Announcement banner text displayed to all users |
+| `BACKUP_DIR` | `data/backups` | Directory to store backup files |
+| `BACKUP_CRON` | — | Cron schedule for automatic backups (e.g. `0 0 2 * * *` for 2 AM daily). Uses 6-field format with seconds. |
+| `BACKUP_RETENTION` | `30` | Days to keep old backups before auto-cleanup |
 
 ## Development
 

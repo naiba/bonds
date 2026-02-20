@@ -43,7 +43,7 @@ type UpdatePreferencesRequest struct {
 }
 
 type CreateNotificationChannelRequest struct {
-	Type          string `json:"type" validate:"required" example:"email"`
+	Type          string `json:"type" validate:"required,oneof=email telegram ntfy gotify webhook" example:"email"`
 	Label         string `json:"label" example:"Personal Email"`
 	Content       string `json:"content" validate:"required" example:"user@example.com"`
 	PreferredTime string `json:"preferred_time" example:"09:00"`

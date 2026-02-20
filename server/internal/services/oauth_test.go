@@ -12,7 +12,7 @@ func setupOAuthTest(t *testing.T) *OAuthService {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
-	return NewOAuthService(db, cfg, "http://localhost:8080")
+	return NewOAuthService(db, cfg, "http://localhost:8080", "")
 }
 
 func TestFindOrCreateUserNew(t *testing.T) {

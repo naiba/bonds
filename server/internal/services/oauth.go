@@ -15,13 +15,14 @@ var (
 )
 
 type OAuthService struct {
-	db     *gorm.DB
-	jwt    *config.JWTConfig
-	appURL string
+	db       *gorm.DB
+	jwt      *config.JWTConfig
+	appURL   string
+	oidcName string
 }
 
-func NewOAuthService(db *gorm.DB, jwt *config.JWTConfig, appURL string) *OAuthService {
-	return &OAuthService{db: db, jwt: jwt, appURL: appURL}
+func NewOAuthService(db *gorm.DB, jwt *config.JWTConfig, appURL string, oidcName string) *OAuthService {
+	return &OAuthService{db: db, jwt: jwt, appURL: appURL, oidcName: oidcName}
 }
 
 // FindOrCreateUser looks up a user by OAuth provider+providerUserID.

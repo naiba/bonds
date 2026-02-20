@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, App, Divider, theme, Tooltip } from "antd";
-import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined, KeyOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GlobalOutlined } from "@ant-design/icons";
+import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined, KeyOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GlobalOutlined, LinkOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import logoImg from "@/assets/logo.svg";
 import { useTranslation } from "react-i18next";
@@ -24,6 +24,7 @@ export default function Login() {
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
   const [isWebAuthnSupported, setIsWebAuthnSupported] = useState(false);
+  const [providers, setProviders] = useState<Array<{name: string; display_name?: string}>>([]);
 
   const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
   const themeModeIcons: Record<ThemeMode, React.ReactNode> = {
@@ -47,6 +48,9 @@ export default function Login() {
 
   useEffect(() => {
     setIsWebAuthnSupported(browserSupportsWebAuthn());
+    httpClient.instance.get<{success: boolean; data: Array<{name: string; display_name?: string}>}>("/auth/providers")
+      .then(res => setProviders(res.data.data ?? []))
+      .catch(() => { /* providers won't show if endpoint unavailable */ });
   }, []);
 
   const from = (location.state as { from?: { pathname: string } })?.from
@@ -180,29 +184,27 @@ export default function Login() {
           </div>
         )}
 
-        <Divider>{t("oauth.continueWith")}</Divider>
-        <div style={{ display: "flex", gap: 12 }}>
-          <Button
-            icon={<GithubOutlined />}
-            href="/api/auth/github"
-            style={{
-              flex: 1,
-              borderColor: token.colorBorderSecondary,
-            }}
-          >
-            {t("oauth.github")}
-          </Button>
-          <Button
-            icon={<GoogleOutlined />}
-            href="/api/auth/google"
-            style={{
-              flex: 1,
-              borderColor: token.colorBorderSecondary,
-            }}
-          >
-            {t("oauth.google")}
-          </Button>
-        </div>
+        {providers.length > 0 && (
+          <>
+            <Divider>{t("oauth.continueWith")}</Divider>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {providers.map(p => {
+                const icon = p.name === "github" ? <GithubOutlined /> : p.name === "google" ? <GoogleOutlined /> : <LinkOutlined />;
+                const label = p.display_name || (p.name === "github" ? t("oauth.github") : p.name === "google" ? t("oauth.google") : p.name === "openid-connect" ? t("oauth.sso") : p.name);
+                return (
+                  <Button
+                    key={p.name}
+                    icon={icon}
+                    href={`/api/auth/${p.name}`}
+                    style={{ flex: 1, minWidth: 120, borderColor: token.colorBorderSecondary }}
+                  >
+                    {label}
+                  </Button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         <div style={{ textAlign: "center", marginTop: 16 }}>
           <Text type="secondary">

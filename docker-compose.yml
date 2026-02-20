@@ -14,5 +14,31 @@ services:
       - APP_URL=http://localhost:8080
     restart: unless-stopped
 
+  # PostgreSQL example (uncomment to use instead of SQLite):
+  # bonds:
+  #   image: ghcr.io/naiba/bonds:latest
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     - SERVER_PORT=8080
+  #     - DB_DRIVER=postgres
+  #     - DB_DSN=host=postgres port=5432 user=bonds password=bonds dbname=bonds sslmode=disable
+  #     - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+  #     - APP_ENV=production
+  #     - APP_URL=http://localhost:8080
+  #   restart: unless-stopped
+  # postgres:
+  #   image: postgres:17-alpine
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   environment:
+  #     - POSTGRES_USER=bonds
+  #     - POSTGRES_PASSWORD=bonds
+  #     - POSTGRES_DB=bonds
+  #   restart: unless-stopped
+
 volumes:
   bonds-data:
+  # postgres-data:

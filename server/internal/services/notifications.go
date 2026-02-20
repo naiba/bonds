@@ -19,6 +19,7 @@ var (
 type NotificationService struct {
 	db     *gorm.DB
 	mailer Mailer
+	sender NotificationSender
 	appURL string
 }
 
@@ -29,6 +30,10 @@ func NewNotificationService(db *gorm.DB) *NotificationService {
 func (s *NotificationService) SetMailer(mailer Mailer, appURL string) {
 	s.mailer = mailer
 	s.appURL = appURL
+}
+
+func (s *NotificationService) SetSender(sender NotificationSender) {
+	s.sender = sender
 }
 
 func (s *NotificationService) List(userID string) ([]dto.NotificationChannelResponse, error) {
@@ -57,10 +62,22 @@ func (s *NotificationService) Create(userID string, req dto.CreateNotificationCh
 		return nil, err
 	}
 
-	if req.Type == "email" && s.mailer != nil {
-		link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.appURL, ch.ID, token)
-		body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
-		_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
+	if req.Type == "email" {
+		if s.mailer != nil {
+			link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.appURL, ch.ID, token)
+			body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
+			_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
+		}
+	} else {
+		now := time.Now()
+		ch.VerifiedAt = &now
+		ch.Active = true
+		if err := s.db.Model(&ch).Updates(map[string]interface{}{
+			"verified_at": now,
+			"active":      true,
+		}).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	resp := toNotificationChannelResponse(&ch)
@@ -125,12 +142,37 @@ func (s *NotificationService) SendTest(id uint, userID string) error {
 		}
 		return err
 	}
+
+	subject := "Test notification"
+	body := "<p>This is a test notification from Bonds.</p>"
+	var sendErr error
+
+	switch ch.Type {
+	case "email":
+		if s.mailer != nil {
+			sendErr = s.mailer.Send(ch.Content, subject, body)
+		}
+	case "telegram", "ntfy", "gotify", "webhook":
+		if s.sender != nil {
+			sendErr = s.sender.Send(ch.Content, subject, body)
+		}
+	}
+
+	now := time.Now()
 	sent := models.UserNotificationSent{
 		UserNotificationChannelID: ch.ID,
-		SentAt:                    time.Now(),
-		SubjectLine:               "Test notification",
+		SentAt:                    now,
+		SubjectLine:               subject,
+		Payload:                   &body,
 	}
-	return s.db.Create(&sent).Error
+	if sendErr != nil {
+		errMsg := sendErr.Error()
+		sent.Error = &errMsg
+	}
+	if err := s.db.Create(&sent).Error; err != nil {
+		return err
+	}
+	return sendErr
 }
 
 func (s *NotificationService) ListLogs(id uint, userID string) ([]dto.NotificationLogResponse, error) {

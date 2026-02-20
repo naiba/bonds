@@ -59,6 +59,13 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 	if err := s.db.Create(&date).Error; err != nil {
 		return nil, err
 	}
+
+	if req.RemindMe != nil && *req.RemindMe {
+		date.RemindMe = true
+		s.db.Model(&date).Update("remind_me", true)
+		s.ensureReminder(contactID, &date)
+	}
+
 	resp := toImportantDateResponse(&date)
 	return &resp, nil
 }
@@ -74,6 +81,7 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 		}
 		return nil, err
 	}
+	oldRemindMe := date.RemindMe
 	label := req.Label
 	if label == "" && req.ContactImportantDateTypeID != nil {
 		label = s.resolveTypeLabel(*req.ContactImportantDateTypeID)
@@ -92,6 +100,20 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 	if err := s.db.Save(&date).Error; err != nil {
 		return nil, err
 	}
+
+	if req.RemindMe != nil {
+		newRemindMe := *req.RemindMe
+		if newRemindMe != oldRemindMe {
+			s.db.Model(&date).Update("remind_me", newRemindMe)
+			date.RemindMe = newRemindMe
+		}
+		if newRemindMe {
+			s.ensureReminder(contactID, &date)
+		} else {
+			s.removeReminder(contactID, date.ID)
+		}
+	}
+
 	resp := toImportantDateResponse(&date)
 	return &resp, nil
 }
@@ -100,6 +122,7 @@ func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error 
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return err
 	}
+	s.removeReminder(contactID, id)
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactImportantDate{})
 	if result.Error != nil {
 		return result.Error
@@ -118,6 +141,47 @@ func (s *ImportantDateService) resolveTypeLabel(typeID uint) string {
 	return dateType.Label
 }
 
+func (s *ImportantDateService) ensureReminder(contactID string, date *models.ContactImportantDate) error {
+	var existing models.ContactReminder
+	err := s.db.Where("contact_id = ? AND important_date_id = ?", contactID, date.ID).First(&existing).Error
+	if err == nil {
+		// Already exists, update it
+		existing.Label = date.Label
+		existing.Day = date.Day
+		existing.Month = date.Month
+		existing.Year = date.Year
+		existing.CalendarType = date.CalendarType
+		existing.OriginalDay = date.OriginalDay
+		existing.OriginalMonth = date.OriginalMonth
+		existing.OriginalYear = date.OriginalYear
+		return s.db.Save(&existing).Error
+	}
+	// Create new yearly recurring reminder
+	reminder := models.ContactReminder{
+		ContactID:       contactID,
+		ImportantDateID: &date.ID,
+		Label:           date.Label,
+		Day:             date.Day,
+		Month:           date.Month,
+		Year:            date.Year,
+		CalendarType:    date.CalendarType,
+		OriginalDay:     date.OriginalDay,
+		OriginalMonth:   date.OriginalMonth,
+		OriginalYear:    date.OriginalYear,
+		Type:            "recurring_year",
+	}
+	return s.db.Create(&reminder).Error
+}
+
+func (s *ImportantDateService) removeReminder(contactID string, dateID uint) error {
+	// Delete scheduled entries first
+	s.db.Where("contact_reminder_id IN (SELECT id FROM contact_reminders WHERE contact_id = ? AND important_date_id = ?)", contactID, dateID).
+		Delete(&models.ContactReminderScheduled{})
+	// Delete the reminder
+	return s.db.Where("contact_id = ? AND important_date_id = ?", contactID, dateID).
+		Delete(&models.ContactReminder{}).Error
+}
+
 func toImportantDateResponse(d *models.ContactImportantDate) dto.ImportantDateResponse {
 	return dto.ImportantDateResponse{
 		ID:                         d.ID,
@@ -131,6 +195,7 @@ func toImportantDateResponse(d *models.ContactImportantDate) dto.ImportantDateRe
 		OriginalMonth:              d.OriginalMonth,
 		OriginalYear:               d.OriginalYear,
 		ContactImportantDateTypeID: d.ContactImportantDateTypeID,
+		RemindMe:                   d.RemindMe,
 		CreatedAt:                  d.CreatedAt,
 		UpdatedAt:                  d.UpdatedAt,
 	}

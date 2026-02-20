@@ -31,6 +31,7 @@ type Config struct {
 	Telegram     TelegramConfig
 	Geocoding    GeocodingConfig
 	Bleve        BleveConfig
+	Backup       BackupConfig
 	Announcement string
 }
 
@@ -70,10 +71,14 @@ type StorageConfig struct {
 }
 
 type OAuthConfig struct {
-	GitHubKey    string
-	GitHubSecret string
-	GoogleKey    string
-	GoogleSecret string
+	GitHubKey        string
+	GitHubSecret     string
+	GoogleKey        string
+	GoogleSecret     string
+	OIDCKey          string
+	OIDCSecret       string
+	OIDCDiscoveryURL string
+	OIDCName         string // Display name, e.g. "Authentik", "Keycloak"
 }
 
 type WebAuthnConfig struct {
@@ -93,6 +98,12 @@ type GeocodingConfig struct {
 
 type BleveConfig struct {
 	IndexPath string
+}
+
+type BackupConfig struct {
+	Dir       string
+	Cron      string
+	Retention int
 }
 
 func Load() *Config {
@@ -138,10 +149,14 @@ func Load() *Config {
 			MaxSize:   getEnvInt64("STORAGE_MAX_SIZE", 10485760),
 		},
 		OAuth: OAuthConfig{
-			GitHubKey:    getEnv("OAUTH_GITHUB_KEY", ""),
-			GitHubSecret: getEnv("OAUTH_GITHUB_SECRET", ""),
-			GoogleKey:    getEnv("OAUTH_GOOGLE_KEY", ""),
-			GoogleSecret: getEnv("OAUTH_GOOGLE_SECRET", ""),
+			GitHubKey:        getEnv("OAUTH_GITHUB_KEY", ""),
+			GitHubSecret:     getEnv("OAUTH_GITHUB_SECRET", ""),
+			GoogleKey:        getEnv("OAUTH_GOOGLE_KEY", ""),
+			GoogleSecret:     getEnv("OAUTH_GOOGLE_SECRET", ""),
+			OIDCKey:          getEnv("OIDC_CLIENT_ID", ""),
+			OIDCSecret:       getEnv("OIDC_CLIENT_SECRET", ""),
+			OIDCDiscoveryURL: getEnv("OIDC_DISCOVERY_URL", ""),
+			OIDCName:         getEnv("OIDC_NAME", "SSO"),
 		},
 		Telegram: TelegramConfig{
 			BotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
@@ -157,6 +172,11 @@ func Load() *Config {
 		},
 		Bleve: BleveConfig{
 			IndexPath: getEnv("BLEVE_INDEX_PATH", "data/bonds.bleve"),
+		},
+		Backup: BackupConfig{
+			Dir:       getEnv("BACKUP_DIR", "data/backups"),
+			Cron:      getEnv("BACKUP_CRON", ""),
+			Retention: getEnvInt("BACKUP_RETENTION", 30),
 		},
 		Announcement: getEnv("ANNOUNCEMENT", ""),
 	}

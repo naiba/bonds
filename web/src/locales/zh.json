@@ -386,7 +386,11 @@
       "sort_updated": "最后更新",
       "filter_label": "标签筛选",
       "all_labels": "所有标签",
-      "quick_search": "快速搜索"
+      "quick_search": "快速搜索",
+      "col_birthday": "生日",
+      "col_age": "年龄",
+      "col_groups": "群组",
+      "columns": "列设置"
     },
     "create": {
       "title": "添加联系人",
@@ -518,7 +522,8 @@
       "type_first_met": "初次见面",
       "type_other": "其他",
       "date_type": "日期类型",
-      "select_type": "选择日期类型"
+      "select_type": "选择日期类型",
+      "remind_me": "每年提醒"
     },
     "tasks": {
       "title": "任务",
@@ -769,7 +774,7 @@
       "type_email": "邮件",
       "type_telegram": "Telegram",
       "telegram_chat_id": "Telegram 聊天 ID",
-      "telegram_help": "向机器人发送 /start 获取您的聊天 ID",
+      "telegram_help": "Shoutrrr URL 格式: telegram://bottoken@telegram?channels=chatid",
       "test_send": "发送测试",
       "test_success": "测试通知已发送",
       "test_failed": "发送测试通知失败",
@@ -784,7 +789,11 @@
       "verify_action": "验证",
       "verify_modal_title": "验证通知渠道",
       "verify_token_placeholder": "输入验证令牌",
-      "verify_success": "渠道验证成功"
+      "verify_success": "渠道验证成功",
+      "shoutrrr_url": "Shoutrrr URL",
+      "ntfy_help": "Shoutrrr URL 格式: ntfy://ntfy.sh/your-topic",
+      "gotify_help": "Shoutrrr URL 格式: gotify://your-server/apptoken",
+      "webhook_help": "完整的 Webhook URL: generic+https://example.com/webhook"
     },
     "personalize": {
       "title": "个性化",
@@ -942,7 +951,8 @@
   "oauth": {
     "continueWith": "或使用以下方式登录",
     "github": "GitHub",
-    "google": "Google"
+    "google": "Google",
+    "sso": "单点登录"
   },
   "calendar": {
     "gregorian": "公历",
@@ -991,5 +1001,34 @@
     "life_event_type_updated": "人生事件类型已更新",
     "move_up": "上移",
     "move_down": "下移"
+  },
+  "backups": {
+    "title": "备份管理",
+    "description": "管理数据库备份与恢复。",
+    "create": "创建备份",
+    "creating": "正在创建备份...",
+    "created": "备份创建成功",
+    "restore": "恢复",
+    "restoring": "正在恢复...",
+    "restored": "备份恢复成功，请刷新页面。",
+    "restore_confirm": "确定要恢复此备份吗？这将替换当前所有数据。",
+    "restore_warning": "此操作不可逆！",
+    "delete_confirm": "确定要删除此备份吗？",
+    "deleted": "备份已删除",
+    "download": "下载",
+    "filename": "文件名",
+    "size": "大小",
+    "created_at": "创建时间",
+    "actions": "操作",
+    "no_backups": "暂无备份",
+    "config": "配置信息",
+    "cron_enabled": "定时备份",
+    "cron_schedule": "执行计划",
+    "retention": "保留时间",
+    "retention_days": "{{days}} 天",
+    "db_driver": "数据库",
+    "backup_dir": "备份目录",
+    "cron_disabled": "未启用",
+    "cron_enabled_label": "已启用"
   }
 }

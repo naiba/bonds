@@ -57,6 +57,15 @@ export default function OAuthProviders() {
     }
   };
 
+  const getDisplayName = (driver: string) => {
+    switch (driver) {
+      case "github": return "GitHub";
+      case "google": return "Google";
+      case "openid-connect": return "SSO";
+      default: return driver;
+    }
+  };
+
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
       <Title level={4} style={{ marginBottom: 4 }}>
@@ -97,8 +106,8 @@ export default function OAuthProviders() {
                     )
                   }
                   title={
-                    <span style={{ textTransform: "capitalize" }}>
-                      {item.driver}
+                    <span>
+                      {getDisplayName(item.driver)}
                     </span>
                   }
                   description={

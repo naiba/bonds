@@ -473,3 +473,111 @@ func TestQuickSearch(t *testing.T) {
 		t.Errorf("Expected 0 results for empty term, got %d", len(results))
 	}
 }
+
+func TestListContacts_BirthdayAgeGroups(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "contact-bdaygroup-test@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	vaultID := vault.ID
+	userID := resp.User.ID
+
+	contactSvc := NewContactService(db)
+	c1, err := contactSvc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Alice"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	_, err = contactSvc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Bob"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	var birthdateType models.ContactImportantDateType
+	if err := db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("Failed to find Birthdate type: %v", err)
+	}
+
+	dateSvc := NewImportantDateService(db)
+	day, month, year := 15, 6, 1990
+	_, err = dateSvc.Create(c1.ID, vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Birthdate",
+		Day:                        &day,
+		Month:                      &month,
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create important date failed: %v", err)
+	}
+
+	groupSvc := NewGroupService(db)
+	grp, err := groupSvc.Create(vaultID, dto.CreateGroupRequest{Name: "Family"})
+	if err != nil {
+		t.Fatalf("Create group failed: %v", err)
+	}
+	if err := groupSvc.AddContactToGroup(c1.ID, dto.AddContactToGroupRequest{GroupID: grp.ID}); err != nil {
+		t.Fatalf("AddContactToGroup failed: %v", err)
+	}
+
+	contacts, _, err := contactSvc.ListContacts(vaultID, userID, 1, 20, "", "first_name")
+	if err != nil {
+		t.Fatalf("ListContacts failed: %v", err)
+	}
+	if len(contacts) != 2 {
+		t.Fatalf("Expected 2 contacts, got %d", len(contacts))
+	}
+
+	var alice, bob *dto.ContactResponse
+	for i := range contacts {
+		if contacts[i].FirstName == "Alice" {
+			alice = &contacts[i]
+		}
+		if contacts[i].FirstName == "Bob" {
+			bob = &contacts[i]
+		}
+	}
+	if alice == nil || bob == nil {
+		t.Fatal("Expected to find both Alice and Bob in results")
+	}
+
+	if alice.Birthday == nil {
+		t.Error("Expected Alice to have a birthday")
+	} else if *alice.Birthday != "1990-06-15" {
+		t.Errorf("Expected birthday '1990-06-15', got '%s'", *alice.Birthday)
+	}
+	if alice.Age == nil {
+		t.Error("Expected Alice to have an age")
+	} else if *alice.Age < 30 {
+		t.Errorf("Expected age >= 30, got %d", *alice.Age)
+	}
+	if len(alice.Groups) != 1 {
+		t.Fatalf("Expected 1 group for Alice, got %d", len(alice.Groups))
+	}
+	if alice.Groups[0].Name != "Family" {
+		t.Errorf("Expected group name 'Family', got '%s'", alice.Groups[0].Name)
+	}
+
+	if bob.Birthday != nil {
+		t.Errorf("Expected Bob to have no birthday, got '%s'", *bob.Birthday)
+	}
+	if bob.Age != nil {
+		t.Errorf("Expected Bob to have no age, got %d", *bob.Age)
+	}
+	if len(bob.Groups) != 0 {
+		t.Errorf("Expected 0 groups for Bob, got %d", len(bob.Groups))
+	}
+}

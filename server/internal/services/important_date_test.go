@@ -305,3 +305,120 @@ func TestCreateImportantDate_ExplicitLabelOverridesType(t *testing.T) {
 		t.Errorf("Expected label 'My Custom Birthday', got '%s'", date.Label)
 	}
 }
+
+func TestImportantDate_RemindMe(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	var birthdateType models.ContactImportantDateType
+	if err := ctx.db.Where("vault_id = ? AND label = ?", ctx.vaultID, "Birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("Failed to find Birthdate type: %v", err)
+	}
+
+	day, month, year := 15, 6, 1990
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Birthday",
+		Day:                        &day,
+		Month:                      &month,
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		RemindMe:                   &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if !date.RemindMe {
+		t.Error("Expected RemindMe to be true after create")
+	}
+
+	var reminder models.ContactReminder
+	if err := ctx.db.Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).First(&reminder).Error; err != nil {
+		t.Fatalf("Expected reminder to exist: %v", err)
+	}
+	if reminder.Type != "recurring_year" {
+		t.Errorf("Expected reminder type 'recurring_year', got '%s'", reminder.Type)
+	}
+	if reminder.Label != "Birthday" {
+		t.Errorf("Expected reminder label 'Birthday', got '%s'", reminder.Label)
+	}
+
+	remindFalse := false
+	updated, err := ctx.svc.Update(date.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
+		Label:                      "Birthday",
+		Day:                        &day,
+		Month:                      &month,
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		RemindMe:                   &remindFalse,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.RemindMe {
+		t.Error("Expected RemindMe to be false after update")
+	}
+
+	var count int64
+	ctx.db.Model(&models.ContactReminder{}).Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("Expected 0 reminders after disabling remind_me, got %d", count)
+	}
+
+	updated2, err := ctx.svc.Update(date.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
+		Label:                      "Birthday",
+		Day:                        &day,
+		Month:                      &month,
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		RemindMe:                   &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Update (re-enable) failed: %v", err)
+	}
+	if !updated2.RemindMe {
+		t.Error("Expected RemindMe to be true after re-enable")
+	}
+
+	ctx.db.Model(&models.ContactReminder{}).Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).Count(&count)
+	if count != 1 {
+		t.Errorf("Expected 1 reminder after re-enabling remind_me, got %d", count)
+	}
+}
+
+func TestImportantDate_DeleteRemovesReminder(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	var birthdateType models.ContactImportantDateType
+	if err := ctx.db.Where("vault_id = ? AND label = ?", ctx.vaultID, "Birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("Failed to find Birthdate type: %v", err)
+	}
+
+	day, month, year := 25, 12, 1985
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Christmas Birthday",
+		Day:                        &day,
+		Month:                      &month,
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		RemindMe:                   &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var count int64
+	ctx.db.Model(&models.ContactReminder{}).Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).Count(&count)
+	if count != 1 {
+		t.Fatalf("Expected 1 reminder before delete, got %d", count)
+	}
+
+	if err := ctx.svc.Delete(date.ID, ctx.contactID, ctx.vaultID); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	ctx.db.Model(&models.ContactReminder{}).Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("Expected 0 reminders after deleting date, got %d", count)
+	}
+}

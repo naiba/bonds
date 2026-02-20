@@ -15,10 +15,11 @@ const maxChannelFails = 10
 type ReminderSchedulerService struct {
 	db     *gorm.DB
 	mailer Mailer
+	sender NotificationSender
 }
 
-func NewReminderSchedulerService(db *gorm.DB, mailer Mailer) *ReminderSchedulerService {
-	return &ReminderSchedulerService{db: db, mailer: mailer}
+func NewReminderSchedulerService(db *gorm.DB, mailer Mailer, sender NotificationSender) *ReminderSchedulerService {
+	return &ReminderSchedulerService{db: db, mailer: mailer, sender: sender}
 }
 
 // ProcessDueReminders finds all scheduled reminders that are due and processes them.
@@ -85,14 +86,17 @@ func (s *ReminderSchedulerService) processOne(scheduled *models.ContactReminderS
 		reminder.Label, contactName, reminder.Label,
 	)
 
-	// Send based on channel type
 	var sendErr error
 	switch channel.Type {
 	case "email":
 		sendErr = s.mailer.Send(channel.Content, subject, htmlBody)
-	case "telegram":
-		log.Printf("[reminder-scheduler] Telegram not yet implemented for channel %d", channel.ID)
-		sendErr = nil // Not an error — just not implemented yet
+	case "telegram", "ntfy", "gotify", "webhook":
+		if s.sender != nil {
+			sendErr = s.sender.Send(channel.Content, subject, htmlBody)
+		} else {
+			log.Printf("[reminder-scheduler] No notification sender configured for channel %d (type=%s)", channel.ID, channel.Type)
+			return
+		}
 	default:
 		log.Printf("[reminder-scheduler] Unknown channel type %q for channel %d", channel.Type, channel.ID)
 		return

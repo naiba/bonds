@@ -57,6 +57,19 @@ func main() {
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
 
+	mailer, mErr := services.NewSMTPMailer(&cfg.SMTP)
+	if mErr != nil {
+		log.Printf("WARNING: Failed to initialize mailer for cron: %v", mErr)
+		mailer = &services.NoopMailer{}
+	}
+	notificationSender := services.NewShoutrrrSender()
+	reminderScheduler := services.NewReminderSchedulerService(db, mailer, notificationSender)
+	if err := scheduler.RegisterJob("0 * * * * *", "process_reminders", func() {
+		reminderScheduler.ProcessDueReminders()
+	}); err != nil {
+		log.Printf("WARNING: Failed to register reminder cron job: %v", err)
+	}
+
 	vcardService := services.NewVCardService(db)
 	davClientService := services.NewDavClientService(db, cfg.JWT.Secret)
 	davSyncService := services.NewDavSyncService(db, davClientService, vcardService)
@@ -68,6 +81,20 @@ func main() {
 		}
 	}); err != nil {
 		log.Printf("WARNING: Failed to register DAV sync cron job: %v", err)
+	}
+
+	backupService := services.NewBackupService(db, cfg)
+	if cfg.Backup.Cron != "" {
+		if err := scheduler.RegisterJob(cfg.Backup.Cron, "create_backup", func() {
+			if _, err := backupService.Create(); err != nil {
+				log.Printf("WARNING: Backup cron failed: %v", err)
+			}
+			if err := backupService.CleanOldBackups(); err != nil {
+				log.Printf("WARNING: Backup cleanup failed: %v", err)
+			}
+		}); err != nil {
+			log.Printf("WARNING: Failed to register backup cron job: %v", err)
+		}
 	}
 
 	e := echo.New()

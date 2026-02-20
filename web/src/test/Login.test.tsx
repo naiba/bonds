@@ -5,6 +5,18 @@ import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import Login from "@/pages/auth/Login";
 
+vi.mock("@/api", () => ({
+  api: {
+    webauthn: { webauthnLoginBeginCreate: vi.fn() },
+  },
+  httpClient: {
+    instance: {
+      get: vi.fn().mockResolvedValue({ data: { success: true, data: [] } }),
+      post: vi.fn().mockResolvedValue({ data: { success: true, data: {} } }),
+    },
+  },
+}));
+
 vi.mock("@/stores/auth", () => ({
   useAuth: () => ({
     login: vi.fn(),

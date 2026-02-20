@@ -51,6 +51,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	reportService := services.NewReportService(db)
 	feedService := services.NewFeedService(db)
 	preferenceService := services.NewPreferenceService(db)
+	notificationSender := services.NewShoutrrrSender()
 	notificationService := services.NewNotificationService(db)
 	personalizeService := services.NewPersonalizeService(db)
 	twoFactorService := services.NewTwoFactorService(db)
@@ -84,6 +85,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	userManagementService := services.NewUserManagementService(db)
 	accountCancelService := services.NewAccountCancelService(db)
 	storageInfoService := services.NewStorageInfoService(db)
+	backupService := services.NewBackupService(db, cfg)
 	currencyService := services.NewCurrencyService(db)
 	templatePageService := services.NewTemplatePageService(db)
 	davClientService := services.NewDavClientService(db, cfg.JWT.Secret)
@@ -97,13 +99,14 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	}
 	invitationService := services.NewInvitationService(db, mailer, cfg.App.URL)
 	notificationService.SetMailer(mailer, cfg.App.URL)
+	notificationService.SetSender(notificationSender)
 
 	if cfg.Geocoding.Provider != "" {
 		geocoder := services.NewGeocoder(cfg.Geocoding.Provider, cfg.Geocoding.APIKey)
 		addressService.SetGeocoder(geocoder)
 	}
 
-	oauthService := services.NewOAuthService(db, &cfg.JWT, cfg.App.URL)
+	oauthService := services.NewOAuthService(db, &cfg.JWT, cfg.App.URL, cfg.OAuth.OIDCName)
 	webauthnService, err := services.NewWebAuthnService(db, &cfg.WebAuthn)
 	if err != nil {
 		log.Printf("WARNING: Failed to initialize WebAuthn: %v — WebAuthn disabled", err)
@@ -205,6 +208,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	userManagementHandler := NewUserManagementHandler(userManagementService)
 	accountCancelHandler := NewAccountCancelHandler(accountCancelService)
 	storageInfoHandler := NewStorageInfoHandler(storageInfoService)
+	backupHandler := NewBackupHandler(backupService)
 	currencyHandler := NewCurrencyHandler(currencyService)
 	templatePageHandler := NewTemplatePageHandler(templatePageService)
 	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
@@ -231,6 +235,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	auth.POST("/login", authHandler.Login)
 	auth.POST("/refresh", authHandler.Refresh, authMiddleware.Authenticate)
 	auth.GET("/me", authHandler.Me, authMiddleware.Authenticate)
+	auth.GET("/providers", oauthHandler.AvailableProviders)
 	auth.GET("/:provider", oauthHandler.BeginAuth)
 	auth.GET("/:provider/callback", oauthHandler.Callback)
 
@@ -598,6 +603,14 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 
 	settingsGroup.DELETE("/account", accountCancelHandler.Cancel, authMiddleware.RequireAdmin)
 	settingsGroup.GET("/storage", storageInfoHandler.Get)
+
+	backupGroup := settingsGroup.Group("/backups", authMiddleware.RequireAdmin)
+	backupGroup.GET("", backupHandler.List)
+	backupGroup.POST("", backupHandler.Create)
+	backupGroup.GET("/config", backupHandler.GetConfig)
+	backupGroup.GET("/:filename/download", backupHandler.Download)
+	backupGroup.DELETE("/:filename", backupHandler.Delete)
+	backupGroup.POST("/:filename/restore", backupHandler.Restore)
 
 	protected.GET("/currencies", currencyHandler.List)
 

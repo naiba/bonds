@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/naiba/bonds/internal/config"
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -16,6 +17,8 @@ func Connect(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
 	switch cfg.Driver {
 	case "sqlite":
 		dialector = sqlite.Open(cfg.DSN)
+	case "postgres":
+		dialector = postgres.Open(cfg.DSN)
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
 	}

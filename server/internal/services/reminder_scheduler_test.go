@@ -80,7 +80,7 @@ func setupReminderSchedulerTest(t *testing.T) *reminderSchedulerTestContext {
 	)`)
 
 	mailer := &mockMailer{}
-	svc := NewReminderSchedulerService(db, mailer)
+	svc := NewReminderSchedulerService(db, mailer, &NoopSender{})
 
 	return &reminderSchedulerTestContext{
 		svc:       svc,
