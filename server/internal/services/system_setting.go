@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -45,6 +46,30 @@ func (s *SystemSettingService) GetBool(key string, defaultVal bool) bool {
 		return defaultVal
 	}
 	return val == "true" || val == "1"
+}
+
+func (s *SystemSettingService) GetInt(key string, defaultVal int) int {
+	val, err := s.Get(key)
+	if err != nil {
+		return defaultVal
+	}
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return defaultVal
+	}
+	return i
+}
+
+func (s *SystemSettingService) GetInt64(key string, defaultVal int64) int64 {
+	val, err := s.Get(key)
+	if err != nil {
+		return defaultVal
+	}
+	i, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return defaultVal
+	}
+	return i
 }
 
 func (s *SystemSettingService) Set(key, value string) error {
