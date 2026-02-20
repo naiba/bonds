@@ -11,14 +11,13 @@ import {
   Drawer,
   Descriptions,
   List,
-  Avatar,
   Empty
 } from "antd";
 import {
   BankOutlined,
   ArrowLeftOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
+import ContactAvatar from "@/components/ContactAvatar";
 import { api } from "@/api";
 import type { Company } from "@/api";
 
@@ -153,7 +152,16 @@ export default function VaultCompanies() {
                     ]}
                 >
                     <List.Item.Meta
-                    avatar={<Avatar icon={<UserOutlined />} src={item.avatar_url} />}
+                    avatar={
+                      <ContactAvatar
+                        vaultId={String(id)}
+                        contactId={item.id}
+                        firstName={item.first_name}
+                        lastName={item.last_name}
+                        size={32}
+                        updatedAt={item.updated_at}
+                      />
+                    }
                     title={`${item.first_name} ${item.last_name}`}
                     description={item.job_title}
                     />

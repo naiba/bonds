@@ -15,23 +15,10 @@ import type { Contact, PaginationMeta, LabelResponse } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import ContactAvatar from "@/components/ContactAvatar";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
-
-const AVATAR_COLORS = [
-  "#5b8c5a", "#6b9e7a", "#7eb09c", "#4a8c8c", "#5a7c9e",
-  "#8c7a5b", "#9e8a6b", "#b09a7e", "#8c6b5a", "#7a8c5b",
-  "#6b7a5a", "#5a6b8c", "#7a5a8c", "#8c5a7a", "#5a8c6b",
-];
-
-function getAvatarColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
 
 // Map frontend sort values to backend sort param values
 const SORT_MAP: Record<string, string> = {
@@ -113,29 +100,16 @@ export default function ContactList() {
     {
       title: t("contact.list.col_name"),
       key: "name",
-      render: (_, record) => {
-        const initials = `${(record.first_name ?? '').charAt(0)}${(record.last_name ?? '').charAt(0)}`.toUpperCase();
-        const bgColor = getAvatarColor((record.first_name ?? '') + (record.last_name ?? ''));
-        return (
+      render: (_, record) => (
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: "50%",
-                backgroundColor: bgColor,
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 600,
-                flexShrink: 0,
-                letterSpacing: 0.5,
-              }}
-            >
-              {initials}
-            </div>
+            <ContactAvatar
+              vaultId={String(id)}
+              contactId={record.id ?? ""}
+              firstName={record.first_name}
+              lastName={record.last_name}
+              size={34}
+              updatedAt={record.updated_at}
+            />
             <span style={{ fontWeight: 500 }}>
               {record.first_name} {record.last_name}
             </span>
@@ -143,8 +117,7 @@ export default function ContactList() {
               <StarFilled style={{ color: token.colorWarning, fontSize: 13 }} />
             )}
           </div>
-        );
-      },
+        ),
       sorter: (a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''),
     },
     {

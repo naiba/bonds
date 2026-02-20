@@ -23,6 +23,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { GroupContact, Contact, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
+import ContactAvatar from "@/components/ContactAvatar";
 
 const { Title } = Typography;
 
@@ -204,7 +205,6 @@ export default function GroupDetail() {
           locale={{ emptyText: <Empty description={t("vault.group_detail.no_members")} style={{ padding: 32 }} /> }}
           renderItem={(member: GroupContact) => {
             const contactName = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim() || '?';
-            const initials = contactName.charAt(0).toUpperCase();
             return (
               <List.Item
                 style={{
@@ -232,22 +232,13 @@ export default function GroupDetail() {
               >
                 <List.Item.Meta
                   avatar={
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: "50%",
-                        background: token.colorPrimaryBg,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 600,
-                        color: token.colorPrimary,
-                        fontSize: 14,
-                      }}
-                    >
-                      {initials}
-                    </div>
+                    <ContactAvatar
+                      vaultId={String(vaultId)}
+                      contactId={member.id!}
+                      firstName={member.first_name}
+                      lastName={member.last_name}
+                      size={36}
+                    />
                   }
                   title={
                     <span style={{ fontWeight: 500 }}>

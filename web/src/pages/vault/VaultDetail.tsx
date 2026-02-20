@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
-import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme, Dropdown, Modal, Form, Input, Popconfirm, App, List, Avatar } from "antd";
-import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, UserOutlined, CloudServerOutlined } from "@ant-design/icons";
+import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme, Dropdown, Modal, Form, Input, Popconfirm, App, List } from "antd";
+import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, CloudServerOutlined } from "@ant-design/icons";
+import ContactAvatar from "@/components/ContactAvatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
@@ -232,7 +233,16 @@ export default function VaultDetail() {
                   onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.id}`)}
                 >
                   <List.Item.Meta
-                    avatar={<Avatar icon={<UserOutlined />} src={item.avatar_url} />}
+                    avatar={
+                      <ContactAvatar
+                        vaultId={vaultId}
+                        contactId={item.id}
+                        firstName={item.first_name}
+                        lastName={item.last_name}
+                        size={32}
+                        updatedAt={item.updated_at}
+                      />
+                    }
                     title={`${item.first_name} ${item.last_name}`}
                   />
                 </List.Item>
