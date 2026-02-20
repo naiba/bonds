@@ -15,6 +15,7 @@ import (
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/handlers"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
 	"gorm.io/gorm"
 )
@@ -102,6 +103,11 @@ func setupTestServer(t *testing.T) *testServer {
 			RefreshHrs: 168,
 		},
 		App: config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
+	}
+
+	settingSvc := services.NewSystemSettingService(db)
+	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
+		t.Fatalf("failed to seed settings: %v", err)
 	}
 
 	e := echo.New()
@@ -1729,6 +1735,10 @@ func setupTestServerWithStorage(t *testing.T) *testServer {
 		App:     config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
 		Storage: config.StorageConfig{UploadDir: t.TempDir(), MaxSize: 10 * 1024 * 1024},
 	}
+	settingSvc := services.NewSystemSettingService(db)
+	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
+		t.Fatalf("failed to seed settings: %v", err)
+	}
 	e := echo.New()
 	handlers.RegisterRoutes(e, db, cfg, "test")
 	return &testServer{e: e, db: db, cfg: cfg}
@@ -2205,6 +2215,10 @@ func setupTestServerWithTelegram(t *testing.T) *testServer {
 		},
 		App:      config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
 		Telegram: config.TelegramConfig{BotToken: "test-bot-token"},
+	}
+	settingSvc := services.NewSystemSettingService(db)
+	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
+		t.Fatalf("failed to seed settings: %v", err)
 	}
 	e := echo.New()
 	handlers.RegisterRoutes(e, db, cfg, "test")
@@ -3403,8 +3417,8 @@ func TestInstanceInfo(t *testing.T) {
 	if !info.PasswordAuthEnabled {
 		t.Error("expected password_auth_enabled=true by default")
 	}
-	if info.AppName != "Bonds" {
-		t.Errorf("expected app_name 'Bonds', got '%s'", info.AppName)
+	if info.AppName != "Monica Test" {
+		t.Errorf("expected app_name 'Monica Test', got '%s'", info.AppName)
 	}
 }
 
@@ -3550,8 +3564,10 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
-	if len(getResp.Settings) != 0 {
-		t.Errorf("expected 0 settings initially, got %d", len(getResp.Settings))
+	// SeedSettingsFromEnv seeds 27 settings during RegisterRoutes
+	initialCount := len(getResp.Settings)
+	if initialCount != 27 {
+		t.Errorf("expected 27 settings initially (seeded from env), got %d", initialCount)
 	}
 
 	rec = ts.doRequest(http.MethodPut, "/api/admin/settings",
@@ -3564,8 +3580,9 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
-	if len(getResp.Settings) != 2 {
-		t.Errorf("expected 2 settings after update, got %d", len(getResp.Settings))
+	// app.name already existed (updated in place), registration.enabled is new → 27 + 1 = 28
+	if len(getResp.Settings) != 28 {
+		t.Errorf("expected 28 settings after update, got %d", len(getResp.Settings))
 	}
 }
 
