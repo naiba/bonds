@@ -276,7 +276,7 @@ func NewMostConsultedHandler(svc *services.MostConsultedService) *MostConsultedH
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			vault_id	path		string	true	"Vault ID"
-//	@Success		200			{object}	response.APIResponse
+//	@Success		200			{object}	response.APIResponse{data=[]dto.MostConsultedContactItem}
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/search/mostConsulted [get]

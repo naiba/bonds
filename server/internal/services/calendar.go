@@ -42,9 +42,8 @@ func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.Cal
 	if month > 0 {
 		query = query.Where("month = ?", month)
 	}
-	if year > 0 {
-		query = query.Where("year = ? OR year IS NULL", year)
-	}
+	// Important dates (especially birthdays) should appear every year regardless
+	// of what year is stored. The year field is only used for display, not filtering.
 	if err := query.Find(&dates).Error; err != nil {
 		return nil, err
 	}
