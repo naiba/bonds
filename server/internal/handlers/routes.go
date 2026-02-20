@@ -20,7 +20,7 @@ import (
 func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string) {
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret)
 
-	services.SetupOAuthProviders(&cfg.OAuth, cfg.App.URL)
+	systemSettingService := services.NewSystemSettingService(db)
 
 	feedRecorder := services.NewFeedRecorder(db)
 
@@ -92,27 +92,29 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	davSyncService := services.NewDavSyncService(db, davClientService, vcardService)
 	davPushService := services.NewDavPushService(db, davClientService, vcardService)
 	adminService := services.NewAdminService(db, cfg.Storage.UploadDir)
-	systemSettingService := services.NewSystemSettingService(db)
 
-	mailer, mErr := services.NewSMTPMailer(&cfg.SMTP)
-	if mErr != nil {
-		log.Printf("WARNING: Failed to initialize mailer: %v", mErr)
-		mailer = &services.NoopMailer{}
-	}
+	mailer := services.NewDynamicMailer(systemSettingService)
 	invitationService := services.NewInvitationService(db, mailer, cfg.App.URL)
-	notificationService.SetMailer(mailer, cfg.App.URL)
+	invitationService.SetSystemSettings(systemSettingService)
+	notificationService.SetMailer(mailer)
 	notificationService.SetSender(notificationSender)
+	notificationService.SetSystemSettings(systemSettingService)
 
-	if cfg.Geocoding.Provider != "" {
-		geocoder := services.NewGeocoder(cfg.Geocoding.Provider, cfg.Geocoding.APIKey)
+	geocodingProvider := systemSettingService.GetWithDefault("geocoding.provider", cfg.Geocoding.Provider)
+	if geocodingProvider != "" {
+		geocodingAPIKey := systemSettingService.GetWithDefault("geocoding.api_key", cfg.Geocoding.APIKey)
+		geocoder := services.NewGeocoder(geocodingProvider, geocodingAPIKey)
 		addressService.SetGeocoder(geocoder)
 	}
 
 	oauthService := services.NewOAuthService(db, &cfg.JWT, cfg.App.URL, cfg.OAuth.OIDCName)
+	oauthService.SetSystemSettings(systemSettingService)
 	webauthnService, err := services.NewWebAuthnService(db, &cfg.WebAuthn)
 	if err != nil {
 		log.Printf("WARNING: Failed to initialize WebAuthn: %v — WebAuthn disabled", err)
 	}
+	webauthnService.SetSystemSettings(systemSettingService)
+	backupService.SetSystemSettings(systemSettingService)
 
 	var searchEngine search.Engine
 	if cfg.Bleve.IndexPath != "" {
@@ -182,7 +184,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	personalizeHandler := NewPersonalizeHandler(personalizeService)
 	twoFactorHandler := NewTwoFactorHandler(twoFactorService)
 	searchHandler := NewSearchHandler(searchService)
-	oauthHandler := NewOAuthHandler(oauthService, cfg.App.URL, cfg.JWT.Secret)
+	oauthHandler := NewOAuthHandler(oauthService, systemSettingService, cfg.JWT.Secret)
 	vcardHandler := NewVCardHandler(vcardService)
 	invitationHandler := NewInvitationHandler(invitationService)
 	contactLabelHandler := NewContactLabelHandler(contactLabelService)
@@ -216,6 +218,14 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
 	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
 	adminHandler := NewAdminHandler(adminService, systemSettingService)
+	adminHandler.RegisterReloader(func() {
+		services.SetupOAuthProvidersFromDB(systemSettingService)
+	})
+	adminHandler.RegisterReloader(func() {
+		if err := webauthnService.ReloadConfig(); err != nil {
+			log.Printf("WARNING: WebAuthn reload failed: %v", err)
+		}
+	})
 	instanceHandler := NewInstanceHandler(systemSettingService, oauthService, webauthnService, version)
 
 	e.Use(middleware.CORS())
@@ -227,12 +237,11 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	api := e.Group("/api")
 
 	api.GET("/announcement", func(c echo.Context) error {
-		return response.OK(c, map[string]string{"content": cfg.Announcement})
+		content := systemSettingService.GetWithDefault("announcement", "")
+		return response.OK(c, map[string]string{"content": content})
 	})
 
-	if cfg.Telegram.BotToken != "" {
-		api.POST("/telegram/webhook", telegramWebhookHandler.HandleWebhook)
-	}
+	api.POST("/telegram/webhook", telegramWebhookHandler.HandleWebhook)
 
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)
@@ -243,11 +252,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	auth.GET("/:provider", oauthHandler.BeginAuth)
 	auth.GET("/:provider/callback", oauthHandler.Callback)
 
-	if webauthnService != nil {
-		webauthnHandler := NewWebAuthnHandler(webauthnService, authService)
-		auth.POST("/webauthn/login/begin", webauthnHandler.BeginLogin)
-		auth.POST("/webauthn/login/finish", webauthnHandler.FinishLogin)
-	}
+	webauthnHandler := NewWebAuthnHandler(webauthnService, authService)
+	auth.POST("/webauthn/login/begin", webauthnHandler.BeginLogin)
+	auth.POST("/webauthn/login/finish", webauthnHandler.FinishLogin)
 
 	api.POST("/invitations/accept", invitationHandler.Accept)
 
@@ -584,14 +591,11 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	tpGroup.DELETE("/:pageId/modules/:moduleId", templatePageHandler.RemoveModule)
 	tpGroup.POST("/:pageId/modules/:moduleId/position", templatePageHandler.UpdateModulePosition)
 
-	if webauthnService != nil {
-		webauthnHandler := NewWebAuthnHandler(webauthnService, authService)
-		webauthnGroup := settingsGroup.Group("/webauthn")
-		webauthnGroup.POST("/register/begin", webauthnHandler.BeginRegistration)
-		webauthnGroup.POST("/register/finish", webauthnHandler.FinishRegistration)
-		webauthnGroup.GET("/credentials", webauthnHandler.ListCredentials)
-		webauthnGroup.DELETE("/credentials/:id", webauthnHandler.DeleteCredential)
-	}
+	webauthnGroup := settingsGroup.Group("/webauthn")
+	webauthnGroup.POST("/register/begin", webauthnHandler.BeginRegistration)
+	webauthnGroup.POST("/register/finish", webauthnHandler.FinishRegistration)
+	webauthnGroup.GET("/credentials", webauthnHandler.ListCredentials)
+	webauthnGroup.DELETE("/credentials/:id", webauthnHandler.DeleteCredential)
 
 	inviteGroup := settingsGroup.Group("/invitations", authMiddleware.RequireAdmin)
 	inviteGroup.GET("", invitationHandler.List)

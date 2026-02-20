@@ -13,10 +13,15 @@ import (
 type AdminHandler struct {
 	adminService   *services.AdminService
 	settingService *services.SystemSettingService
+	reloaders      []func()
 }
 
 func NewAdminHandler(adminService *services.AdminService, settingService *services.SystemSettingService) *AdminHandler {
 	return &AdminHandler{adminService: adminService, settingService: settingService}
+}
+
+func (h *AdminHandler) RegisterReloader(fn func()) {
+	h.reloaders = append(h.reloaders, fn)
 }
 
 // ListUsers godoc
@@ -198,6 +203,11 @@ func (h *AdminHandler) UpdateSettings(c echo.Context) error {
 
 	if err := h.settingService.BulkSet(req.Settings); err != nil {
 		return response.InternalError(c, "err.failed_to_update_settings")
+	}
+
+	// Trigger hot-reload for all registered services
+	for _, reload := range h.reloaders {
+		reload()
 	}
 
 	settings, err := h.settingService.GetAll()

@@ -14,18 +14,21 @@ import (
 
 type OAuthHandler struct {
 	oauthService *services.OAuthService
-	appURL       string
+	settings     *services.SystemSettingService
 }
 
-func NewOAuthHandler(oauthService *services.OAuthService, appURL string, jwtSecret string) *OAuthHandler {
-	// Set up Gothic session store
+func NewOAuthHandler(oauthService *services.OAuthService, settings *services.SystemSettingService, jwtSecret string) *OAuthHandler {
 	store := sessions.NewCookieStore([]byte(jwtSecret))
 	store.MaxAge(86400 * 30)
 	store.Options.Path = "/"
 	store.Options.HttpOnly = true
 	gothic.Store = store
 
-	return &OAuthHandler{oauthService: oauthService, appURL: appURL}
+	return &OAuthHandler{oauthService: oauthService, settings: settings}
+}
+
+func (h *OAuthHandler) getAppURL() string {
+	return h.settings.GetWithDefault("app.url", "http://localhost:8080")
 }
 
 // BeginAuth godoc
@@ -73,13 +76,13 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 	gothUser, err := gothic.CompleteUserAuth(c.Response(), c.Request())
 	if err != nil {
 		return c.Redirect(http.StatusTemporaryRedirect,
-			fmt.Sprintf("%s/login?error=oauth_failed", h.appURL))
+			fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))
 	}
 
 	authResp, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name)
 	if err != nil {
 		return c.Redirect(http.StatusTemporaryRedirect,
-			fmt.Sprintf("%s/login?error=oauth_failed", h.appURL))
+			fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))
 	}
 
 	// Save OAuth token for future API calls
@@ -91,7 +94,7 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 		gothUser.AccessToken, gothUser.RefreshToken, expiresIn)
 
 	return c.Redirect(http.StatusTemporaryRedirect,
-		fmt.Sprintf("%s/auth/callback?token=%s", h.appURL, authResp.Token))
+		fmt.Sprintf("%s/auth/callback?token=%s", h.getAppURL(), authResp.Token))
 }
 
 // AvailableProviders godoc

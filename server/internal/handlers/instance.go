@@ -53,7 +53,7 @@ func (h *InstanceHandler) GetInfo(c echo.Context) error {
 		}
 	}
 
-	webauthnEnabled := h.webauthnService != nil
+	webauthnEnabled := h.webauthnService.IsEnabled()
 
 	info := dto.InstanceInfoResponse{
 		Version:             h.version,

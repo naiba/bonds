@@ -34,6 +34,9 @@ func NewWebAuthnHandler(webauthnService *services.WebAuthnService, authService *
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/settings/webauthn/register/begin [post]
 func (h *WebAuthnHandler) BeginRegistration(c echo.Context) error {
+	if !h.webauthnService.IsEnabled() {
+		return response.BadRequest(c, "err.webauthn_not_configured", nil)
+	}
 	userID := middleware.GetUserID(c)
 	if userID == "" {
 		return response.Unauthorized(c, "err.invalid_user")
@@ -61,6 +64,9 @@ func (h *WebAuthnHandler) BeginRegistration(c echo.Context) error {
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/settings/webauthn/register/finish [post]
 func (h *WebAuthnHandler) FinishRegistration(c echo.Context) error {
+	if !h.webauthnService.IsEnabled() {
+		return response.BadRequest(c, "err.webauthn_not_configured", nil)
+	}
 	userID := middleware.GetUserID(c)
 	if userID == "" {
 		return response.Unauthorized(c, "err.invalid_user")
@@ -90,6 +96,9 @@ func (h *WebAuthnHandler) FinishRegistration(c echo.Context) error {
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/auth/webauthn/login/begin [post]
 func (h *WebAuthnHandler) BeginLogin(c echo.Context) error {
+	if !h.webauthnService.IsEnabled() {
+		return response.BadRequest(c, "err.webauthn_not_configured", nil)
+	}
 	var req struct {
 		Email string `json:"email" validate:"required,email"`
 	}
@@ -129,6 +138,9 @@ func (h *WebAuthnHandler) BeginLogin(c echo.Context) error {
 //	@Failure		500		{object}	response.APIResponse
 //	@Router			/auth/webauthn/login/finish [post]
 func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
+	if !h.webauthnService.IsEnabled() {
+		return response.BadRequest(c, "err.webauthn_not_configured", nil)
+	}
 	var req struct {
 		Email string `json:"email"`
 	}
@@ -176,6 +188,9 @@ func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/settings/webauthn/credentials [get]
 func (h *WebAuthnHandler) ListCredentials(c echo.Context) error {
+	if !h.webauthnService.IsEnabled() {
+		return response.BadRequest(c, "err.webauthn_not_configured", nil)
+	}
 	userID := middleware.GetUserID(c)
 	if userID == "" {
 		return response.Unauthorized(c, "err.invalid_user")
@@ -203,6 +218,9 @@ func (h *WebAuthnHandler) ListCredentials(c echo.Context) error {
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/settings/webauthn/credentials/{id} [delete]
 func (h *WebAuthnHandler) DeleteCredential(c echo.Context) error {
+	if !h.webauthnService.IsEnabled() {
+		return response.BadRequest(c, "err.webauthn_not_configured", nil)
+	}
 	userID := middleware.GetUserID(c)
 	if userID == "" {
 		return response.Unauthorized(c, "err.invalid_user")
