@@ -230,6 +230,157 @@ func TestImportantDatesReportLunar(t *testing.T) {
 	}
 }
 
+func TestReportOverview(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "reports-overview@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Overview Vault"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact1, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Alice"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	contact2, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Bob"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	svc := NewReportService(db)
+
+	overview, err := svc.Overview(vault.ID)
+	if err != nil {
+		t.Fatalf("Overview failed: %v", err)
+	}
+	if overview.TotalContacts != 2 {
+		t.Errorf("Expected 2 contacts, got %d", overview.TotalContacts)
+	}
+	if overview.TotalAddresses != 0 {
+		t.Errorf("Expected 0 addresses, got %d", overview.TotalAddresses)
+	}
+	if overview.TotalImportantDates != 0 {
+		t.Errorf("Expected 0 important dates, got %d", overview.TotalImportantDates)
+	}
+	if overview.TotalMoodEntries != 0 {
+		t.Errorf("Expected 0 mood entries, got %d", overview.TotalMoodEntries)
+	}
+
+	country := "US"
+	city := "New York"
+	addr := &models.Address{VaultID: vault.ID, Country: &country, City: &city}
+	if err := db.Create(addr).Error; err != nil {
+		t.Fatalf("Create address failed: %v", err)
+	}
+
+	day := 25
+	month := 12
+	importantDate := &models.ContactImportantDate{
+		ContactID: contact1.ID,
+		Label:     "Birthday",
+		Day:       &day,
+		Month:     &month,
+	}
+	if err := db.Create(importantDate).Error; err != nil {
+		t.Fatalf("Create important date failed: %v", err)
+	}
+	importantDate2 := &models.ContactImportantDate{
+		ContactID: contact2.ID,
+		Label:     "Anniversary",
+		Day:       &day,
+		Month:     &month,
+	}
+	if err := db.Create(importantDate2).Error; err != nil {
+		t.Fatalf("Create important date 2 failed: %v", err)
+	}
+
+	var params []models.MoodTrackingParameter
+	if err := db.Where("vault_id = ?", vault.ID).Find(&params).Error; err != nil {
+		t.Fatalf("Find mood params failed: %v", err)
+	}
+	if len(params) > 0 {
+		event := &models.MoodTrackingEvent{
+			ContactID:               contact1.ID,
+			MoodTrackingParameterID: params[0].ID,
+			RatedAt:                 importantDate.CreatedAt,
+		}
+		if err := db.Create(event).Error; err != nil {
+			t.Fatalf("Create mood event failed: %v", err)
+		}
+	}
+
+	overview, err = svc.Overview(vault.ID)
+	if err != nil {
+		t.Fatalf("Overview failed: %v", err)
+	}
+	if overview.TotalContacts != 2 {
+		t.Errorf("Expected 2 contacts, got %d", overview.TotalContacts)
+	}
+	if overview.TotalAddresses != 1 {
+		t.Errorf("Expected 1 address, got %d", overview.TotalAddresses)
+	}
+	if overview.TotalImportantDates != 2 {
+		t.Errorf("Expected 2 important dates, got %d", overview.TotalImportantDates)
+	}
+	if len(params) > 0 && overview.TotalMoodEntries != 1 {
+		t.Errorf("Expected 1 mood entry, got %d", overview.TotalMoodEntries)
+	}
+}
+
+func TestReportOverviewEmpty(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "reports-overview-empty@example.com",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Empty Vault"})
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	svc := NewReportService(db)
+	overview, err := svc.Overview(vault.ID)
+	if err != nil {
+		t.Fatalf("Overview failed: %v", err)
+	}
+	if overview.TotalContacts != 0 {
+		t.Errorf("Expected 0 contacts, got %d", overview.TotalContacts)
+	}
+	if overview.TotalAddresses != 0 {
+		t.Errorf("Expected 0 addresses, got %d", overview.TotalAddresses)
+	}
+	if overview.TotalImportantDates != 0 {
+		t.Errorf("Expected 0 important dates, got %d", overview.TotalImportantDates)
+	}
+	if overview.TotalMoodEntries != 0 {
+		t.Errorf("Expected 0 mood entries, got %d", overview.TotalMoodEntries)
+	}
+}
+
 func TestMoodReport(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()

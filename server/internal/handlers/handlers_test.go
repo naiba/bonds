@@ -3199,3 +3199,57 @@ func TestAvatarUploadAndGet(t *testing.T) {
 		t.Errorf("expected body size 100 (uploaded file), got %d — avatar not returned!", len(bodyBytes))
 	}
 }
+
+func TestReportOverviewHandler(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "report-overview@example.com")
+	vault := ts.createTestVault(t, token, "Report Vault")
+	c1 := ts.createTestContact(t, token, vault.ID, "Alice")
+	ts.createTestContact(t, token, vault.ID, "Bob")
+
+	// Add address
+	rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+c1.ID+"/addresses",
+		`{"line_1":"123 Main St","city":"Springfield","country":"US","address_type_id":1}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create address: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Add important date
+	rec = ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+c1.ID+"/dates",
+		`{"label":"Birthday","day":15,"month":6,"year":1990}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create date: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Get overview
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/reports/overview", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("overview: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var overview struct {
+		TotalContacts       int `json:"total_contacts"`
+		TotalAddresses      int `json:"total_addresses"`
+		TotalImportantDates int `json:"total_important_dates"`
+		TotalMoodEntries    int `json:"total_mood_entries"`
+	}
+	if err := json.Unmarshal(resp.Data, &overview); err != nil {
+		t.Fatalf("failed to parse overview: %v", err)
+	}
+	if overview.TotalContacts != 2 {
+		t.Errorf("total_contacts: expected 2, got %d", overview.TotalContacts)
+	}
+	if overview.TotalAddresses != 1 {
+		t.Errorf("total_addresses: expected 1, got %d", overview.TotalAddresses)
+	}
+	if overview.TotalImportantDates < 1 {
+		t.Errorf("total_important_dates: expected >= 1, got %d", overview.TotalImportantDates)
+	}
+}

@@ -462,6 +462,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config) {
 	vaultScoped.GET("/calendar/years/:year/months/:month/days/:day", calendarHandler.GetDay)
 
 	vaultScoped.GET("/reports", reportHandler.Index)
+	vaultScoped.GET("/reports/overview", reportHandler.Overview)
 	vaultScoped.GET("/reports/addresses", reportHandler.Addresses)
 	vaultScoped.GET("/reports/addresses/city/:city", reportHandler.AddressesByCity)
 	vaultScoped.GET("/reports/addresses/country/:country", reportHandler.AddressesByCountry)

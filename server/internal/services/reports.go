@@ -88,6 +88,48 @@ func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDat
 	return result, nil
 }
 
+func (s *ReportService) Overview(vaultID string) (*dto.ReportOverviewResponse, error) {
+	var totalContacts int64
+	if err := s.db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&totalContacts).Error; err != nil {
+		return nil, err
+	}
+
+	var totalAddresses int64
+	if err := s.db.Model(&models.Address{}).Where("vault_id = ?", vaultID).Count(&totalAddresses).Error; err != nil {
+		return nil, err
+	}
+
+	var contactIDs []string
+	if err := s.db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Pluck("id", &contactIDs).Error; err != nil {
+		return nil, err
+	}
+
+	var totalDates int64
+	if len(contactIDs) > 0 {
+		if err := s.db.Model(&models.ContactImportantDate{}).Where("contact_id IN ?", contactIDs).Count(&totalDates).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	var totalMood int64
+	var paramIDs []uint
+	if err := s.db.Model(&models.MoodTrackingParameter{}).Where("vault_id = ?", vaultID).Pluck("id", &paramIDs).Error; err != nil {
+		return nil, err
+	}
+	if len(paramIDs) > 0 {
+		if err := s.db.Model(&models.MoodTrackingEvent{}).Where("mood_tracking_parameter_id IN ?", paramIDs).Count(&totalMood).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	return &dto.ReportOverviewResponse{
+		TotalContacts:       int(totalContacts),
+		TotalAddresses:      int(totalAddresses),
+		TotalImportantDates: int(totalDates),
+		TotalMoodEntries:    int(totalMood),
+	}, nil
+}
+
 func (s *ReportService) MoodReport(vaultID string) ([]dto.MoodReportItem, error) {
 	var params []models.MoodTrackingParameter
 	if err := s.db.Where("vault_id = ?", vaultID).Find(&params).Error; err != nil {

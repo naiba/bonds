@@ -26,3 +26,10 @@ type MoodReportItem struct {
 	HexColor       string `json:"hex_color" example:"#3B82F6"`
 	Count          int    `json:"count" example:"10"`
 }
+
+type ReportOverviewResponse struct {
+	TotalContacts       int `json:"total_contacts" example:"42"`
+	TotalAddresses      int `json:"total_addresses" example:"10"`
+	TotalImportantDates int `json:"total_important_dates" example:"15"`
+	TotalMoodEntries    int `json:"total_mood_entries" example:"8"`
+}

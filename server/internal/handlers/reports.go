@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
@@ -15,6 +15,26 @@ type ReportHandler struct {
 
 func NewReportHandler(reportService *services.ReportService) *ReportHandler {
 	return &ReportHandler{reportService: reportService}
+}
+
+// Overview godoc
+//
+//	@Summary		Get reports overview
+//	@Description	Return overview statistics for a vault
+//	@Tags			reports
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.ReportOverviewResponse}
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/reports/overview [get]
+func (h *ReportHandler) Overview(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	data, err := h.reportService.Overview(vaultID)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_get_report_overview")
+	}
+	return response.OK(c, data)
 }
 
 // Addresses godoc

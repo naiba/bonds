@@ -42,7 +42,7 @@ export default function VaultReports() {
   const { data: reportOverview } = useQuery({
     queryKey: ["vault", vaultId, "reports", "overview"],
     queryFn: async () => {
-      const res = await api.reports.reportsList(String(vaultId));
+      const res = await api.reports.reportsOverviewList(String(vaultId));
       return res.data;
     },
     enabled: !!vaultId,

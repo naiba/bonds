@@ -317,6 +317,7 @@ export type { GithubComNaibaBondsInternalDtoAddressReportItem as AddressReportIt
 export type { GithubComNaibaBondsInternalDtoImportantDateReportItem as ImportantDateReportItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoMoodReportItem as MoodReportItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoAddressContactItem as AddressContactItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoReportOverviewResponse as ReportOverviewResponse } from "./generated/data-contracts";
 
 // DAV Subscriptions
 export type { GithubComNaibaBondsInternalDtoDavSubscriptionResponse as DavSubscription } from "./generated/data-contracts";
