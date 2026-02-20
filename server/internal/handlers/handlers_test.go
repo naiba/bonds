@@ -3144,3 +3144,58 @@ func TestDavSubscription_Unauthorized(t *testing.T) {
 		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestAvatarUploadAndGet(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "avatar-test@example.com")
+	vault := ts.createTestVault(t, token, "Avatar Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "AvatarTest")
+
+	// 1) GET avatar before upload -> should return generated initials PNG
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/avatar", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET avatar before upload: expected 200, got %d", rec.Code)
+	}
+	contentType := rec.Header().Get("Content-Type")
+	t.Logf("Before upload Content-Type: %s, body size: %d", contentType, rec.Body.Len())
+
+	// 2) Upload avatar via PUT (multipart)
+	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	fakeImage := make([]byte, 100)
+	copy(fakeImage, pngHeader)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	mh := make(textproto.MIMEHeader)
+	mh.Set("Content-Disposition", `form-data; name="file"; filename="avatar.png"`)
+	mh.Set("Content-Type", "image/png")
+	part, err := mw.CreatePart(mh)
+	if err != nil {
+		t.Fatalf("create part: %v", err)
+	}
+	part.Write(fakeImage)
+	mw.Close()
+	avatarPath := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/avatar"
+	req := httptest.NewRequest(http.MethodPut, avatarPath, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	ts.e.ServeHTTP(rec, req)
+	t.Logf("Upload response: status=%d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT avatar: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// 3) GET avatar after upload -> should return the uploaded image
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/avatar", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET avatar after upload: expected 200, got %d", rec.Code)
+	}
+	contentType = rec.Header().Get("Content-Type")
+	t.Logf("After upload Content-Type: %s, body size: %d", contentType, rec.Body.Len())
+	bodyBytes := rec.Body.Bytes()
+	if len(bodyBytes) != 100 {
+		t.Errorf("expected body size 100 (uploaded file), got %d — avatar not returned!", len(bodyBytes))
+	}
+}

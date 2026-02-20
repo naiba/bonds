@@ -481,7 +481,7 @@ export default function ContactDetail() {
               }}
             >
               <AvatarImageLoader 
-                url={`/api/vaults/${vaultId}/contacts/${cId}/avatar?k=${avatarKey}`} 
+                url={`/vaults/${vaultId}/contacts/${cId}/avatar?k=${avatarKey}`} 
                 updatedAt={contact.updated_at ?? ""}
                 initials={initials}
                 token={token}
