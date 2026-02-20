@@ -190,31 +190,23 @@ test.describe('Bugfixes', () => {
     await goToContacts(page);
     await createContact(page, 'Avatar', 'Test');
 
-    // The avatar area should show initials "AT"
-    // The avatar is inside a circular div. Check that the contact header is visible
-    // and the initials or the avatar image loader is present.
-    const avatarArea = page.locator('div').filter({ hasText: /^AT$/ }).first();
-    await expect(avatarArea).toBeVisible({ timeout: 10000 });
+    // The avatar area renders either an <img> (backend generates initials PNG) or
+    // a <span> with text initials. Check for either one inside the circular container.
+    const avatarImg = page.locator('img[alt="Avatar"]').first();
+    const avatarInitials = page.locator('div').filter({ hasText: /^AT$/ }).first();
+    await expect(avatarImg.or(avatarInitials)).toBeVisible({ timeout: 10000 });
 
-    // Verify the avatar endpoint returns a 200 response
+    // Verify the avatar endpoint returns a 200 response via direct API call
     const contactUrl = page.url();
     const match = contactUrl.match(/\/vaults\/([^/]+)\/contacts\/([^/]+)/);
     expect(match).toBeTruthy();
     const [, vid, cid] = match!;
 
-    const avatarResp = await page.waitForResponse(
-      (resp) => resp.url().includes(`/api/vaults/${vid}/contacts/${cid}/avatar`) && resp.status() === 200,
-      { timeout: 15000 }
-    ).catch(() => null);
-
-    // If we didn't catch the response in time, make a direct request
-    if (!avatarResp) {
-      // Navigate to contact detail again to trigger avatar load
-      await page.reload();
-      await page.waitForLoadState('networkidle');
-      // Just verify avatar area still visible after reload
-      await expect(page.locator('div').filter({ hasText: /^AT$/ }).first()).toBeVisible({ timeout: 10000 });
-    }
+    const token = await page.evaluate(() => localStorage.getItem('token'));
+    const resp = await page.request.get(`http://localhost:8080/api/vaults/${vid}/contacts/${cid}/avatar`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(resp.status()).toBe(200);
   });
 
   // Test 5: #12 — Contact groups module in contact detail
