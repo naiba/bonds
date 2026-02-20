@@ -84,10 +84,20 @@ test.describe('Admin Features', () => {
     await page.goto('/admin/settings');
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('System Settings')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('GitHub OAuth Key')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('OIDC Client ID')).toBeVisible({ timeout: 5000 });
+
+    // "Application" and "Authentication" panels are expanded by default
     await expect(page.getByText('Password Authentication')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('User Registration')).toBeVisible({ timeout: 5000 });
+
+    // Verify collapsed panel headers are visible
+    await expect(page.getByText('OAuth / OIDC')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('SMTP Email')).toBeVisible({ timeout: 5000 });
+
+    // Expand OAuth panel and verify fields inside
+    await page.getByText('OAuth / OIDC').click();
+    await expect(page.getByText('GitHub OAuth Key')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('OIDC Client ID')).toBeVisible({ timeout: 5000 });
+
     await expect(page.getByRole('button', { name: 'Save Settings' })).toBeVisible({ timeout: 5000 });
   });
 });
