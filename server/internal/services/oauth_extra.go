@@ -41,8 +41,8 @@ func (s *OAuthService) ListAvailableProviders() []map[string]string {
 		entry := map[string]string{
 			"name": p.Name(),
 		}
-		if p.Name() == "openid-connect" && s.oidcName != "" {
-			entry["display_name"] = s.oidcName
+		if p.Name() == "openid-connect" && s.getOIDCName() != "" {
+			entry["display_name"] = s.getOIDCName()
 		}
 		result = append(result, entry)
 	}

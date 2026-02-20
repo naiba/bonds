@@ -57,6 +57,39 @@ func (m *SMTPMailer) Close() {
 	m.pool.Close()
 }
 
+// DynamicMailer reads SMTP config from SystemSettingService on each Send().
+type DynamicMailer struct {
+	settings *SystemSettingService
+}
+
+func NewDynamicMailer(settings *SystemSettingService) Mailer {
+	return &DynamicMailer{settings: settings}
+}
+
+func (m *DynamicMailer) Send(to, subject, htmlBody string) error {
+	host := m.settings.GetWithDefault("smtp.host", "")
+	if host == "" {
+		return ErrMailerNotConfigured
+	}
+	port := m.settings.GetWithDefault("smtp.port", "587")
+	username := m.settings.GetWithDefault("smtp.username", "")
+	password := m.settings.GetWithDefault("smtp.password", "")
+	from := m.settings.GetWithDefault("smtp.from", "")
+
+	addr := fmt.Sprintf("%s:%s", host, port)
+	auth := smtp.PlainAuth("", username, password, host)
+
+	e := email.NewEmail()
+	e.From = from
+	e.To = []string{to}
+	e.Subject = subject
+	e.HTML = []byte(htmlBody)
+
+	return e.Send(addr, auth)
+}
+
+func (m *DynamicMailer) Close() {}
+
 type NoopMailer struct{}
 
 func (m *NoopMailer) Send(to, subject, _ string) error {

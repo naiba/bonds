@@ -19,10 +19,29 @@ type OAuthService struct {
 	jwt      *config.JWTConfig
 	appURL   string
 	oidcName string
+	settings *SystemSettingService
 }
 
 func NewOAuthService(db *gorm.DB, jwt *config.JWTConfig, appURL string, oidcName string) *OAuthService {
 	return &OAuthService{db: db, jwt: jwt, appURL: appURL, oidcName: oidcName}
+}
+
+func (s *OAuthService) SetSystemSettings(settings *SystemSettingService) {
+	s.settings = settings
+}
+
+func (s *OAuthService) getAppURL() string {
+	if s.settings != nil {
+		return s.settings.GetWithDefault("app.url", s.appURL)
+	}
+	return s.appURL
+}
+
+func (s *OAuthService) getOIDCName() string {
+	if s.settings != nil {
+		return s.settings.GetWithDefault("oidc_name", s.oidcName)
+	}
+	return s.oidcName
 }
 
 // FindOrCreateUser looks up a user by OAuth provider+providerUserID.
