@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme, Dropdown, Modal, Form, Input, Popconfirm, App, List, Avatar } from "antd";
-import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, UserOutlined } from "@ant-design/icons";
+import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, UserOutlined, CloudServerOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
@@ -90,6 +90,12 @@ export default function VaultDetail() {
         });
         setEditModalOpen(true);
       },
+    },
+    {
+      key: "dav-sync",
+      icon: <CloudServerOutlined />,
+      label: t("vault.dav_subscriptions.title"),
+      onClick: () => navigate(`/vaults/${vaultId}/dav-subscriptions`),
     },
     {
       key: "delete",

@@ -64,6 +64,7 @@ import { Users } from "./generated/Users";
 import { Vaults } from "./generated/Vaults";
 import { VaultSettings } from "./generated/VaultSettings";
 import { VaultTasks } from "./generated/VaultTasks";
+import { DavSubscriptions } from "./generated/DavSubscriptions";
 import { Vcard } from "./generated/Vcard";
 import { Webauthn } from "./generated/Webauthn";
 
@@ -170,6 +171,7 @@ export const api = {
   contactPhotos: new ContactPhotos(httpClient),
   contacts: new Contacts(httpClient),
   currencies: new Currencies(httpClient),
+  davSubscriptions: new DavSubscriptions(httpClient),
   feed: new Feed(httpClient),
   files: new Files(httpClient),
   goals: new Goals(httpClient),
@@ -315,6 +317,14 @@ export type { GithubComNaibaBondsInternalDtoAddressReportItem as AddressReportIt
 export type { GithubComNaibaBondsInternalDtoImportantDateReportItem as ImportantDateReportItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoMoodReportItem as MoodReportItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoAddressContactItem as AddressContactItem } from "./generated/data-contracts";
+
+// DAV Subscriptions
+export type { GithubComNaibaBondsInternalDtoDavSubscriptionResponse as DavSubscription } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoDavSyncLogResponse as DavSyncLog } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCreateDavSubscriptionRequest as CreateDavSubscriptionRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoUpdateDavSubscriptionRequest as UpdateDavSubscriptionRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoTestDavConnectionRequest as TestDavConnectionRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoTestDavConnectionResponse as TestDavConnectionResponse } from "./generated/data-contracts";
 
 // OAuthProvider — not in generated types (backend returns raw goth data)
 export interface OAuthProvider {

@@ -26,6 +26,9 @@ const VaultFeed = lazy(() => import("@/pages/vault/VaultFeed"));
 const VaultSettings = lazy(() => import("@/pages/vault/VaultSettings"));
 const VaultCompanies = lazy(() => import("@/pages/vault/VaultCompanies"));
 const VaultReminders = lazy(() => import("@/pages/vault/VaultReminders"));
+const DavSubscriptions = lazy(
+  () => import("@/pages/vault/DavSubscriptions")
+);
 const VaultLifeMetrics = lazy(
   () => import("@/pages/vault/VaultLifeMetrics")
 );
@@ -148,6 +151,10 @@ export default function App() {
             <Route
               path="/vaults/:id/life-metrics"
               element={<VaultLifeMetrics />}
+            />
+            <Route
+              path="/vaults/:id/dav-subscriptions"
+              element={<DavSubscriptions />}
             />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/preferences" element={<Preferences />} />

@@ -2828,3 +2828,319 @@ func TestContactTabs_ContactNotFound(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+type davSubscriptionData struct {
+	ID                 string  `json:"id"`
+	VaultID            string  `json:"vault_id"`
+	URI                string  `json:"uri"`
+	Username           string  `json:"username"`
+	Active             bool    `json:"active"`
+	SyncWay            uint8   `json:"sync_way"`
+	Frequency          int     `json:"frequency"`
+	LastSynchronizedAt *string `json:"last_synchronized_at"`
+}
+
+func (ts *testServer) createTestDavSubscription(t *testing.T, token, vaultID string) davSubscriptionData {
+	t.Helper()
+	body := `{"uri":"https://dav.example.com/contacts/","username":"testuser","password":"testpass","sync_way":2,"frequency":180}`
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vaultID),
+		body, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create dav subscription failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data davSubscriptionData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse dav subscription data: %v", err)
+	}
+	return data
+}
+
+func TestDavSubscription_Create_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-create@test.com")
+	vault := ts.createTestVault(t, token, "DAV Create Vault")
+
+	body := `{"uri":"https://dav.example.com/contacts/","username":"testuser","password":"testpass","sync_way":2,"frequency":180}`
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vault.ID),
+		body, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var sub davSubscriptionData
+	if err := json.Unmarshal(resp.Data, &sub); err != nil {
+		t.Fatalf("failed to parse subscription: %v", err)
+	}
+	if sub.ID == "" {
+		t.Error("expected non-empty subscription ID")
+	}
+	if sub.VaultID != vault.ID {
+		t.Errorf("expected vault_id=%s, got %s", vault.ID, sub.VaultID)
+	}
+	if sub.URI != "https://dav.example.com/contacts/" {
+		t.Errorf("expected uri=https://dav.example.com/contacts/, got %s", sub.URI)
+	}
+	if sub.Username != "testuser" {
+		t.Errorf("expected username=testuser, got %s", sub.Username)
+	}
+	if sub.SyncWay != 2 {
+		t.Errorf("expected sync_way=2, got %d", sub.SyncWay)
+	}
+	if sub.Frequency != 180 {
+		t.Errorf("expected frequency=180, got %d", sub.Frequency)
+	}
+	if !sub.Active {
+		t.Error("expected active=true")
+	}
+}
+
+func TestDavSubscription_Create_MissingFields(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-create-bad@test.com")
+	vault := ts.createTestVault(t, token, "DAV Create Bad Vault")
+
+	body := `{"uri":"https://dav.example.com/contacts/"}`
+	rec := ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vault.ID),
+		body, token)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+}
+
+func TestDavSubscription_List_Empty(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-list-empty@test.com")
+	vault := ts.createTestVault(t, token, "DAV List Empty Vault")
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vault.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var subs []davSubscriptionData
+	if err := json.Unmarshal(resp.Data, &subs); err != nil {
+		t.Fatalf("failed to parse subscriptions: %v", err)
+	}
+	if len(subs) != 0 {
+		t.Errorf("expected 0 subscriptions, got %d", len(subs))
+	}
+}
+
+func TestDavSubscription_List_WithData(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-list-data@test.com")
+	vault := ts.createTestVault(t, token, "DAV List Data Vault")
+
+	ts.createTestDavSubscription(t, token, vault.ID)
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vault.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	var subs []davSubscriptionData
+	if err := json.Unmarshal(resp.Data, &subs); err != nil {
+		t.Fatalf("failed to parse subscriptions: %v", err)
+	}
+	if len(subs) != 1 {
+		t.Fatalf("expected 1 subscription, got %d", len(subs))
+	}
+	if subs[0].URI != "https://dav.example.com/contacts/" {
+		t.Errorf("expected uri=https://dav.example.com/contacts/, got %s", subs[0].URI)
+	}
+}
+
+func TestDavSubscription_Get_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-get@test.com")
+	vault := ts.createTestVault(t, token, "DAV Get Vault")
+
+	created := ts.createTestDavSubscription(t, token, vault.ID)
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, created.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var sub davSubscriptionData
+	if err := json.Unmarshal(resp.Data, &sub); err != nil {
+		t.Fatalf("failed to parse subscription: %v", err)
+	}
+	if sub.ID != created.ID {
+		t.Errorf("expected id=%s, got %s", created.ID, sub.ID)
+	}
+	if sub.Username != "testuser" {
+		t.Errorf("expected username=testuser, got %s", sub.Username)
+	}
+}
+
+func TestDavSubscription_Get_NotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-get404@test.com")
+	vault := ts.createTestVault(t, token, "DAV Get404 Vault")
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, "nonexistent-id"),
+		"", token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDavSubscription_Update_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-update@test.com")
+	vault := ts.createTestVault(t, token, "DAV Update Vault")
+
+	created := ts.createTestDavSubscription(t, token, vault.ID)
+
+	body := `{"uri":"https://dav2.example.com/contacts/","username":"newuser","sync_way":3,"frequency":60}`
+	rec := ts.doRequest(http.MethodPut,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, created.ID),
+		body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var sub davSubscriptionData
+	if err := json.Unmarshal(resp.Data, &sub); err != nil {
+		t.Fatalf("failed to parse subscription: %v", err)
+	}
+	if sub.URI != "https://dav2.example.com/contacts/" {
+		t.Errorf("expected uri=https://dav2.example.com/contacts/, got %s", sub.URI)
+	}
+	if sub.Username != "newuser" {
+		t.Errorf("expected username=newuser, got %s", sub.Username)
+	}
+	if sub.SyncWay != 3 {
+		t.Errorf("expected sync_way=3, got %d", sub.SyncWay)
+	}
+	if sub.Frequency != 60 {
+		t.Errorf("expected frequency=60, got %d", sub.Frequency)
+	}
+}
+
+func TestDavSubscription_Delete_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-delete@test.com")
+	vault := ts.createTestVault(t, token, "DAV Delete Vault")
+
+	created := ts.createTestDavSubscription(t, token, vault.ID)
+
+	rec := ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, created.ID),
+		"", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, created.ID),
+		"", token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 after delete, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDavSubscription_Delete_NotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-delete404@test.com")
+	vault := ts.createTestVault(t, token, "DAV Delete404 Vault")
+
+	rec := ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, "nonexistent-id"),
+		"", token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDavSubscription_GetLogs_Empty(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-logs@test.com")
+	vault := ts.createTestVault(t, token, "DAV Logs Vault")
+
+	created := ts.createTestDavSubscription(t, token, vault.ID)
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s/logs", vault.ID, created.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var logs []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &logs); err != nil {
+		t.Fatalf("failed to parse logs: %v", err)
+	}
+	if len(logs) != 0 {
+		t.Errorf("expected 0 logs, got %d", len(logs))
+	}
+	if resp.Meta == nil {
+		t.Fatal("expected meta in response")
+	}
+	if resp.Meta.Total != 0 {
+		t.Errorf("expected total=0, got %d", resp.Meta.Total)
+	}
+}
+
+func TestDavSubscription_Unauthorized(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dav-unauth@test.com")
+	vault := ts.createTestVault(t, token, "DAV Unauth Vault")
+
+	rec := ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vault.ID),
+		"", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vault.ID),
+		`{"uri":"https://dav.example.com/","username":"u","password":"p"}`, "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
