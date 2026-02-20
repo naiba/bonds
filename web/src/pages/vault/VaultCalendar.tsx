@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -44,6 +44,7 @@ export default function VaultCalendar() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [panelDate, setPanelDate] = useState<Dayjs>(dayjs());
   const [calendarMode, setCalendarMode] = useState<"month" | "year">("month");
+  const panelChangingRef = useRef(false);
 
   const panelYear = panelDate.year();
   const panelMonth = panelDate.month() + 1;
@@ -191,8 +192,20 @@ export default function VaultCalendar() {
       >
         <Calendar
           cellRender={(date, info) => cellRender(date as Dayjs, info as { type: "date" | "month" })}
-          onSelect={(date) => setSelectedDate((date as Dayjs).format("YYYY-MM-DD"))}
-          onPanelChange={(date, mode) => { setPanelDate(date as Dayjs); setCalendarMode(mode); }}
+          onSelect={(date) => {
+            if (panelChangingRef.current) {
+              panelChangingRef.current = false;
+              return;
+            }
+            if (calendarMode === "month") {
+              setSelectedDate((date as Dayjs).format("YYYY-MM-DD"));
+            }
+          }}
+          onPanelChange={(date, mode) => {
+            panelChangingRef.current = true;
+            setPanelDate(date as Dayjs);
+            setCalendarMode(mode);
+          }}
         />
       </Card>
 
