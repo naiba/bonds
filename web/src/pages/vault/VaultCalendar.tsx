@@ -43,17 +43,33 @@ export default function VaultCalendar() {
   const { token } = theme.useToken();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [panelDate, setPanelDate] = useState<Dayjs>(dayjs());
+  const [calendarMode, setCalendarMode] = useState<"month" | "year">("month");
 
   const panelYear = panelDate.year();
   const panelMonth = panelDate.month() + 1;
+
+  type MonthPayload = { important_dates?: CalendarDateItem[]; reminders?: CalendarReminderItem[] } | undefined;
 
   const { data: monthData } = useQuery({
     queryKey: ["vaults", vaultId, "calendar", "month", panelYear, panelMonth],
     queryFn: async () => {
       const res = await api.calendar.calendarYearsMonthsDetail(String(vaultId), panelYear, panelMonth);
-      return res.data as { important_dates?: CalendarDateItem[]; reminders?: CalendarReminderItem[] } | undefined;
+      return res.data as MonthPayload;
     },
-    enabled: !!vaultId,
+    enabled: !!vaultId && calendarMode === "month",
+  });
+
+  const { data: yearData } = useQuery({
+    queryKey: ["vaults", vaultId, "calendar", "year", panelYear],
+    queryFn: async () => {
+      const results = await Promise.all(
+        Array.from({ length: 12 }, (_, i) =>
+          api.calendar.calendarYearsMonthsDetail(String(vaultId), panelYear, i + 1)
+        )
+      );
+      return results.map(r => r.data as MonthPayload);
+    },
+    enabled: !!vaultId && calendarMode === "year",
   });
 
   const { data: dayDetail } = useQuery({
@@ -73,23 +89,33 @@ export default function VaultCalendar() {
 
   const itemsByDate = useMemo(() => {
     const map = new Map<string, CalendarItem[]>();
-    const dates = monthData?.important_dates ?? [];
-    const reminders = monthData?.reminders ?? [];
 
-    for (const d of dates) {
-      const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
-      if (!key) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ type: "date", label: d.label ?? '', contactName: d.contact_name ?? '', contactId: d.contact_id ?? '', dateStr: key, calendarType: d.calendar_type });
-    }
-    for (const r of reminders) {
-      const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
-      if (!key) continue;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ type: "reminder", label: r.label ?? '', contactName: r.contact_name ?? '', contactId: r.contact_id ?? '', dateStr: key, calendarType: r.calendar_type });
+    const sources: MonthPayload[] =
+      calendarMode === "year" && yearData
+        ? yearData
+        : monthData
+          ? [monthData]
+          : [];
+
+    for (const src of sources) {
+      const dates = src?.important_dates ?? [];
+      const reminders = src?.reminders ?? [];
+
+      for (const d of dates) {
+        const key = toDateKey(d.year ?? null, d.month ?? null, d.day ?? null);
+        if (!key) continue;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push({ type: "date", label: d.label ?? '', contactName: d.contact_name ?? '', contactId: d.contact_id ?? '', dateStr: key, calendarType: d.calendar_type });
+      }
+      for (const r of reminders) {
+        const key = toDateKey(r.year ?? null, r.month ?? null, r.day ?? null);
+        if (!key) continue;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push({ type: "reminder", label: r.label ?? '', contactName: r.contact_name ?? '', contactId: r.contact_id ?? '', dateStr: key, calendarType: r.calendar_type });
+      }
     }
     return map;
-  }, [monthData]);
+  }, [calendarMode, monthData, yearData]);
 
   function cellRender(date: Dayjs) {
     const key = date.format("YYYY-MM-DD");
@@ -139,7 +165,7 @@ export default function VaultCalendar() {
         <Calendar
           cellRender={(date) => cellRender(date as Dayjs)}
           onSelect={(date) => setSelectedDate((date as Dayjs).format("YYYY-MM-DD"))}
-          onPanelChange={(date) => setPanelDate(date as Dayjs)}
+          onPanelChange={(date, mode) => { setPanelDate(date as Dayjs); setCalendarMode(mode); }}
         />
       </Card>
 
