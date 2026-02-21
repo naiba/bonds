@@ -44,7 +44,7 @@ export default function VaultCalendar() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [panelDate, setPanelDate] = useState<Dayjs>(dayjs());
   const [calendarMode, setCalendarMode] = useState<"month" | "year">("month");
-  const panelChangingRef = useRef(false);
+  const panelChangingRef = useRef(0);
 
   const panelYear = panelDate.year();
   const panelMonth = panelDate.month() + 1;
@@ -193,8 +193,7 @@ export default function VaultCalendar() {
         <Calendar
           cellRender={(date, info) => cellRender(date as Dayjs, info as { type: "date" | "month" })}
           onSelect={(date) => {
-            if (panelChangingRef.current) {
-              panelChangingRef.current = false;
+            if (Date.now() - panelChangingRef.current < 300) {
               return;
             }
             if (calendarMode === "month") {
@@ -202,7 +201,7 @@ export default function VaultCalendar() {
             }
           }}
           onPanelChange={(date, mode) => {
-            panelChangingRef.current = true;
+            panelChangingRef.current = Date.now();
             setPanelDate(date as Dayjs);
             setCalendarMode(mode);
           }}
