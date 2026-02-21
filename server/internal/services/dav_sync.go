@@ -6,11 +6,12 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/emersion/go-vcard"
-	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/carddav"
+	"github.com/icholy/digest"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/pkg/response"
@@ -41,9 +42,56 @@ type CardDAVClientFactory interface {
 type DefaultCardDAVClientFactory struct{}
 
 func (f *DefaultCardDAVClientFactory) NewClient(uri, username, password string) (CardDAVClient, error) {
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	authClient := webdav.HTTPClientWithBasicAuth(httpClient, username, password)
-	return carddav.NewClient(authClient, uri)
+	httpClient := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &fallbackAuthTransport{
+			username: username,
+			password: password,
+		},
+	}
+	return carddav.NewClient(httpClient, uri)
+}
+
+type fallbackAuthTransport struct {
+	username   string
+	password   string
+	useDigest  bool
+	digestOnce sync.Once
+	digestT    *digest.Transport
+}
+
+func (t *fallbackAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.useDigest {
+		return t.getDigestTransport().RoundTrip(req)
+	}
+
+	req.SetBasicAuth(t.username, t.password)
+	resp, err := http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		wwwAuth := resp.Header.Get("Www-Authenticate")
+		if _, parseErr := digest.ParseChallenge(wwwAuth); parseErr == nil {
+			resp.Body.Close()
+			t.useDigest = true
+			newReq := req.Clone(req.Context())
+			newReq.Header.Del("Authorization")
+			return t.getDigestTransport().RoundTrip(newReq)
+		}
+	}
+	return resp, nil
+}
+
+func (t *fallbackAuthTransport) getDigestTransport() *digest.Transport {
+	t.digestOnce.Do(func() {
+		t.digestT = &digest.Transport{
+			Username: t.username,
+			Password: t.password,
+		}
+	})
+	return t.digestT
 }
 
 type DavSyncService struct {
