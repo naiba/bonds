@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
@@ -88,4 +88,112 @@ func (h *CompanyHandler) Get(c echo.Context) error {
 		return response.InternalError(c, "err.failed_to_get_company")
 	}
 	return response.OK(c, company)
+}
+
+// Create godoc
+//
+//	@Summary		Create a company
+//	@Description	Create a new company in a vault
+//	@Tags			companies
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			request		body		dto.CreateCompanyRequest		true	"Company details"
+//	@Success		201			{object}	response.APIResponse{data=dto.CompanyResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/companies [post]
+func (h *CompanyHandler) Create(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+
+	var req dto.CreateCompanyRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+
+	company, err := h.companyService.Create(vaultID, req)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_create_company")
+	}
+	return response.Created(c, company)
+}
+
+// Update godoc
+//
+//	@Summary		Update a company
+//	@Description	Update an existing company
+//	@Tags			companies
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			id			path		integer						true	"Company ID"
+//	@Param			request		body		dto.UpdateCompanyRequest		true	"Company details"
+//	@Success		200			{object}	response.APIResponse{data=dto.CompanyResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/companies/{id} [put]
+func (h *CompanyHandler) Update(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_company_id", nil)
+	}
+
+	var req dto.UpdateCompanyRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+
+	company, err := h.companyService.Update(uint(id), vaultID, req)
+	if err != nil {
+		if errors.Is(err, services.ErrCompanyNotFound) {
+			return response.NotFound(c, "err.company_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_update_company")
+	}
+	return response.OK(c, company)
+}
+
+// Delete godoc
+//
+//	@Summary		Delete a company
+//	@Description	Permanently delete a company and unlink associated contacts
+//	@Tags			companies
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Company ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/companies/{id} [delete]
+func (h *CompanyHandler) Delete(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_company_id", nil)
+	}
+
+	if err := h.companyService.Delete(uint(id), vaultID); err != nil {
+		if errors.Is(err, services.ErrCompanyNotFound) {
+			return response.NotFound(c, "err.company_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_delete_company")
+	}
+	return response.NoContent(c)
 }

@@ -2,6 +2,16 @@ package dto
 
 import "time"
 
+type CreateCompanyRequest struct {
+	Name string `json:"name" validate:"required" example:"Acme Corporation"`
+	Type string `json:"type" example:"employer"`
+}
+
+type UpdateCompanyRequest struct {
+	Name string `json:"name" validate:"required" example:"Acme Corporation"`
+	Type string `json:"type" example:"employer"`
+}
+
 type CompanyResponse struct {
 	ID        uint                  `json:"id" example:"1"`
 	VaultID   string                `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`

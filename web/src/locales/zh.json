@@ -301,9 +301,11 @@
       "create": "添加公司",
       "edit": "编辑公司",
       "name": "公司名称",
+      "type": "类型",
       "employees": "员工",
       "detail": "公司详情",
-      "no_employees": "暂无员工"
+      "no_employees": "暂无员工",
+      "delete_confirm": "确定要删除此公司吗？关联的联系人将被取消关联。"
     },
     "lifeMetrics": {
       "title": "生活指标",

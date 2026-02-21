@@ -477,7 +477,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.DELETE("/files/:id", vaultFileHandler.Delete, requireEditor)
 
 	vaultScoped.GET("/companies", companyHandler.List)
+	vaultScoped.POST("/companies", companyHandler.Create, requireEditor)
 	vaultScoped.GET("/companies/:id", companyHandler.Get)
+	vaultScoped.PUT("/companies/:id", companyHandler.Update, requireEditor)
+	vaultScoped.DELETE("/companies/:id", companyHandler.Delete, requireEditor)
 
 	vaultScoped.GET("/files/photos", vaultFileHandler.ListPhotos)
 	vaultScoped.GET("/files/documents", vaultFileHandler.ListDocuments)

@@ -301,9 +301,11 @@
       "create": "Add Company",
       "edit": "Edit Company",
       "name": "Company Name",
+      "type": "Type",
       "employees": "Employees",
       "detail": "Company Details",
-      "no_employees": "No employees found"
+      "no_employees": "No employees found",
+      "delete_confirm": "Are you sure you want to delete this company? Associated contacts will be unlinked."
     },
     "lifeMetrics": {
       "title": "Life Metrics",

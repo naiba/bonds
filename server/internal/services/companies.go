@@ -42,6 +42,54 @@ func (s *CompanyService) Get(id uint) (*dto.CompanyResponse, error) {
 	return &resp, nil
 }
 
+func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*dto.CompanyResponse, error) {
+	company := models.Company{
+		VaultID: vaultID,
+		Name:    req.Name,
+		Type:    strPtrOrNil(req.Type),
+	}
+	if err := s.db.Create(&company).Error; err != nil {
+		return nil, err
+	}
+	resp := toCompanyResponse(&company)
+	return &resp, nil
+}
+
+func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
+	var company models.Company
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrCompanyNotFound
+		}
+		return nil, err
+	}
+	company.Name = req.Name
+	company.Type = strPtrOrNil(req.Type)
+	if err := s.db.Save(&company).Error; err != nil {
+		return nil, err
+	}
+	resp := toCompanyResponse(&company)
+	return &resp, nil
+}
+
+func (s *CompanyService) Delete(id uint, vaultID string) error {
+	var company models.Company
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrCompanyNotFound
+		}
+		return err
+	}
+	// Null out CompanyID on associated contacts
+	if err := s.db.Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
+		return err
+	}
+	if err := s.db.Delete(&company).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 func toCompanyResponse(c *models.Company) dto.CompanyResponse {
 	return dto.CompanyResponse{
 		ID:        c.ID,

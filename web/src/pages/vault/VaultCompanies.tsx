@@ -1,20 +1,28 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Typography,
   Button,
   Table,
+  Space,
+  Modal,
+  Form,
+  Input,
+  message,
   theme,
   Tag,
   Drawer,
   Descriptions,
   List,
-  Empty
+  Empty,
 } from "antd";
 import {
   BankOutlined,
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
@@ -28,7 +36,11 @@ export default function VaultCompanies() {
   const vaultId = id!;
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { token } = theme.useToken();
+  const [form] = Form.useForm();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
 
   const { data: companies = [], isLoading } = useQuery({
@@ -56,6 +68,55 @@ export default function VaultCompanies() {
 
   const employees = companyDetails?.contacts ?? selectedCompany?.contacts ?? [];
 
+  const createMutation = useMutation({
+    mutationFn: (values: { name: string; type: string }) =>
+      api.companies.companiesCreate(String(vaultId), values),
+    onSuccess: () => {
+      message.success(t("common.saved"));
+      setIsModalOpen(false);
+      form.resetFields();
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "companies"] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (values: { id: number; name: string; type: string }) =>
+      api.companies.companiesUpdate(String(vaultId), values.id, { name: values.name, type: values.type }),
+    onSuccess: () => {
+      message.success(t("common.saved"));
+      setIsModalOpen(false);
+      setEditingCompany(null);
+      form.resetFields();
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "companies"] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (companyId: number) => api.companies.companiesDelete(String(vaultId), companyId),
+    onSuccess: () => {
+      message.success(t("common.deleted"));
+      setSelectedCompany(null);
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "companies"] });
+    },
+  });
+
+  const handleEdit = (company: Company) => {
+    setEditingCompany(company);
+    form.setFieldsValue({ name: company.name, type: company.type });
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = (companyId: number) => {
+    Modal.confirm({
+      title: t("common.confirmDelete"),
+      content: t("vault.companies.delete_confirm"),
+      okText: t("common.delete"),
+      cancelText: t("common.cancel"),
+      okType: "danger",
+      onOk: () => deleteMutation.mutate(companyId),
+    });
+  };
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
@@ -69,6 +130,17 @@ export default function VaultCompanies() {
           <BankOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
           <Title level={4} style={{ margin: 0 }}>{t("vault.companies.title")}</Title>
         </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setEditingCompany(null);
+            form.resetFields();
+            setIsModalOpen(true);
+          }}
+        >
+          {t("vault.companies.create")}
+        </Button>
       </div>
 
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -87,6 +159,11 @@ export default function VaultCompanies() {
             dataIndex: "name",
             key: "name",
             render: (text) => <Text strong>{text}</Text>,
+          },
+          {
+            title: t("vault.companies.type"),
+            dataIndex: "type",
+            key: "type",
           },
           {
             title: t("vault.companies.employees"),
@@ -112,8 +189,70 @@ export default function VaultCompanies() {
               </div>
             ),
           },
+          {
+            title: t("common.actions"),
+            key: "actions",
+            width: 120,
+            render: (_, record) => (
+              <Space>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(record);
+                  }}
+                />
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(record.id);
+                  }}
+                />
+              </Space>
+            ),
+          },
         ]}
       />
+
+      <Modal
+        title={editingCompany ? t("vault.companies.edit") : t("vault.companies.create")}
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        onOk={() => form.submit()}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={(values) => {
+            if (editingCompany) {
+              updateMutation.mutate({ id: editingCompany.id!, name: values.name, type: values.type ?? "" });
+            } else {
+              createMutation.mutate({ name: values.name, type: values.type ?? "" });
+            }
+          }}
+        >
+          <Form.Item
+            name="name"
+            label={t("vault.companies.name")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="type"
+            label={t("vault.companies.type")}
+          >
+            <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Drawer
         title={companyDetails?.name || selectedCompany?.name}
@@ -127,6 +266,9 @@ export default function VaultCompanies() {
             <Descriptions column={1} bordered>
                 <Descriptions.Item label={t("vault.companies.name")}>
                 {companyDetails?.name || selectedCompany.name}
+                </Descriptions.Item>
+                <Descriptions.Item label={t("vault.companies.type")}>
+                {companyDetails?.type || selectedCompany.type || "—"}
                 </Descriptions.Item>
             </Descriptions>
 
