@@ -76,6 +76,10 @@ export JWT_SECRET=your-secret-key-here
 
 ## First Steps After Login
 
+::: tip First User = Instance Admin
+The **first user** to register on a new Bonds instance is automatically granted **instance admin** privileges. This user can access the admin panel to manage system settings, other users, and backups. Additional admins can be promoted from the admin panel.
+:::
+
 1. **Create a Vault** — Vaults are isolated containers for your contacts. You might create one for "Family", another for "Work".
 2. **Add Contacts** — Create contacts inside a vault. Add their details, photos, notes.
 3. **Set Up Reminders** — Never forget a birthday or important date. Configure email or Telegram notifications.

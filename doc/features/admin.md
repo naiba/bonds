@@ -2,6 +2,10 @@
 
 Bonds includes an admin panel for system-wide configuration and user management.
 
+## Becoming an Admin
+
+The **first user** to register on a new Bonds instance is automatically granted instance admin privileges. After that, existing admins can promote other users from the **User Management** page in the admin panel.
+
 ## Admin Panel
 
 Users with admin privileges can access the admin panel to configure:
