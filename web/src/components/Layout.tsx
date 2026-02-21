@@ -32,6 +32,8 @@ import {
   RightOutlined,
   CrownOutlined,
   CloudServerOutlined,
+  LinkOutlined,
+  HeartOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/stores/auth";
@@ -76,6 +78,8 @@ export default function Layout() {
         { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
         { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
         { key: `/vaults/${vaultId}/feed`, icon: <UnorderedListOutlined />, label: t("nav.feed") },
+        { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
+        { key: `/vaults/${vaultId}/life-metrics`, icon: <HeartOutlined />, label: t("nav.lifeMetrics") },
         { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
       ]
     : [];
@@ -93,6 +97,9 @@ export default function Layout() {
     { key: "/settings/users", icon: <UserSwitchOutlined />, label: t("nav.users") },
     { key: "/settings/2fa", icon: <LockOutlined />, label: t("nav.twoFactor") },
     { key: "/settings/invitations", icon: <MailOutlined />, label: t("nav.invitations") },
+    { key: "/settings/webauthn", icon: <LockOutlined />, label: t("nav.webauthn") },
+    { key: "/settings/oauth", icon: <LinkOutlined />, label: t("nav.oauth") },
+    { key: "/settings/storage", icon: <CloudServerOutlined />, label: t("nav.storage") },
     ...(user?.is_instance_administrator
       ? [
           { type: "divider" as const },

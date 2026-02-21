@@ -1,5 +1,5 @@
 import { Card, Typography, Button, App, Spin, Form, Input, Select, Collapse, InputNumber, Segmented } from "antd";
-import { SettingOutlined, TeamOutlined } from "@ant-design/icons";
+import { SettingOutlined, TeamOutlined, DatabaseOutlined, KeyOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -36,23 +36,10 @@ const KNOWN_SETTINGS: SettingDef[] = [
   { key: "smtp.password", type: "password", section: "smtp" },
   { key: "smtp.from", section: "smtp" },
 
-  // OAuth / OIDC
-  { key: "oauth_github_key", section: "oauth" },
-  { key: "oauth_github_secret", type: "password", section: "oauth" },
-  { key: "oauth_google_key", section: "oauth" },
-  { key: "oauth_google_secret", type: "password", section: "oauth" },
-  { key: "oidc_client_id", section: "oauth" },
-  { key: "oidc_client_secret", type: "password", section: "oauth" },
-  { key: "oidc_discovery_url", section: "oauth" },
-  { key: "oidc_name", section: "oauth" },
-
   // WebAuthn
   { key: "webauthn.rp_id", section: "webauthn" },
   { key: "webauthn.rp_display_name", section: "webauthn" },
   { key: "webauthn.rp_origins", section: "webauthn" },
-
-  // Telegram
-  { key: "telegram.bot_token", type: "password", section: "telegram" },
 
   // Geocoding
   {
@@ -80,9 +67,7 @@ const SECTIONS = [
   "auth",
   "jwt",
   "smtp",
-  "oauth",
   "webauthn",
-  "telegram",
   "geocoding",
   "storage",
   "backup",
@@ -208,10 +193,14 @@ export default function AdminSettings() {
         value="settings"
         onChange={(val) => {
           if (val === "users") navigate("/admin/users");
+          if (val === "backups") navigate("/admin/backups");
+          if (val === "oauth-providers") navigate("/admin/oauth-providers");
         }}
         options={[
           { label: t("admin.tab_users"), value: "users", icon: <TeamOutlined /> },
           { label: t("admin.tab_settings"), value: "settings", icon: <SettingOutlined /> },
+          { label: t("admin.tab_backups"), value: "backups", icon: <DatabaseOutlined /> },
+          { label: t("admin.tab_oauth"), value: "oauth-providers", icon: <KeyOutlined /> },
         ]}
         style={{ marginBottom: 24 }}
       />

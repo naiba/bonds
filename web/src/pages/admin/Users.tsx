@@ -17,6 +17,8 @@ import {
   CheckCircleOutlined,
   SettingOutlined,
   TeamOutlined,
+  DatabaseOutlined,
+  KeyOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -231,10 +233,14 @@ export default function AdminUsers() {
         value="users"
         onChange={(val) => {
           if (val === "settings") navigate("/admin/settings");
+          if (val === "backups") navigate("/admin/backups");
+          if (val === "oauth-providers") navigate("/admin/oauth-providers");
         }}
         options={[
           { label: t("admin.tab_users"), value: "users", icon: <TeamOutlined /> },
           { label: t("admin.tab_settings"), value: "settings", icon: <SettingOutlined /> },
+          { label: t("admin.tab_backups"), value: "backups", icon: <DatabaseOutlined /> },
+          { label: t("admin.tab_oauth"), value: "oauth-providers", icon: <KeyOutlined /> },
         ]}
         style={{ marginBottom: 24 }}
       />
