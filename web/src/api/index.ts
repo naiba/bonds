@@ -59,7 +59,7 @@ import { Search } from "./generated/Search";
 import { Settings } from "./generated/Settings";
 import { SlicesOfLife } from "./generated/SlicesOfLife";
 import { Tasks } from "./generated/Tasks";
-import { Telegram } from "./generated/Telegram";
+
 import { TemplatePages } from "./generated/TemplatePages";
 import { TwoFactor } from "./generated/TwoFactor";
 import { Users } from "./generated/Users";
@@ -209,7 +209,6 @@ export const api = {
   settings: new Settings(httpClient),
   slicesOfLife: new SlicesOfLife(httpClient),
   tasks: new Tasks(httpClient),
-  telegram: new Telegram(httpClient),
   templatePages: new TemplatePages(httpClient),
   twoFactor: new TwoFactor(httpClient),
   users: new Users(httpClient),

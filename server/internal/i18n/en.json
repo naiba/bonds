@@ -18,6 +18,9 @@
   "err.missing_authorization_header": "Missing authorization header",
   "err.invalid_authorization_format": "Invalid authorization format",
   "err.invalid_or_expired_token": "Invalid or expired token",
+  "err.two_factor_required": "Two-factor authentication required",
+  "err.user_account_disabled": "User account is disabled",
+  "err.database_error": "Database error occurred",
   "err.administrator_access_required": "Administrator access required",
 
   "err.vault_id_required": "vault_id is required",

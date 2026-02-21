@@ -18,6 +18,9 @@
   "err.missing_authorization_header": "缺少授权头",
   "err.invalid_authorization_format": "无效的授权格式",
   "err.invalid_or_expired_token": "令牌无效或已过期",
+  "err.two_factor_required": "需要双因素认证",
+  "err.user_account_disabled": "用户账户已被禁用",
+  "err.database_error": "数据库错误",
   "err.administrator_access_required": "需要管理员权限",
 
   "err.vault_id_required": "vault_id 为必填项",

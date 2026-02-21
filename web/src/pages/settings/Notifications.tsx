@@ -41,10 +41,7 @@ const { Title, Text } = Typography;
 
 const channelTypes = [
   { label: "Email", value: "email" },
-  { label: "Telegram", value: "telegram" },
-  { label: "Ntfy", value: "ntfy" },
-  { label: "Gotify", value: "gotify" },
-  { label: "Webhook", value: "webhook" },
+  { label: "Shoutrrr", value: "shoutrrr" },
 ];
 
 const channelIconMap: Record<
@@ -56,7 +53,16 @@ const channelIconMap: Record<
   ntfy: { icon: <NotificationOutlined />, color: "#52c41a", bg: "#f6ffed" },
   gotify: { icon: <BellOutlined />, color: "#fa8c16", bg: "#fff7e6" },
   webhook: { icon: <ApiOutlined />, color: "#722ed1", bg: "#f9f0ff" },
+  shoutrrr: { icon: <ApiOutlined />, color: "#722ed1", bg: "#f9f0ff" },
 };
+
+function getShoutrrrIcon(content: string): { icon: React.ReactNode; color: string; bg: string } {
+  if (content.startsWith("telegram://")) return channelIconMap.telegram;
+  if (content.startsWith("ntfy://")) return channelIconMap.ntfy;
+  if (content.startsWith("gotify://")) return channelIconMap.gotify;
+  if (content.startsWith("generic+") || content.startsWith("generic://")) return channelIconMap.webhook;
+  return channelIconMap.shoutrrr;
+}
 
 export default function Notifications() {
   const [open, setOpen] = useState(false);
@@ -80,7 +86,7 @@ export default function Notifications() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { type: "email" | "telegram" | "ntfy" | "gotify" | "webhook"; label: string; content: string }) =>
+    mutationFn: (values: { type: "email" | "shoutrrr"; label: string; content: string }) =>
       api.notifications.notificationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -181,11 +187,13 @@ export default function Notifications() {
             ),
           }}
           renderItem={(ch: NotificationChannel) => {
-            const iconInfo = channelIconMap[ch.type!] ?? {
-              icon: <ApiOutlined />,
-              color: token.colorTextSecondary,
-              bg: token.colorBgLayout,
-            };
+            const iconInfo = ch.type === "shoutrrr"
+              ? getShoutrrrIcon(ch.content ?? "")
+              : channelIconMap[ch.type!] ?? {
+                  icon: <ApiOutlined />,
+                  color: token.colorTextSecondary,
+                  bg: token.colorBgLayout,
+                };
             return (
               <List.Item
                 actions={[
@@ -318,15 +326,9 @@ export default function Notifications() {
                 : t("settings.notifications.shoutrrr_url")
             }
             extra={
-              selectedType === "telegram"
-                ? t("settings.notifications.telegram_help")
-                : selectedType === "ntfy"
-                  ? t("settings.notifications.ntfy_help")
-                  : selectedType === "gotify"
-                    ? t("settings.notifications.gotify_help")
-                    : selectedType === "webhook"
-                      ? t("settings.notifications.webhook_help")
-                      : null
+              selectedType === "shoutrrr"
+                ? <span>{t("settings.notifications.shoutrrr_help")} — <a href="https://containrrr.dev/shoutrrr/v0.8/services/overview/" target="_blank" rel="noopener noreferrer">{t("settings.notifications.shoutrrr_docs_link")}</a></span>
+                : null
             }
             rules={[{ required: true }]}
           >
@@ -334,15 +336,7 @@ export default function Notifications() {
               placeholder={
                 selectedType === "email"
                   ? "user@example.com"
-                  : selectedType === "telegram"
-                    ? "telegram://token@telegram?channels=chatid"
-                    : selectedType === "ntfy"
-                      ? "ntfy://ntfy.sh/your-topic"
-                      : selectedType === "gotify"
-                        ? "gotify://your-server/apptoken"
-                        : selectedType === "webhook"
-                          ? "generic+https://example.com/webhook"
-                          : t("settings.notifications.destination_placeholder")
+                  : "telegram://token@telegram?channels=chatid"
               }
             />
           </Form.Item>

@@ -5,7 +5,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/pkg/response"
+	"gorm.io/gorm"
 )
 
 type JWTClaims struct {
@@ -20,10 +22,11 @@ type JWTClaims struct {
 
 type AuthMiddleware struct {
 	secret []byte
+	db     *gorm.DB
 }
 
-func NewAuthMiddleware(secret string) *AuthMiddleware {
-	return &AuthMiddleware{secret: []byte(secret)}
+func NewAuthMiddleware(secret string, db *gorm.DB) *AuthMiddleware {
+	return &AuthMiddleware{secret: []byte(secret), db: db}
 }
 
 func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
@@ -58,6 +61,18 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 		// The temp token is only valid for the /auth/2fa/verify endpoint.
 		if claims.TwoFactorPending {
 			return response.Forbidden(c, "err.two_factor_required")
+		}
+
+		// Check if user is disabled
+		user := &models.User{}
+		if err := m.db.Select("disabled").Where("id = ?", claims.UserID).First(user).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return response.Unauthorized(c, "err.user_not_found")
+			}
+			return response.InternalError(c, "err.database_error")
+		}
+		if user.Disabled {
+			return response.Forbidden(c, "err.user_account_disabled")
 		}
 
 		c.Set("user_id", claims.UserID)

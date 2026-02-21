@@ -18,7 +18,7 @@ import (
 )
 
 func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string) {
-	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret)
+	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret, db)
 
 	systemSettingService := services.NewSystemSettingService(db)
 
@@ -107,7 +107,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		addressService.SetGeocoder(geocoder)
 	}
 
-	oauthService := services.NewOAuthService(db, &cfg.JWT, cfg.App.URL, cfg.OAuth.OIDCName)
+	oauthProviderService := services.NewOAuthProviderService(db)
+	oauthProviderService.SetSystemSettings(systemSettingService)
+
+	oauthService := services.NewOAuthService(db, &cfg.JWT, cfg.App.URL)
 	oauthService.SetSystemSettings(systemSettingService)
 	webauthnService, err := services.NewWebAuthnService(db, &cfg.WebAuthn)
 	if err != nil {
@@ -148,8 +151,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	postPhotoHandler := NewPostPhotoHandler(vaultFileService)
 	contactPhotoHandler := NewContactPhotoHandler(vaultFileService)
 	contactDocumentHandler := NewContactDocumentHandler(vaultFileService)
-
-	telegramWebhookService := services.NewTelegramWebhookService(db)
 
 	authHandler := NewAuthHandler(authService)
 	accountHandler := NewAccountHandler(db)
@@ -215,17 +216,17 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	backupHandler := NewBackupHandler(backupService)
 	currencyHandler := NewCurrencyHandler(currencyService)
 	templatePageHandler := NewTemplatePageHandler(templatePageService)
-	telegramWebhookHandler := NewTelegramWebhookHandler(telegramWebhookService)
 	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
 	adminHandler := NewAdminHandler(adminService, systemSettingService)
 	adminHandler.RegisterReloader(func() {
-		services.SetupOAuthProvidersFromDB(systemSettingService)
+		oauthProviderService.ReloadProviders()
 	})
 	adminHandler.RegisterReloader(func() {
 		if err := webauthnService.ReloadConfig(); err != nil {
 			log.Printf("WARNING: WebAuthn reload failed: %v", err)
 		}
 	})
+	oauthProviderHandler := NewOAuthProviderHandler(oauthProviderService)
 	instanceHandler := NewInstanceHandler(systemSettingService, oauthService, webauthnService, version)
 
 	e.Use(middleware.CORS())
@@ -240,8 +241,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		content := systemSettingService.GetWithDefault("announcement", "")
 		return response.OK(c, map[string]string{"content": content})
 	})
-
-	api.POST("/telegram/webhook", telegramWebhookHandler.HandleWebhook)
 
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)
@@ -267,6 +266,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	adminGroup.DELETE("/users/:id", adminHandler.DeleteUser)
 	adminGroup.GET("/settings", adminHandler.GetSettings)
 	adminGroup.PUT("/settings", adminHandler.UpdateSettings)
+	adminGroup.GET("/oauth-providers", oauthProviderHandler.List)
+	adminGroup.POST("/oauth-providers", oauthProviderHandler.Create)
+	adminGroup.PUT("/oauth-providers/:id", oauthProviderHandler.Update)
+	adminGroup.DELETE("/oauth-providers/:id", oauthProviderHandler.Delete)
 
 	protected := api.Group("", authMiddleware.Authenticate)
 
@@ -625,7 +628,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	settingsGroup.DELETE("/account", accountCancelHandler.Cancel, authMiddleware.RequireAdmin)
 	settingsGroup.GET("/storage", storageInfoHandler.Get)
 
-	backupGroup := settingsGroup.Group("/backups", authMiddleware.RequireAdmin)
+	backupGroup := settingsGroup.Group("/backups", authMiddleware.RequireInstanceAdmin)
 	backupGroup.GET("", backupHandler.List)
 	backupGroup.POST("", backupHandler.Create)
 	backupGroup.GET("/config", backupHandler.GetConfig)

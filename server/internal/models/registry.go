@@ -104,6 +104,7 @@ func AllModels() []interface{} {
 
 		&WebAuthnCredential{},
 
+		&OAuthProvider{},
 		&SystemSetting{},
 	}
 }
