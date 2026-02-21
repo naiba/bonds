@@ -32,7 +32,8 @@
     "error": "Error",
     "saved": "Saved",
     "updated": "Updated",
-    "load_more": "Load more"
+    "load_more": "Load more",
+    "copy": "Copy"
   },
   "nav": {
     "vaults": "Vaults",
@@ -55,7 +56,8 @@
     "twoFactor": "Two-Factor Auth",
     "invitations": "Invitations",
     "logout": "Logout",
-    "admin": "Administration"
+    "admin": "Administration",
+    "davSubscriptions": "DAV Sync"
   },
   "auth": {
     "login": {
@@ -356,7 +358,13 @@
       "created": "Subscription created",
       "updated": "Subscription updated",
       "deleted": "Subscription deleted",
-      "delete_confirm": "Delete this subscription?"
+      "delete_confirm": "Delete this subscription?",
+      "server_urls": "Server URLs",
+      "carddav_url": "CardDAV URL",
+      "caldav_url": "CalDAV URL",
+      "auth_note": "Authentication",
+      "auth_note_text": "Use your login email and password for Basic Auth when configuring your DAV client.",
+      "copy_success": "Copied"
     },
     "group_detail": {
       "back": "Back to groups",
@@ -397,12 +405,20 @@
     },
     "create": {
       "title": "Add a contact",
+      "prefix_label": "Prefix",
+      "prefix_placeholder": "e.g. Mr., Dr.",
       "first_name_label": "First name",
       "first_name_placeholder": "First name",
+      "middle_name_label": "Middle name",
+      "middle_name_placeholder": "Middle name",
       "last_name_label": "Last name",
       "last_name_placeholder": "Last name",
+      "suffix_label": "Suffix",
+      "suffix_placeholder": "e.g. Jr., III",
       "nickname_label": "Nickname",
       "nickname_placeholder": "Nickname (optional)",
+      "maiden_name_label": "Maiden name",
+      "maiden_name_placeholder": "Maiden name (optional)",
       "submit": "Create contact",
       "success": "Contact created",
       "failed": "Failed to create contact"
@@ -430,7 +446,11 @@
       },
       "first_name": "First name",
       "last_name": "Last name",
+      "middle_name": "Middle name",
       "nickname": "Nickname",
+      "maiden_name": "Maiden name",
+      "prefix": "Prefix",
+      "suffix": "Suffix",
     "status": "Status",
     "edit_title": "Edit Contact",
     "edit_success": "Contact updated",
@@ -1035,6 +1055,8 @@
     "cron_enabled_label": "Enabled"
   },
   "admin": {
+    "tab_users": "Users",
+    "tab_settings": "Settings",
     "users": {
       "title": "User Management",
       "description": "Manage all registered users on this instance",

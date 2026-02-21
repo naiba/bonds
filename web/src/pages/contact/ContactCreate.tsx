@@ -92,25 +92,54 @@ export default function ContactCreate() {
         <Form layout="vertical" onFinish={onFinish} requiredMark="optional">
           <div style={{ display: "flex", gap: 16 }}>
             <Form.Item
+              name="prefix"
+              label={t("contact.create.prefix_label")}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder={t("contact.create.prefix_placeholder")} />
+            </Form.Item>
+            <Form.Item
               name="first_name"
               label={t("contact.create.first_name_label")}
-              style={{ flex: 1 }}
+              style={{ flex: 2 }}
               rules={[{ required: true, message: t("common.required") }]}
             >
               <Input placeholder={t("contact.create.first_name_placeholder")} />
             </Form.Item>
             <Form.Item
-              name="last_name"
-              label={t("contact.create.last_name_label")}
-              style={{ flex: 1 }}
+              name="middle_name"
+              label={t("contact.create.middle_name_label")}
+              style={{ flex: 2 }}
             >
-              <Input placeholder={t("contact.create.last_name_placeholder")} />
+              <Input placeholder={t("contact.create.middle_name_placeholder")} />
             </Form.Item>
           </div>
 
-          <Form.Item name="nickname" label={t("contact.create.nickname_label")}>
-            <Input placeholder={t("contact.create.nickname_placeholder")} />
-          </Form.Item>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item
+              name="last_name"
+              label={t("contact.create.last_name_label")}
+              style={{ flex: 2 }}
+            >
+              <Input placeholder={t("contact.create.last_name_placeholder")} />
+            </Form.Item>
+            <Form.Item
+              name="suffix"
+              label={t("contact.create.suffix_label")}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder={t("contact.create.suffix_placeholder")} />
+            </Form.Item>
+          </div>
+
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item name="nickname" label={t("contact.create.nickname_label")} style={{ flex: 1 }}>
+              <Input placeholder={t("contact.create.nickname_placeholder")} />
+            </Form.Item>
+            <Form.Item name="maiden_name" label={t("contact.create.maiden_name_label")} style={{ flex: 1 }}>
+              <Input placeholder={t("contact.create.maiden_name_placeholder")} />
+            </Form.Item>
+          </div>
 
           <Form.Item style={{ marginBottom: 0, marginTop: 8, textAlign: "right" }}>
             <Button

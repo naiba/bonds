@@ -278,15 +278,35 @@ export default function ContactDetail() {
   const overviewCard = (
     <Card>
       <Descriptions column={{ xs: 1, sm: 2 }}>
+        {contact.prefix && (
+          <Descriptions.Item label={t("contact.detail.prefix")}>
+            {contact.prefix}
+          </Descriptions.Item>
+        )}
         <Descriptions.Item label={t("contact.detail.first_name")}>
           {contact.first_name}
         </Descriptions.Item>
+        {contact.middle_name && (
+          <Descriptions.Item label={t("contact.detail.middle_name")}>
+            {contact.middle_name}
+          </Descriptions.Item>
+        )}
         <Descriptions.Item label={t("contact.detail.last_name")}>
           {contact.last_name || "\u2014"}
         </Descriptions.Item>
+        {contact.suffix && (
+          <Descriptions.Item label={t("contact.detail.suffix")}>
+            {contact.suffix}
+          </Descriptions.Item>
+        )}
         <Descriptions.Item label={t("contact.detail.nickname")}>
           {contact.nickname || "\u2014"}
         </Descriptions.Item>
+        {contact.maiden_name && (
+          <Descriptions.Item label={t("contact.detail.maiden_name")}>
+            {contact.maiden_name}
+          </Descriptions.Item>
+        )}
         <Descriptions.Item label={t("contact.detail.status")}>
           {contact.is_archived ? (
             <Tag color="default">{t("common.archived")}</Tag>
@@ -528,9 +548,13 @@ export default function ContactDetail() {
               type="text"
               onClick={() => {
                 editForm.setFieldsValue({
+                  prefix: contact.prefix,
                   first_name: contact.first_name,
+                  middle_name: contact.middle_name,
                   last_name: contact.last_name,
+                  suffix: contact.suffix,
                   nickname: contact.nickname,
+                  maiden_name: contact.maiden_name,
                 });
                 setIsEditModalOpen(true);
               }}
@@ -654,25 +678,62 @@ export default function ContactDetail() {
           layout="vertical"
           onFinish={(values) => updateContactMutation.mutate(values)}
         >
-          <Form.Item
-            name="first_name"
-            label={t("contact.detail.first_name")}
-            rules={[{ required: true, message: t("common.required") }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="last_name"
-            label={t("contact.detail.last_name")}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="nickname"
-            label={t("contact.detail.nickname")}
-          >
-            <Input />
-          </Form.Item>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item
+              name="prefix"
+              label={t("contact.detail.prefix")}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder={t("contact.create.prefix_placeholder")} />
+            </Form.Item>
+            <Form.Item
+              name="first_name"
+              label={t("contact.detail.first_name")}
+              style={{ flex: 2 }}
+              rules={[{ required: true, message: t("common.required") }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="middle_name"
+              label={t("contact.detail.middle_name")}
+              style={{ flex: 2 }}
+            >
+              <Input />
+            </Form.Item>
+          </div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item
+              name="last_name"
+              label={t("contact.detail.last_name")}
+              style={{ flex: 2 }}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="suffix"
+              label={t("contact.detail.suffix")}
+              style={{ flex: 1 }}
+            >
+              <Input placeholder={t("contact.create.suffix_placeholder")} />
+            </Form.Item>
+          </div>
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item
+              name="nickname"
+              label={t("contact.detail.nickname")}
+              style={{ flex: 1 }}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              name="maiden_name"
+              label={t("contact.detail.maiden_name")}
+              style={{ flex: 1 }}
+            >
+              <Input />
+            </Form.Item>
+          </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button onClick={() => setIsEditModalOpen(false)}>
               {t("common.cancel")}

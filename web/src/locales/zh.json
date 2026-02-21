@@ -32,7 +32,8 @@
     "error": "错误",
     "saved": "已保存",
     "updated": "已更新",
-    "load_more": "加载更多"
+    "load_more": "加载更多",
+    "copy": "复制"
   },
   "nav": {
     "vaults": "保险库",
@@ -55,7 +56,8 @@
     "twoFactor": "双因素认证",
     "invitations": "邀请管理",
     "logout": "退出登录",
-    "admin": "系统管理"
+    "admin": "系统管理",
+    "davSubscriptions": "DAV 同步"
   },
   "auth": {
     "login": {
@@ -356,7 +358,13 @@
       "created": "订阅已创建",
       "updated": "订阅已更新",
       "deleted": "订阅已删除",
-      "delete_confirm": "确定删除此订阅？"
+      "delete_confirm": "确定删除此订阅？",
+      "server_urls": "服务器地址",
+      "carddav_url": "CardDAV 地址",
+      "caldav_url": "CalDAV 地址",
+      "auth_note": "认证说明",
+      "auth_note_text": "配置 DAV 客户端时，请使用你的登录邮箱和密码进行 Basic Auth 认证。",
+      "copy_success": "已复制"
     },
     "group_detail": {
       "back": "返回群组列表",
@@ -397,12 +405,20 @@
     },
     "create": {
       "title": "添加联系人",
+      "prefix_label": "前缀",
+      "prefix_placeholder": "如 Mr.、Dr.",
       "first_name_label": "名",
       "first_name_placeholder": "名",
+      "middle_name_label": "中间名",
+      "middle_name_placeholder": "中间名",
       "last_name_label": "姓",
       "last_name_placeholder": "姓",
+      "suffix_label": "后缀",
+      "suffix_placeholder": "如 Jr.、III",
       "nickname_label": "昵称",
       "nickname_placeholder": "昵称（可选）",
+      "maiden_name_label": "婚前姓",
+      "maiden_name_placeholder": "婚前姓（可选）",
       "submit": "创建联系人",
       "success": "联系人已创建",
       "failed": "创建联系人失败"
@@ -430,7 +446,11 @@
       },
       "first_name": "名",
       "last_name": "姓",
+      "middle_name": "中间名",
       "nickname": "昵称",
+      "maiden_name": "婚前姓",
+      "prefix": "前缀",
+      "suffix": "后缀",
     "status": "状态",
     "edit_title": "编辑联系人",
     "edit_success": "联系人已更新",
@@ -1035,6 +1055,8 @@
     "cron_enabled_label": "已启用"
   },
   "admin": {
+    "tab_users": "用户",
+    "tab_settings": "设置",
     "users": {
       "title": "用户管理",
       "description": "管理此实例上的所有注册用户",

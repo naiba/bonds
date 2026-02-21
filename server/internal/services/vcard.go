@@ -139,7 +139,7 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 				continue
 			}
 
-			firstName, lastName := extractNameFromCard(card)
+			nameComponents := extractFullNameFromCard(card)
 			nickname := card.Value(vcard.FieldNickname)
 
 			title := card.Value(vcard.FieldTitle)
@@ -147,8 +147,11 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 			now := time.Now()
 			contact := models.Contact{
 				VaultID:       vaultID,
-				FirstName:     strPtrOrNil(firstName),
-				LastName:      strPtrOrNil(lastName),
+				FirstName:     strPtrOrNil(nameComponents.firstName),
+				LastName:      strPtrOrNil(nameComponents.lastName),
+				MiddleName:    strPtrOrNil(nameComponents.middleName),
+				Prefix:        strPtrOrNil(nameComponents.prefix),
+				Suffix:        strPtrOrNil(nameComponents.suffix),
 				Nickname:      strPtrOrNil(nickname),
 				JobPosition:   strPtrOrNil(title),
 				LastUpdatedAt: &now,
@@ -316,10 +319,16 @@ func buildVCard(contact *models.Contact, infos []models.ContactInformation, addr
 
 	firstName := ptrToStr(contact.FirstName)
 	lastName := ptrToStr(contact.LastName)
+	middleName := ptrToStr(contact.MiddleName)
+	prefix := ptrToStr(contact.Prefix)
+	suffix := ptrToStr(contact.Suffix)
 
 	card.SetName(&vcard.Name{
-		FamilyName: lastName,
-		GivenName:  firstName,
+		FamilyName:      lastName,
+		GivenName:       firstName,
+		AdditionalName:  middleName,
+		HonorificPrefix: prefix,
+		HonorificSuffix: suffix,
 	})
 	card.SetValue(vcard.FieldFormattedName, buildFullName(firstName, lastName))
 
@@ -356,16 +365,35 @@ func buildVCard(contact *models.Contact, infos []models.ContactInformation, addr
 	return card
 }
 
+type vcardNameComponents struct {
+	firstName  string
+	lastName   string
+	middleName string
+	prefix     string
+	suffix     string
+}
+
 func extractNameFromCard(card vcard.Card) (string, string) {
+	c := extractFullNameFromCard(card)
+	return c.firstName, c.lastName
+}
+
+func extractFullNameFromCard(card vcard.Card) vcardNameComponents {
 	name := card.Name()
 	if name != nil && (name.GivenName != "" || name.FamilyName != "") {
-		return name.GivenName, name.FamilyName
+		return vcardNameComponents{
+			firstName:  name.GivenName,
+			lastName:   name.FamilyName,
+			middleName: name.AdditionalName,
+			prefix:     name.HonorificPrefix,
+			suffix:     name.HonorificSuffix,
+		}
 	}
 	fn := card.Value(vcard.FieldFormattedName)
 	if fn != "" {
-		return fn, ""
+		return vcardNameComponents{firstName: fn}
 	}
-	return "", ""
+	return vcardNameComponents{}
 }
 
 func buildFullName(firstName, lastName string) string {
@@ -395,13 +423,16 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 				return existing.ID, "conflict_local_wins", nil
 			}
 
-			firstName, lastName := extractNameFromCard(card)
+			nameComponents := extractFullNameFromCard(card)
 			nickname := card.Value(vcard.FieldNickname)
 			title := card.Value(vcard.FieldTitle)
 			now := time.Now()
 
-			existing.FirstName = strPtrOrNil(firstName)
-			existing.LastName = strPtrOrNil(lastName)
+			existing.FirstName = strPtrOrNil(nameComponents.firstName)
+			existing.LastName = strPtrOrNil(nameComponents.lastName)
+			existing.MiddleName = strPtrOrNil(nameComponents.middleName)
+			existing.Prefix = strPtrOrNil(nameComponents.prefix)
+			existing.Suffix = strPtrOrNil(nameComponents.suffix)
 			existing.Nickname = strPtrOrNil(nickname)
 			existing.JobPosition = strPtrOrNil(title)
 			existing.DistantEtag = strPtrOrNil(distantEtag)
@@ -417,7 +448,7 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		}
 	}
 
-	firstName, lastName := extractNameFromCard(card)
+	nameComponents := extractFullNameFromCard(card)
 	nickname := card.Value(vcard.FieldNickname)
 	title := card.Value(vcard.FieldTitle)
 	now := time.Now()
@@ -426,8 +457,11 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 
 	contact := models.Contact{
 		VaultID:       vaultID,
-		FirstName:     strPtrOrNil(firstName),
-		LastName:      strPtrOrNil(lastName),
+		FirstName:     strPtrOrNil(nameComponents.firstName),
+		LastName:      strPtrOrNil(nameComponents.lastName),
+		MiddleName:    strPtrOrNil(nameComponents.middleName),
+		Prefix:        strPtrOrNil(nameComponents.prefix),
+		Suffix:        strPtrOrNil(nameComponents.suffix),
 		Nickname:      strPtrOrNil(nickname),
 		JobPosition:   strPtrOrNil(title),
 		DistantUUID:   strPtrOrNil(uid),
