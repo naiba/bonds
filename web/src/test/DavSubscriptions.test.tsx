@@ -42,6 +42,15 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+vi.mock("@/stores/auth", () => ({
+  useAuth: () => ({
+    user: { email: "test@example.com" },
+    token: "test-token",
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 function renderPage() {
   return render(
     <ConfigProvider>

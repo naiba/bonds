@@ -31,6 +31,7 @@ import {
   DashboardOutlined,
   RightOutlined,
   CrownOutlined,
+  CloudServerOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/stores/auth";
@@ -75,6 +76,7 @@ export default function Layout() {
         { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
         { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
         { key: `/vaults/${vaultId}/feed`, icon: <UnorderedListOutlined />, label: t("nav.feed") },
+        { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
       ]
     : [];
 

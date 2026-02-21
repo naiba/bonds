@@ -20,6 +20,7 @@ import {
   Alert,
   Tooltip,
   Empty,
+  Card,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -35,6 +36,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { api } from "@/api";
+import { useAuth } from "@/stores/auth";
 import type {
   DavSubscription,
   DavSyncLog,
@@ -45,7 +47,7 @@ import type {
   PaginationMeta,
 } from "@/api";
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 
 const SYNC_WAY_PUSH = 1;
 const SYNC_WAY_PULL = 2;
@@ -72,6 +74,7 @@ export default function DavSubscriptions() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const { message } = App.useApp();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
 
@@ -261,6 +264,44 @@ export default function DavSubscriptions() {
           {t("vault.dav_subscriptions.add")}
         </Button>
       </div>
+
+      <Card
+        title={t("vault.dav_subscriptions.server_urls")}
+        size="small"
+        style={{ marginBottom: 24 }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+              {t("vault.dav_subscriptions.carddav_url")}
+            </Text>
+            <Paragraph
+              copyable={{ tooltips: [t("common.copy"), t("vault.dav_subscriptions.copy_success")] }}
+              style={{ margin: 0, background: token.colorFillQuaternary, padding: "6px 12px", borderRadius: token.borderRadius, fontFamily: "monospace", fontSize: 13 }}
+            >
+              {`${window.location.origin}/dav/addressbooks/${user?.email ?? ""}/`}
+            </Paragraph>
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: "block", marginBottom: 4 }}>
+              {t("vault.dav_subscriptions.caldav_url")}
+            </Text>
+            <Paragraph
+              copyable={{ tooltips: [t("common.copy"), t("vault.dav_subscriptions.copy_success")] }}
+              style={{ margin: 0, background: token.colorFillQuaternary, padding: "6px 12px", borderRadius: token.borderRadius, fontFamily: "monospace", fontSize: 13 }}
+            >
+              {`${window.location.origin}/dav/calendars/${user?.email ?? ""}/`}
+            </Paragraph>
+          </div>
+          <Alert
+            type="info"
+            showIcon
+            message={t("vault.dav_subscriptions.auth_note")}
+            description={t("vault.dav_subscriptions.auth_note_text")}
+            style={{ marginTop: 4 }}
+          />
+        </div>
+      </Card>
 
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       <Table<any>
