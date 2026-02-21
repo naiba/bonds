@@ -100,6 +100,149 @@ test.describe('Admin Features', () => {
 
     await expect(page.getByRole('button', { name: 'Save Settings' })).toBeVisible({ timeout: 5000 });
   });
+
+  let secondUserEmail: string;
+
+  test('admin can disable a user', async ({ page }) => {
+    secondUserEmail = `user2-${Date.now()}@example.com`;
+    await registerUser(page, secondUserEmail, 'Second', 'User');
+
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
+
+    const row = page.getByRole('row').filter({ hasText: secondUserEmail });
+    await expect(row).toBeVisible({ timeout: 5000 });
+    await expect(row.locator('.ant-tag').filter({ hasText: 'Active' })).toBeVisible({ timeout: 5000 });
+    await row.getByRole('button', { name: 'Disable' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(row.locator('.ant-tag').filter({ hasText: 'Disabled' })).toBeVisible({ timeout: 10000 });
+  });
+
+  test('admin can re-enable a disabled user', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
+
+    const row = page.getByRole('row').filter({ hasText: secondUserEmail });
+    await expect(row.locator('.ant-tag').filter({ hasText: 'Disabled' })).toBeVisible({ timeout: 5000 });
+    await row.getByRole('button', { name: 'Enable' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(row.locator('.ant-tag').filter({ hasText: 'Active' })).toBeVisible({ timeout: 10000 });
+  });
+
+  test('admin can promote a user to admin', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
+
+    const row = page.getByRole('row').filter({ hasText: secondUserEmail });
+    await expect(row.locator('.ant-tag').filter({ hasText: 'User' })).toBeVisible({ timeout: 5000 });
+    await row.getByRole('button', { name: 'Set Admin' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(row.locator('.ant-tag').filter({ hasText: 'Admin' })).toBeVisible({ timeout: 10000 });
+  });
+
+  test('admin can remove admin role from a user', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
+
+    const row = page.getByRole('row').filter({ hasText: secondUserEmail });
+    await expect(row.locator('.ant-tag').filter({ hasText: 'Admin' })).toBeVisible({ timeout: 5000 });
+    await row.getByRole('button', { name: 'Remove Admin' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(row.locator('.ant-tag').filter({ hasText: 'User' })).toBeVisible({ timeout: 10000 });
+  });
+
+  test('admin cannot see action buttons for own row', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
+
+    const selfRow = page.getByRole('row').filter({ hasText: adminEmail });
+    await expect(selfRow).toBeVisible({ timeout: 5000 });
+    await expect(selfRow.getByRole('button', { name: 'Disable' })).not.toBeVisible();
+    await expect(selfRow.getByRole('button', { name: 'Set Admin' })).not.toBeVisible();
+  });
+
+  test('admin can delete a user', async ({ page }) => {
+    const throwawayEmail = `throwaway-${Date.now()}@example.com`;
+    await registerUser(page, throwawayEmail, 'Throw', 'Away');
+
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByRole('table')).toBeVisible({ timeout: 10000 });
+
+    const row = page.getByRole('row').filter({ hasText: throwawayEmail });
+    await expect(row).toBeVisible({ timeout: 5000 });
+
+    await row.locator('button.ant-btn-dangerous').click();
+
+    const popconfirm = page.locator('.ant-popconfirm');
+    await expect(popconfirm).toBeVisible({ timeout: 5000 });
+    await popconfirm.getByRole('button', { name: 'OK' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByRole('table').getByText(throwawayEmail)).not.toBeVisible({ timeout: 10000 });
+  });
+
+  test('admin can save and persist settings', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/settings');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('System Settings')).toBeVisible({ timeout: 10000 });
+
+    const appNameInput = page.locator('#app\\.name');
+    await expect(appNameInput).toBeVisible({ timeout: 5000 });
+
+    await appNameInput.clear();
+    await appNameInput.fill('Test Bonds App');
+
+    await page.getByRole('button', { name: 'Save Settings' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('System Settings')).toBeVisible({ timeout: 10000 });
+
+    const reloadedInput = page.locator('#app\\.name');
+    await expect(reloadedInput).toHaveValue('Test Bonds App', { timeout: 10000 });
+  });
+
+  test('non-admin user cannot access admin users page', async ({ page }) => {
+    await loginUser(page, secondUserEmail);
+
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+
+    await page.waitForTimeout(2000);
+    await expect(page.getByRole('table').getByText(adminEmail)).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test('non-admin user cannot access admin settings page', async ({ page }) => {
+    await loginUser(page, secondUserEmail);
+
+    await page.goto('/admin/settings');
+    await page.waitForLoadState('networkidle');
+
+    await page.waitForTimeout(2000);
+    const appNameInput = page.locator('#app\\.name');
+    const count = await appNameInput.count();
+    if (count > 0) {
+      await expect(appNameInput).toHaveValue('', { timeout: 5000 });
+    }
+  });
 });
 
 test.describe('2FA QR Code', () => {
