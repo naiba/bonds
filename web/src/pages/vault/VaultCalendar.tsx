@@ -104,7 +104,7 @@ export default function VaultCalendar() {
       const reminders = src?.reminders ?? [];
 
       for (const d of dates) {
-        const key = dateKey(d.year ?? null, d.month ?? null, d.day ?? null);
+        const key = dateKey(null, d.month ?? null, d.day ?? null);
         if (!key) continue;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push({ type: "date", label: d.label ?? '', contactName: d.contact_name ?? '', contactId: d.contact_id ?? '', dateStr: key, calendarType: d.calendar_type });
