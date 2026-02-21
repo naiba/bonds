@@ -2942,8 +2942,8 @@ func TestContactTabs_Success(t *testing.T) {
 	if tabs.Pages[0].Slug != "contact" {
 		t.Errorf("expected first page slug 'contact', got '%s'", tabs.Pages[0].Slug)
 	}
-	if len(tabs.Pages[0].Modules) != 8 {
-		t.Errorf("expected 8 modules on contact page, got %d", len(tabs.Pages[0].Modules))
+	if len(tabs.Pages[0].Modules) != 10 {
+		t.Errorf("expected 10 modules on contact page, got %d", len(tabs.Pages[0].Modules))
 	}
 }
 

@@ -66,8 +66,8 @@ func TestGetTabs_WithTemplate(t *testing.T) {
 	if contactPage.Slug != "contact" {
 		t.Errorf("Expected first page slug 'contact', got '%s'", contactPage.Slug)
 	}
-	if len(contactPage.Modules) != 8 {
-		t.Errorf("Expected 8 modules on contact page, got %d", len(contactPage.Modules))
+	if len(contactPage.Modules) != 10 {
+		t.Errorf("Expected 10 modules on contact page, got %d", len(contactPage.Modules))
 	}
 
 	feedPage := tabs.Pages[1]
@@ -82,8 +82,8 @@ func TestGetTabs_WithTemplate(t *testing.T) {
 	if socialPage.Slug != "social" {
 		t.Errorf("Expected third page slug 'social', got '%s'", socialPage.Slug)
 	}
-	if len(socialPage.Modules) != 5 {
-		t.Errorf("Expected 5 modules on social page, got %d", len(socialPage.Modules))
+	if len(socialPage.Modules) != 3 {
+		t.Errorf("Expected 3 modules on social page, got %d", len(socialPage.Modules))
 	}
 
 	lifeGoalsPage := tabs.Pages[3]
@@ -144,7 +144,7 @@ func TestGetTabs_ModuleOrdering(t *testing.T) {
 		}
 	}
 
-	expectedTypes := []string{"avatar", "contact_names", "family_summary", "important_dates", "gender_pronoun", "labels", "company", "religions"}
+	expectedTypes := []string{"avatar", "contact_names", "family_summary", "important_dates", "gender_pronoun", "labels", "company", "religions", "addresses", "contact_information"}
 	for i, mod := range contactPage.Modules {
 		if mod.Type != expectedTypes[i] {
 			t.Errorf("Module %d: expected type '%s', got '%s'", i, expectedTypes[i], mod.Type)

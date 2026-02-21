@@ -21,6 +21,7 @@ import (
 	appMiddleware "github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
+	"gorm.io/gorm"
 )
 
 var Version = "dev"
@@ -65,6 +66,7 @@ func main() {
 	services.SetupOAuthProvidersFromDB(systemSettingService)
 
 	migrateUploadDir(cfg.Storage.UploadDir)
+	migrateModulesToContactPage(db)
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
@@ -156,6 +158,29 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+func migrateModulesToContactPage(db *gorm.DB) {
+	var moduleIDs []uint
+	db.Raw(`SELECT id FROM modules WHERE type IN ('addresses','contact_information')`).Scan(&moduleIDs)
+	if len(moduleIDs) == 0 {
+		return
+	}
+	result := db.Exec(`
+		UPDATE module_template_pages SET template_page_id = (
+			SELECT tp2.id FROM template_pages tp2
+			WHERE tp2.slug = 'contact'
+			AND tp2.template_id = (
+				SELECT tp1.template_id FROM template_pages tp1 WHERE tp1.id = module_template_pages.template_page_id
+			)
+			LIMIT 1
+		)
+		WHERE module_id IN (?)
+		AND template_page_id IN (SELECT id FROM template_pages WHERE slug = 'social')
+	`, moduleIDs)
+	if result.RowsAffected > 0 {
+		log.Printf("Migrated %d module-page bindings from 'social' to 'contact' page", result.RowsAffected)
+	}
 }
 
 func migrateUploadDir(currentDir string) {

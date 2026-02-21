@@ -552,6 +552,8 @@ func seedDefaultModules(tx *gorm.DB, accountID, locale string) error {
 			{"seed.modules.labels", "labels", true},
 			{"seed.modules.job_information", "company", true},
 			{"seed.modules.religions", "religions", true},
+			{"seed.modules.addresses", "addresses", false},
+			{"seed.modules.contact_information", "contact_information", false},
 		},
 		"feed": {
 			{"seed.modules.contact_feed", "feed", false},
@@ -560,8 +562,6 @@ func seedDefaultModules(tx *gorm.DB, accountID, locale string) error {
 			{"seed.modules.relationships", "relationships", false},
 			{"seed.modules.pets", "pets", false},
 			{"seed.modules.groups", "groups", false},
-			{"seed.modules.addresses", "addresses", false},
-			{"seed.modules.contact_information", "contact_information", false},
 		},
 		"life-goals": {
 			{"seed.modules.life_events", "life_events", false},
