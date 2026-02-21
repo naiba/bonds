@@ -31,17 +31,20 @@ func TestIndexAndSearch(t *testing.T) {
 	}
 
 	found := false
-	for _, r := range resp.Results {
-		if r.ID == "contact:c1" {
+	for _, r := range resp.Contacts {
+		if r.ID == "c1" {
 			found = true
 			if r.Type != "contact" {
 				t.Errorf("Expected type 'contact', got '%s'", r.Type)
+			}
+			if r.Name != "Alice Smith" {
+				t.Errorf("Expected name 'Alice Smith', got '%s'", r.Name)
 			}
 			break
 		}
 	}
 	if !found {
-		t.Error("Expected to find contact:c1 in results")
+		t.Error("Expected to find c1 in contacts")
 	}
 }
 
@@ -88,8 +91,8 @@ func TestSearchFiltersVault(t *testing.T) {
 	if resp.Total != 1 {
 		t.Fatalf("Expected 1 result in vault-a, got %d", resp.Total)
 	}
-	if resp.Results[0].ID != "contact:c1" {
-		t.Errorf("Expected contact:c1, got '%s'", resp.Results[0].ID)
+	if len(resp.Contacts) != 1 || resp.Contacts[0].ID != "c1" {
+		t.Errorf("Expected contact c1 in vault-a, got %+v", resp.Contacts)
 	}
 }
 

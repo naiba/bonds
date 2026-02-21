@@ -16,9 +16,10 @@ func (e *NoopEngine) DeleteDocument(id string) error {
 
 func (e *NoopEngine) Search(vaultID, query string, limit, offset int) (*SearchResponse, error) {
 	return &SearchResponse{
-		Results: []SearchResult{},
-		Total:   0,
-		TookMs:  0,
+		Contacts: []SearchResult{},
+		Notes:    []SearchResult{},
+		Total:    0,
+		TookMs:   0,
 	}, nil
 }
 

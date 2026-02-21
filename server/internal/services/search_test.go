@@ -19,12 +19,12 @@ func TestSearchService(t *testing.T) {
 		LastName:  "User",
 		Email:     "search-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -57,14 +57,7 @@ func TestSearchService(t *testing.T) {
 		t.Fatal("Expected at least 1 result for 'Alice'")
 	}
 
-	found := false
-	for _, r := range result.Results {
-		if r.Type == "contact" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if len(result.Contacts) == 0 {
 		t.Error("Expected to find a contact in search results")
 	}
 }
@@ -80,12 +73,12 @@ func TestSearchService_DeleteContact(t *testing.T) {
 		LastName:  "User",
 		Email:     "search-delete@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -138,16 +131,16 @@ func TestSearchService_VaultIsolation(t *testing.T) {
 		LastName:  "User",
 		Email:     "search-isolation@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault1, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault One"})
+	vault1, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault One"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault 1 failed: %v", err)
 	}
-	vault2, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault Two"})
+	vault2, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault Two"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault 2 failed: %v", err)
 	}
@@ -179,7 +172,7 @@ func TestSearchService_VaultIsolation(t *testing.T) {
 	if result.Total != 1 {
 		t.Errorf("Expected exactly 1 result in vault1, got %d", result.Total)
 	}
-	for _, r := range result.Results {
+	for _, r := range result.Contacts {
 		if r.ID == contact2.ID {
 			t.Error("Vault1 search returned vault2's contact — isolation violated")
 		}
@@ -205,12 +198,12 @@ func TestSearchService_NoteIndexing(t *testing.T) {
 		LastName:  "User",
 		Email:     "search-note@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -249,14 +242,7 @@ func TestSearchService_NoteIndexing(t *testing.T) {
 		t.Fatal("Expected at least 1 result for note body content 'milestones'")
 	}
 
-	found := false
-	for _, r := range result.Results {
-		if r.Type == "note" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if len(result.Notes) == 0 {
 		t.Error("Expected to find a note in search results")
 	}
 

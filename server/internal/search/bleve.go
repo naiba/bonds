@@ -3,6 +3,7 @@ package search
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/blevesearch/bleve/v2"
@@ -109,20 +110,36 @@ func (e *BleveEngine) Search(vaultID, query string, limit, offset int) (*SearchR
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
-	results := make([]SearchResult, len(searchResult.Hits))
-	for i, hit := range searchResult.Hits {
-		results[i] = SearchResult{
-			ID:         hit.ID,
-			Type:       entityTypeFromHit(hit),
+	var contacts, notes []SearchResult
+	for _, hit := range searchResult.Hits {
+		entityType := entityTypeFromHit(hit)
+		id := stripIDPrefix(hit.ID)
+		r := SearchResult{
+			ID:         id,
+			Type:       entityType,
+			Name:       nameFromHit(hit),
 			Score:      hit.Score,
 			Highlights: fragmentsToMap(hit.Fragments),
 		}
+		switch entityType {
+		case "contact":
+			contacts = append(contacts, r)
+		case "note":
+			notes = append(notes, r)
+		}
+	}
+	if contacts == nil {
+		contacts = []SearchResult{}
+	}
+	if notes == nil {
+		notes = []SearchResult{}
 	}
 
 	return &SearchResponse{
-		Results: results,
-		Total:   int(searchResult.Total),
-		TookMs:  time.Since(start).Milliseconds(),
+		Contacts: contacts,
+		Notes:    notes,
+		Total:    int(searchResult.Total),
+		TookMs:   time.Since(start).Milliseconds(),
 	}, nil
 }
 
@@ -137,6 +154,31 @@ func entityTypeFromHit(hit *bleveSearch.DocumentMatch) string {
 		}
 	}
 	return ""
+}
+
+func stripIDPrefix(id string) string {
+	if idx := strings.IndexByte(id, ':'); idx >= 0 {
+		return id[idx+1:]
+	}
+	return id
+}
+
+func nameFromHit(hit *bleveSearch.DocumentMatch) string {
+	if hit.Fields == nil {
+		return ""
+	}
+	entityType, _ := hit.Fields["entity_type"].(string)
+	if entityType == "contact" {
+		first, _ := hit.Fields["first_name"].(string)
+		last, _ := hit.Fields["last_name"].(string)
+		name := strings.TrimSpace(first + " " + last)
+		if name == "" {
+			name, _ = hit.Fields["nickname"].(string)
+		}
+		return name
+	}
+	title, _ := hit.Fields["title"].(string)
+	return title
 }
 
 func fragmentsToMap(fragments bleveSearch.FieldFragmentMap) map[string][]string {
