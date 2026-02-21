@@ -90,7 +90,7 @@ func (s *ReminderSchedulerService) processOne(scheduled *models.ContactReminderS
 	switch channel.Type {
 	case "email":
 		sendErr = s.mailer.Send(channel.Content, subject, htmlBody)
-	case "telegram", "ntfy", "gotify", "webhook":
+	case "shoutrrr", "telegram", "ntfy", "gotify", "webhook":
 		if s.sender != nil {
 			sendErr = s.sender.Send(channel.Content, subject, htmlBody)
 		} else {

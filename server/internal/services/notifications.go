@@ -162,7 +162,7 @@ func (s *NotificationService) SendTest(id uint, userID string) error {
 		if s.mailer != nil {
 			sendErr = s.mailer.Send(ch.Content, subject, body)
 		}
-	case "telegram", "ntfy", "gotify", "webhook":
+	case "shoutrrr", "telegram", "ntfy", "gotify", "webhook":
 		if s.sender != nil {
 			sendErr = s.sender.Send(ch.Content, subject, body)
 		}
