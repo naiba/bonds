@@ -78,6 +78,25 @@ test.describe('Admin Features', () => {
     await expect(page.getByText('Administration')).not.toBeVisible({ timeout: 3000 });
   });
 
+  test('admin pages have tab navigation between Users and Settings', async ({ page }) => {
+    await loginUser(page, adminEmail);
+
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('User Management')).toBeVisible({ timeout: 10000 });
+
+    const segmented = page.locator('.ant-segmented');
+    await expect(segmented).toBeVisible({ timeout: 5000 });
+
+    await segmented.getByText('Settings').click();
+    await expect(page).toHaveURL(/\/admin\/settings/, { timeout: 10000 });
+    await expect(page.getByText('System Settings')).toBeVisible({ timeout: 10000 });
+
+    await page.locator('.ant-segmented').getByText('Users').click();
+    await expect(page).toHaveURL(/\/admin\/users/, { timeout: 10000 });
+    await expect(page.getByText('User Management')).toBeVisible({ timeout: 10000 });
+  });
+
   test('admin settings page loads with form fields', async ({ page }) => {
     await loginUser(page, adminEmail);
 

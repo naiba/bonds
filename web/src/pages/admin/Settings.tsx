@@ -1,7 +1,8 @@
-import { Card, Typography, Button, App, Spin, Form, Input, Select, Collapse, InputNumber } from "antd";
-import { SettingOutlined } from "@ant-design/icons";
+import { Card, Typography, Button, App, Spin, Form, Input, Select, Collapse, InputNumber, Segmented } from "antd";
+import { SettingOutlined, TeamOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
 import type { SystemSettingItem, APIError } from "@/api";
 
@@ -91,6 +92,7 @@ export default function AdminSettings() {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [form] = Form.useForm();
   const qk = ["admin", "settings"];
 
@@ -202,6 +204,18 @@ export default function AdminSettings() {
 
   return (
     <div style={{ maxWidth: 700, margin: "0 auto" }}>
+      <Segmented
+        value="settings"
+        onChange={(val) => {
+          if (val === "users") navigate("/admin/users");
+        }}
+        options={[
+          { label: t("admin.tab_users"), value: "users", icon: <TeamOutlined /> },
+          { label: t("admin.tab_settings"), value: "settings", icon: <SettingOutlined /> },
+        ]}
+        style={{ marginBottom: 24 }}
+      />
+
       <div style={{ marginBottom: 24 }}>
         <Title level={4} style={{ marginBottom: 4 }}>
           <SettingOutlined style={{ marginRight: 8 }} />

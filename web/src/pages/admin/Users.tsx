@@ -8,15 +8,19 @@ import {
   Popconfirm,
   Space,
   Spin,
+  Segmented,
 } from "antd";
 import {
   CrownOutlined,
   DeleteOutlined,
   StopOutlined,
   CheckCircleOutlined,
+  SettingOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
 import type { AdminUser, APIError } from "@/api";
 import { useAuth } from "@/stores/auth";
@@ -30,6 +34,7 @@ export default function AdminUsers() {
   const { message } = App.useApp();
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const qk = ["admin", "users"];
 
   const { data: users = [], isLoading } = useQuery({
@@ -222,6 +227,18 @@ export default function AdminUsers() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+      <Segmented
+        value="users"
+        onChange={(val) => {
+          if (val === "settings") navigate("/admin/settings");
+        }}
+        options={[
+          { label: t("admin.tab_users"), value: "users", icon: <TeamOutlined /> },
+          { label: t("admin.tab_settings"), value: "settings", icon: <SettingOutlined /> },
+        ]}
+        style={{ marginBottom: 24 }}
+      />
+
       <div style={{ marginBottom: 24 }}>
         <Title level={4} style={{ marginBottom: 4 }}>
           <CrownOutlined style={{ marginRight: 8 }} />
