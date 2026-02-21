@@ -28,6 +28,9 @@ func seedContactImportantDateTypes(tx *gorm.DB, vaultID, locale string) error {
 	defs := []dateDef{
 		{"seed.important_date_types.birthdate", "birthdate"},
 		{"seed.important_date_types.deceased_date", "deceased_date"},
+		{"seed.important_date_types.anniversary", ""},
+		{"seed.important_date_types.wedding", ""},
+		{"seed.important_date_types.one_time", ""},
 	}
 	items := make([]ContactImportantDateType, len(defs))
 	for idx, d := range defs {
@@ -40,13 +43,18 @@ func seedContactImportantDateTypes(tx *gorm.DB, vaultID, locale string) error {
 	if err := tx.Create(&items).Error; err != nil {
 		return err
 	}
-	ids := make([]uint, len(items))
-	for i, item := range items {
-		ids[i] = item.ID
+	var undeletableIDs []uint
+	for i, d := range defs {
+		if d.internalType != "" {
+			undeletableIDs = append(undeletableIDs, items[i].ID)
+		}
 	}
-	return tx.Model(&ContactImportantDateType{}).
-		Where("id IN ?", ids).
-		Update("can_be_deleted", false).Error
+	if len(undeletableIDs) > 0 {
+		return tx.Model(&ContactImportantDateType{}).
+			Where("id IN ?", undeletableIDs).
+			Update("can_be_deleted", false).Error
+	}
+	return nil
 }
 
 func seedMoodTrackingParameters(tx *gorm.DB, vaultID, locale string) error {

@@ -54,8 +54,8 @@ func TestCreateVault(t *testing.T) {
 
 	var dateTypeCount int64
 	db.Model(&models.ContactImportantDateType{}).Where("vault_id = ?", vault.ID).Count(&dateTypeCount)
-	if dateTypeCount != 2 {
-		t.Errorf("expected 2 ContactImportantDateTypes, got %d", dateTypeCount)
+	if dateTypeCount != 5 {
+		t.Errorf("expected 5 ContactImportantDateTypes, got %d", dateTypeCount)
 	}
 
 	var moodCount int64

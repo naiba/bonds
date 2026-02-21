@@ -370,6 +370,9 @@
 
   "seed.important_date_types.birthdate": "生日",
   "seed.important_date_types.deceased_date": "逝世日期",
+  "seed.important_date_types.anniversary": "纪念日",
+  "seed.important_date_types.wedding": "结婚纪念日",
+  "seed.important_date_types.one_time": "一次性日期",
 
   "seed.mood_tracking.awesome": "🥳 棒极了",
   "seed.mood_tracking.good": "😀 不错",

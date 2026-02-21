@@ -370,6 +370,9 @@
 
   "seed.important_date_types.birthdate": "Birthdate",
   "seed.important_date_types.deceased_date": "Deceased date",
+  "seed.important_date_types.anniversary": "Anniversary",
+  "seed.important_date_types.wedding": "Wedding",
+  "seed.important_date_types.one_time": "One-time date",
 
   "seed.mood_tracking.awesome": "🥳 Awesome",
   "seed.mood_tracking.good": "😀 Good",
