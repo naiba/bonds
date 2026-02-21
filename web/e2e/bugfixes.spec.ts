@@ -434,8 +434,7 @@ test.describe('Bugfixes', () => {
     await goToContacts(page);
     await createContact(page, 'Report', 'Two');
 
-    // Add an address to the second contact (Social tab → Addresses)
-    await navigateToTab(page, 'Social');
+    await navigateToTab(page, 'Contact information');
 
     const addressCard = page.locator('.ant-card').filter({ hasText: 'Addresses' });
     await expect(addressCard).toBeVisible({ timeout: 10000 });

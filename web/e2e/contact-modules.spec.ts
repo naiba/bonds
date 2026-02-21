@@ -174,7 +174,7 @@ test.describe('Contact Modules - Addresses', () => {
     await goToContacts(page);
     await createContact(page, 'AddressTest', 'User');
 
-    await navigateToTab(page, 'Social');
+    await navigateToTab(page, 'Contact information');
 
     const addressCard = page.locator('.ant-card').filter({ hasText: /Addresses/ });
     await expect(addressCard).toBeVisible({ timeout: 10000 });
@@ -335,7 +335,7 @@ test.describe('Contact Modules - Contact Information', () => {
     await goToContacts(page);
     await createContact(page, 'CInfoTest', 'User');
 
-    await navigateToTab(page, 'Social');
+    await navigateToTab(page, 'Contact information');
 
     const infoCard = page.locator('.ant-card').filter({ hasText: 'Contact Information' });
     await expect(infoCard).toBeVisible({ timeout: 10000 });
