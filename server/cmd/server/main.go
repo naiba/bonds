@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -61,6 +63,8 @@ func main() {
 		log.Fatalf("Failed to seed system settings: %v", err)
 	}
 	services.SetupOAuthProvidersFromDB(systemSettingService)
+
+	migrateUploadDir(cfg.Storage.UploadDir)
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
@@ -152,4 +156,26 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+func migrateUploadDir(currentDir string) {
+	if currentDir != "data/uploads" {
+		return
+	}
+	oldDir := "uploads"
+	if info, err := os.Stat(oldDir); err != nil || !info.IsDir() {
+		return
+	}
+	if _, err := os.Stat(currentDir); err == nil {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(currentDir), 0o755); err != nil {
+		log.Printf("WARNING: failed to create parent for %s: %v", currentDir, err)
+		return
+	}
+	if err := os.Rename(oldDir, currentDir); err != nil {
+		log.Printf("WARNING: failed to migrate %s -> %s: %v", oldDir, currentDir, err)
+		return
+	}
+	log.Printf("Migrated upload directory: %s -> %s", oldDir, currentDir)
 }

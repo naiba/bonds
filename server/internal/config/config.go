@@ -145,7 +145,7 @@ func Load() *Config {
 			From:     getEnv("SMTP_FROM", ""),
 		},
 		Storage: StorageConfig{
-			UploadDir: getEnv("STORAGE_UPLOAD_DIR", "uploads"),
+			UploadDir: getEnv("STORAGE_UPLOAD_DIR", "data/uploads"),
 			MaxSize:   getEnvInt64("STORAGE_MAX_SIZE", 10485760),
 		},
 		OAuth: OAuthConfig{
