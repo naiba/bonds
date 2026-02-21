@@ -8,8 +8,9 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
@@ -162,7 +163,8 @@ func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, file
 	}
 	defer src.Close()
 
-	result, err := h.vaultFileService.Upload(vaultID, contactID, fileType, fileHeader.Filename, mimeType, fileHeader.Size, src)
+	authorID := middleware.GetUserID(c)
+	result, err := h.vaultFileService.Upload(vaultID, contactID, authorID, fileType, fileHeader.Filename, mimeType, fileHeader.Size, src)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_upload_file")
 	}

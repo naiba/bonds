@@ -1820,6 +1820,31 @@ func TestFileDownload_NotFound(t *testing.T) {
 	}
 }
 
+func TestContactPhotoUpload_CreatesFeedEntry(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "photo-feed@example.com")
+	vault := ts.createTestVault(t, token, "Photo Feed Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "FeedPhoto")
+
+	pngData := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("x", 100))
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos",
+		token, "file", "trip.png", "image/png", pngData)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload photo failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/feed", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get feed failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "file_uploaded") {
+		t.Errorf("expected feed to contain 'file_uploaded' action, got: %s", body)
+	}
+}
+
 // ==================== Invitations Additional ====================
 
 func TestInvitationCreate_Success(t *testing.T) {

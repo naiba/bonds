@@ -131,7 +131,7 @@ func TestUploadFile(t *testing.T) {
 	content := []byte("hello world test file content")
 	reader := bytes.NewReader(content)
 
-	result, err := svc.Upload(vaultID, "", "document", "test.txt", "text/plain", int64(len(content)), reader)
+	result, err := svc.Upload(vaultID, "", "", "document", "test.txt", "text/plain", int64(len(content)), reader)
 	if err != nil {
 		t.Fatalf("Upload failed: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestUploadFileWithContact(t *testing.T) {
 	content := []byte("photo data")
 	reader := bytes.NewReader(content)
 
-	result, err := svc.Upload(vault.ID, contact.ID, "photo", "avatar.png", "image/png", int64(len(content)), reader)
+	result, err := svc.Upload(vault.ID, contact.ID, resp.User.ID, "photo", "avatar.png", "image/png", int64(len(content)), reader)
 	if err != nil {
 		t.Fatalf("Upload failed: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestGetFile(t *testing.T) {
 	content := []byte("get test content")
 	reader := bytes.NewReader(content)
 
-	uploaded, err := svc.Upload(vaultID, "", "document", "doc.pdf", "application/pdf", int64(len(content)), reader)
+	uploaded, err := svc.Upload(vaultID, "", "", "document", "doc.pdf", "application/pdf", int64(len(content)), reader)
 	if err != nil {
 		t.Fatalf("Upload failed: %v", err)
 	}
@@ -303,13 +303,155 @@ func TestVaultFilesListByTypePagination(t *testing.T) {
 	}
 }
 
+func TestUploadFileWithContactCreatesFeedEntry(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "file-feed-test@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Jane"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	svc := NewVaultFileService(db, t.TempDir())
+	feedRecorder := NewFeedRecorder(db)
+	svc.SetFeedRecorder(feedRecorder)
+
+	content := []byte("photo data for feed test")
+	reader := bytes.NewReader(content)
+
+	result, err := svc.Upload(vault.ID, contact.ID, resp.User.ID, "photo", "vacation.jpg", "image/jpeg", int64(len(content)), reader)
+	if err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
+
+	// Verify feed entry was created
+	var feedItem models.ContactFeedItem
+	err = db.Where("contact_id = ? AND action = ?", contact.ID, ActionFileUploaded).First(&feedItem).Error
+	if err != nil {
+		t.Fatalf("Expected feed item for file upload, got error: %v", err)
+	}
+	if feedItem.ContactID != contact.ID {
+		t.Errorf("Expected contact_id '%s', got '%s'", contact.ID, feedItem.ContactID)
+	}
+	if feedItem.AuthorID == nil || *feedItem.AuthorID != resp.User.ID {
+		t.Errorf("Expected author_id '%s', got '%v'", resp.User.ID, feedItem.AuthorID)
+	}
+	if feedItem.FeedableID == nil || *feedItem.FeedableID != result.ID {
+		t.Errorf("Expected feedable_id %d, got %v", result.ID, feedItem.FeedableID)
+	}
+	if feedItem.FeedableType == nil || *feedItem.FeedableType != "File" {
+		t.Errorf("Expected feedable_type 'File', got %v", feedItem.FeedableType)
+	}
+	if feedItem.Description == nil || *feedItem.Description != "Uploaded photo: vacation.jpg" {
+		t.Errorf("Expected description 'Uploaded photo: vacation.jpg', got %v", feedItem.Description)
+	}
+}
+
+func TestUploadFileWithoutContactNoFeedEntry(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "file-nofeed-test@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	svc := NewVaultFileService(db, t.TempDir())
+	feedRecorder := NewFeedRecorder(db)
+	svc.SetFeedRecorder(feedRecorder)
+
+	content := []byte("document data")
+	reader := bytes.NewReader(content)
+
+	_, err = svc.Upload(vault.ID, "", resp.User.ID, "document", "report.pdf", "application/pdf", int64(len(content)), reader)
+	if err != nil {
+		t.Fatalf("Upload failed: %v", err)
+	}
+
+	// No feed entry should be created when contactID is empty
+	var count int64
+	db.Model(&models.ContactFeedItem{}).Where("action = ?", ActionFileUploaded).Count(&count)
+	if count != 0 {
+		t.Errorf("Expected 0 feed items for file upload without contact, got %d", count)
+	}
+}
+
+func TestUploadFileWithoutFeedRecorder(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "file-norecorder-test@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Bob"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	// No feedRecorder set — should not panic
+	svc := NewVaultFileService(db, t.TempDir())
+
+	content := []byte("safe upload")
+	reader := bytes.NewReader(content)
+
+	_, err = svc.Upload(vault.ID, contact.ID, resp.User.ID, "document", "safe.txt", "text/plain", int64(len(content)), reader)
+	if err != nil {
+		t.Fatalf("Upload should succeed without feedRecorder, got: %v", err)
+	}
+}
+
 func TestDeleteFileRemovesDisk(t *testing.T) {
 	svc, vaultID, _ := setupVaultFileTest(t)
 
 	content := []byte("delete me")
 	reader := bytes.NewReader(content)
 
-	uploaded, err := svc.Upload(vaultID, "", "document", "temp.txt", "text/plain", int64(len(content)), reader)
+	uploaded, err := svc.Upload(vaultID, "", "", "document", "temp.txt", "text/plain", int64(len(content)), reader)
 	if err != nil {
 		t.Fatalf("Upload failed: %v", err)
 	}

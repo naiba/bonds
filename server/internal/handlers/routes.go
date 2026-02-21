@@ -143,6 +143,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	lifeEventService.SetFeedRecorder(feedRecorder)
 	loanService.SetFeedRecorder(feedRecorder)
 	relationshipService.SetFeedRecorder(feedRecorder)
+	vaultFileService.SetFeedRecorder(feedRecorder)
 
 	contactService.SetSearchService(searchService)
 	contactService.SetDavPushService(davPushService)

@@ -16,12 +16,17 @@ import (
 var ErrFileNotFound = errors.New("file not found")
 
 type VaultFileService struct {
-	db        *gorm.DB
-	uploadDir string
+	db           *gorm.DB
+	uploadDir    string
+	feedRecorder *FeedRecorder
 }
 
 func NewVaultFileService(db *gorm.DB, uploadDir string) *VaultFileService {
 	return &VaultFileService{db: db, uploadDir: uploadDir}
+}
+
+func (s *VaultFileService) SetFeedRecorder(fr *FeedRecorder) {
+	s.feedRecorder = fr
 }
 
 func (s *VaultFileService) UploadDir() string {
@@ -52,7 +57,7 @@ func (s *VaultFileService) Get(id uint, vaultID string) (*dto.VaultFileResponse,
 	return &resp, nil
 }
 
-func (s *VaultFileService) Upload(vaultID string, contactID string, fileType string, filename string, mimeType string, size int64, data io.Reader) (*dto.VaultFileResponse, error) {
+func (s *VaultFileService) Upload(vaultID string, contactID string, authorID string, fileType string, filename string, mimeType string, size int64, data io.Reader) (*dto.VaultFileResponse, error) {
 	fileUUID := uuid.New().String()
 
 	if err := os.MkdirAll(s.uploadDir, 0o755); err != nil {
@@ -89,6 +94,11 @@ func (s *VaultFileService) Upload(vaultID string, contactID string, fileType str
 	if err := s.db.Create(&file).Error; err != nil {
 		os.Remove(destPath)
 		return nil, fmt.Errorf("failed to save file record: %w", err)
+	}
+
+	if s.feedRecorder != nil && contactID != "" {
+		entityType := "File"
+		s.feedRecorder.Record(contactID, authorID, ActionFileUploaded, "Uploaded "+fileType+": "+filename, &file.ID, &entityType)
 	}
 
 	resp := toVaultFileResponse(&file)

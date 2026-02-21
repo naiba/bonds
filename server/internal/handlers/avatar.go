@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/avatar"
-	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
 )
@@ -100,7 +101,8 @@ func (h *AvatarHandler) UpdateAvatar(c echo.Context) error {
 	}
 	defer src.Close()
 
-	file, err := h.vaultFileService.Upload(vaultID, contactID, "avatar", fileHeader.Filename, mimeType, fileHeader.Size, src)
+	authorID := middleware.GetUserID(c)
+	file, err := h.vaultFileService.Upload(vaultID, contactID, authorID, "avatar", fileHeader.Filename, mimeType, fileHeader.Size, src)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_upload_file")
 	}
