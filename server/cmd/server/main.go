@@ -63,7 +63,10 @@ func main() {
 	if err := services.SeedSettingsFromEnv(systemSettingService, cfg); err != nil {
 		log.Fatalf("Failed to seed system settings: %v", err)
 	}
-	services.SetupOAuthProvidersFromDB(systemSettingService)
+	services.MigrateOAuthSettingsToProviders(db, systemSettingService)
+	oauthProviderService := services.NewOAuthProviderService(db)
+	oauthProviderService.SetSystemSettings(systemSettingService)
+	oauthProviderService.ReloadProviders()
 
 	migrateUploadDir(cfg.Storage.UploadDir)
 	migrateModulesToContactPage(db)

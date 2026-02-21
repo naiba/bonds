@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/naiba/bonds/internal/config"
+	"github.com/naiba/bonds/internal/models"
+	"gorm.io/gorm"
 )
 
 type settingSeed struct {
@@ -26,21 +28,9 @@ func SeedSettingsFromEnv(svc *SystemSettingService, cfg *config.Config) error {
 		{"smtp.password", cfg.SMTP.Password},
 		{"smtp.from", cfg.SMTP.From},
 
-		// Existing DB key names preserved for backward compatibility
-		{"oauth_github_key", cfg.OAuth.GitHubKey},
-		{"oauth_github_secret", cfg.OAuth.GitHubSecret},
-		{"oauth_google_key", cfg.OAuth.GoogleKey},
-		{"oauth_google_secret", cfg.OAuth.GoogleSecret},
-		{"oidc_client_id", cfg.OAuth.OIDCKey},
-		{"oidc_client_secret", cfg.OAuth.OIDCSecret},
-		{"oidc_discovery_url", cfg.OAuth.OIDCDiscoveryURL},
-		{"oidc_name", cfg.OAuth.OIDCName},
-
 		{"webauthn.rp_id", cfg.WebAuthn.RPID},
 		{"webauthn.rp_display_name", cfg.WebAuthn.RPDisplayName},
 		{"webauthn.rp_origins", joinStrings(cfg.WebAuthn.RPOrigins)},
-
-		{"telegram.bot_token", cfg.Telegram.BotToken},
 
 		{"geocoding.provider", cfg.Geocoding.Provider},
 		{"geocoding.api_key", cfg.Geocoding.APIKey},
@@ -87,4 +77,60 @@ func joinStrings(ss []string) string {
 		result += "," + s
 	}
 	return result
+}
+
+// MigrateOAuthSettingsToProviders migrates legacy oauth_* system settings
+// to the OAuthProvider table. Runs once: skips if any providers already exist.
+// After migration, the legacy settings are deleted from system_settings.
+func MigrateOAuthSettingsToProviders(db *gorm.DB, settings *SystemSettingService) {
+	var count int64
+	db.Model(&models.OAuthProvider{}).Count(&count)
+	if count > 0 {
+		return
+	}
+
+	legacyKeys := []string{
+		"oauth_github_key", "oauth_github_secret",
+		"oauth_google_key", "oauth_google_secret",
+		"oidc_client_id", "oidc_client_secret", "oidc_discovery_url", "oidc_name",
+	}
+
+	ghKey := settings.GetWithDefault("oauth_github_key", "")
+	ghSecret := settings.GetWithDefault("oauth_github_secret", "")
+	if ghKey != "" && ghSecret != "" {
+		db.Create(&models.OAuthProvider{
+			Type: "github", Name: "github", ClientID: ghKey, ClientSecret: ghSecret,
+			DisplayName: "GitHub", Enabled: true,
+		})
+	}
+
+	goKey := settings.GetWithDefault("oauth_google_key", "")
+	goSecret := settings.GetWithDefault("oauth_google_secret", "")
+	if goKey != "" && goSecret != "" {
+		db.Create(&models.OAuthProvider{
+			Type: "google", Name: "google", ClientID: goKey, ClientSecret: goSecret,
+			DisplayName: "Google", Enabled: true,
+		})
+	}
+
+	oidcKey := settings.GetWithDefault("oidc_client_id", "")
+	oidcSecret := settings.GetWithDefault("oidc_client_secret", "")
+	oidcDiscovery := settings.GetWithDefault("oidc_discovery_url", "")
+	oidcName := settings.GetWithDefault("oidc_name", "SSO")
+	if oidcKey != "" && oidcSecret != "" && oidcDiscovery != "" {
+		db.Create(&models.OAuthProvider{
+			Type: "oidc", Name: "openid-connect", ClientID: oidcKey, ClientSecret: oidcSecret,
+			DisplayName: oidcName, DiscoveryURL: oidcDiscovery, Enabled: true,
+		})
+	}
+
+	migrated := false
+	for _, key := range legacyKeys {
+		if err := settings.Delete(key); err == nil {
+			migrated = true
+		}
+	}
+	if migrated {
+		log.Println("Migrated legacy OAuth settings to OAuthProvider table")
+	}
 }

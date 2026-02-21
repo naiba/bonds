@@ -19,16 +19,15 @@ func splitAndTrim(s, sep string) []string {
 }
 
 type Config struct {
-	Debug        bool
-	Server       ServerConfig
-	Database     DatabaseConfig
-	JWT          JWTConfig
-	App          AppConfig
-	SMTP         SMTPConfig
-	Storage      StorageConfig
-	OAuth        OAuthConfig
-	WebAuthn     WebAuthnConfig
-	Telegram     TelegramConfig
+	Debug    bool
+	Server   ServerConfig
+	Database DatabaseConfig
+	JWT      JWTConfig
+	App      AppConfig
+	SMTP     SMTPConfig
+	Storage  StorageConfig
+	WebAuthn WebAuthnConfig
+
 	Geocoding    GeocodingConfig
 	Bleve        BleveConfig
 	Backup       BackupConfig
@@ -70,25 +69,10 @@ type StorageConfig struct {
 	MaxSize   int64
 }
 
-type OAuthConfig struct {
-	GitHubKey        string
-	GitHubSecret     string
-	GoogleKey        string
-	GoogleSecret     string
-	OIDCKey          string
-	OIDCSecret       string
-	OIDCDiscoveryURL string
-	OIDCName         string // Display name, e.g. "Authentik", "Keycloak"
-}
-
 type WebAuthnConfig struct {
 	RPID          string
 	RPDisplayName string
 	RPOrigins     []string
-}
-
-type TelegramConfig struct {
-	BotToken string
 }
 
 type GeocodingConfig struct {
@@ -147,19 +131,6 @@ func Load() *Config {
 		Storage: StorageConfig{
 			UploadDir: getEnv("STORAGE_UPLOAD_DIR", "data/uploads"),
 			MaxSize:   getEnvInt64("STORAGE_MAX_SIZE", 10485760),
-		},
-		OAuth: OAuthConfig{
-			GitHubKey:        getEnv("OAUTH_GITHUB_KEY", ""),
-			GitHubSecret:     getEnv("OAUTH_GITHUB_SECRET", ""),
-			GoogleKey:        getEnv("OAUTH_GOOGLE_KEY", ""),
-			GoogleSecret:     getEnv("OAUTH_GOOGLE_SECRET", ""),
-			OIDCKey:          getEnv("OIDC_CLIENT_ID", ""),
-			OIDCSecret:       getEnv("OIDC_CLIENT_SECRET", ""),
-			OIDCDiscoveryURL: getEnv("OIDC_DISCOVERY_URL", ""),
-			OIDCName:         getEnv("OIDC_NAME", "SSO"),
-		},
-		Telegram: TelegramConfig{
-			BotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
 		},
 		Geocoding: GeocodingConfig{
 			Provider: getEnv("GEOCODING_PROVIDER", "nominatim"),

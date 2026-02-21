@@ -41,8 +41,9 @@ func (s *OAuthService) ListAvailableProviders() []map[string]string {
 		entry := map[string]string{
 			"name": p.Name(),
 		}
-		if p.Name() == "openid-connect" && s.getOIDCName() != "" {
-			entry["display_name"] = s.getOIDCName()
+		var op models.OAuthProvider
+		if err := s.db.Where("name = ?", p.Name()).First(&op).Error; err == nil && op.DisplayName != "" {
+			entry["display_name"] = op.DisplayName
 		}
 		result = append(result, entry)
 	}
