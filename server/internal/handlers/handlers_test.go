@@ -2170,61 +2170,6 @@ func TestContactCompaniesList(t *testing.T) {
 	}
 }
 
-// ==================== Telegram Webhook ====================
-
-func TestTelegramWebhook_InvalidBody(t *testing.T) {
-	ts := setupTestServerWithTelegram(t)
-
-	rec := ts.doRequest(http.MethodPost, "/api/telegram/webhook",
-		`{"message":null}`, "")
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestTelegramWebhook_NonStartMessage(t *testing.T) {
-	ts := setupTestServerWithTelegram(t)
-
-	rec := ts.doRequest(http.MethodPost, "/api/telegram/webhook",
-		`{"message":{"chat":{"id":123},"text":"hello"}}`, "")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestTelegramWebhook_InvalidToken(t *testing.T) {
-	ts := setupTestServerWithTelegram(t)
-
-	rec := ts.doRequest(http.MethodPost, "/api/telegram/webhook",
-		`{"message":{"chat":{"id":123},"text":"/start invalid-token"}}`, "")
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func setupTestServerWithTelegram(t *testing.T) *testServer {
-	t.Helper()
-	db := testutil.SetupTestDB(t)
-	cfg := &config.Config{
-		Server:   config.ServerConfig{Port: "8080", Host: "localhost"},
-		Database: config.DatabaseConfig{Driver: "sqlite", DSN: ":memory:"},
-		JWT: config.JWTConfig{
-			Secret:     "test-secret-key",
-			ExpiryHrs:  24,
-			RefreshHrs: 168,
-		},
-		App:      config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
-		Telegram: config.TelegramConfig{BotToken: "test-bot-token"},
-	}
-	settingSvc := services.NewSystemSettingService(db)
-	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
-		t.Fatalf("failed to seed settings: %v", err)
-	}
-	e := echo.New()
-	handlers.RegisterRoutes(e, db, cfg, "test")
-	return &testServer{e: e, db: db, cfg: cfg}
-}
-
 // ==================== Contact List By Label ====================
 
 func TestContactListByLabel_Success(t *testing.T) {
@@ -3564,10 +3509,9 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
-	// SeedSettingsFromEnv seeds 27 settings during RegisterRoutes
 	initialCount := len(getResp.Settings)
-	if initialCount != 27 {
-		t.Errorf("expected 27 settings initially (seeded from env), got %d", initialCount)
+	if initialCount != 18 {
+		t.Errorf("expected 18 settings initially (seeded from env), got %d", initialCount)
 	}
 
 	rec = ts.doRequest(http.MethodPut, "/api/admin/settings",
@@ -3580,9 +3524,8 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
-	// app.name already existed (updated in place), registration.enabled is new → 27 + 1 = 28
-	if len(getResp.Settings) != 28 {
-		t.Errorf("expected 28 settings after update, got %d", len(getResp.Settings))
+	if len(getResp.Settings) != 19 {
+		t.Errorf("expected 19 settings after update, got %d", len(getResp.Settings))
 	}
 }
 
@@ -3639,5 +3582,158 @@ func TestRegisterFirstUserIsInstanceAdmin_Handler(t *testing.T) {
 	ts.db.Where("email = ?", "second-h@example.com").First(&secondUser)
 	if secondUser.IsInstanceAdministrator {
 		t.Error("expected second user NOT to be instance administrator")
+	}
+}
+
+func TestAdminOAuthProviders_CRUD(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-oauth-crud@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/oauth-providers", "", adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var list []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &list); err != nil {
+		t.Fatalf("parse list: %v", err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expected 0 providers initially, got %d", len(list))
+	}
+
+	rec = ts.doRequest(http.MethodPost, "/api/admin/oauth-providers",
+		`{"type":"github","name":"github","client_id":"test-key","client_secret":"test-secret","display_name":"GitHub"}`,
+		adminToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var created struct {
+		ID          uint   `json:"id"`
+		Type        string `json:"type"`
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
+		Enabled     bool   `json:"enabled"`
+		HasSecret   bool   `json:"has_secret"`
+	}
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("parse created: %v", err)
+	}
+	if created.Type != "github" {
+		t.Errorf("expected type 'github', got '%s'", created.Type)
+	}
+	if !created.Enabled {
+		t.Error("expected enabled=true by default")
+	}
+	if !created.HasSecret {
+		t.Error("expected has_secret=true")
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/admin/oauth-providers", "", adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list after create: expected 200, got %d", rec.Code)
+	}
+	resp = parseResponse(t, rec)
+	if err := json.Unmarshal(resp.Data, &list); err != nil {
+		t.Fatalf("parse list: %v", err)
+	}
+	if len(list) != 1 {
+		t.Errorf("expected 1 provider, got %d", len(list))
+	}
+
+	updateURL := fmt.Sprintf("/api/admin/oauth-providers/%d", created.ID)
+	rec = ts.doRequest(http.MethodPut, updateURL,
+		`{"display_name":"GitHub Updated","enabled":false}`, adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updated struct {
+		DisplayName string `json:"display_name"`
+		Enabled     bool   `json:"enabled"`
+	}
+	if err := json.Unmarshal(resp.Data, &updated); err != nil {
+		t.Fatalf("parse updated: %v", err)
+	}
+	if updated.DisplayName != "GitHub Updated" {
+		t.Errorf("expected display_name 'GitHub Updated', got '%s'", updated.DisplayName)
+	}
+	if updated.Enabled {
+		t.Error("expected enabled=false after update")
+	}
+
+	rec = ts.doRequest(http.MethodDelete, updateURL, "", adminToken)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/admin/oauth-providers", "", adminToken)
+	resp = parseResponse(t, rec)
+	if err := json.Unmarshal(resp.Data, &list); err != nil {
+		t.Fatalf("parse list: %v", err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expected 0 providers after delete, got %d", len(list))
+	}
+}
+
+func TestAdminOAuthProviders_NonAdminForbidden(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.registerTestUser(t, "admin-oauth-first@example.com")
+	nonAdminToken, _ := ts.registerTestUser(t, "admin-oauth-nonadmin@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/oauth-providers", "", nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPost, "/api/admin/oauth-providers",
+		`{"type":"github","name":"github","client_id":"k","client_secret":"s"}`, nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for create, got %d", rec.Code)
+	}
+}
+
+func TestBackups_RequiresInstanceAdmin(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.cfg.Backup.Dir = t.TempDir()
+	adminToken, _ := ts.registerTestUser(t, "backup-admin@example.com")
+	nonAdminToken, _ := ts.registerTestUser(t, "backup-nonadmin@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/settings/backups", "", adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("instance admin: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/settings/backups", "", nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("non-admin: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/settings/backups/config", "", adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("backup config: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestDisabledUser_JWTRejected(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "disabled-jwt@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/vaults", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("before disable: expected 200, got %d", rec.Code)
+	}
+
+	ts.db.Model(&models.User{}).Where("email = ?", "disabled-jwt@example.com").Update("disabled", true)
+
+	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", token)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("after disable: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Error("expected success=false for disabled user")
 	}
 }
