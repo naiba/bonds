@@ -49,6 +49,12 @@ type CreateNotificationChannelRequest struct {
 	PreferredTime string `json:"preferred_time" example:"09:00"`
 }
 
+type UpdateNotificationChannelRequest struct {
+	Label         string `json:"label" example:"Work Email"`
+	Content       string `json:"content" validate:"required" example:"user@example.com"`
+	PreferredTime string `json:"preferred_time" example:"09:00"`
+}
+
 type NotificationChannelResponse struct {
 	ID            uint       `json:"id" example:"1"`
 	Type          string     `json:"type" example:"email"`

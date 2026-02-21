@@ -94,6 +94,45 @@ func (s *NotificationService) Create(userID string, req dto.CreateNotificationCh
 	return &resp, nil
 }
 
+func (s *NotificationService) Update(id uint, userID string, req dto.UpdateNotificationChannelRequest) (*dto.NotificationChannelResponse, error) {
+	var ch models.UserNotificationChannel
+	if err := s.db.Where("id = ? AND user_id = ?", id, userID).First(&ch).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotificationChannelNotFound
+		}
+		return nil, err
+	}
+
+	contentChanged := ch.Content != req.Content
+
+	ch.Label = strPtrOrNil(req.Label)
+	ch.Content = req.Content
+	ch.PreferredTime = strPtrOrNil(req.PreferredTime)
+
+	if contentChanged && ch.Type == "email" {
+		token := uuid.New().String()
+		ch.VerificationToken = &token
+		ch.VerifiedAt = nil
+		ch.Active = false
+		ch.Fails = 0
+	}
+
+	if err := s.db.Save(&ch).Error; err != nil {
+		return nil, err
+	}
+
+	if contentChanged && ch.Type == "email" {
+		if s.mailer != nil {
+			link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.getAppURL(), ch.ID, *ch.VerificationToken)
+			body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
+			_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
+		}
+	}
+
+	resp := toNotificationChannelResponse(&ch)
+	return &resp, nil
+}
+
 func (s *NotificationService) Toggle(id uint, userID string) (*dto.NotificationChannelResponse, error) {
 	var ch models.UserNotificationChannel
 	if err := s.db.Where("id = ? AND user_id = ?", id, userID).First(&ch).Error; err != nil {

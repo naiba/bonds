@@ -818,7 +818,11 @@
       "verify_modal_title": "验证通知渠道",
       "verify_token_placeholder": "输入验证令牌",
       "verify_success": "渠道验证成功",
-      "shoutrrr_url": "Shoutrrr URL"
+      "shoutrrr_url": "Shoutrrr URL",
+      "edit_channel": "编辑渠道",
+      "edit_modal_title": "编辑通知渠道",
+      "updated": "渠道已更新",
+      "content_changed_reverify": "目标地址已更改——邮件渠道需要重新验证。"
     },
     "personalize": {
       "title": "个性化",

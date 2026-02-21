@@ -543,6 +543,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	notifGroup := settingsGroup.Group("/notifications")
 	notifGroup.GET("", notificationHandler.List)
 	notifGroup.POST("", notificationHandler.Create)
+	notifGroup.PUT("/:id", notificationHandler.Update)
 	notifGroup.PUT("/:id/toggle", notificationHandler.Toggle)
 	notifGroup.DELETE("/:id", notificationHandler.Delete)
 	notifGroup.GET("/:id/verify/:token", notificationHandler.Verify)

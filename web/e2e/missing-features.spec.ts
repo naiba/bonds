@@ -221,5 +221,56 @@ test.describe('Notifications - Channel Verification', () => {
 
     await expect(newChannel).not.toBeVisible({ timeout: 10000 });
   });
+
+  test('should edit a notification channel', async ({ page }) => {
+    await registerUser(page, 'notif-edit');
+
+    await page.goto('/settings/notifications');
+    await page.waitForLoadState('networkidle');
+
+    await page.getByRole('button').filter({ has: page.locator('.anticon-plus') }).click();
+
+    const createModal = page.locator('.ant-modal').filter({ hasText: /add notification/i });
+    await expect(createModal).toBeVisible({ timeout: 5000 });
+
+    await createModal.getByLabel(/label/i).fill('Edit Me Channel');
+    await createModal.getByLabel(/destination/i).fill('edit-me@example.com');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/notifications') && resp.request().method() === 'POST'
+    );
+    await createModal.getByRole('button', { name: /ok/i }).click();
+    await createResp;
+
+    await expect(createModal).not.toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState('networkidle');
+
+    const channelItem = page.locator('.ant-list-item').filter({ hasText: 'Edit Me Channel' });
+    await expect(channelItem).toBeVisible({ timeout: 10000 });
+
+    await channelItem.getByRole('button').filter({ has: page.locator('.anticon-edit') }).click();
+
+    const editModal = page.locator('.ant-modal').filter({ hasText: /edit notification/i });
+    await expect(editModal).toBeVisible({ timeout: 5000 });
+
+    const typeSelect = editModal.locator('.ant-select');
+    await expect(typeSelect).toHaveClass(/ant-select-disabled/, { timeout: 3000 });
+
+    await editModal.getByLabel(/label/i).clear();
+    await editModal.getByLabel(/label/i).fill('Renamed Channel');
+
+    const updateResp = page.waitForResponse(
+      (resp) => resp.url().includes('/notifications/') && resp.request().method() === 'PUT' && !resp.url().includes('/toggle')
+    );
+    await editModal.getByRole('button', { name: /ok/i }).click();
+    await updateResp;
+
+    await expect(editModal).not.toBeVisible({ timeout: 10000 });
+    await page.waitForLoadState('networkidle');
+
+    await expect(
+      page.locator('.ant-list-item').filter({ hasText: 'Renamed Channel' })
+    ).toBeVisible({ timeout: 10000 });
+  });
 });
 

@@ -21,6 +21,7 @@ import {
 import {
   PlusOutlined,
   DeleteOutlined,
+  EditOutlined,
   MailOutlined,
   SendOutlined,
   ApiOutlined,
@@ -65,7 +66,8 @@ function getShoutrrrIcon(content: string): { icon: React.ReactNode; color: strin
 }
 
 export default function Notifications() {
-  const [open, setOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingChannel, setEditingChannel] = useState<NotificationChannel | null>(null);
   const [logsChannelId, setLogsChannelId] = useState<number | null>(null);
   const [verifyingChannelId, setVerifyingChannelId] = useState<number | null>(null);
   const [verifyToken, setVerifyToken] = useState("");
@@ -90,9 +92,19 @@ export default function Notifications() {
       api.notifications.notificationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
-      setOpen(false);
-      form.resetFields();
+      closeModal();
       message.success(t("settings.notifications.created"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, values }: { id: number; values: { label: string; content: string; preferred_time?: string } }) =>
+      api.notifications.notificationsUpdate(id, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      closeModal();
+      message.success(t("settings.notifications.updated"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -140,6 +152,40 @@ export default function Notifications() {
     enabled: logsChannelId !== null,
   });
 
+  function openCreateModal() {
+    setEditingChannel(null);
+    form.resetFields();
+    setModalOpen(true);
+  }
+
+  function openEditModal(ch: NotificationChannel) {
+    setEditingChannel(ch);
+    form.setFieldsValue({
+      type: ch.type,
+      label: ch.label,
+      content: ch.content,
+      preferred_time: ch.preferred_time,
+    });
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditingChannel(null);
+    form.resetFields();
+  }
+
+  function handleFormSubmit(values: { type: string; label: string; content: string; preferred_time?: string }) {
+    if (editingChannel) {
+      updateMutation.mutate({
+        id: editingChannel.id!,
+        values: { label: values.label, content: values.content, preferred_time: values.preferred_time },
+      });
+    } else {
+      createMutation.mutate(values as { type: "email" | "shoutrrr"; label: string; content: string });
+    }
+  }
+
   if (isLoading) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
@@ -147,6 +193,9 @@ export default function Notifications() {
       </div>
     );
   }
+
+  const isEditing = editingChannel !== null;
+  const formType = isEditing ? editingChannel.type : selectedType;
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
@@ -169,7 +218,7 @@ export default function Notifications() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => setOpen(true)}
+          onClick={openCreateModal}
           style={{ flexShrink: 0, marginTop: 4 }}
         >
           {t("settings.notifications.add_channel")}
@@ -201,6 +250,14 @@ export default function Notifications() {
                     key="toggle"
                     checked={ch.active}
                     onChange={() => toggleMutation.mutate(ch)}
+                  />,
+                  <Button
+                    key="edit"
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => openEditModal(ch)}
+                    title={t("settings.notifications.edit_channel")}
                   />,
                   ...(!ch.verified_at
                     ? [
@@ -289,19 +346,16 @@ export default function Notifications() {
       </Card>
 
       <Modal
-        title={t("settings.notifications.modal_title")}
-        open={open}
-        onCancel={() => {
-          setOpen(false);
-          form.resetFields();
-        }}
+        title={isEditing ? t("settings.notifications.edit_modal_title") : t("settings.notifications.modal_title")}
+        open={modalOpen}
+        onCancel={closeModal}
         onOk={() => form.submit()}
-        confirmLoading={createMutation.isPending}
+        confirmLoading={isEditing ? updateMutation.isPending : createMutation.isPending}
       >
         <Form
           form={form}
           layout="vertical"
-          onFinish={(v) => createMutation.mutate(v)}
+          onFinish={handleFormSubmit}
           initialValues={{ type: "email" }}
         >
           <Form.Item
@@ -309,7 +363,7 @@ export default function Notifications() {
             label={t("settings.notifications.type")}
             rules={[{ required: true }]}
           >
-            <Select options={channelTypes} />
+            <Select options={channelTypes} disabled={isEditing} />
           </Form.Item>
           <Form.Item
             name="label"
@@ -321,20 +375,22 @@ export default function Notifications() {
           <Form.Item
             name="content"
             label={
-              selectedType === "email"
+              formType === "email"
                 ? t("settings.notifications.destination")
                 : t("settings.notifications.shoutrrr_url")
             }
             extra={
-              selectedType === "shoutrrr"
+              formType === "shoutrrr"
                 ? <span>{t("settings.notifications.shoutrrr_help")} — <a href="https://containrrr.dev/shoutrrr/v0.8/services/overview/" target="_blank" rel="noopener noreferrer">{t("settings.notifications.shoutrrr_docs_link")}</a></span>
-                : null
+                : isEditing && editingChannel?.type === "email"
+                  ? t("settings.notifications.content_changed_reverify")
+                  : null
             }
             rules={[{ required: true }]}
           >
             <Input
               placeholder={
-                selectedType === "email"
+                formType === "email"
                   ? "user@example.com"
                   : "telegram://token@telegram?channels=chatid"
               }

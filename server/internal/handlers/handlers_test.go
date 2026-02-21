@@ -2748,6 +2748,96 @@ func TestNotificationVerify_Success(t *testing.T) {
 	}
 }
 
+func TestNotificationUpdate_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "notif-update@test.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/notifications",
+		`{"type":"shoutrrr","label":"My Bot","content":"telegram://token@telegram?channels=123"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var channel struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &channel)
+
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/settings/notifications/%d", channel.ID),
+		`{"label":"Updated Bot","content":"telegram://token@telegram?channels=456"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updated struct {
+		Label   string `json:"label"`
+		Content string `json:"content"`
+	}
+	json.Unmarshal(resp.Data, &updated)
+	if updated.Label != "Updated Bot" {
+		t.Errorf("expected label 'Updated Bot', got '%s'", updated.Label)
+	}
+	if updated.Content != "telegram://token@telegram?channels=456" {
+		t.Errorf("expected updated content, got '%s'", updated.Content)
+	}
+}
+
+func TestNotificationUpdate_NotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "notif-update-nf@test.com")
+
+	rec := ts.doRequest(http.MethodPut, "/api/settings/notifications/99999",
+		`{"label":"X","content":"x@example.com"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNotificationUpdate_EmailResetsVerification(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "notif-update-reverify@test.com")
+	ts.createTestVault(t, token, "V")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/notifications",
+		`{"type":"email","label":"Email","content":"original@example.com"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var channel struct {
+		ID uint `json:"id"`
+	}
+	json.Unmarshal(resp.Data, &channel)
+
+	var dbChannel models.UserNotificationChannel
+	ts.db.Where("id = ? AND user_id = ?", channel.ID, auth.User.ID).First(&dbChannel)
+	verifyToken := *dbChannel.VerificationToken
+	ts.doRequest(http.MethodGet, fmt.Sprintf("/api/settings/notifications/%d/verify/%s", channel.ID, verifyToken), "", token)
+
+	ts.db.First(&dbChannel, channel.ID)
+	if dbChannel.VerifiedAt == nil {
+		t.Fatal("expected channel to be verified before update")
+	}
+
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/settings/notifications/%d", channel.ID),
+		`{"label":"Email","content":"changed@example.com"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updated struct {
+		Active     bool    `json:"active"`
+		VerifiedAt *string `json:"verified_at"`
+	}
+	json.Unmarshal(resp.Data, &updated)
+	if updated.VerifiedAt != nil {
+		t.Error("expected verified_at to be null after content change")
+	}
+	if updated.Active {
+		t.Error("expected channel to be inactive after content change")
+	}
+}
+
 func (ts *testServer) createTestJournal(t *testing.T, token, vaultID, name string) uint {
 	t.Helper()
 	body := `{"name":"` + name + `"}`

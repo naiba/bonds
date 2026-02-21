@@ -818,7 +818,11 @@
       "verify_action": "Verify",
       "verify_modal_title": "Verify Notification Channel",
       "verify_token_placeholder": "Enter verification token",
-      "verify_success": "Channel verified successfully"
+      "verify_success": "Channel verified successfully",
+      "edit_channel": "Edit Channel",
+      "edit_modal_title": "Edit Notification Channel",
+      "updated": "Channel updated",
+      "content_changed_reverify": "Destination changed — email channels require re-verification."
     },
     "personalize": {
       "title": "Personalize",

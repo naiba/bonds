@@ -64,4 +64,21 @@ describe("Notifications", () => {
       screen.getByRole("button", { name: /add channel/i }),
     ).toBeInTheDocument();
   });
+
+  it("renders edit button for each channel", () => {
+    mockUseQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+      if (queryKey[0] === "settings" && queryKey[1] === "notifications") {
+        return {
+          data: [
+            { id: 1, type: "email", label: "My Email", content: "test@example.com", active: true, verified_at: "2026-01-01" },
+          ],
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+    renderNotifications();
+    const editButton = document.querySelector('[title="Edit Channel"]');
+    expect(editButton).toBeInTheDocument();
+  });
 });
