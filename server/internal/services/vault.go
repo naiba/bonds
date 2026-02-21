@@ -49,7 +49,7 @@ func (s *VaultService) ListVaults(userID string) ([]dto.VaultResponse, error) {
 	return result, nil
 }
 
-func (s *VaultService) CreateVault(accountID, userID string, req dto.CreateVaultRequest) (*dto.VaultResponse, error) {
+func (s *VaultService) CreateVault(accountID, userID string, req dto.CreateVaultRequest, locale string) (*dto.VaultResponse, error) {
 	desc := req.Description
 	vault := models.Vault{
 		AccountID:   accountID,
@@ -70,7 +70,7 @@ func (s *VaultService) CreateVault(accountID, userID string, req dto.CreateVault
 		if err := tx.Create(&userVault).Error; err != nil {
 			return err
 		}
-		return models.SeedVaultDefaults(tx, vault.ID)
+		return models.SeedVaultDefaults(tx, vault.ID, locale)
 	})
 	if err != nil {
 		return nil, err

@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -79,7 +80,8 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 			fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))
 	}
 
-	authResp, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name)
+	locale := middleware.GetLocale(c)
+	authResp, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name, locale)
 	if err != nil {
 		return c.Redirect(http.StatusTemporaryRedirect,
 			fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))

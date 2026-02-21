@@ -64,7 +64,8 @@ func (h *VaultHandler) Create(c echo.Context) error {
 
 	accountID := middleware.GetAccountID(c)
 	userID := middleware.GetUserID(c)
-	vault, err := h.vaultService.CreateVault(accountID, userID, req)
+	locale := middleware.GetLocale(c)
+	vault, err := h.vaultService.CreateVault(accountID, userID, req, locale)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_create_vault")
 	}

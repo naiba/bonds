@@ -41,7 +41,8 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	result, err := h.authService.Register(req)
+	locale := middleware.GetLocale(c)
+	result, err := h.authService.Register(req, locale)
 	if err != nil {
 		if errors.Is(err, services.ErrEmailExists) {
 			return response.Conflict(c, "err.email_already_exists")

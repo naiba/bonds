@@ -46,7 +46,7 @@ func (s *OAuthService) getOIDCName() string {
 
 // FindOrCreateUser looks up a user by OAuth provider+providerUserID.
 // If found, returns the user. If not, checks by email and either links or creates a new account.
-func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name string) (*dto.AuthResponse, error) {
+func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, locale string) (*dto.AuthResponse, error) {
 	// Look up existing UserToken by Driver+DriverID
 	var token models.UserToken
 	err := s.db.Where("driver = ? AND driver_id = ?", provider, providerUserID).First(&token).Error
@@ -111,7 +111,7 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name st
 		if err := tx.Create(&user).Error; err != nil {
 			return err
 		}
-		if err := models.SeedAccountDefaults(tx, account.ID, user.ID, email); err != nil {
+		if err := models.SeedAccountDefaults(tx, account.ID, user.ID, email, locale); err != nil {
 			return err
 		}
 		newToken := models.UserToken{

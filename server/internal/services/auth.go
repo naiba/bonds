@@ -28,7 +28,7 @@ func NewAuthService(db *gorm.DB, cfg *config.JWTConfig) *AuthService {
 	return &AuthService{db: db, cfg: cfg}
 }
 
-func (s *AuthService) Register(req dto.RegisterRequest) (*dto.AuthResponse, error) {
+func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.AuthResponse, error) {
 	var existing models.User
 	if err := s.db.Where("email = ?", req.Email).First(&existing).Error; err == nil {
 		return nil, ErrEmailExists
@@ -63,7 +63,7 @@ func (s *AuthService) Register(req dto.RegisterRequest) (*dto.AuthResponse, erro
 		if err := tx.Create(&user).Error; err != nil {
 			return err
 		}
-		return models.SeedAccountDefaults(tx, account.ID, user.ID, req.Email)
+		return models.SeedAccountDefaults(tx, account.ID, user.ID, req.Email, locale)
 	})
 	if err != nil {
 		return nil, err

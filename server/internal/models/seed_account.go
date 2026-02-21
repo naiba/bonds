@@ -3,14 +3,15 @@ package models
 import (
 	"time"
 
+	"github.com/naiba/bonds/internal/i18n"
 	"gorm.io/gorm"
 )
 
 func strPtr(s string) *string { return &s }
 func intPtr(i int) *int       { return &i }
 
-func SeedAccountDefaults(tx *gorm.DB, accountID, userID, userEmail string) error {
-	seeders := []func(*gorm.DB, string) error{
+func SeedAccountDefaults(tx *gorm.DB, accountID, userID, userEmail, locale string) error {
+	seeders := []func(*gorm.DB, string, string) error{
 		seedGenders,
 		seedPronouns,
 		seedAddressTypes,
@@ -29,76 +30,130 @@ func SeedAccountDefaults(tx *gorm.DB, accountID, userID, userEmail string) error
 		seedAccountCurrencies,
 	}
 	for _, fn := range seeders {
-		if err := fn(tx, accountID); err != nil {
+		if err := fn(tx, accountID, locale); err != nil {
 			return err
 		}
 	}
-	return seedNotificationChannel(tx, userID, userEmail)
+	return seedNotificationChannel(tx, userID, userEmail, locale)
 }
 
-func seedGenders(tx *gorm.DB, accountID string) error {
-	items := []Gender{
-		{AccountID: accountID, Name: strPtr("Male")},
-		{AccountID: accountID, Name: strPtr("Female")},
-		{AccountID: accountID, Name: strPtr("Other")},
+func seedGenders(tx *gorm.DB, accountID, locale string) error {
+	keys := []string{
+		"seed.genders.male",
+		"seed.genders.female",
+		"seed.genders.other",
+	}
+	items := make([]Gender, len(keys))
+	for idx, k := range keys {
+		items[idx] = Gender{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, k)),
+			NameTranslationKey: strPtr(k),
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedPronouns(tx *gorm.DB, accountID string) error {
-	items := []Pronoun{
-		{AccountID: accountID, Name: strPtr("he/him")},
-		{AccountID: accountID, Name: strPtr("she/her")},
-		{AccountID: accountID, Name: strPtr("they/them")},
-		{AccountID: accountID, Name: strPtr("per/per")},
-		{AccountID: accountID, Name: strPtr("ve/ver")},
-		{AccountID: accountID, Name: strPtr("xe/xem")},
-		{AccountID: accountID, Name: strPtr("ze/hir")},
+func seedPronouns(tx *gorm.DB, accountID, locale string) error {
+	keys := []string{
+		"seed.pronouns.he_him",
+		"seed.pronouns.she_her",
+		"seed.pronouns.they_them",
+		"seed.pronouns.per_per",
+		"seed.pronouns.ve_ver",
+		"seed.pronouns.xe_xem",
+		"seed.pronouns.ze_hir",
+	}
+	items := make([]Pronoun, len(keys))
+	for idx, k := range keys {
+		items[idx] = Pronoun{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, k)),
+			NameTranslationKey: strPtr(k),
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedAddressTypes(tx *gorm.DB, accountID string) error {
-	items := []AddressType{
-		{AccountID: accountID, Name: strPtr("Home"), Type: strPtr("home")},
-		{AccountID: accountID, Name: strPtr("Secondary residence"), Type: strPtr("secondary")},
-		{AccountID: accountID, Name: strPtr("Work"), Type: strPtr("work")},
-		{AccountID: accountID, Name: strPtr("Chalet"), Type: strPtr("chalet")},
-		{AccountID: accountID, Name: strPtr("Other"), Type: strPtr("other")},
+func seedAddressTypes(tx *gorm.DB, accountID, locale string) error {
+	type addrDef struct {
+		key string
+		typ string
+	}
+	defs := []addrDef{
+		{"seed.address_types.home", "home"},
+		{"seed.address_types.secondary_residence", "secondary"},
+		{"seed.address_types.work", "work"},
+		{"seed.address_types.chalet", "chalet"},
+		{"seed.address_types.other", "other"},
+	}
+	items := make([]AddressType, len(defs))
+	for idx, d := range defs {
+		items[idx] = AddressType{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, d.key)),
+			Type:               strPtr(d.typ),
+			NameTranslationKey: strPtr(d.key),
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedPetCategories(tx *gorm.DB, accountID string) error {
-	items := []PetCategory{
-		{AccountID: accountID, Name: strPtr("Dog")},
-		{AccountID: accountID, Name: strPtr("Cat")},
-		{AccountID: accountID, Name: strPtr("Bird")},
-		{AccountID: accountID, Name: strPtr("Fish")},
-		{AccountID: accountID, Name: strPtr("Small animal")},
-		{AccountID: accountID, Name: strPtr("Hamster")},
-		{AccountID: accountID, Name: strPtr("Horse")},
-		{AccountID: accountID, Name: strPtr("Rabbit")},
-		{AccountID: accountID, Name: strPtr("Rat")},
-		{AccountID: accountID, Name: strPtr("Reptile")},
+func seedPetCategories(tx *gorm.DB, accountID, locale string) error {
+	keys := []string{
+		"seed.pet_categories.dog",
+		"seed.pet_categories.cat",
+		"seed.pet_categories.bird",
+		"seed.pet_categories.fish",
+		"seed.pet_categories.small_animal",
+		"seed.pet_categories.hamster",
+		"seed.pet_categories.horse",
+		"seed.pet_categories.rabbit",
+		"seed.pet_categories.rat",
+		"seed.pet_categories.reptile",
+	}
+	items := make([]PetCategory, len(keys))
+	for idx, k := range keys {
+		items[idx] = PetCategory{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, k)),
+			NameTranslationKey: strPtr(k),
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedContactInfoTypes(tx *gorm.DB, accountID string) error {
-	items := []ContactInformationType{
-		{AccountID: accountID, Name: strPtr("Email address"), Type: strPtr("email"), Protocol: strPtr("mailto:")},
-		{AccountID: accountID, Name: strPtr("Phone"), Type: strPtr("phone"), Protocol: strPtr("tel:")},
-		{AccountID: accountID, Name: strPtr("Facebook"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("WhatsApp"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("Telegram"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("LinkedIn"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("Instagram"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("Twitter"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("Mastodon"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("Bluesky"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("Threads"), Type: strPtr("social")},
-		{AccountID: accountID, Name: strPtr("GitHub"), Type: strPtr("social")},
+func seedContactInfoTypes(tx *gorm.DB, accountID, locale string) error {
+	type infoDef struct {
+		key      string
+		typ      string
+		protocol string
+	}
+	defs := []infoDef{
+		{"seed.contact_info_types.email_address", "email", "mailto:"},
+		{"seed.contact_info_types.phone", "phone", "tel:"},
+		{"seed.contact_info_types.facebook", "social", ""},
+		{"seed.contact_info_types.whatsapp", "social", ""},
+		{"seed.contact_info_types.telegram", "social", ""},
+		{"seed.contact_info_types.linkedin", "social", ""},
+		{"seed.contact_info_types.instagram", "social", ""},
+		{"seed.contact_info_types.twitter", "social", ""},
+		{"seed.contact_info_types.mastodon", "social", ""},
+		{"seed.contact_info_types.bluesky", "social", ""},
+		{"seed.contact_info_types.threads", "social", ""},
+		{"seed.contact_info_types.github", "social", ""},
+	}
+	items := make([]ContactInformationType, len(defs))
+	for idx, d := range defs {
+		items[idx] = ContactInformationType{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, d.key)),
+			Type:               strPtr(d.typ),
+			NameTranslationKey: strPtr(d.key),
+		}
+		if d.protocol != "" {
+			items[idx].Protocol = strPtr(d.protocol)
+		}
 	}
 	if err := tx.Create(&items).Error; err != nil {
 		return err
@@ -108,53 +163,53 @@ func seedContactInfoTypes(tx *gorm.DB, accountID string) error {
 		Update("can_be_deleted", false).Error
 }
 
-func seedRelationshipGroupTypes(tx *gorm.DB, accountID string) error {
+func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 	type relType struct {
-		name, reverse, typ string
-		canBeDeleted       bool
+		nameKey, reverseKey, typ string
+		canBeDeleted             bool
 	}
 	type relGroup struct {
-		name         string
+		nameKey      string
 		canBeDeleted bool
 		types        []relType
 	}
 
 	groups := []relGroup{
 		{
-			name: "Love", canBeDeleted: false,
+			nameKey: "seed.relationship_groups.love", canBeDeleted: false,
 			types: []relType{
-				{"significant other", "significant other", "love", false},
-				{"spouse", "spouse", "love", false},
-				{"date", "date", "", true},
-				{"lover", "lover", "", true},
-				{"in love with", "loved by", "", true},
-				{"ex-boyfriend", "ex-boyfriend", "", true},
+				{"seed.relationship_types.significant_other", "seed.relationship_types.significant_other", "love", false},
+				{"seed.relationship_types.spouse", "seed.relationship_types.spouse", "love", false},
+				{"seed.relationship_types.date", "seed.relationship_types.date", "", true},
+				{"seed.relationship_types.lover", "seed.relationship_types.lover", "", true},
+				{"seed.relationship_types.in_love_with", "seed.relationship_types.loved_by", "", true},
+				{"seed.relationship_types.ex_boyfriend", "seed.relationship_types.ex_boyfriend", "", true},
 			},
 		},
 		{
-			name: "Family", canBeDeleted: false,
+			nameKey: "seed.relationship_groups.family", canBeDeleted: false,
 			types: []relType{
-				{"parent", "child", "child", false},
-				{"brother/sister", "brother/sister", "", true},
-				{"grand parent", "grand child", "", true},
-				{"uncle/aunt", "nephew/niece", "", true},
-				{"cousin", "cousin", "", true},
-				{"godparent", "godchild", "", true},
+				{"seed.relationship_types.parent", "seed.relationship_types.child", "child", false},
+				{"seed.relationship_types.brother_sister", "seed.relationship_types.brother_sister", "", true},
+				{"seed.relationship_types.grand_parent", "seed.relationship_types.grand_child", "", true},
+				{"seed.relationship_types.uncle_aunt", "seed.relationship_types.nephew_niece", "", true},
+				{"seed.relationship_types.cousin", "seed.relationship_types.cousin", "", true},
+				{"seed.relationship_types.godparent", "seed.relationship_types.godchild", "", true},
 			},
 		},
 		{
-			name: "Friend", canBeDeleted: true,
+			nameKey: "seed.relationship_groups.friend", canBeDeleted: true,
 			types: []relType{
-				{"friend", "friend", "", true},
-				{"best friend", "best friend", "", true},
+				{"seed.relationship_types.friend", "seed.relationship_types.friend", "", true},
+				{"seed.relationship_types.best_friend", "seed.relationship_types.best_friend", "", true},
 			},
 		},
 		{
-			name: "Work", canBeDeleted: true,
+			nameKey: "seed.relationship_groups.work", canBeDeleted: true,
 			types: []relType{
-				{"colleague", "colleague", "", true},
-				{"subordinate", "boss", "", true},
-				{"mentor", "protege", "", true},
+				{"seed.relationship_types.colleague", "seed.relationship_types.colleague", "", true},
+				{"seed.relationship_types.subordinate", "seed.relationship_types.boss", "", true},
+				{"seed.relationship_types.mentor", "seed.relationship_types.protege", "", true},
 			},
 		},
 	}
@@ -164,8 +219,9 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID string) error {
 
 	for _, g := range groups {
 		group := RelationshipGroupType{
-			AccountID: accountID,
-			Name:      strPtr(g.name),
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, g.nameKey)),
+			NameTranslationKey: strPtr(g.nameKey),
 		}
 		if err := tx.Create(&group).Error; err != nil {
 			return err
@@ -175,9 +231,11 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID string) error {
 		}
 		for _, t := range g.types {
 			rt := RelationshipType{
-				RelationshipGroupTypeID: group.ID,
-				Name:                    strPtr(t.name),
-				NameReverseRelationship: strPtr(t.reverse),
+				RelationshipGroupTypeID:               group.ID,
+				Name:                                  strPtr(i18n.T(locale, t.nameKey)),
+				NameTranslationKey:                    strPtr(t.nameKey),
+				NameReverseRelationship:               strPtr(i18n.T(locale, t.reverseKey)),
+				NameReverseRelationshipTranslationKey: strPtr(t.reverseKey),
 			}
 			if t.typ != "" {
 				rt.Type = strPtr(t.typ)
@@ -204,74 +262,116 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID string) error {
 	return nil
 }
 
-func seedCallReasonTypes(tx *gorm.DB, accountID string) error {
-	personal := CallReasonType{AccountID: accountID, Label: strPtr("Personal")}
+func seedCallReasonTypes(tx *gorm.DB, accountID, locale string) error {
+	personalKey := "seed.call_reason_types.personal"
+	personal := CallReasonType{
+		AccountID:           accountID,
+		Label:               strPtr(i18n.T(locale, personalKey)),
+		LabelTranslationKey: strPtr(personalKey),
+	}
 	if err := tx.Create(&personal).Error; err != nil {
 		return err
 	}
-	personalReasons := []CallReason{
-		{CallReasonTypeID: personal.ID, Label: strPtr("For advice")},
-		{CallReasonTypeID: personal.ID, Label: strPtr("Just to say hello")},
-		{CallReasonTypeID: personal.ID, Label: strPtr("To see if they need anything")},
-		{CallReasonTypeID: personal.ID, Label: strPtr("Out of respect and appreciation")},
-		{CallReasonTypeID: personal.ID, Label: strPtr("To hear their story")},
+	personalReasonKeys := []string{
+		"seed.call_reasons.for_advice",
+		"seed.call_reasons.just_to_say_hello",
+		"seed.call_reasons.to_see_if_they_need_anything",
+		"seed.call_reasons.out_of_respect_and_appreciation",
+		"seed.call_reasons.to_hear_their_story",
+	}
+	personalReasons := make([]CallReason, len(personalReasonKeys))
+	for idx, k := range personalReasonKeys {
+		personalReasons[idx] = CallReason{
+			CallReasonTypeID:    personal.ID,
+			Label:               strPtr(i18n.T(locale, k)),
+			LabelTranslationKey: strPtr(k),
+		}
 	}
 	if err := tx.Create(&personalReasons).Error; err != nil {
 		return err
 	}
 
-	business := CallReasonType{AccountID: accountID, Label: strPtr("Business")}
+	businessKey := "seed.call_reason_types.business"
+	business := CallReasonType{
+		AccountID:           accountID,
+		Label:               strPtr(i18n.T(locale, businessKey)),
+		LabelTranslationKey: strPtr(businessKey),
+	}
 	if err := tx.Create(&business).Error; err != nil {
 		return err
 	}
-	businessReasons := []CallReason{
-		{CallReasonTypeID: business.ID, Label: strPtr("Discuss recent purchases")},
-		{CallReasonTypeID: business.ID, Label: strPtr("Discuss partnership")},
+	businessReasonKeys := []string{
+		"seed.call_reasons.discuss_recent_purchases",
+		"seed.call_reasons.discuss_partnership",
+	}
+	businessReasons := make([]CallReason, len(businessReasonKeys))
+	for idx, k := range businessReasonKeys {
+		businessReasons[idx] = CallReason{
+			CallReasonTypeID:    business.ID,
+			Label:               strPtr(i18n.T(locale, k)),
+			LabelTranslationKey: strPtr(k),
+		}
 	}
 	return tx.Create(&businessReasons).Error
 }
 
-func seedReligions(tx *gorm.DB, accountID string) error {
-	names := []string{
-		"Christian", "Muslim", "Hinduist", "Buddhist", "Shintoist",
-		"Taoist", "Sikh", "Jew", "Atheist",
+func seedReligions(tx *gorm.DB, accountID, locale string) error {
+	keys := []string{
+		"seed.religions.christian",
+		"seed.religions.muslim",
+		"seed.religions.hinduist",
+		"seed.religions.buddhist",
+		"seed.religions.shintoist",
+		"seed.religions.taoist",
+		"seed.religions.sikh",
+		"seed.religions.jew",
+		"seed.religions.atheist",
 	}
-	items := make([]Religion, len(names))
-	for i, n := range names {
-		pos := i + 1
-		items[i] = Religion{AccountID: accountID, Name: strPtr(n), Position: &pos}
+	items := make([]Religion, len(keys))
+	for idx, k := range keys {
+		pos := idx + 1
+		items[idx] = Religion{
+			AccountID:      accountID,
+			Name:           strPtr(i18n.T(locale, k)),
+			TranslationKey: strPtr(k),
+			Position:       &pos,
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedGroupTypes(tx *gorm.DB, accountID string) error {
-	groups := []struct {
-		label    string
+func seedGroupTypes(tx *gorm.DB, accountID, locale string) error {
+	type groupDef struct {
+		key      string
 		position int
 		roles    []string
-	}{
-		{"Family", 1, []string{"Parent", "Child"}},
-		{"Couple", 2, []string{"Partner"}},
-		{"Club", 3, nil},
-		{"Association", 4, nil},
-		{"Roommates", 5, nil},
+	}
+
+	groups := []groupDef{
+		{"seed.group_types.family", 1, []string{"seed.group_type_roles.parent", "seed.group_type_roles.child"}},
+		{"seed.group_types.couple", 2, []string{"seed.group_type_roles.partner"}},
+		{"seed.group_types.club", 3, nil},
+		{"seed.group_types.association", 4, nil},
+		{"seed.group_types.roommates", 5, nil},
 	}
 
 	for _, g := range groups {
 		gt := GroupType{
-			AccountID: accountID,
-			Label:     strPtr(g.label),
-			Position:  g.position,
+			AccountID:           accountID,
+			Label:               strPtr(i18n.T(locale, g.key)),
+			LabelTranslationKey: strPtr(g.key),
+			Position:            g.position,
 		}
 		if err := tx.Create(&gt).Error; err != nil {
 			return err
 		}
-		for i, r := range g.roles {
-			pos := i + 1
+		for idx, rk := range g.roles {
+			pos := idx + 1
 			role := GroupTypeRole{
-				GroupTypeID: gt.ID,
-				Label:       strPtr(r),
-				Position:    &pos,
+				GroupTypeID:         gt.ID,
+				Label:               strPtr(i18n.T(locale, rk)),
+				LabelTranslationKey: strPtr(rk),
+				Position:            &pos,
 			}
 			if err := tx.Create(&role).Error; err != nil {
 				return err
@@ -281,49 +381,101 @@ func seedGroupTypes(tx *gorm.DB, accountID string) error {
 	return nil
 }
 
-func seedEmotions(tx *gorm.DB, accountID string) error {
-	items := []Emotion{
-		{AccountID: accountID, Name: strPtr("Negative"), Type: "negative"},
-		{AccountID: accountID, Name: strPtr("Neutral"), Type: "neutral"},
-		{AccountID: accountID, Name: strPtr("Positive"), Type: "positive"},
+func seedEmotions(tx *gorm.DB, accountID, locale string) error {
+	type emotionDef struct {
+		key string
+		typ string
+	}
+	defs := []emotionDef{
+		{"seed.emotions.negative", "negative"},
+		{"seed.emotions.neutral", "neutral"},
+		{"seed.emotions.positive", "positive"},
+	}
+	items := make([]Emotion, len(defs))
+	for idx, d := range defs {
+		items[idx] = Emotion{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, d.key)),
+			NameTranslationKey: strPtr(d.key),
+			Type:               d.typ,
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedGiftOccasions(tx *gorm.DB, accountID string) error {
-	names := []string{"Birthday", "Anniversary", "Christmas", "Just because", "Wedding"}
-	items := make([]GiftOccasion, len(names))
-	for i, n := range names {
-		pos := i + 1
-		items[i] = GiftOccasion{AccountID: accountID, Label: strPtr(n), Position: &pos}
+func seedGiftOccasions(tx *gorm.DB, accountID, locale string) error {
+	keys := []string{
+		"seed.gift_occasions.birthday",
+		"seed.gift_occasions.anniversary",
+		"seed.gift_occasions.christmas",
+		"seed.gift_occasions.just_because",
+		"seed.gift_occasions.wedding",
+	}
+	items := make([]GiftOccasion, len(keys))
+	for idx, k := range keys {
+		pos := idx + 1
+		items[idx] = GiftOccasion{
+			AccountID:           accountID,
+			Label:               strPtr(i18n.T(locale, k)),
+			LabelTranslationKey: strPtr(k),
+			Position:            &pos,
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedGiftStates(tx *gorm.DB, accountID string) error {
-	names := []string{"Idea", "Searched", "Found", "Bought", "Offered"}
-	items := make([]GiftState, len(names))
-	for i, n := range names {
-		pos := i + 1
-		items[i] = GiftState{AccountID: accountID, Label: strPtr(n), Position: &pos}
+func seedGiftStates(tx *gorm.DB, accountID, locale string) error {
+	keys := []string{
+		"seed.gift_states.idea",
+		"seed.gift_states.searched",
+		"seed.gift_states.found",
+		"seed.gift_states.bought",
+		"seed.gift_states.offered",
+	}
+	items := make([]GiftState, len(keys))
+	for idx, k := range keys {
+		pos := idx + 1
+		items[idx] = GiftState{
+			AccountID:           accountID,
+			Label:               strPtr(i18n.T(locale, k)),
+			LabelTranslationKey: strPtr(k),
+			Position:            &pos,
+		}
 	}
 	return tx.Create(&items).Error
 }
 
-func seedPostTemplates(tx *gorm.DB, accountID string) error {
-	regular := PostTemplate{AccountID: accountID, Label: strPtr("Regular post"), Position: 1}
+func seedPostTemplates(tx *gorm.DB, accountID, locale string) error {
+	regularKey := "seed.post_templates.regular_post"
+	regular := PostTemplate{
+		AccountID:           accountID,
+		Label:               strPtr(i18n.T(locale, regularKey)),
+		LabelTranslationKey: strPtr(regularKey),
+		Position:            1,
+	}
 	if err := tx.Create(&regular).Error; err != nil {
 		return err
 	}
 	if err := tx.Model(&regular).Update("can_be_deleted", false).Error; err != nil {
 		return err
 	}
-	inspirational := PostTemplate{AccountID: accountID, Label: strPtr("Inspirational post"), Position: 2}
+	inspirationalKey := "seed.post_templates.inspirational_post"
+	inspirational := PostTemplate{
+		AccountID:           accountID,
+		Label:               strPtr(i18n.T(locale, inspirationalKey)),
+		LabelTranslationKey: strPtr(inspirationalKey),
+		Position:            2,
+	}
 	return tx.Create(&inspirational).Error
 }
 
-func seedDefaultTemplate(tx *gorm.DB, accountID string) error {
-	tmpl := Template{AccountID: accountID, Name: strPtr("Default template")}
+func seedDefaultTemplate(tx *gorm.DB, accountID, locale string) error {
+	tmplKey := "seed.templates.default_template"
+	tmpl := Template{
+		AccountID:          accountID,
+		Name:               strPtr(i18n.T(locale, tmplKey)),
+		NameTranslationKey: strPtr(tmplKey),
+	}
 	if err := tx.Create(&tmpl).Error; err != nil {
 		return err
 	}
@@ -332,28 +484,29 @@ func seedDefaultTemplate(tx *gorm.DB, accountID string) error {
 	}
 
 	type pageDef struct {
-		name     string
+		key      string
 		slug     string
 		position int
 		typ      *string
 		undel    bool
 	}
 	pages := []pageDef{
-		{"Contact information", "contact", 1, strPtr("contact"), true},
-		{"Feed", "feed", 2, nil, false},
-		{"Social", "social", 3, nil, false},
-		{"Life & goals", "life-goals", 4, nil, false},
-		{"Information", "information", 5, nil, false},
+		{"seed.template_pages.contact_information", "contact", 1, strPtr("contact"), true},
+		{"seed.template_pages.feed", "feed", 2, nil, false},
+		{"seed.template_pages.social", "social", 3, nil, false},
+		{"seed.template_pages.life_and_goals", "life-goals", 4, nil, false},
+		{"seed.template_pages.information", "information", 5, nil, false},
 	}
 
 	for _, p := range pages {
 		pos := p.position
 		page := TemplatePage{
-			TemplateID: tmpl.ID,
-			Name:       strPtr(p.name),
-			Slug:       p.slug,
-			Position:   &pos,
-			Type:       p.typ,
+			TemplateID:         tmpl.ID,
+			Name:               strPtr(i18n.T(locale, p.key)),
+			NameTranslationKey: strPtr(p.key),
+			Slug:               p.slug,
+			Position:           &pos,
+			Type:               p.typ,
 		}
 		if err := tx.Create(&page).Error; err != nil {
 			return err
@@ -367,7 +520,7 @@ func seedDefaultTemplate(tx *gorm.DB, accountID string) error {
 	return nil
 }
 
-func seedDefaultModules(tx *gorm.DB, accountID string) error {
+func seedDefaultModules(tx *gorm.DB, accountID, locale string) error {
 	var tmpl Template
 	if err := tx.Where("account_id = ? AND can_be_deleted = ?", accountID, false).First(&tmpl).Error; err != nil {
 		return err
@@ -384,45 +537,45 @@ func seedDefaultModules(tx *gorm.DB, accountID string) error {
 	}
 
 	type moduleDef struct {
-		name                         string
+		key                          string
 		typ                          string
 		reservedToContactInformation bool
 	}
 
 	pageModules := map[string][]moduleDef{
 		"contact": {
-			{"Avatar", "avatar", true},
-			{"Contact name", "contact_names", true},
-			{"Family summary", "family_summary", true},
-			{"Important dates", "important_dates", true},
-			{"Gender and pronoun", "gender_pronoun", true},
-			{"Labels", "labels", true},
-			{"Job information", "company", true},
-			{"Religions", "religions", true},
+			{"seed.modules.avatar", "avatar", true},
+			{"seed.modules.contact_name", "contact_names", true},
+			{"seed.modules.family_summary", "family_summary", true},
+			{"seed.modules.important_dates", "important_dates", true},
+			{"seed.modules.gender_and_pronoun", "gender_pronoun", true},
+			{"seed.modules.labels", "labels", true},
+			{"seed.modules.job_information", "company", true},
+			{"seed.modules.religions", "religions", true},
 		},
 		"feed": {
-			{"Contact feed", "feed", false},
+			{"seed.modules.contact_feed", "feed", false},
 		},
 		"social": {
-			{"Relationships", "relationships", false},
-			{"Pets", "pets", false},
-			{"Groups", "groups", false},
-			{"Addresses", "addresses", false},
-			{"Contact information", "contact_information", false},
+			{"seed.modules.relationships", "relationships", false},
+			{"seed.modules.pets", "pets", false},
+			{"seed.modules.groups", "groups", false},
+			{"seed.modules.addresses", "addresses", false},
+			{"seed.modules.contact_information", "contact_information", false},
 		},
 		"life-goals": {
-			{"Life events", "life_events", false},
-			{"Goals", "goals", false},
+			{"seed.modules.life_events", "life_events", false},
+			{"seed.modules.goals", "goals", false},
 		},
 		"information": {
-			{"Documents", "documents", false},
-			{"Photos", "photos", false},
-			{"Notes", "notes", false},
-			{"Reminders", "reminders", false},
-			{"Loans", "loans", false},
-			{"Tasks", "tasks", false},
-			{"Calls", "calls", false},
-			{"Posts", "posts", false},
+			{"seed.modules.documents", "documents", false},
+			{"seed.modules.photos", "photos", false},
+			{"seed.modules.notes", "notes", false},
+			{"seed.modules.reminders", "reminders", false},
+			{"seed.modules.loans", "loans", false},
+			{"seed.modules.tasks", "tasks", false},
+			{"seed.modules.calls", "calls", false},
+			{"seed.modules.posts", "posts", false},
 		},
 	}
 
@@ -434,10 +587,11 @@ func seedDefaultModules(tx *gorm.DB, accountID string) error {
 			continue
 		}
 		defs := pageModules[slug]
-		for i, def := range defs {
+		for idx, def := range defs {
 			mod := Module{
 				AccountID:                    accountID,
-				Name:                         strPtr(def.name),
+				Name:                         strPtr(i18n.T(locale, def.key)),
+				NameTranslationKey:           strPtr(def.key),
 				Type:                         strPtr(def.typ),
 				ReservedToContactInformation: def.reservedToContactInformation,
 			}
@@ -446,7 +600,7 @@ func seedDefaultModules(tx *gorm.DB, accountID string) error {
 			}
 			undeletableModuleIDs = append(undeletableModuleIDs, mod.ID)
 
-			pos := i + 1
+			pos := idx + 1
 			pivot := ModuleTemplatePage{
 				TemplatePageID: page.ID,
 				ModuleID:       mod.ID,
@@ -467,12 +621,13 @@ func seedDefaultModules(tx *gorm.DB, accountID string) error {
 	return nil
 }
 
-func seedNotificationChannel(tx *gorm.DB, userID, userEmail string) error {
+func seedNotificationChannel(tx *gorm.DB, userID, userEmail, locale string) error {
+	key := "seed.notification_channel.email_address"
 	now := time.Now()
 	channel := UserNotificationChannel{
 		UserID:        &userID,
 		Type:          "email",
-		Label:         strPtr("Email address"),
+		Label:         strPtr(i18n.T(locale, key)),
 		Content:       userEmail,
 		PreferredTime: strPtr("09:00"),
 		VerifiedAt:    &now,
@@ -483,7 +638,7 @@ func seedNotificationChannel(tx *gorm.DB, userID, userEmail string) error {
 	return tx.Model(&channel).Update("active", true).Error
 }
 
-func seedAccountCurrencies(tx *gorm.DB, accountID string) error {
+func seedAccountCurrencies(tx *gorm.DB, accountID, _ string) error {
 	var currencies []Currency
 	if err := tx.Find(&currencies).Error; err != nil {
 		return err
