@@ -30,7 +30,7 @@ func setupTemplatePageTest(t *testing.T) (*TemplatePageService, string, uint) {
 		t.Fatalf("Create user failed: %v", err)
 	}
 
-	if err := models.SeedAccountDefaults(db, account.ID, user.ID, user.Email); err != nil {
+	if err := models.SeedAccountDefaults(db, account.ID, user.ID, user.Email, "en"); err != nil {
 		t.Fatalf("SeedAccountDefaults failed: %v", err)
 	}
 

@@ -17,7 +17,7 @@ func setupPostTemplateSectionTest(t *testing.T) (*PostTemplateSectionService, st
 	resp, _ := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "pts-test@example.com", Password: "password123",
-	})
+	}, "en")
 
 	var tpl models.PostTemplate
 	db.Where("account_id = ?", resp.User.AccountID).First(&tpl)

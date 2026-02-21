@@ -17,7 +17,7 @@ func setupCallReasonTest(t *testing.T) (*CallReasonService, string, uint) {
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "cr-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

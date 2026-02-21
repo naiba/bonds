@@ -19,7 +19,7 @@ func setupContactSortTest(t *testing.T) (*ContactSortService, string) {
 		LastName:  "User",
 		Email:     "sort-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

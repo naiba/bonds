@@ -43,7 +43,7 @@ func TestCurrencyListEmpty(t *testing.T) {
 	_, err = authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "currency-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -61,7 +61,7 @@ func setupCurrencyTestWithAccount(t *testing.T) (*CurrencyService, string) {
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "currency-toggle-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

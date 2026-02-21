@@ -20,12 +20,12 @@ func setupCalendarTest(t *testing.T) (*CalendarService, string, string) {
 		LastName:  "User",
 		Email:     "calendar-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -65,12 +65,12 @@ func TestCalendarWithDates(t *testing.T) {
 		LastName:  "User",
 		Email:     "calendar-dates@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -142,12 +142,12 @@ func TestCalendarWithLunarDates(t *testing.T) {
 		LastName:  "User",
 		Email:     "calendar-lunar@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

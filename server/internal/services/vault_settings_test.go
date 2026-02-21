@@ -19,12 +19,12 @@ func setupVaultSettingsTest(t *testing.T) (*VaultSettingsService, string, string
 		LastName:  "User",
 		Email:     "vault-settings-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault", Description: "desc"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault", Description: "desc"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

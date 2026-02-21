@@ -20,12 +20,12 @@ func setupContactPhotoTest(t *testing.T) (*VaultFileService, string, string) {
 		LastName:  "User",
 		Email:     "contact-photos-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -80,12 +80,12 @@ func TestListContactPhotosEmpty(t *testing.T) {
 		LastName:  "User",
 		Email:     "contact-photos-empty@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Empty Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Empty Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -182,12 +182,12 @@ func TestListContactDocuments(t *testing.T) {
 		LastName:  "User",
 		Email:     "contact-docs-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -235,12 +235,12 @@ func TestDeleteContactDocument(t *testing.T) {
 		LastName:  "User",
 		Email:     "contact-docs-del@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -299,12 +299,12 @@ func TestContactPhotosListPagination(t *testing.T) {
 		LastName:  "User",
 		Email:     "photos-pagination@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -369,12 +369,12 @@ func TestContactDocumentsListPagination(t *testing.T) {
 		LastName:  "User",
 		Email:     "docs-pagination@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

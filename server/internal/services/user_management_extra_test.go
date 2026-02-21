@@ -18,7 +18,7 @@ func setupUserManagementExtraTest(t *testing.T) (*UserManagementService, string,
 		LastName:  "User",
 		Email:     "user-mgmt-extra-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestUserManagementGetAnotherUser(t *testing.T) {
 		LastName:  "User",
 		Email:     "second-user@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

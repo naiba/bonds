@@ -20,7 +20,7 @@ func setupVaultTest(t *testing.T) (*VaultService, string, string) {
 		Email:     "vault-test@example.com",
 		Password:  "password123",
 	}
-	resp, err := authSvc.Register(regReq)
+	resp, err := authSvc.Register(regReq, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestCreateVault(t *testing.T) {
 		Description: "Test vault",
 	}
 
-	vault, err := svc.CreateVault(accountID, userID, req)
+	vault, err := svc.CreateVault(accountID, userID, req, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -80,11 +80,11 @@ func TestCreateVault(t *testing.T) {
 func TestListVaults(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
-	_, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Vault 1"})
+	_, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Vault 1"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
-	_, err = svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Vault 2"})
+	_, err = svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Vault 2"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestListVaults(t *testing.T) {
 func TestUpdateVault(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
-	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Before"})
+	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Before"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestUpdateVault(t *testing.T) {
 func TestDeleteVault(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
-	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "ToDelete"})
+	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "ToDelete"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestDeleteVault(t *testing.T) {
 func TestCheckUserVaultAccess(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
-	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"})
+	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

@@ -17,11 +17,11 @@ func setupVaultLabelTest(t *testing.T) (*VaultLabelService, string) {
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "vault-label-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "V"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "V"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

@@ -19,12 +19,12 @@ func setupRelationshipTest(t *testing.T) (*RelationshipService, string, string, 
 		LastName:  "User",
 		Email:     "relationship-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

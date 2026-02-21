@@ -32,7 +32,7 @@ func setupTwoFactorTest(t *testing.T) *twoFactorTestContext {
 		LastName:  "User",
 		Email:     "2fa@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

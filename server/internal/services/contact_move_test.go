@@ -19,17 +19,17 @@ func setupContactMoveTest(t *testing.T) (*ContactMoveService, string, string, st
 		LastName:  "User",
 		Email:     "move-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault1, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault 1"})
+	vault1, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault 1"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault 1 failed: %v", err)
 	}
 
-	vault2, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault 2"})
+	vault2, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault 2"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault 2 failed: %v", err)
 	}

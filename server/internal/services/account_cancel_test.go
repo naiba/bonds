@@ -18,7 +18,7 @@ func setupAccountCancelTest(t *testing.T) (*AccountCancelService, string, string
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "cancel-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -29,7 +29,7 @@ func setupAccountCancelTest(t *testing.T) (*AccountCancelService, string, string
 func TestAccountCancelSuccess(t *testing.T) {
 	svc, userID, accountID, vaultSvc := setupAccountCancelTest(t)
 
-	_, err := vaultSvc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "V1"})
+	_, err := vaultSvc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "V1"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

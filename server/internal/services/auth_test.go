@@ -21,7 +21,7 @@ func TestRegister(t *testing.T) {
 		Password:  "password123",
 	}
 
-	resp, err := svc.Register(req)
+	resp, err := svc.Register(req, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestRegisterSeedsDefaultData(t *testing.T) {
 		LastName:  "Test",
 		Email:     "seed@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -171,12 +171,12 @@ func TestRegisterDuplicateEmail(t *testing.T) {
 		Password:  "password123",
 	}
 
-	_, err := svc.Register(req)
+	_, err := svc.Register(req, "en")
 	if err != nil {
 		t.Fatalf("First register failed: %v", err)
 	}
 
-	_, err = svc.Register(req)
+	_, err = svc.Register(req, "en")
 	if err != ErrEmailExists {
 		t.Errorf("Expected ErrEmailExists, got %v", err)
 	}
@@ -192,7 +192,7 @@ func TestLoginScenarios(t *testing.T) {
 		LastName:  "Doe",
 		Email:     "jane@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestRegisterFirstUserIsInstanceAdmin(t *testing.T) {
 		LastName:  "User",
 		Email:     "first@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register first user failed: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestRegisterFirstUserIsInstanceAdmin(t *testing.T) {
 		LastName:  "User",
 		Email:     "second@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register second user failed: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestLoginDisabledUser(t *testing.T) {
 		LastName:  "User",
 		Email:     "disabled@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -287,7 +287,7 @@ func TestRefreshTokenDisabledUser(t *testing.T) {
 		LastName:  "Disabled",
 		Email:     "refresh-disabled@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

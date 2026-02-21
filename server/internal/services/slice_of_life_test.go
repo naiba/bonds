@@ -17,8 +17,8 @@ func setupSliceOfLifeTest(t *testing.T) (*SliceOfLifeService, uint, string) {
 	resp, _ := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "sol-test@example.com", Password: "password123",
-	})
-	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	}, "en")
+	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 
 	journalSvc := NewJournalService(db)
 	journal, _ := journalSvc.Create(vault.ID, dto.CreateJournalRequest{Name: "Test Journal"})

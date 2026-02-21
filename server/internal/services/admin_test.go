@@ -25,7 +25,7 @@ func registerTestUser(t *testing.T, authSvc *AuthService, email string) *dto.Aut
 		LastName:  "User",
 		Email:     email,
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestAdminListUsers_WithStats(t *testing.T) {
 
 	resp := registerTestUser(t, authSvc, "stats-user@example.com")
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestAdminDeleteUser_Success(t *testing.T) {
 	admin := registerTestUser(t, authSvc, "del-admin@example.com")
 	target := registerTestUser(t, authSvc, "del-target@example.com")
 
-	vault, err := vaultSvc.CreateVault(target.User.AccountID, target.User.ID, dto.CreateVaultRequest{Name: "Vault"})
+	vault, err := vaultSvc.CreateVault(target.User.AccountID, target.User.ID, dto.CreateVaultRequest{Name: "Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestAdminDeleteUser_SharedAccount_OnlyDeletesTargetUser(t *testing.T) {
 
 	owner := registerTestUser(t, authSvc, "shared-owner@example.com")
 
-	vault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Shared Vault"})
+	vault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Shared Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

@@ -19,7 +19,7 @@ func setupNotificationTest(t *testing.T) (*NotificationService, string) {
 		LastName:  "User",
 		Email:     "notifications-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -181,12 +181,12 @@ func TestNotificationVerifySchedulesReminders(t *testing.T) {
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "verify-schedule@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "V"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "V"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}

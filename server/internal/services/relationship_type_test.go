@@ -18,7 +18,7 @@ func setupRelationshipTypeTest(t *testing.T) (*RelationshipTypeService, *gorm.DB
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "rt-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

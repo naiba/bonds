@@ -16,8 +16,8 @@ func TestAddressesByCity(t *testing.T) {
 	resp, _ := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "rpt-city-test@example.com", Password: "password123",
-	})
-	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	}, "en")
+	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 
 	reportSvc := NewReportService(db)
 	items, err := reportSvc.AddressesByCity(vault.ID, "Tokyo")
@@ -41,8 +41,8 @@ func TestAddressesByCountry(t *testing.T) {
 	resp, _ := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "rpt-country-test@example.com", Password: "password123",
-	})
-	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	}, "en")
+	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 
 	reportSvc := NewReportService(db)
 	items, err := reportSvc.AddressesByCountry(vault.ID, "Japan")

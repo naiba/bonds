@@ -18,7 +18,7 @@ func setupPreferenceTest(t *testing.T) (*PreferenceService, string) {
 		LastName:  "User",
 		Email:     "preferences-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

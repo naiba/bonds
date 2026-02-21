@@ -19,12 +19,12 @@ func setupVaultUsersTest(t *testing.T) (*VaultUsersService, *AuthService, string
 		LastName:  "User",
 		Email:     "vault-users-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"})
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestVaultUsersAdd(t *testing.T) {
 		LastName:  "User",
 		Email:     "other-user@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register second user failed: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestVaultUsersUpdatePermission(t *testing.T) {
 	_, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Other", LastName: "User",
 		Email: "other2@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

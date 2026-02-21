@@ -16,7 +16,7 @@ func setupStorageInfoTest(t *testing.T) (*StorageInfoService, string) {
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "storage-test@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

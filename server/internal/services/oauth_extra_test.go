@@ -19,7 +19,7 @@ func setupOAuthExtraTest(t *testing.T) (*OAuthService, string) {
 		LastName:  "User",
 		Email:     "oauth-extra-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestListProvidersEmpty(t *testing.T) {
 		LastName:  "OAuth",
 		Email:     "no-oauth@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

@@ -18,7 +18,7 @@ func setupPersonalizeTest(t *testing.T) (*PersonalizeService, string) {
 		LastName:  "User",
 		Email:     "personalize-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

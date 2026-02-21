@@ -18,7 +18,7 @@ func setupOAuthTest(t *testing.T) *OAuthService {
 func TestFindOrCreateUserNew(t *testing.T) {
 	svc := setupOAuthTest(t)
 
-	resp, err := svc.FindOrCreateUser("github", "gh-12345", "newuser@example.com", "John Doe")
+	resp, err := svc.FindOrCreateUser("github", "gh-12345", "newuser@example.com", "John Doe", "en")
 	if err != nil {
 		t.Fatalf("FindOrCreateUser failed: %v", err)
 	}
@@ -50,12 +50,12 @@ func TestFindOrCreateUserNew(t *testing.T) {
 func TestFindOrCreateUserExisting(t *testing.T) {
 	svc := setupOAuthTest(t)
 
-	resp1, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", "Jane Doe")
+	resp1, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", "Jane Doe", "en")
 	if err != nil {
 		t.Fatalf("First FindOrCreateUser failed: %v", err)
 	}
 
-	resp2, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", "Jane Doe")
+	resp2, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", "Jane Doe", "en")
 	if err != nil {
 		t.Fatalf("Second FindOrCreateUser failed: %v", err)
 	}
@@ -77,13 +77,13 @@ func TestFindOrCreateUserLinkEmail(t *testing.T) {
 		LastName:  "User",
 		Email:     "link@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 	existingUserID := regResp.User.ID
 
-	resp, err := svc.FindOrCreateUser("google", "goo-99999", "link@example.com", "Link User")
+	resp, err := svc.FindOrCreateUser("google", "goo-99999", "link@example.com", "Link User", "en")
 	if err != nil {
 		t.Fatalf("FindOrCreateUser failed: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestFindOrCreateUserLinkEmail(t *testing.T) {
 func TestSaveTokenCreate(t *testing.T) {
 	svc := setupOAuthTest(t)
 
-	resp, err := svc.FindOrCreateUser("github", "gh-save", "save@example.com", "Save User")
+	resp, err := svc.FindOrCreateUser("github", "gh-save", "save@example.com", "Save User", "en")
 	if err != nil {
 		t.Fatalf("FindOrCreateUser failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestSaveTokenCreate(t *testing.T) {
 func TestSaveTokenUpdate(t *testing.T) {
 	svc := setupOAuthTest(t)
 
-	resp, err := svc.FindOrCreateUser("github", "gh-update", "update@example.com", "Update User")
+	resp, err := svc.FindOrCreateUser("github", "gh-update", "update@example.com", "Update User", "en")
 	if err != nil {
 		t.Fatalf("FindOrCreateUser failed: %v", err)
 	}

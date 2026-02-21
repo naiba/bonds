@@ -16,7 +16,7 @@ func setupUserManagementTest(t *testing.T) (*UserManagementService, string, stri
 	resp, err := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Admin", LastName: "User",
 		Email: "admin-user@example.com", Password: "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

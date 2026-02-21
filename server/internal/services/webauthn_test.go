@@ -36,7 +36,7 @@ func setupWebAuthnTest(t *testing.T) (*WebAuthnService, string) {
 		LastName:  "Test",
 		Email:     "webauthn@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

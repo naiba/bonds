@@ -21,7 +21,7 @@ func setupInvitationTest(t *testing.T) (*InvitationService, string, string) {
 		LastName:  "User",
 		Email:     "invite-test@example.com",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}

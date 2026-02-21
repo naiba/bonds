@@ -17,7 +17,7 @@ func setupGroupTypeRoleTest(t *testing.T) (*GroupTypeRoleService, string, uint) 
 	resp, _ := authSvc.Register(dto.RegisterRequest{
 		FirstName: "Test", LastName: "User",
 		Email: "gtr-test@example.com", Password: "password123",
-	})
+	}, "en")
 
 	var gt models.GroupType
 	db.Where("account_id = ?", resp.User.AccountID).First(&gt)
