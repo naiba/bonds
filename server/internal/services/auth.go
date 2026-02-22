@@ -22,6 +22,8 @@ var (
 	ErrEmailNotVerified              = errors.New("email not verified")
 	ErrInvalidEmailVerificationToken = errors.New("invalid email verification token")
 	ErrEmailAlreadyVerified          = errors.New("email already verified")
+	ErrRegistrationDisabled          = errors.New("registration is disabled")
+	ErrPasswordAuthDisabled          = errors.New("password authentication is disabled")
 )
 
 type AuthService struct {
@@ -77,6 +79,14 @@ func (s *AuthService) sendVerificationEmail(user *models.User) {
 }
 
 func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.AuthResponse, error) {
+	// Check if registration is enabled (first user always allowed)
+	var userCount int64
+	s.db.Model(&models.User{}).Count(&userCount)
+	isFirstUser := userCount == 0
+	if !isFirstUser && s.settings != nil && !s.settings.GetBool("registration.enabled", true) {
+		return nil, ErrRegistrationDisabled
+	}
+
 	var existing models.User
 	if err := s.db.Where("email = ?", req.Email).First(&existing).Error; err == nil {
 		return nil, ErrEmailExists
@@ -86,11 +96,6 @@ func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.Aut
 	if err != nil {
 		return nil, err
 	}
-
-	// First registered user becomes instance administrator
-	var userCount int64
-	s.db.Model(&models.User{}).Count(&userCount)
-	isFirstUser := userCount == 0
 
 	hashedStr := string(hashedPassword)
 	account := models.Account{}

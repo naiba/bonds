@@ -1156,8 +1156,15 @@
         "url": "Application URL"
       },
       "announcement": "Announcement Banner",
-      "password_auth_enabled": "Password Authentication",
-      "registration_enabled": "User Registration",
+      "auth": {
+        "password": {
+          "enabled": "Password Authentication"
+        },
+        "require_email_verification": "Email Verification"
+      },
+      "registration": {
+        "enabled": "User Registration"
+      },
       "jwt": {
         "expiry_hrs": "Token Expiry (hours)",
         "refresh_hrs": "Refresh Window (hours)"

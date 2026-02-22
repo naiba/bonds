@@ -22,7 +22,7 @@ type ContactImportantDate struct {
 	ID                         uint           `json:"id" gorm:"primaryKey;autoIncrement"`
 	ContactID                  string         `json:"contact_id" gorm:"type:text;not null;index"`
 	UUID                       *string        `json:"uuid" gorm:"type:text;index"`
-	Vcalendar                  *string        `json:"vcalendar" gorm:"type:mediumtext"`
+	Vcalendar                  *string        `json:"vcalendar" gorm:"type:text"`
 	DistantUUID                *string        `json:"distant_uuid" gorm:"size:256"`
 	DistantEtag                *string        `json:"distant_etag" gorm:"size:256"`
 	DistantURI                 *string        `json:"distant_uri" gorm:"size:2096"`

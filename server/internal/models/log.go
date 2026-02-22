@@ -8,10 +8,10 @@ type Log struct {
 	Level        string    `json:"level" gorm:"index;not null"`
 	LevelName    string    `json:"level_name" gorm:"not null"`
 	Channel      string    `json:"channel" gorm:"index;not null"`
-	Message      *string   `json:"message" gorm:"type:longtext"`
-	Context      *string   `json:"context" gorm:"type:longtext"`
-	Extra        *string   `json:"extra" gorm:"type:longtext"`
-	Formatted    *string   `json:"formatted" gorm:"type:longtext"`
+	Message      *string   `json:"message" gorm:"type:text"`
+	Context      *string   `json:"context" gorm:"type:text"`
+	Extra        *string   `json:"extra" gorm:"type:text"`
+	Formatted    *string   `json:"formatted" gorm:"type:text"`
 	LoggableType string    `json:"loggable_type" gorm:"index:idx_loggable;not null"`
 	LoggableID   uint64    `json:"loggable_id" gorm:"index:idx_loggable;not null"`
 	LoggedAt     time.Time `json:"logged_at" gorm:"not null"`

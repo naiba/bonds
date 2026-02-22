@@ -26,7 +26,7 @@ type UserNotificationSent struct {
 	SentAt                    time.Time `json:"sent_at" gorm:"not null"`
 	SubjectLine               string    `json:"subject_line" gorm:"not null"`
 	Payload                   *string   `json:"payload" gorm:"type:text"`
-	Error                     *string   `json:"error" gorm:"type:longtext"`
+	Error                     *string   `json:"error" gorm:"type:text"`
 	CreatedAt                 time.Time `json:"created_at"`
 	UpdatedAt                 time.Time `json:"updated_at"`
 

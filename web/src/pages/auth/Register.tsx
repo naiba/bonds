@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Typography, App, theme, Tooltip } from "antd";
+import { Card, Form, Input, Button, Typography, App, theme, Tooltip, Spin } from "antd";
 import { MailOutlined, LockOutlined, UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import logoImg from "@/assets/logo.svg";
@@ -8,17 +8,44 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "@/stores/theme";
 import type { ThemeMode } from "@/stores/theme";
 import type { RegisterRequest, APIError } from "@/api";
+import { api } from "@/api";
 
 const { Title, Text } = Typography;
 
 export default function Register() {
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState(true);
+  const [loadingInstanceInfo, setLoadingInstanceInfo] = useState(true);
   const { register } = useAuth();
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { t, i18n } = useTranslation();
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
+
+  useEffect(() => {
+    let cancelled = false;
+    api.instance
+      .infoList()
+      .then((res) => {
+        if (!cancelled) {
+          setRegistrationEnabled(res.data?.registration_enabled !== false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRegistrationEnabled(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingInstanceInfo(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
   const themeModeIcons: Record<ThemeMode, React.ReactNode> = {
@@ -51,6 +78,61 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (loadingInstanceInfo) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: `linear-gradient(145deg, ${token.colorBgLayout} 0%, ${token.colorPrimaryBg} 50%, ${token.colorBgLayout} 100%)`,
+        }}
+      >
+        <Spin />
+      </div>
+    );
+  }
+
+  if (!registrationEnabled) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: `linear-gradient(145deg, ${token.colorBgLayout} 0%, ${token.colorPrimaryBg} 50%, ${token.colorBgLayout} 100%)`,
+          padding: 16,
+        }}
+      >
+        <Card
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            border: `1px solid ${token.colorBorderSecondary}`,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)",
+            borderRadius: token.borderRadiusLG,
+          }}
+        >
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <Title level={3} style={{ marginBottom: 4 }}>
+              Registration Disabled
+            </Title>
+            <Text type="secondary">User registration is currently disabled. Please contact an administrator.</Text>
+            <div style={{ marginTop: 24 }}>
+              <Link to="/login">
+                <Button type="primary">{t("auth.register.sign_in")}</Button>
+              </Link>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (

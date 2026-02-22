@@ -3625,12 +3625,12 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
 	initialCount := len(getResp.Settings)
-	if initialCount != 19 {
-		t.Errorf("expected 19 settings initially (seeded from env), got %d", initialCount)
+	if initialCount != 21 {
+		t.Errorf("expected 21 settings initially (seeded from env), got %d", initialCount)
 	}
 
 	rec = ts.doRequest(http.MethodPut, "/api/admin/settings",
-		`{"settings":[{"key":"app.name","value":"TestApp"},{"key":"registration.enabled","value":"false"}]}`,
+		`{"settings":[{"key":"app.name","value":"TestApp"},{"key":"test.custom.setting","value":"test"}]}`,
 		adminToken)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update settings: expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -3639,8 +3639,8 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
-	if len(getResp.Settings) != 20 {
-		t.Errorf("expected 20 settings after update, got %d", len(getResp.Settings))
+	if len(getResp.Settings) != 22 {
+		t.Errorf("expected 22 settings after update, got %d", len(getResp.Settings))
 	}
 }
 

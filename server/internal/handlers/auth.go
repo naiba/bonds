@@ -11,11 +11,12 @@ import (
 )
 
 type AuthHandler struct {
-	authService *services.AuthService
+	authService    *services.AuthService
+	settingService *services.SystemSettingService
 }
 
-func NewAuthHandler(authService *services.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *services.AuthService, settingService *services.SystemSettingService) *AuthHandler {
+	return &AuthHandler{authService: authService, settingService: settingService}
 }
 
 // Register godoc
@@ -47,6 +48,9 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		if errors.Is(err, services.ErrEmailExists) {
 			return response.Conflict(c, "err.email_already_exists")
 		}
+		if errors.Is(err, services.ErrRegistrationDisabled) {
+			return response.Forbidden(c, "err.registration_disabled")
+		}
 		return response.InternalError(c, "err.failed_to_register")
 	}
 
@@ -74,6 +78,10 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+
+	if h.settingService != nil && !h.settingService.GetBool("auth.password.enabled", true) {
+		return response.Forbidden(c, "err.password_auth_disabled")
 	}
 
 	result, err := h.authService.Login(req)

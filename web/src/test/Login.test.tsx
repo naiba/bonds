@@ -14,6 +14,7 @@ vi.mock("@/api", () => ({
           version: "v0.1.5",
           password_auth_enabled: true,
           registration_enabled: true,
+          require_email_verification: false,
           webauthn_enabled: false,
           oauth_providers: [],
         },

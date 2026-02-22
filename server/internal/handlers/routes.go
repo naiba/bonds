@@ -155,7 +155,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactPhotoHandler := NewContactPhotoHandler(vaultFileService)
 	contactDocumentHandler := NewContactDocumentHandler(vaultFileService)
 
-	authHandler := NewAuthHandler(authService)
+	authHandler := NewAuthHandler(authService, systemSettingService)
 	accountHandler := NewAccountHandler(db)
 	vaultHandler := NewVaultHandler(vaultService)
 	contactHandler := NewContactHandler(contactService)

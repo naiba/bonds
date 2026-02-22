@@ -41,6 +41,9 @@ func NewInstanceHandler(
 func (h *InstanceHandler) GetInfo(c echo.Context) error {
 	registrationEnabled := h.settingService.GetBool("registration.enabled", true)
 	passwordAuthEnabled := h.settingService.GetBool("auth.password.enabled", true)
+	requireEmailVerification := h.settingService.GetBool("auth.require_email_verification", false)
+	smtpConfigured := h.settingService.GetWithDefault("smtp.host", "") != ""
+	emailVerificationActive := requireEmailVerification && smtpConfigured
 	appName := h.settingService.GetWithDefault("app.name", "Bonds")
 
 	providers := h.oauthService.ListAvailableProviders()
@@ -56,12 +59,13 @@ func (h *InstanceHandler) GetInfo(c echo.Context) error {
 	webauthnEnabled := h.webauthnService.IsEnabled()
 
 	info := dto.InstanceInfoResponse{
-		Version:             h.version,
-		RegistrationEnabled: registrationEnabled,
-		PasswordAuthEnabled: passwordAuthEnabled,
-		OAuthProviders:      oauthNames,
-		WebAuthnEnabled:     webauthnEnabled,
-		AppName:             appName,
+		Version:                  h.version,
+		RegistrationEnabled:      registrationEnabled,
+		PasswordAuthEnabled:      passwordAuthEnabled,
+		OAuthProviders:           oauthNames,
+		WebAuthnEnabled:          webauthnEnabled,
+		AppName:                  appName,
+		RequireEmailVerification: emailVerificationActive,
 	}
 
 	return response.OK(c, info)

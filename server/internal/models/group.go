@@ -37,7 +37,7 @@ type Group struct {
 	VaultID     string         `json:"vault_id" gorm:"type:text;not null;index"`
 	GroupTypeID *uint          `json:"group_type_id" gorm:"index"`
 	Name        string         `json:"name" gorm:"not null"`
-	Vcard       *string        `json:"vcard" gorm:"type:mediumtext"`
+	Vcard       *string        `json:"vcard" gorm:"type:text"`
 	DistantUUID *string        `json:"distant_uuid" gorm:"size:256"`
 	DistantEtag *string        `json:"distant_etag" gorm:"size:256"`
 	DistantURI  *string        `json:"distant_uri" gorm:"size:2096"`

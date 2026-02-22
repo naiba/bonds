@@ -9,7 +9,7 @@ import {
 import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { api } from "@/api";
-import type { User, LoginRequest, RegisterRequest } from "@/api";
+import type { User, LoginRequest, RegisterRequest, InstanceInfo } from "@/api";
 
 interface AuthContextType {
   user: User | null;
@@ -109,12 +109,38 @@ export function useAuth() {
 export function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
+  const [instanceInfo, setInstanceInfo] = useState<InstanceInfo | null>(null);
+  const [loadingInstanceInfo, setLoadingInstanceInfo] = useState(true);
 
-  if (isLoading) return null;
+  useEffect(() => {
+    let cancelled = false;
+    api.instance
+      .infoList()
+      .then((res) => {
+        if (!cancelled) {
+          setInstanceInfo(res.data || {});
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setInstanceInfo({});
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingInstanceInfo(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (isLoading || loadingInstanceInfo) return null;
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
-  if (user && !user.email_verified_at) {
+  if (user && !user.email_verified_at && instanceInfo?.require_email_verification) {
     return <Navigate to="/verify-email" replace />;
   }
   return <>{children}</>;

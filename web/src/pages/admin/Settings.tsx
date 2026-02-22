@@ -22,8 +22,9 @@ const KNOWN_SETTINGS: SettingDef[] = [
   { key: "announcement", type: "textarea", section: "app" },
 
   // Authentication
-  { key: "password_auth_enabled", type: "boolean", section: "auth" },
-  { key: "registration_enabled", type: "boolean", section: "auth" },
+  { key: "auth.password.enabled", type: "boolean", section: "auth" },
+  { key: "registration.enabled", type: "boolean", section: "auth" },
+  { key: "auth.require_email_verification", type: "boolean", section: "auth" },
 
   // JWT
   { key: "jwt.expiry_hrs", type: "number", section: "jwt" },

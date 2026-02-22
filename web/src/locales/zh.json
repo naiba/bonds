@@ -1156,8 +1156,15 @@
         "url": "应用地址"
       },
       "announcement": "公告横幅",
-      "password_auth_enabled": "密码登录",
-      "registration_enabled": "用户注册",
+      "auth": {
+        "password": {
+          "enabled": "密码登录"
+        },
+        "require_email_verification": "邮箱验证"
+      },
+      "registration": {
+        "enabled": "用户注册"
+      },
       "jwt": {
         "expiry_hrs": "令牌过期时间（小时）",
         "refresh_hrs": "刷新窗口（小时）"
