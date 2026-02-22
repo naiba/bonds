@@ -2180,3 +2180,478 @@ func TestViewerCannotToggleQuickFacts(t *testing.T) {
 		t.Errorf("expected 403 for Viewer toggling quick facts, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// ==================== AE. Cross-User Notification Operations ====================
+
+func TestCrossUserNotificationUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "notif-upd-owner@example.com")
+	channelID := createTestNotificationChannel(t, ts, token1)
+	token2, _ := ts.registerTestUser(t, "notif-upd-intruder@example.com")
+
+	path := fmt.Sprintf("/api/settings/notifications/%s", channelID)
+	body := `{"label":"hacked","type":"email","content":"hacker@example.com"}`
+	rec := ts.doRequest(http.MethodPut, path, body, token2)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-user notification update, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossUserNotificationSendTestBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "notif-test-owner@example.com")
+	channelID := createTestNotificationChannel(t, ts, token1)
+	token2, _ := ts.registerTestUser(t, "notif-test-intruder@example.com")
+
+	path := fmt.Sprintf("/api/settings/notifications/%s/test", channelID)
+	rec := ts.doRequest(http.MethodPost, path, "", token2)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-user notification test, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossUserNotificationListLogsBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "notif-logs-owner@example.com")
+	channelID := createTestNotificationChannel(t, ts, token1)
+	token2, _ := ts.registerTestUser(t, "notif-logs-intruder@example.com")
+
+	path := fmt.Sprintf("/api/settings/notifications/%s/logs", channelID)
+	rec := ts.doRequest(http.MethodGet, path, "", token2)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-user notification logs, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCrossUserNotificationVerifyBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "notif-verify-owner@example.com")
+	channelID := createTestNotificationChannel(t, ts, token1)
+	token2, _ := ts.registerTestUser(t, "notif-verify-intruder@example.com")
+
+	path := fmt.Sprintf("/api/settings/notifications/%s/verify/fake-token", channelID)
+	rec := ts.doRequest(http.MethodGet, path, "", token2)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-user notification verify, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== AF. Non-Admin Cannot Manage Users ====================
+
+func TestNonAdminCannotListUsers(t *testing.T) {
+	ts := setupTestServer(t)
+	_, authResp := ts.registerTestUser(t, "admin-user-mgmt@example.com")
+	nonAdminUser := createSecondUser(t, ts, authResp.User.AccountID, "nonadmin-user-mgmt@example.com", false)
+	nonAdminToken := generateJWT(nonAdminUser.ID, nonAdminUser.AccountID, nonAdminUser.Email, false, false)
+
+	rec := ts.doRequest(http.MethodGet, "/api/settings/users", "", nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin listing users, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNonAdminCannotCreateUser(t *testing.T) {
+	ts := setupTestServer(t)
+	_, authResp := ts.registerTestUser(t, "admin-usr-create@example.com")
+	nonAdminUser := createSecondUser(t, ts, authResp.User.AccountID, "nonadmin-usr-create@example.com", false)
+	nonAdminToken := generateJWT(nonAdminUser.ID, nonAdminUser.AccountID, nonAdminUser.Email, false, false)
+
+	body := `{"email":"newuser@example.com","password":"password123","first_name":"New","last_name":"User"}`
+	rec := ts.doRequest(http.MethodPost, "/api/settings/users", body, nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin creating user, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNonAdminCannotUpdateUser(t *testing.T) {
+	ts := setupTestServer(t)
+	_, authResp := ts.registerTestUser(t, "admin-usr-upd@example.com")
+	nonAdminUser := createSecondUser(t, ts, authResp.User.AccountID, "nonadmin-usr-upd@example.com", false)
+	nonAdminToken := generateJWT(nonAdminUser.ID, nonAdminUser.AccountID, nonAdminUser.Email, false, false)
+
+	path := fmt.Sprintf("/api/settings/users/%s", nonAdminUser.ID)
+	body := `{"first_name":"Hacked"}`
+	rec := ts.doRequest(http.MethodPut, path, body, nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin updating user, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestNonAdminCannotDeleteUser(t *testing.T) {
+	ts := setupTestServer(t)
+	_, authResp := ts.registerTestUser(t, "admin-usr-del@example.com")
+	nonAdminUser := createSecondUser(t, ts, authResp.User.AccountID, "nonadmin-usr-del@example.com", false)
+	nonAdminToken := generateJWT(nonAdminUser.ID, nonAdminUser.AccountID, nonAdminUser.Email, false, false)
+
+	path := fmt.Sprintf("/api/settings/users/%s", nonAdminUser.ID)
+	rec := ts.doRequest(http.MethodDelete, path, "", nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin deleting user, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== AG. Non-Admin Cannot Cancel Account ====================
+
+func TestNonAdminCannotCancelAccount(t *testing.T) {
+	ts := setupTestServer(t)
+	_, authResp := ts.registerTestUser(t, "admin-cancel@example.com")
+	nonAdminUser := createSecondUser(t, ts, authResp.User.AccountID, "nonadmin-cancel@example.com", false)
+	nonAdminToken := generateJWT(nonAdminUser.ID, nonAdminUser.AccountID, nonAdminUser.Email, false, false)
+
+	body := `{"password":"password123"}`
+	rec := ts.doRequest(http.MethodDelete, "/api/settings/account", body, nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for non-admin canceling account, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== AH. Cross-Vault Contact Sub-Resource IDOR ====================
+
+func TestCrossVaultCallBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-call@example.com")
+	vault1 := ts.createTestVault(t, token, "Call Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "CallContact")
+	vault2 := ts.createTestVault(t, token, "Call Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/calls", vault2.ID, contact1.ID)
+	body := `{"called_at":"2025-01-01T00:00:00Z","description":"test"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault call create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultAddressBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-addr@example.com")
+	vault1 := ts.createTestVault(t, token, "Addr Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "AddrContact")
+	vault2 := ts.createTestVault(t, token, "Addr Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/addresses", vault2.ID, contact1.ID)
+	body := `{"street":"123 Main St","city":"Test","country":"US"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault address create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultContactInfoBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-cinfo@example.com")
+	vault1 := ts.createTestVault(t, token, "CInfo Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "CInfoContact")
+	vault2 := ts.createTestVault(t, token, "CInfo Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/contactInformation", vault2.ID, contact1.ID)
+	body := `{"contact_information_type_id":1,"data":"test@test.com"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault contact info create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultLoanBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-loan@example.com")
+	vault1 := ts.createTestVault(t, token, "Loan Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "LoanContact")
+	vault2 := ts.createTestVault(t, token, "Loan Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/loans", vault2.ID, contact1.ID)
+	body := `{"type":"debt","name":"Test Loan","amount_lent":100}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault loan create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultPetBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-pet@example.com")
+	vault1 := ts.createTestVault(t, token, "Pet Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "PetContact")
+	vault2 := ts.createTestVault(t, token, "Pet Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/pets", vault2.ID, contact1.ID)
+	body := `{"pet_category_id":1,"name":"Rex"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault pet create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultRelationshipBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-rel@example.com")
+	vault1 := ts.createTestVault(t, token, "Rel Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "RelContact1")
+	contact2 := ts.createTestContact(t, token, vault1.ID, "RelContact2")
+	vault2 := ts.createTestVault(t, token, "Rel Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/relationships", vault2.ID, contact1.ID)
+	body := fmt.Sprintf(`{"relationship_type_id":1,"related_contact_id":"%s"}`, contact2.ID)
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault relationship create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultGoalBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-goal@example.com")
+	vault1 := ts.createTestVault(t, token, "Goal Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "GoalContact")
+	vault2 := ts.createTestVault(t, token, "Goal Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/goals", vault2.ID, contact1.ID)
+	body := `{"name":"Test Goal"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault goal create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultTimelineEventBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-timeline@example.com")
+	vault1 := ts.createTestVault(t, token, "Timeline Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "TimelineContact")
+	vault2 := ts.createTestVault(t, token, "Timeline Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents", vault2.ID, contact1.ID)
+	body := `{"label":"Test Event","started_at":"2025-01-01"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault timeline event create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultMoodEventBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-mood@example.com")
+	vault1 := ts.createTestVault(t, token, "Mood Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "MoodContact")
+	vault2 := ts.createTestVault(t, token, "Mood Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/moodTrackingEvents", vault2.ID, contact1.ID)
+	body := `{"mood_tracking_parameter_id":1,"rated_at":"2025-01-01","note":"test"}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault mood event create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultImportantDateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-date@example.com")
+	vault1 := ts.createTestVault(t, token, "Date Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "DateContact")
+	vault2 := ts.createTestVault(t, token, "Date Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/dates", vault2.ID, contact1.ID)
+	body := `{"contact_important_date_type_id":1,"label":"Birthday","day":1,"month":1,"year":2000}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault important date create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultContactLabelBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-clabel@example.com")
+	vault1 := ts.createTestVault(t, token, "CLabel Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "CLabelContact")
+	vault2 := ts.createTestVault(t, token, "CLabel Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/labels", vault2.ID, contact1.ID)
+	body := `{"label_id":1}`
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code == http.StatusCreated || rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault contact label create, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultReligionUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-religion@example.com")
+	vault1 := ts.createTestVault(t, token, "Religion Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "ReligionContact")
+	vault2 := ts.createTestVault(t, token, "Religion Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/religion", vault2.ID, contact1.ID)
+	body := `{"religion_id":1}`
+	rec := ts.doRequest(http.MethodPut, path, body, token)
+	if rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault religion update, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultJobInfoUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-job@example.com")
+	vault1 := ts.createTestVault(t, token, "Job Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "JobContact")
+	vault2 := ts.createTestVault(t, token, "Job Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/jobInformation", vault2.ID, contact1.ID)
+	body := `{"job_title":"CEO","company":"Test Corp"}`
+	rec := ts.doRequest(http.MethodPut, path, body, token)
+	if rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault job info update, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultAvatarUpdateBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-avatar@example.com")
+	vault1 := ts.createTestVault(t, token, "Avatar Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "AvatarContact")
+	vault2 := ts.createTestVault(t, token, "Avatar Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/avatar", vault2.ID, contact1.ID)
+	rec := ts.doRequest(http.MethodPut, path, "", token)
+	if rec.Code == http.StatusOK {
+		t.Errorf("expected error for cross-vault avatar update, got %d", rec.Code)
+	}
+}
+
+func TestCrossVaultContactFeedReturnsEmpty(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "xvault-feed@example.com")
+	vault1 := ts.createTestVault(t, token, "Feed Vault A")
+	contact1 := ts.createTestContact(t, token, vault1.ID, "FeedContact")
+	vault2 := ts.createTestVault(t, token, "Feed Vault B")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/feed", vault2.ID, contact1.ID)
+	rec := ts.doRequest(http.MethodGet, path, "", token)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 (empty feed) for cross-vault contact feed, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// ==================== AI. Viewer Cannot Write Vault-Scoped Resources ====================
+
+func TestViewerCannotCreateDavSubscription(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/dav/subscriptions", vaultID)
+	body := `{"name":"Test","url":"https://example.com/dav","username":"user","password":"pass"}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating DAV subscription, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreateLifeMetric(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/lifeMetrics", vaultID)
+	body := `{"label":"Test Metric"}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating life metric, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreateCompany(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/companies", vaultID)
+	body := `{"name":"Test Corp","type":"employer"}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating company, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreateSliceOfLife(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/slices", vaultID, journalID)
+	body := `{"name":"Test Slice"}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating slice of life, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreateJournalMetric(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/metrics", vaultID, journalID)
+	body := `{"label":"Test Metric"}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating journal metric, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreatePostMetric(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	postID := createTestPost(t, ts, adminToken, vaultID, journalID)
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s/metrics", vaultID, journalID, postID)
+	body := `{"journal_metric_id":1,"value":5}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating post metric, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotCreatePostTag(t *testing.T) {
+	ts, adminToken, viewerToken, vaultID, _ := setupViewerTest(t)
+	journalID := createTestJournal(t, ts, adminToken, vaultID)
+	postID := createTestPost(t, ts, adminToken, vaultID, journalID)
+	path := fmt.Sprintf("/api/vaults/%s/journals/%s/posts/%s/tags", vaultID, journalID, postID)
+	body := `{"name":"test-tag"}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer creating post tag, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotUpdateDefaultTab(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/defaultTab", vaultID)
+	body := `{"default_tab":"feed"}`
+	rec := ts.doRequest(http.MethodPut, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer updating default tab, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotAddContactToGroup(t *testing.T) {
+	ts, _, viewerToken, vaultID, contactID := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/groups", vaultID, contactID)
+	body := `{"group_id":1}`
+	rec := ts.doRequest(http.MethodPost, path, body, viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer adding contact to group, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotDeleteDavSubscription(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/dav/subscriptions/999", vaultID)
+	rec := ts.doRequest(http.MethodDelete, path, "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer deleting DAV subscription, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotDeleteLifeMetric(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/lifeMetrics/999", vaultID)
+	rec := ts.doRequest(http.MethodDelete, path, "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer deleting life metric, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestViewerCannotDeleteCompany(t *testing.T) {
+	ts, _, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/companies/999", vaultID)
+	rec := ts.doRequest(http.MethodDelete, path, "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer deleting company, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
