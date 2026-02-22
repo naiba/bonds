@@ -43,7 +43,7 @@ func (m *mockCardDAVClient) FindAddressBooks(ctx context.Context, homeSet string
 	if m.findAddrBooksFn != nil {
 		return m.findAddrBooksFn(ctx, homeSet)
 	}
-	return nil, nil
+	return []carddav.AddressBook{{Path: "/addressbooks/user/default/", Name: "Default"}}, nil
 }
 
 func (m *mockCardDAVClient) SyncCollection(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
@@ -173,8 +173,11 @@ func TestDavSyncService_TestConnection(t *testing.T) {
 	if len(result.AddressBooks) != 2 {
 		t.Errorf("expected 2 address books, got %d", len(result.AddressBooks))
 	}
-	if result.AddressBooks[0] != "Contacts" {
-		t.Errorf("expected first address book 'Contacts', got %q", result.AddressBooks[0])
+	if result.AddressBooks[0].Name != "Contacts" {
+		t.Errorf("expected first address book name 'Contacts', got %q", result.AddressBooks[0].Name)
+	}
+	if result.AddressBooks[0].Path != "/addressbooks/user/contacts/" {
+		t.Errorf("expected first address book path '/addressbooks/user/contacts/', got %q", result.AddressBooks[0].Path)
 	}
 }
 
@@ -718,7 +721,82 @@ func TestDavSyncService_TestConnection_SabreDAVPath(t *testing.T) {
 	if len(result.AddressBooks) != 1 {
 		t.Errorf("expected 1 address book, got %d", len(result.AddressBooks))
 	}
-	if result.AddressBooks[0] != "Default" {
-		t.Errorf("expected 'Default', got %q", result.AddressBooks[0])
+	if result.AddressBooks[0].Name != "Default" {
+		t.Errorf("expected 'Default', got %q", result.AddressBooks[0].Name)
+	}
+	if result.AddressBooks[0].Path != "/dav.php/addressbooks/user/default/" {
+		t.Errorf("expected path '/dav.php/addressbooks/user/default/', got %q", result.AddressBooks[0].Path)
+	}
+}
+
+func TestDavSyncService_SyncSubscription_DiscoverPath(t *testing.T) {
+	syncSvc, clientSvc, _, vaultID, userID, _ := setupDavSyncTest(t)
+
+	// Create subscription with URI only — no AddressBookPath
+	sub, err := clientSvc.Create(vaultID, userID, dto.CreateDavSubscriptionRequest{
+		URI:      "https://dav.example.com/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("Create subscription failed: %v", err)
+	}
+
+	// Verify AddressBookPath is initially empty
+	var initialSub models.AddressBookSubscription
+	syncSvc.db.First(&initialSub, "id = ?", sub.ID)
+	if initialSub.AddressBookPath != "" {
+		t.Fatalf("expected empty AddressBookPath initially, got %q", initialSub.AddressBookPath)
+	}
+
+	discoveredPath := "/addressbooks/user/main/"
+	var queryPathReceived string
+
+	mc := &mockCardDAVClient{
+		findPrincipalFn: func(ctx context.Context) (string, error) {
+			return "/principals/user/", nil
+		},
+		findHomeSetFn: func(ctx context.Context, principal string) (string, error) {
+			return "/addressbooks/user/", nil
+		},
+		findAddrBooksFn: func(ctx context.Context, homeSet string) ([]carddav.AddressBook, error) {
+			return []carddav.AddressBook{
+				{Path: discoveredPath, Name: "Main"},
+			}, nil
+		},
+		syncCollFn: func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
+			return nil, fmt.Errorf("sync not supported")
+		},
+		queryFn: func(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
+			queryPathReceived = path
+			return []carddav.AddressObject{
+				{
+					Path: "/addressbooks/user/main/alice.vcf",
+					ETag: "etag-alice",
+					Card: makeVCard("Alice", "Discover", "uid-alice-disc"),
+				},
+			}, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.SyncSubscription(context.Background(), sub.ID, vaultID)
+	if err != nil {
+		t.Fatalf("SyncSubscription failed: %v", err)
+	}
+	if result.Created != 1 {
+		t.Errorf("expected 1 created, got %d", result.Created)
+	}
+
+	// Verify QueryAddressBook received the DISCOVERED path, not the URI
+	if queryPathReceived != discoveredPath {
+		t.Errorf("expected QueryAddressBook to use discovered path %q, got %q", discoveredPath, queryPathReceived)
+	}
+
+	// Verify AddressBookPath was saved to DB
+	var updatedSub models.AddressBookSubscription
+	syncSvc.db.First(&updatedSub, "id = ?", sub.ID)
+	if updatedSub.AddressBookPath != discoveredPath {
+		t.Errorf("expected AddressBookPath cached as %q, got %q", discoveredPath, updatedSub.AddressBookPath)
 	}
 }

@@ -94,7 +94,11 @@ func (s *DavPushService) PushContactChange(contactID, vaultID string) {
 			if hasState {
 				putPath = state.DistantURI
 			} else {
-				putPath = strings.TrimRight(sub.URI, "/") + "/" + contactID + ".vcf"
+				basePath := sub.AddressBookPath
+				if basePath == "" {
+					basePath = sub.URI
+				}
+				putPath = strings.TrimRight(basePath, "/") + "/" + contactID + ".vcf"
 			}
 
 			result, err := client.PutAddressObject(ctx, putPath, card)

@@ -92,14 +92,15 @@ func (s *DavClientService) Create(vaultID, userID string, req dto.CreateDavSubsc
 	}
 
 	sub := models.AddressBookSubscription{
-		UserID:       userID,
-		VaultID:      vaultID,
-		URI:          req.URI,
-		Username:     req.Username,
-		Password:     encryptedPwd,
-		SyncWay:      syncWay,
-		Frequency:    frequency,
-		Capabilities: "{}",
+		UserID:          userID,
+		VaultID:         vaultID,
+		URI:             req.URI,
+		AddressBookPath: req.AddressBookPath,
+		Username:        req.Username,
+		Password:        encryptedPwd,
+		SyncWay:         syncWay,
+		Frequency:       frequency,
+		Capabilities:    "{}",
 	}
 	if err := s.db.Create(&sub).Error; err != nil {
 		return nil, err
@@ -165,6 +166,9 @@ func (s *DavClientService) Update(id, vaultID string, req dto.UpdateDavSubscript
 		sub.Active = *req.Active
 	}
 
+	if req.AddressBookPath != "" {
+		sub.AddressBookPath = req.AddressBookPath
+	}
 	if err := s.db.Save(&sub).Error; err != nil {
 		return nil, err
 	}
@@ -225,6 +229,7 @@ func toDavSubscriptionResponse(sub *models.AddressBookSubscription) dto.DavSubsc
 		VaultID:            sub.VaultID,
 		URI:                sub.URI,
 		Username:           sub.Username,
+		AddressBookPath:    sub.AddressBookPath,
 		Active:             sub.Active,
 		SyncWay:            sub.SyncWay,
 		Frequency:          sub.Frequency,

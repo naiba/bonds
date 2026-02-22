@@ -8,6 +8,7 @@ type CreateDavSubscriptionRequest struct {
 	Password  string `json:"password" validate:"required" example:"app-password"`
 	SyncWay   uint8  `json:"sync_way" example:"2"`
 	Frequency int    `json:"frequency" example:"180"`
+	AddressBookPath string `json:"address_book_path" example:"/dav.php/addressbooks/user/contacts/"`
 }
 
 type UpdateDavSubscriptionRequest struct {
@@ -17,6 +18,7 @@ type UpdateDavSubscriptionRequest struct {
 	SyncWay   uint8  `json:"sync_way" example:"2"`
 	Frequency int    `json:"frequency" example:"180"`
 	Active    *bool  `json:"active" example:"true"`
+	AddressBookPath string `json:"address_book_path" example:"/dav.php/addressbooks/user/contacts/"`
 }
 
 type TestDavConnectionRequest struct {
@@ -30,6 +32,7 @@ type DavSubscriptionResponse struct {
 	VaultID            string     `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	URI                string     `json:"uri" example:"https://dav.example.com/addressbooks/user/contacts/"`
 	Username           string     `json:"username" example:"user@example.com"`
+	AddressBookPath    string     `json:"address_book_path" example:"/dav.php/addressbooks/user/contacts/"`
 	Active             bool       `json:"active" example:"true"`
 	SyncWay            uint8      `json:"sync_way" example:"2"`
 	Frequency          int        `json:"frequency" example:"180"`
@@ -38,10 +41,15 @@ type DavSubscriptionResponse struct {
 	UpdatedAt          time.Time  `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
 
+type AddressBookInfo struct {
+	Name string `json:"name" example:"Contacts"`
+	Path string `json:"path" example:"/dav.php/addressbooks/user/contacts/"`
+}
+
 type TestDavConnectionResponse struct {
-	Success      bool     `json:"success" example:"true"`
-	AddressBooks []string `json:"address_books,omitempty"`
-	Error        string   `json:"error,omitempty"`
+	Success      bool              `json:"success" example:"true"`
+	AddressBooks []AddressBookInfo `json:"address_books,omitempty"`
+	Error        string            `json:"error,omitempty"`
 }
 
 type DavSyncLogResponse struct {

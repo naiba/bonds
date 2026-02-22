@@ -43,6 +43,7 @@ import type {
   CreateDavSubscriptionRequest,
   UpdateDavSubscriptionRequest,
   TestDavConnectionResponse,
+  AddressBookInfo,
   APIError,
   PaginationMeta,
 } from "@/api";
@@ -81,6 +82,7 @@ export default function DavSubscriptions() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<DavSubscription | null>(null);
   const [testResult, setTestResult] = useState<TestDavConnectionResponse | null>(null);
+  const [discoveredAddressBooks, setDiscoveredAddressBooks] = useState<AddressBookInfo[]>([]);
   const [testLoading, setTestLoading] = useState(false);
 
   const [logsDrawerOpen, setLogsDrawerOpen] = useState(false);
@@ -162,6 +164,7 @@ export default function DavSubscriptions() {
   const openCreateModal = () => {
     setEditingSubscription(null);
     setTestResult(null);
+    setDiscoveredAddressBooks([]);
     form.resetFields();
     form.setFieldsValue({ sync_way: SYNC_WAY_PULL, frequency: 180 });
     setModalOpen(true);
@@ -170,6 +173,7 @@ export default function DavSubscriptions() {
   const openEditModal = (record: DavSubscription) => {
     setEditingSubscription(record);
     setTestResult(null);
+    setDiscoveredAddressBooks([]);
     form.resetFields();
     form.setFieldsValue({
       uri: record.uri,
@@ -177,6 +181,7 @@ export default function DavSubscriptions() {
       sync_way: record.sync_way,
       frequency: record.frequency,
       active: record.active,
+      address_book_path: record.address_book_path,
     });
     setModalOpen(true);
   };
@@ -197,6 +202,7 @@ export default function DavSubscriptions() {
         sync_way: values.sync_way,
         frequency: values.frequency,
         active: values.active,
+        address_book_path: values.address_book_path,
       };
       if (values.password) {
         data.password = values.password;
@@ -212,12 +218,20 @@ export default function DavSubscriptions() {
       const values = await form.validateFields(["uri", "username", "password"]);
       setTestLoading(true);
       setTestResult(null);
+      setDiscoveredAddressBooks([]);
       const res = await api.davSubscriptions.davSubscriptionsTestCreate(vaultId, {
         uri: values.uri,
         username: values.username,
         password: values.password,
       });
-      setTestResult(res.data as TestDavConnectionResponse);
+      const result = res.data as TestDavConnectionResponse;
+      setTestResult(result);
+      if (result.success && result.address_books) {
+        setDiscoveredAddressBooks(result.address_books);
+        if (result.address_books.length === 1) {
+          form.setFieldValue("address_book_path", result.address_books[0].path);
+        }
+      }
     } catch {
       setTestResult({ success: false, error: "Validation failed" });
     } finally {
@@ -414,6 +428,7 @@ export default function DavSubscriptions() {
           setModalOpen(false);
           setEditingSubscription(null);
           setTestResult(null);
+          setDiscoveredAddressBooks([]);
           form.resetFields();
         }}
         onOk={handleModalOk}
@@ -504,8 +519,32 @@ export default function DavSubscriptions() {
                     })
                   : testResult.error
               }
-              style={{ marginBottom: 0 }}
+              style={{ marginBottom: 16 }}
             />
+          )}
+
+          {(discoveredAddressBooks.length > 0 || editingSubscription?.address_book_path) && (
+            <Form.Item
+              name="address_book_path"
+              label={t("vault.dav_subscriptions.address_book")}
+            >
+              <Select
+                placeholder={t("vault.dav_subscriptions.address_book_placeholder")}
+                allowClear
+              >
+                {discoveredAddressBooks.map((ab) => (
+                  <Select.Option key={ab.path} value={ab.path!}>
+                    {ab.name} ({ab.path})
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+
+          {!discoveredAddressBooks.length && !editingSubscription?.address_book_path && (
+            <Text type="secondary" style={{ display: "block", marginBottom: 16, fontSize: 12 }}>
+              {t("vault.dav_subscriptions.address_book_auto_discover")}
+            </Text>
           )}
         </Form>
       </Modal>

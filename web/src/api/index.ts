@@ -329,6 +329,7 @@ export type { GithubComNaibaBondsInternalDtoCreateDavSubscriptionRequest as Crea
 export type { GithubComNaibaBondsInternalDtoUpdateDavSubscriptionRequest as UpdateDavSubscriptionRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoTestDavConnectionRequest as TestDavConnectionRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoTestDavConnectionResponse as TestDavConnectionResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoAddressBookInfo as AddressBookInfo } from "./generated/data-contracts";
 
 // OAuthProvider — not in generated types (backend returns raw goth data)
 export interface OAuthProvider {

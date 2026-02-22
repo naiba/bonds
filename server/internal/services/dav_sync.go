@@ -151,15 +151,42 @@ func (s *DavSyncService) TestConnection(req dto.TestDavConnectionRequest) (*dto.
 		}, nil
 	}
 
-	names := make([]string, len(books))
+	addressBooks := make([]dto.AddressBookInfo, len(books))
 	for i, b := range books {
-		names[i] = b.Name
+		addressBooks[i] = dto.AddressBookInfo{
+			Name: b.Name,
+			Path: b.Path,
+		}
 	}
-
 	return &dto.TestDavConnectionResponse{
 		Success:      true,
-		AddressBooks: names,
+		AddressBooks: addressBooks,
 	}, nil
+}
+
+var ErrNoAddressBooksFound = fmt.Errorf("no address books found on remote server")
+
+func (s *DavSyncService) discoverAddressBookPath(ctx context.Context, client CardDAVClient) (string, error) {
+	principal, principalErr := client.FindCurrentUserPrincipal(ctx)
+	if principalErr != nil {
+		principal = ""
+	}
+
+	homeSet, err := client.FindAddressBookHomeSet(ctx, principal)
+	if err != nil {
+		return "", fmt.Errorf("failed to find address book home set: %w", err)
+	}
+
+	books, err := client.FindAddressBooks(ctx, homeSet)
+	if err != nil {
+		return "", fmt.Errorf("failed to list address books: %w", err)
+	}
+
+	if len(books) == 0 {
+		return "", ErrNoAddressBooksFound
+	}
+
+	return books[0].Path, nil
 }
 
 func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID string) (*dto.TriggerSyncResponse, error) {
@@ -181,15 +208,26 @@ func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID st
 	userID := sub.UserID
 
 	result := &dto.TriggerSyncResponse{}
-
+	// Discover address book path if not cached
+	addressBookPath := sub.AddressBookPath
+	if addressBookPath == "" {
+		discovered, discoverErr := s.discoverAddressBookPath(ctx, client)
+		if discoverErr != nil {
+			return nil, fmt.Errorf("failed to discover address book path: %w", discoverErr)
+		}
+		addressBookPath = discovered
+		// Cache the discovered path
+		s.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).Update("address_book_path", addressBookPath)
+		sub.AddressBookPath = addressBookPath
+	}
 	hasToken := sub.DistantSyncToken != nil && *sub.DistantSyncToken != ""
 	if hasToken {
-		syncResp, syncErr := client.SyncCollection(ctx, sub.URI, &carddav.SyncQuery{
+		syncResp, syncErr := client.SyncCollection(ctx, addressBookPath, &carddav.SyncQuery{
 			DataRequest: carddav.AddressDataRequest{AllProp: true},
 			SyncToken:   *sub.DistantSyncToken,
 		})
 		if syncErr == nil {
-			s.processIncrementalSync(ctx, client, syncResp, sub, vaultID, userID, accountID, result)
+			s.processIncrementalSync(ctx, client, syncResp, sub, addressBookPath, vaultID, userID, accountID, result)
 			if err := s.clientService.UpdateSyncStatus(sub.ID, &syncResp.SyncToken); err != nil {
 				log.Printf("[dav-sync] failed to update sync status: %v", err)
 			}
@@ -198,7 +236,7 @@ func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID st
 		log.Printf("[dav-sync] incremental sync failed for sub %s, falling back to full sync: %v", sub.ID, syncErr)
 	}
 
-	s.performFullSync(ctx, client, sub, vaultID, userID, accountID, result)
+	s.performFullSync(ctx, client, sub, addressBookPath, vaultID, userID, accountID, result)
 
 	return result, nil
 }
@@ -208,6 +246,7 @@ func (s *DavSyncService) processIncrementalSync(
 	client CardDAVClient,
 	syncResp *carddav.SyncResponse,
 	sub *models.AddressBookSubscription,
+	addressBookPath string,
 	vaultID, userID, accountID string,
 	result *dto.TriggerSyncResponse,
 ) {
@@ -224,7 +263,7 @@ func (s *DavSyncService) processIncrementalSync(
 			}
 			batch := paths[i:end]
 
-			objects, err := client.MultiGetAddressBook(ctx, sub.URI, &carddav.AddressBookMultiGet{
+			objects, err := client.MultiGetAddressBook(ctx, addressBookPath, &carddav.AddressBookMultiGet{
 				Paths:       batch,
 				DataRequest: carddav.AddressDataRequest{AllProp: true},
 			})
@@ -255,10 +294,11 @@ func (s *DavSyncService) performFullSync(
 	ctx context.Context,
 	client CardDAVClient,
 	sub *models.AddressBookSubscription,
+	addressBookPath string,
 	vaultID, userID, accountID string,
 	result *dto.TriggerSyncResponse,
 ) {
-	syncResp, syncErr := client.SyncCollection(ctx, sub.URI, &carddav.SyncQuery{
+	syncResp, syncErr := client.SyncCollection(ctx, addressBookPath, &carddav.SyncQuery{
 		DataRequest: carddav.AddressDataRequest{AllProp: true},
 		SyncToken:   "",
 	})
@@ -278,7 +318,7 @@ func (s *DavSyncService) performFullSync(
 			}
 			batch := paths[i:end]
 
-			objects, err := client.MultiGetAddressBook(ctx, sub.URI, &carddav.AddressBookMultiGet{
+			objects, err := client.MultiGetAddressBook(ctx, addressBookPath, &carddav.AddressBookMultiGet{
 				Paths:       batch,
 				DataRequest: carddav.AddressDataRequest{AllProp: true},
 			})
@@ -309,12 +349,12 @@ func (s *DavSyncService) performFullSync(
 		log.Printf("[dav-sync] SyncCollection failed, falling back to QueryAddressBook: %v", syncErr)
 	}
 
-	objects, err := client.QueryAddressBook(ctx, sub.URI, &carddav.AddressBookQuery{
+	objects, err := client.QueryAddressBook(ctx, addressBookPath, &carddav.AddressBookQuery{
 		DataRequest: carddav.AddressDataRequest{AllProp: true},
 	})
 	if err != nil {
 		log.Printf("[dav-sync] QueryAddressBook failed: %v", err)
-		s.logSyncAction(sub.ID, nil, sub.URI, "", "error", fmt.Sprintf("QueryAddressBook failed: %v", err))
+		s.logSyncAction(sub.ID, nil, addressBookPath, "", "error", fmt.Sprintf("QueryAddressBook failed: %v", err))
 		result.Errors++
 		return
 	}

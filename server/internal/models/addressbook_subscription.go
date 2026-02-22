@@ -12,6 +12,7 @@ type AddressBookSubscription struct {
 	UserID             string     `json:"user_id" gorm:"type:text;not null;index"`
 	VaultID            string     `json:"vault_id" gorm:"type:text;not null;index"`
 	URI                string     `json:"uri" gorm:"size:2096;not null"`
+	AddressBookPath    string     `json:"address_book_path" gorm:"size:2096"`
 	Username           string     `json:"username" gorm:"size:1024;not null"`
 	Password           string     `json:"-" gorm:"size:2048;not null"`
 	Active             bool       `json:"active" gorm:"default:true"`
