@@ -14,6 +14,7 @@ import (
 )
 
 type mockCardDAVClient struct {
+	findPrincipalFn func(ctx context.Context) (string, error)
 	findHomeSetFn   func(ctx context.Context, principal string) (string, error)
 	findAddrBooksFn func(ctx context.Context, homeSet string) ([]carddav.AddressBook, error)
 	syncCollFn      func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error)
@@ -22,6 +23,13 @@ type mockCardDAVClient struct {
 	getAddrObjFn    func(ctx context.Context, path string) (*carddav.AddressObject, error)
 	putAddrObjFn    func(ctx context.Context, path string, card vcard.Card) (*carddav.AddressObject, error)
 	removeAllFn     func(ctx context.Context, path string) error
+}
+
+func (m *mockCardDAVClient) FindCurrentUserPrincipal(ctx context.Context) (string, error) {
+	if m.findPrincipalFn != nil {
+		return m.findPrincipalFn(ctx)
+	}
+	return "", nil
 }
 
 func (m *mockCardDAVClient) FindAddressBookHomeSet(ctx context.Context, principal string) (string, error) {
@@ -136,6 +144,9 @@ func TestDavSyncService_TestConnection(t *testing.T) {
 	syncSvc, _, _, _, _, _ := setupDavSyncTest(t)
 
 	mc := &mockCardDAVClient{
+		findPrincipalFn: func(ctx context.Context) (string, error) {
+			return "/principals/user/", nil
+		},
 		findHomeSetFn: func(ctx context.Context, principal string) (string, error) {
 			return "/addressbooks/user/", nil
 		},
@@ -171,6 +182,9 @@ func TestDavSyncService_TestConnection_Failure(t *testing.T) {
 	syncSvc, _, _, _, _, _ := setupDavSyncTest(t)
 
 	mc := &mockCardDAVClient{
+		findPrincipalFn: func(ctx context.Context) (string, error) {
+			return "/principals/user/", nil
+		},
 		findHomeSetFn: func(ctx context.Context, principal string) (string, error) {
 			return "", fmt.Errorf("connection refused")
 		},
@@ -589,5 +603,122 @@ func TestDavSyncService_SyncNoConflictWhenNotLocallyModified(t *testing.T) {
 	syncSvc.db.Where("distant_uri = ?", "/contacts/no-conflict.vcf").First(&contact)
 	if ptrToStr(contact.FirstName) != "Updated" {
 		t.Errorf("expected remote update applied 'Updated', got %q", ptrToStr(contact.FirstName))
+	}
+}
+
+func TestDavSyncService_TestConnection_WithPrincipal(t *testing.T) {
+	syncSvc, _, _, _, _, _ := setupDavSyncTest(t)
+
+	mc := &mockCardDAVClient{
+		findPrincipalFn: func(ctx context.Context) (string, error) {
+			return "/principals/user/", nil
+		},
+		findHomeSetFn: func(ctx context.Context, principal string) (string, error) {
+			if principal != "/principals/user/" {
+				t.Errorf("expected principal '/principals/user/', got %q", principal)
+			}
+			return "/addressbooks/user/", nil
+		},
+		findAddrBooksFn: func(ctx context.Context, homeSet string) ([]carddav.AddressBook, error) {
+			return []carddav.AddressBook{
+				{Path: "/addressbooks/user/contacts/", Name: "Contacts"},
+			}, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.TestConnection(dto.TestDavConnectionRequest{
+		URI:      "https://dav.example.com/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("TestConnection returned error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got error: %s", result.Error)
+	}
+	if len(result.AddressBooks) != 1 {
+		t.Errorf("expected 1 address book, got %d", len(result.AddressBooks))
+	}
+}
+
+func TestDavSyncService_TestConnection_PrincipalFallback(t *testing.T) {
+	syncSvc, _, _, _, _, _ := setupDavSyncTest(t)
+
+	mc := &mockCardDAVClient{
+		findPrincipalFn: func(ctx context.Context) (string, error) {
+			return "", fmt.Errorf("current-user-principal not supported")
+		},
+		findHomeSetFn: func(ctx context.Context, principal string) (string, error) {
+			if principal != "" {
+				t.Errorf("expected empty principal on fallback, got %q", principal)
+			}
+			return "/addressbooks/user/", nil
+		},
+		findAddrBooksFn: func(ctx context.Context, homeSet string) ([]carddav.AddressBook, error) {
+			return []carddav.AddressBook{
+				{Path: "/addressbooks/user/contacts/", Name: "Contacts"},
+			}, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.TestConnection(dto.TestDavConnectionRequest{
+		URI:      "https://simple.example.com/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("TestConnection returned error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success on fallback, got error: %s", result.Error)
+	}
+	if len(result.AddressBooks) != 1 {
+		t.Errorf("expected 1 address book, got %d", len(result.AddressBooks))
+	}
+}
+
+func TestDavSyncService_TestConnection_SabreDAVPath(t *testing.T) {
+	syncSvc, _, _, _, _, _ := setupDavSyncTest(t)
+
+	mc := &mockCardDAVClient{
+		findPrincipalFn: func(ctx context.Context) (string, error) {
+			return "/dav.php/principals/user/", nil
+		},
+		findHomeSetFn: func(ctx context.Context, principal string) (string, error) {
+			if principal != "/dav.php/principals/user/" {
+				t.Errorf("expected SabreDAV principal '/dav.php/principals/user/', got %q", principal)
+			}
+			return "/dav.php/addressbooks/user/", nil
+		},
+		findAddrBooksFn: func(ctx context.Context, homeSet string) ([]carddav.AddressBook, error) {
+			if homeSet != "/dav.php/addressbooks/user/" {
+				t.Errorf("expected SabreDAV homeSet '/dav.php/addressbooks/user/', got %q", homeSet)
+			}
+			return []carddav.AddressBook{
+				{Path: "/dav.php/addressbooks/user/default/", Name: "Default"},
+			}, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.TestConnection(dto.TestDavConnectionRequest{
+		URI:      "https://baikal.example.com/dav.php/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("TestConnection returned error: %v", err)
+	}
+	if !result.Success {
+		t.Errorf("expected success, got error: %s", result.Error)
+	}
+	if len(result.AddressBooks) != 1 {
+		t.Errorf("expected 1 address book, got %d", len(result.AddressBooks))
+	}
+	if result.AddressBooks[0] != "Default" {
+		t.Errorf("expected 'Default', got %q", result.AddressBooks[0])
 	}
 }

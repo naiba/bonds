@@ -51,6 +51,7 @@ func (s *RelationshipTypeService) Create(accountID string, groupTypeID uint, req
 		RelationshipGroupTypeID: groupTypeID,
 		Name:                    strPtrOrNil(req.Name),
 		NameReverseRelationship: strPtrOrNil(req.NameReverseRelationship),
+		Degree:                  req.Degree,
 		CanBeDeleted:            true,
 	}
 	if err := s.db.Create(&rt).Error; err != nil {
@@ -77,6 +78,7 @@ func (s *RelationshipTypeService) Update(accountID string, groupTypeID uint, typ
 	}
 	rt.Name = strPtrOrNil(req.Name)
 	rt.NameReverseRelationship = strPtrOrNil(req.NameReverseRelationship)
+	rt.Degree = req.Degree
 	if err := s.db.Save(&rt).Error; err != nil {
 		return nil, err
 	}
@@ -111,6 +113,7 @@ func toRelationshipTypeResponse(rt *models.RelationshipType) dto.RelationshipTyp
 		RelationshipGroupTypeID: rt.RelationshipGroupTypeID,
 		Name:                    ptrToStr(rt.Name),
 		NameReverseRelationship: ptrToStr(rt.NameReverseRelationship),
+		Degree:                  rt.Degree,
 		CanBeDeleted:            rt.CanBeDeleted,
 		CreatedAt:               rt.CreatedAt,
 		UpdatedAt:               rt.UpdatedAt,

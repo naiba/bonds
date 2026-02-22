@@ -25,6 +25,7 @@ const (
 )
 
 type CardDAVClient interface {
+	FindCurrentUserPrincipal(ctx context.Context) (string, error)
 	FindAddressBookHomeSet(ctx context.Context, principal string) (string, error)
 	FindAddressBooks(ctx context.Context, homeSet string) ([]carddav.AddressBook, error)
 	SyncCollection(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error)
@@ -126,7 +127,15 @@ func (s *DavSyncService) TestConnection(req dto.TestDavConnectionRequest) (*dto.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	homeSet, err := client.FindAddressBookHomeSet(ctx, "")
+	// Step 1: Discover principal (SabreDAV/Baikal requires this)
+	principal, principalErr := client.FindCurrentUserPrincipal(ctx)
+	if principalErr != nil {
+		// Fallback: try empty path for simple servers
+		principal = ""
+	}
+
+	// Step 2: Find address book home set using principal
+	homeSet, err := client.FindAddressBookHomeSet(ctx, principal)
 	if err != nil {
 		return &dto.TestDavConnectionResponse{
 			Success: false,

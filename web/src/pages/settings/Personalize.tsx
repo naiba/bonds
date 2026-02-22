@@ -53,7 +53,7 @@ const sectionI18nMap: Record<string, string> = {
 interface SubItemConfig {
   labelKey: string;
   addKey: string;
-  fields: Array<{ key: string; placeholder: string }>;
+  fields: Array<{ key: string; placeholder: string; optional?: boolean }>;
   list: (parentId: number) => Promise<{ data?: Array<Record<string, unknown>> }>;
   create: (parentId: number, body: Record<string, string>) => Promise<unknown>;
   update: (parentId: number, itemId: number, body: Record<string, string>) => Promise<unknown>;
@@ -107,10 +107,11 @@ const subItemConfigs: Record<string, SubItemConfig> = {
     fields: [
       { key: "name", placeholder: "common.name" },
       { key: "name_reverse_relationship", placeholder: "settings.personalize.name_reverse" },
+      { key: "degree", placeholder: "settings.personalize.degree_placeholder", optional: true },
     ],
     list: (id) => api.relationshipTypes.personalizeRelationshipTypesTypesList(id),
-    create: (id, b) => api.relationshipTypes.personalizeRelationshipTypesTypesCreate(id, { name: b.name, name_reverse_relationship: b.name_reverse_relationship }),
-    update: (id, itemId, b) => api.relationshipTypes.personalizeRelationshipTypesTypesUpdate(id, itemId, { name: b.name, name_reverse_relationship: b.name_reverse_relationship }),
+    create: (id, b) => api.relationshipTypes.personalizeRelationshipTypesTypesCreate(id, { name: b.name, name_reverse_relationship: b.name_reverse_relationship, degree: b.degree ? Number(b.degree) : undefined }),
+    update: (id, itemId, b) => api.relationshipTypes.personalizeRelationshipTypesTypesUpdate(id, itemId, { name: b.name, name_reverse_relationship: b.name_reverse_relationship, degree: b.degree ? Number(b.degree) : undefined }),
     remove: (id, itemId) => api.relationshipTypes.personalizeRelationshipTypesTypesDelete(id, itemId),
   },
 };
@@ -184,14 +185,15 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
     setFormValues((prev) => ({ ...prev, [key]: value }));
   }
 
-  const hasValues = config.fields.every((f) => (formValues[f.key] ?? "").trim());
+  const hasValues = config.fields.filter((f) => !f.optional).every((f) => (formValues[f.key] ?? "").trim());
   const showForm = adding || editingId !== null;
   const hasPosition = !!config.position;
 
   function getDisplayLabel(item: Record<string, unknown>): string {
     const primary = String(item[config.fields[0].key] ?? item.label ?? "");
     if (sectionKey === "relationship-types" && item.name_reverse_relationship) {
-      return `${primary} ↔ ${item.name_reverse_relationship}`;
+      const degree = item.degree ? ` (${item.degree})` : "";
+      return `${primary} ↔ ${item.name_reverse_relationship}${degree}`;
     }
     return primary;
   }

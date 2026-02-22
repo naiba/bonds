@@ -685,7 +685,12 @@
       "modal_title": "Add Relationship",
       "contact": "Contact",
       "select_contact": "Select a contact",
-      "relationship_type": "Relationship Type"
+      "relationship_type": "Relationship Type",
+      "graph_title": "Relationship Network",
+      "graph_empty": "No relationships to visualize",
+      "kinship_degree": "Kinship Degree: {{degree}}",
+      "kinship_no_path": "No kinship path found",
+      "click_to_calculate": "Click two nodes to calculate kinship"
     },
       "life_events": {
         "title": "Life Events",
@@ -865,6 +870,9 @@
       "post_templates": "Post Templates",
       "group_types": "Group Types",
       "name_reverse": "Reverse Relationship Name",
+      "degree": "Kinship Degree",
+      "degree_tooltip": "Distance weight for kinship calculation. Leave empty to exclude.",
+      "degree_placeholder": "e.g. 1",
       "enable_all": "Enable All",
       "disable_all": "Disable All",
       "search_currencies": "Search currencies...",

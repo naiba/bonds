@@ -24,6 +24,7 @@ type RelationshipType struct {
 	NameReverseRelationship               *string   `json:"name_reverse_relationship"`
 	NameReverseRelationshipTranslationKey *string   `json:"name_reverse_relationship_translation_key"`
 	Type                                  *string   `json:"type"`
+	Degree                                *int      `json:"degree" gorm:"default:null"`
 	CanBeDeleted                          bool      `json:"can_be_deleted" gorm:"default:true"`
 	CreatedAt                             time.Time `json:"created_at"`
 	UpdatedAt                             time.Time `json:"updated_at"`

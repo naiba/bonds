@@ -4,10 +4,27 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
+	"gorm.io/gorm"
 )
 
+type relationshipTestCtx struct {
+	svc              *RelationshipService
+	db               *gorm.DB
+	contactID        string
+	relatedContactID string
+	vaultID          string
+	accountID        string
+}
+
 func setupRelationshipTest(t *testing.T) (*RelationshipService, string, string, string) {
+	t.Helper()
+	ctx := setupRelationshipTestFull(t)
+	return ctx.svc, ctx.contactID, ctx.relatedContactID, ctx.vaultID
+}
+
+func setupRelationshipTestFull(t *testing.T) relationshipTestCtx {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -40,7 +57,79 @@ func setupRelationshipTest(t *testing.T) (*RelationshipService, string, string, 
 		t.Fatalf("CreateContact (related) failed: %v", err)
 	}
 
-	return NewRelationshipService(db), contact.ID, relatedContact.ID, vault.ID
+	return relationshipTestCtx{
+		svc:              NewRelationshipService(db),
+		db:               db,
+		contactID:        contact.ID,
+		relatedContactID: relatedContact.ID,
+		vaultID:          vault.ID,
+		accountID:        resp.User.AccountID,
+	}
+}
+
+type graphTestEnv struct {
+	svc     *RelationshipService
+	db      *gorm.DB
+	vaultID string
+	userID  string
+}
+
+func setupGraphTest(t *testing.T) (*graphTestEnv, func(firstName string) string) {
+	t.Helper()
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "graph-test@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Graph Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	createContact := func(firstName string) string {
+		c, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: firstName})
+		if err != nil {
+			t.Fatalf("CreateContact(%s) failed: %v", firstName, err)
+		}
+		return c.ID
+	}
+
+	env := &graphTestEnv{
+		svc:     NewRelationshipService(db),
+		db:      db,
+		vaultID: vault.ID,
+		userID:  resp.User.ID,
+	}
+	return env, createContact
+}
+
+func findRelTypeByDegree(t *testing.T, db *gorm.DB, degree int) uint {
+	t.Helper()
+	var rt models.RelationshipType
+	if err := db.Where("degree = ?", degree).First(&rt).Error; err != nil {
+		t.Fatalf("no relationship type with degree %d found: %v", degree, err)
+	}
+	return rt.ID
+}
+
+func findRelTypeNilDegree(t *testing.T, db *gorm.DB) uint {
+	t.Helper()
+	var rt models.RelationshipType
+	if err := db.Where("degree IS NULL").First(&rt).Error; err != nil {
+		t.Fatalf("no relationship type with nil degree found: %v", err)
+	}
+	return rt.ID
 }
 
 func TestCreateRelationship(t *testing.T) {
@@ -149,5 +238,253 @@ func TestRelationshipNotFound(t *testing.T) {
 	err = svc.Delete(9999, contactID, vaultID)
 	if err != ErrRelationshipNotFound {
 		t.Errorf("Expected ErrRelationshipNotFound, got %v", err)
+	}
+}
+
+func createAsymmetricTypePair(t *testing.T, db *gorm.DB, accountID string) (parentTypeID, childTypeID uint) {
+	t.Helper()
+	var group models.RelationshipGroupType
+	if err := db.Where("account_id = ?", accountID).First(&group).Error; err != nil {
+		t.Fatalf("Failed to find group: %v", err)
+	}
+	parentName := "test-parent"
+	childName := "test-child"
+	parentType := models.RelationshipType{
+		RelationshipGroupTypeID: group.ID,
+		Name:                    &parentName,
+		NameReverseRelationship: &childName,
+		CanBeDeleted:            true,
+	}
+	if err := db.Create(&parentType).Error; err != nil {
+		t.Fatalf("Create parent type failed: %v", err)
+	}
+	childType := models.RelationshipType{
+		RelationshipGroupTypeID: group.ID,
+		Name:                    &childName,
+		NameReverseRelationship: &parentName,
+		CanBeDeleted:            true,
+	}
+	if err := db.Create(&childType).Error; err != nil {
+		t.Fatalf("Create child type failed: %v", err)
+	}
+	return parentType.ID, childType.ID
+}
+
+func TestCreateRelationship_AutoCreatesReverse(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+	parentTypeID, childTypeID := createAsymmetricTypePair(t, ctx.db, ctx.accountID)
+
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
+		RelationshipTypeID: parentTypeID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse failed: %v", err)
+	}
+	found := false
+	for _, r := range reverseRels {
+		if r.ContactID == ctx.relatedContactID && r.RelatedContactID == ctx.contactID && r.RelationshipTypeID == childTypeID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected reverse relationship (child type %d) on related contact, not found in %d relationships", childTypeID, len(reverseRels))
+	}
+}
+
+func TestCreateRelationship_SymmetricType(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+
+	var spouseType models.RelationshipType
+	if err := ctx.db.Where("name = name_reverse_relationship AND name IS NOT NULL").First(&spouseType).Error; err != nil {
+		t.Fatalf("Failed to find symmetric type: %v", err)
+	}
+
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
+		RelationshipTypeID: spouseType.ID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse failed: %v", err)
+	}
+	found := false
+	for _, r := range reverseRels {
+		if r.ContactID == ctx.relatedContactID && r.RelatedContactID == ctx.contactID && r.RelationshipTypeID == spouseType.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected symmetric reverse relationship (type %d) on related contact, not found", spouseType.ID)
+	}
+}
+
+func TestCreateRelationship_NoReverseType(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+
+	var group models.RelationshipGroupType
+	if err := ctx.db.Where("account_id = ?", ctx.accountID).First(&group).Error; err != nil {
+		t.Fatalf("Failed to find group: %v", err)
+	}
+	name := "orphan-type"
+	reverseName := "nonexistent-reverse"
+	orphanType := models.RelationshipType{
+		RelationshipGroupTypeID: group.ID,
+		Name:                    &name,
+		NameReverseRelationship: &reverseName,
+		CanBeDeleted:            true,
+	}
+	if err := ctx.db.Create(&orphanType).Error; err != nil {
+		t.Fatalf("Create orphan type failed: %v", err)
+	}
+
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
+		RelationshipTypeID: orphanType.ID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List forward failed: %v", err)
+	}
+	if len(forwardRels) != 1 {
+		t.Errorf("Expected 1 forward relationship, got %d", len(forwardRels))
+	}
+
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse failed: %v", err)
+	}
+	if len(reverseRels) != 0 {
+		t.Errorf("Expected 0 reverse relationships (no matching reverse type), got %d", len(reverseRels))
+	}
+}
+
+func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+	parentTypeID, childTypeID := createAsymmetricTypePair(t, ctx.db, ctx.accountID)
+	_ = childTypeID
+
+	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
+		RelationshipTypeID: parentTypeID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse failed: %v", err)
+	}
+	if len(reverseRels) != 1 {
+		t.Fatalf("Expected 1 reverse relationship before delete, got %d", len(reverseRels))
+	}
+
+	if err := ctx.svc.Delete(created.ID, ctx.contactID, ctx.vaultID); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List forward failed: %v", err)
+	}
+	if len(forwardRels) != 0 {
+		t.Errorf("Expected 0 forward relationships after delete, got %d", len(forwardRels))
+	}
+
+	reverseRels, err = ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse after delete failed: %v", err)
+	}
+	if len(reverseRels) != 0 {
+		t.Errorf("Expected 0 reverse relationships after delete, got %d", len(reverseRels))
+	}
+}
+
+func TestDeleteRelationship_ReverseAlreadyGone(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+	parentTypeID, _ := createAsymmetricTypePair(t, ctx.db, ctx.accountID)
+
+	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
+		RelationshipTypeID: parentTypeID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse failed: %v", err)
+	}
+	for _, r := range reverseRels {
+		ctx.db.Where("id = ?", r.ID).Delete(&models.Relationship{})
+	}
+
+	if err := ctx.svc.Delete(created.ID, ctx.contactID, ctx.vaultID); err != nil {
+		t.Fatalf("Delete failed (reverse already gone): %v", err)
+	}
+}
+
+func TestUpdateRelationship_NotBidirectional(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+	parentTypeID, childTypeID := createAsymmetricTypePair(t, ctx.db, ctx.accountID)
+
+	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
+		RelationshipTypeID: parentTypeID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reverseRelsBefore, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse failed: %v", err)
+	}
+	if len(reverseRelsBefore) != 1 {
+		t.Fatalf("Expected 1 reverse relationship, got %d", len(reverseRelsBefore))
+	}
+	reverseBeforeTypeID := reverseRelsBefore[0].RelationshipTypeID
+
+	var spouseType models.RelationshipType
+	if err := ctx.db.Where("name = name_reverse_relationship AND name IS NOT NULL").First(&spouseType).Error; err != nil {
+		t.Fatalf("Failed to find symmetric type: %v", err)
+	}
+	_, err = ctx.svc.Update(created.ID, ctx.contactID, ctx.vaultID, dto.UpdateRelationshipRequest{
+		RelationshipTypeID: spouseType.ID,
+		RelatedContactID:   ctx.relatedContactID,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	reverseRelsAfter, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List reverse after update failed: %v", err)
+	}
+	if len(reverseRelsAfter) != 1 {
+		t.Fatalf("Expected 1 reverse relationship after update, got %d", len(reverseRelsAfter))
+	}
+	if reverseRelsAfter[0].RelationshipTypeID != reverseBeforeTypeID {
+		t.Errorf("Reverse should be unchanged (type %d), got type %d", reverseBeforeTypeID, reverseRelsAfter[0].RelationshipTypeID)
+	}
+	if reverseRelsAfter[0].RelationshipTypeID != childTypeID {
+		t.Errorf("Reverse should still be child type %d, got %d", childTypeID, reverseRelsAfter[0].RelationshipTypeID)
 	}
 }

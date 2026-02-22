@@ -15,6 +15,7 @@ import {
 import { PlusOutlined, DeleteOutlined, UserOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
+import NetworkGraph from "@/components/NetworkGraph";
 import type { Relationship, Contact, APIError } from "@/api";
 import type { GithubComNaibaBondsInternalDtoRelationshipTypeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
@@ -111,6 +112,7 @@ export default function RelationshipsModule({
     }));
 
   return (
+    <>
     <Card
       title={<span style={{ fontWeight: 500 }}>{t("modules.relationships.title")}</span>}
       styles={{
@@ -202,5 +204,17 @@ export default function RelationshipsModule({
         </Form>
       </Modal>
     </Card>
+
+    <Card
+      title={<span style={{ fontWeight: 500 }}>{t("modules.relationships.graph_title")}</span>}
+      styles={{
+        header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
+        body: { padding: '16px 24px' },
+      }}
+      style={{ marginTop: 16 }}
+    >
+      <NetworkGraph vaultId={String(vaultId)} contactId={String(contactId)} />
+    </Card>
+    </>
   );
 }

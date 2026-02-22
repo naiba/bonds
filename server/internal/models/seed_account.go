@@ -167,6 +167,7 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 	type relType struct {
 		nameKey, reverseKey, typ string
 		canBeDeleted             bool
+		degree                   *int
 	}
 	type relGroup struct {
 		nameKey      string
@@ -178,38 +179,38 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 		{
 			nameKey: "seed.relationship_groups.love", canBeDeleted: false,
 			types: []relType{
-				{"seed.relationship_types.significant_other", "seed.relationship_types.significant_other", "love", false},
-				{"seed.relationship_types.spouse", "seed.relationship_types.spouse", "love", false},
-				{"seed.relationship_types.date", "seed.relationship_types.date", "", true},
-				{"seed.relationship_types.lover", "seed.relationship_types.lover", "", true},
-				{"seed.relationship_types.in_love_with", "seed.relationship_types.loved_by", "", true},
-				{"seed.relationship_types.ex_boyfriend", "seed.relationship_types.ex_boyfriend", "", true},
+				{"seed.relationship_types.significant_other", "seed.relationship_types.significant_other", "love", false, nil},
+				{"seed.relationship_types.spouse", "seed.relationship_types.spouse", "love", false, nil},
+				{"seed.relationship_types.date", "seed.relationship_types.date", "", true, nil},
+				{"seed.relationship_types.lover", "seed.relationship_types.lover", "", true, nil},
+				{"seed.relationship_types.in_love_with", "seed.relationship_types.loved_by", "", true, nil},
+				{"seed.relationship_types.ex_boyfriend", "seed.relationship_types.ex_boyfriend", "", true, nil},
 			},
 		},
 		{
 			nameKey: "seed.relationship_groups.family", canBeDeleted: false,
 			types: []relType{
-				{"seed.relationship_types.parent", "seed.relationship_types.child", "child", false},
-				{"seed.relationship_types.brother_sister", "seed.relationship_types.brother_sister", "", true},
-				{"seed.relationship_types.grand_parent", "seed.relationship_types.grand_child", "", true},
-				{"seed.relationship_types.uncle_aunt", "seed.relationship_types.nephew_niece", "", true},
-				{"seed.relationship_types.cousin", "seed.relationship_types.cousin", "", true},
-				{"seed.relationship_types.godparent", "seed.relationship_types.godchild", "", true},
+				{"seed.relationship_types.parent", "seed.relationship_types.child", "child", false, intPtr(1)},
+				{"seed.relationship_types.brother_sister", "seed.relationship_types.brother_sister", "", true, intPtr(2)},
+				{"seed.relationship_types.grand_parent", "seed.relationship_types.grand_child", "", true, intPtr(2)},
+				{"seed.relationship_types.uncle_aunt", "seed.relationship_types.nephew_niece", "", true, intPtr(3)},
+				{"seed.relationship_types.cousin", "seed.relationship_types.cousin", "", true, intPtr(4)},
+				{"seed.relationship_types.godparent", "seed.relationship_types.godchild", "", true, nil},
 			},
 		},
 		{
 			nameKey: "seed.relationship_groups.friend", canBeDeleted: true,
 			types: []relType{
-				{"seed.relationship_types.friend", "seed.relationship_types.friend", "", true},
-				{"seed.relationship_types.best_friend", "seed.relationship_types.best_friend", "", true},
+				{"seed.relationship_types.friend", "seed.relationship_types.friend", "", true, nil},
+				{"seed.relationship_types.best_friend", "seed.relationship_types.best_friend", "", true, nil},
 			},
 		},
 		{
 			nameKey: "seed.relationship_groups.work", canBeDeleted: true,
 			types: []relType{
-				{"seed.relationship_types.colleague", "seed.relationship_types.colleague", "", true},
-				{"seed.relationship_types.subordinate", "seed.relationship_types.boss", "", true},
-				{"seed.relationship_types.mentor", "seed.relationship_types.protege", "", true},
+				{"seed.relationship_types.colleague", "seed.relationship_types.colleague", "", true, nil},
+				{"seed.relationship_types.subordinate", "seed.relationship_types.boss", "", true, intPtr(1)},
+				{"seed.relationship_types.mentor", "seed.relationship_types.protege", "", true, intPtr(1)},
 			},
 		},
 	}
@@ -236,6 +237,7 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 				NameTranslationKey:                    strPtr(t.nameKey),
 				NameReverseRelationship:               strPtr(i18n.T(locale, t.reverseKey)),
 				NameReverseRelationshipTranslationKey: strPtr(t.reverseKey),
+				Degree:                                t.degree,
 			}
 			if t.typ != "" {
 				rt.Type = strPtr(t.typ)

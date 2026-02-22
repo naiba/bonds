@@ -685,7 +685,12 @@
       "modal_title": "添加关系",
       "contact": "联系人",
       "select_contact": "选择联系人",
-      "relationship_type": "关系类型"
+      "relationship_type": "关系类型",
+      "graph_title": "关系网络",
+      "graph_empty": "暂无关系可视化",
+      "kinship_degree": "亲等度数: {{degree}}",
+      "kinship_no_path": "未找到亲等路径",
+      "click_to_calculate": "点击两个节点计算亲等"
     },
       "life_events": {
         "title": "人生事件",
@@ -865,6 +870,9 @@
       "post_templates": "文章模板",
       "group_types": "群组类型",
       "name_reverse": "反向关系名称",
+      "degree": "亲等度数",
+      "degree_tooltip": "用于亲等计算的距离权重，留空则不参与计算。",
+      "degree_placeholder": "例如 1",
       "enable_all": "全部启用",
       "disable_all": "全部禁用",
       "search_currencies": "搜索货币...",

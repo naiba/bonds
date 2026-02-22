@@ -376,6 +376,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	relationshipRoutes := contactSub.Group("/relationships")
 	relationshipRoutes.GET("", relationshipHandler.List)
+	relationshipRoutes.GET("/graph", relationshipHandler.GetContactGraph)
+	relationshipRoutes.GET("/kinship/:related_contact_id", relationshipHandler.CalculateKinship)
 	relationshipRoutes.POST("", relationshipHandler.Create, requireEditor)
 	relationshipRoutes.PUT("/:id", relationshipHandler.Update, requireEditor)
 	relationshipRoutes.DELETE("/:id", relationshipHandler.Delete, requireEditor)

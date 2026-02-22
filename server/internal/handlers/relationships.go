@@ -168,3 +168,61 @@ func (h *RelationshipHandler) Delete(c echo.Context) error {
 	}
 	return response.NoContent(c)
 }
+
+// GetContactGraph godoc
+//
+//	@Summary		Get contact relationship graph
+//	@Description	Return nodes and edges for the contact's relationship network
+//	@Tags			relationships
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.ContactGraphResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/relationships/graph [get]
+func (h *RelationshipHandler) GetContactGraph(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	graph, err := h.relationshipService.GetContactGraph(contactID, vaultID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_get_graph")
+	}
+	return response.OK(c, graph)
+}
+
+// CalculateKinship godoc
+//
+//	@Summary		Calculate kinship degree between two contacts
+//	@Description	Compute the shortest kinship path between two contacts using Dijkstra's algorithm
+//	@Tags			relationships
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id			path		string	true	"Vault ID"
+//	@Param			contact_id			path		string	true	"Contact ID"
+//	@Param			related_contact_id	path		string	true	"Related Contact ID"
+//	@Success		200					{object}	response.APIResponse{data=dto.KinshipResponse}
+//	@Failure		401					{object}	response.APIResponse
+//	@Failure		404					{object}	response.APIResponse
+//	@Failure		500					{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/relationships/kinship/{related_contact_id} [get]
+func (h *RelationshipHandler) CalculateKinship(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	relatedContactID := c.Param("related_contact_id")
+	kinship, err := h.relationshipService.CalculateKinship(contactID, relatedContactID, vaultID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_calculate_kinship")
+	}
+	return response.OK(c, kinship)
+}
