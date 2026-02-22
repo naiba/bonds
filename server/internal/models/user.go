@@ -14,6 +14,7 @@ type User struct {
 	LastName                  *string    `json:"last_name"`
 	Email                     string     `json:"email" gorm:"uniqueIndex;not null"`
 	EmailVerifiedAt           *time.Time `json:"email_verified_at"`
+	EmailVerificationToken    *string    `json:"-" gorm:"type:text"`
 	Password                  *string    `json:"-"`
 	TwoFactorSecret           *string    `json:"-"`
 	TwoFactorRecoveryCodes    *string    `json:"-"`

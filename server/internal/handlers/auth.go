@@ -149,3 +149,61 @@ func (h *AuthHandler) Me(c echo.Context) error {
 
 	return response.OK(c, user)
 }
+
+// VerifyEmail godoc
+//
+//	@Summary		Verify email address
+//	@Description	Verify user's email with token from verification email
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.VerifyEmailRequest	true	"Verification token"
+//	@Success		200		{object}	response.APIResponse{data=dto.VerifyEmailResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Router			/auth/verify-email [post]
+func (h *AuthHandler) VerifyEmail(c echo.Context) error {
+	var req dto.VerifyEmailRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+	user, err := h.authService.VerifyEmail(req.Token)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidEmailVerificationToken) {
+			return response.NotFound(c, "err.invalid_verification_token")
+		}
+		if errors.Is(err, services.ErrEmailAlreadyVerified) {
+			return response.BadRequest(c, "err.email_already_verified", nil)
+		}
+		return response.InternalError(c, "err.failed_to_verify_email")
+	}
+	return response.OK(c, dto.VerifyEmailResponse{
+		Message: "Email verified successfully",
+		User:    *user,
+	})
+}
+
+// ResendVerification godoc
+//
+//	@Summary		Resend verification email
+//	@Description	Resend email verification link
+//	@Tags			auth
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse
+//	@Failure		400	{object}	response.APIResponse
+//	@Failure		401	{object}	response.APIResponse
+//	@Router			/auth/resend-verification [post]
+func (h *AuthHandler) ResendVerification(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	if err := h.authService.ResendVerification(userID); err != nil {
+		if errors.Is(err, services.ErrEmailAlreadyVerified) {
+			return response.BadRequest(c, "err.email_already_verified", nil)
+		}
+		return response.InternalError(c, "err.failed_to_resend_verification")
+	}
+	return response.OK(c, map[string]string{"message": "Verification email sent"})
+}

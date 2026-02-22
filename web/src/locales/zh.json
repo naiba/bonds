@@ -369,7 +369,10 @@
       "caldav_url": "CalDAV 地址",
       "auth_note": "认证说明",
       "auth_note_text": "配置 DAV 客户端时，请使用你的登录邮箱和密码进行 Basic Auth 认证。",
-      "copy_success": "已复制"
+      "copy_success": "已复制",
+      "address_book": "通讯录",
+      "address_book_placeholder": "选择通讯录",
+      "address_book_auto_discover": "首次同步时自动发现"
     },
     "group_detail": {
       "back": "返回群组列表",
@@ -890,18 +893,13 @@
       "role_admin": "管理员",
       "role_user": "用户",
       "no_users": "暂无用户",
-      "create": "创建用户",
       "edit": "编辑用户",
-      "created": "用户已创建",
       "updated": "用户已更新",
       "deleted": "用户已删除",
       "delete_confirm": "确定删除此用户？",
-      "modal_title_create": "创建用户",
       "modal_title_edit": "编辑用户",
       "first_name": "名",
       "last_name": "姓",
-      "email": "邮箱",
-      "password": "密码",
       "is_admin": "管理员"
     },
     "webauthn": {
@@ -1191,5 +1189,15 @@
         "retention": "保留天数"
       }
     }
+  },
+  "verify_email": {
+    "title": "验证邮箱",
+    "description": "我们已向你的邮箱发送了验证链接。请查收邮件并点击链接完成验证。",
+    "resend": "重新发送验证邮件",
+    "resent": "验证邮件已发送",
+    "resend_failed": "发送验证邮件失败",
+    "success": "邮箱验证成功！正在跳转...",
+    "invalid_token": "无效或已过期的验证链接",
+    "logout": "退出登录"
   }
 }

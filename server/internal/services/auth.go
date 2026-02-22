@@ -2,9 +2,11 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/middleware"
@@ -14,18 +16,64 @@ import (
 )
 
 var (
-	ErrEmailExists        = errors.New("email already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotFound       = errors.New("user not found")
+	ErrEmailExists                   = errors.New("email already exists")
+	ErrInvalidCredentials            = errors.New("invalid credentials")
+	ErrUserNotFound                  = errors.New("user not found")
+	ErrEmailNotVerified              = errors.New("email not verified")
+	ErrInvalidEmailVerificationToken = errors.New("invalid email verification token")
+	ErrEmailAlreadyVerified          = errors.New("email already verified")
 )
 
 type AuthService struct {
-	db  *gorm.DB
-	cfg *config.JWTConfig
+	db       *gorm.DB
+	cfg      *config.JWTConfig
+	mailer   Mailer
+	settings *SystemSettingService
 }
 
 func NewAuthService(db *gorm.DB, cfg *config.JWTConfig) *AuthService {
 	return &AuthService{db: db, cfg: cfg}
+}
+
+func (s *AuthService) SetMailer(mailer Mailer) {
+	s.mailer = mailer
+}
+
+func (s *AuthService) SetSystemSettings(settings *SystemSettingService) {
+	s.settings = settings
+}
+
+func (s *AuthService) isEmailVerificationRequired() bool {
+	if s.settings == nil {
+		return false
+	}
+	if !s.settings.GetBool("auth.require_email_verification", true) {
+		return false
+	}
+	smtpHost := s.settings.GetWithDefault("smtp.host", "")
+	return smtpHost != ""
+}
+
+func (s *AuthService) sendVerificationEmail(user *models.User) {
+	if s.mailer == nil || s.settings == nil {
+		return
+	}
+	token := uuid.New().String()
+	user.EmailVerificationToken = &token
+	s.db.Model(user).Update("email_verification_token", token)
+
+	appURL := s.settings.GetWithDefault("app.url", "http://localhost:8080")
+	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", appURL, token)
+	subject := "Verify your email address"
+	body := fmt.Sprintf(
+		`<h2>Verify your email</h2>
+<p>Please click the link below to verify your email address:</p>
+<p><a href="%s">Verify Email</a></p>`,
+		verifyLink,
+	)
+	if err := s.mailer.Send(user.Email, subject, body); err != nil {
+		fmt.Printf("[AuthService] Failed to send verification email to %s: %v\n", user.Email, err)
+	}
 }
 
 func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.AuthResponse, error) {
@@ -67,6 +115,14 @@ func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.Aut
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	if isFirstUser || !s.isEmailVerificationRequired() {
+		now := time.Now()
+		user.EmailVerifiedAt = &now
+		s.db.Model(&user).Update("email_verified_at", now)
+	} else {
+		s.sendVerificationEmail(&user)
 	}
 
 	return s.generateAuthResponse(&user)
@@ -167,6 +223,38 @@ func (s *AuthService) GetCurrentUser(userID string) (*dto.UserResponse, error) {
 	return toUserResponse(&user), nil
 }
 
+func (s *AuthService) VerifyEmail(token string) (*dto.UserResponse, error) {
+	var user models.User
+	if err := s.db.Where("email_verification_token = ?", token).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrInvalidEmailVerificationToken
+		}
+		return nil, err
+	}
+	if user.EmailVerifiedAt != nil {
+		return nil, ErrEmailAlreadyVerified
+	}
+	now := time.Now()
+	s.db.Model(&user).Updates(map[string]interface{}{
+		"email_verified_at":        now,
+		"email_verification_token": nil,
+	})
+	user.EmailVerifiedAt = &now
+	return toUserResponse(&user), nil
+}
+
+func (s *AuthService) ResendVerification(userID string) error {
+	var user models.User
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
+		return ErrUserNotFound
+	}
+	if user.EmailVerifiedAt != nil {
+		return ErrEmailAlreadyVerified
+	}
+	s.sendVerificationEmail(&user)
+	return nil
+}
+
 func (s *AuthService) generateAuthResponse(user *models.User) (*dto.AuthResponse, error) {
 	expiresAt := time.Now().Add(time.Duration(s.cfg.ExpiryHrs) * time.Hour)
 	claims := &middleware.JWTClaims{
@@ -210,6 +298,7 @@ func toUserResponse(user *models.User) *dto.UserResponse {
 		Email:                   user.Email,
 		IsAdmin:                 user.IsAccountAdministrator,
 		IsInstanceAdministrator: user.IsInstanceAdministrator,
+		EmailVerifiedAt:         user.EmailVerifiedAt,
 		CreatedAt:               user.CreatedAt,
 	}
 }

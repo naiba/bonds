@@ -63,9 +63,8 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 			return response.Forbidden(c, "err.two_factor_required")
 		}
 
-		// Check if user is disabled
 		user := &models.User{}
-		if err := m.db.Select("disabled").Where("id = ?", claims.UserID).First(user).Error; err != nil {
+		if err := m.db.Select("disabled, email_verified_at").Where("id = ?", claims.UserID).First(user).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return response.Unauthorized(c, "err.user_not_found")
 			}
@@ -80,6 +79,7 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 		c.Set("email", claims.Email)
 		c.Set("is_admin", claims.IsAdmin)
 		c.Set("is_instance_admin", claims.IsInstanceAdmin)
+		c.Set("email_verified", user.EmailVerifiedAt != nil)
 		c.Set("claims", claims)
 
 		return next(c)
@@ -119,4 +119,19 @@ func GetAccountID(c echo.Context) string {
 func GetClaims(c echo.Context) *JWTClaims {
 	claims, _ := c.Get("claims").(*JWTClaims)
 	return claims
+}
+
+func RequireEmailVerification(isRequired func() bool) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if !isRequired() {
+				return next(c)
+			}
+			verified, _ := c.Get("email_verified").(bool)
+			if !verified {
+				return response.Forbidden(c, "err.email_not_verified")
+			}
+			return next(c)
+		}
+	}
 }

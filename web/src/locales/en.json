@@ -369,7 +369,10 @@
       "caldav_url": "CalDAV URL",
       "auth_note": "Authentication",
       "auth_note_text": "Use your login email and password for Basic Auth when configuring your DAV client.",
-      "copy_success": "Copied"
+      "copy_success": "Copied",
+      "address_book": "Address Book",
+      "address_book_placeholder": "Select an address book",
+      "address_book_auto_discover": "Will be auto-discovered on first sync"
     },
     "group_detail": {
       "back": "Back to groups",
@@ -890,18 +893,13 @@
       "role_admin": "Admin",
       "role_user": "User",
       "no_users": "No users found",
-      "create": "Create User",
       "edit": "Edit User",
-      "created": "User created",
       "updated": "User updated",
       "deleted": "User deleted",
       "delete_confirm": "Delete this user?",
-      "modal_title_create": "Create User",
       "modal_title_edit": "Edit User",
       "first_name": "First Name",
       "last_name": "Last Name",
-      "email": "Email",
-      "password": "Password",
       "is_admin": "Administrator"
     },
     "webauthn": {
@@ -1191,5 +1189,15 @@
         "retention": "Retention (days)"
       }
     }
+  },
+  "verify_email": {
+    "title": "Verify Your Email",
+    "description": "We sent a verification link to your email address. Please check your inbox and click the link to verify your account.",
+    "resend": "Resend Verification Email",
+    "resent": "Verification email sent",
+    "resend_failed": "Failed to send verification email",
+    "success": "Email verified successfully! Redirecting...",
+    "invalid_token": "Invalid or expired verification link",
+    "logout": "Sign out"
   }
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"time"
 
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/dto"
@@ -58,7 +59,11 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, l
 	var existingUser models.User
 	err = s.db.Where("email = ?", email).First(&existingUser).Error
 	if err == nil {
-		// User exists — link OAuth token to existing user
+		if existingUser.EmailVerifiedAt == nil {
+			verifiedNow := time.Now()
+			s.db.Model(&existingUser).Update("email_verified_at", verifiedNow)
+			existingUser.EmailVerifiedAt = &verifiedNow
+		}
 		newToken := models.UserToken{
 			UserID:   existingUser.ID,
 			Driver:   provider,
@@ -83,11 +88,13 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, l
 	}
 	hashedStr := string(randomPassword)
 
+	now := time.Now()
 	account := models.Account{}
 	user := models.User{
 		Email:                  email,
 		Password:               &hashedStr,
 		IsAccountAdministrator: true,
+		EmailVerifiedAt:        &now,
 	}
 
 	// Parse name into first/last

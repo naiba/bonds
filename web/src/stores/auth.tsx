@@ -107,12 +107,15 @@ export function useAuth() {
 }
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
   if (isLoading) return null;
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  if (user && !user.email_verified_at) {
+    return <Navigate to="/verify-email" replace />;
   }
   return <>{children}</>;
 }

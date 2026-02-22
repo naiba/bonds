@@ -3625,8 +3625,8 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
 	initialCount := len(getResp.Settings)
-	if initialCount != 18 {
-		t.Errorf("expected 18 settings initially (seeded from env), got %d", initialCount)
+	if initialCount != 19 {
+		t.Errorf("expected 19 settings initially (seeded from env), got %d", initialCount)
 	}
 
 	rec = ts.doRequest(http.MethodPut, "/api/admin/settings",
@@ -3639,8 +3639,8 @@ func TestAdminSettings_GetAndUpdate(t *testing.T) {
 	if err := json.Unmarshal(resp.Data, &getResp); err != nil {
 		t.Fatalf("failed to parse settings: %v", err)
 	}
-	if len(getResp.Settings) != 19 {
-		t.Errorf("expected 19 settings after update, got %d", len(getResp.Settings))
+	if len(getResp.Settings) != 20 {
+		t.Errorf("expected 20 settings after update, got %d", len(getResp.Settings))
 	}
 }
 
@@ -3850,5 +3850,109 @@ func TestDisabledUser_JWTRejected(t *testing.T) {
 	resp := parseResponse(t, rec)
 	if resp.Success {
 		t.Error("expected success=false for disabled user")
+	}
+}
+
+func enableEmailVerification(ts *testServer) {
+	settings := services.NewSystemSettingService(ts.db)
+	settings.Set("auth.require_email_verification", "true")
+	settings.Set("smtp.host", "test-smtp")
+}
+
+func TestVerifyEmail_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	enableEmailVerification(ts)
+
+	_, _ = ts.registerTestUser(t, "first@example.com")
+
+	body := `{"first_name":"Second","last_name":"User","email":"second@example.com","password":"password123"}`
+	rec := ts.doRequest(http.MethodPost, "/api/auth/register", body, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register second user: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var user models.User
+	ts.db.First(&user, "email = ?", "second@example.com")
+	if user.EmailVerificationToken == nil {
+		t.Fatal("expected email_verification_token to be set")
+	}
+
+	verifyBody := fmt.Sprintf(`{"token":"%s"}`, *user.EmailVerificationToken)
+	rec = ts.doRequest(http.MethodPost, "/api/auth/verify-email", verifyBody, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("verify email: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Error("expected success=true")
+	}
+}
+
+func TestVerifyEmailInvalidToken_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+
+	body := `{"token":"invalid-token-12345"}`
+	rec := ts.doRequest(http.MethodPost, "/api/auth/verify-email", body, "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestResendVerification_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	enableEmailVerification(ts)
+
+	_, _ = ts.registerTestUser(t, "first@example.com")
+
+	body := `{"first_name":"Second","last_name":"User","email":"second@example.com","password":"password123"}`
+	rec := ts.doRequest(http.MethodPost, "/api/auth/register", body, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register second user: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var auth authData
+	json.Unmarshal(resp.Data, &auth)
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/resend-verification", "", auth.Token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("resend verification: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUnverifiedUserBlockedFromProtectedEndpoints(t *testing.T) {
+	ts := setupTestServer(t)
+	enableEmailVerification(ts)
+
+	_, _ = ts.registerTestUser(t, "first@example.com")
+
+	body := `{"first_name":"Second","last_name":"User","email":"second@example.com","password":"password123"}`
+	rec := ts.doRequest(http.MethodPost, "/api/auth/register", body, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register second user: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var auth authData
+	json.Unmarshal(resp.Data, &auth)
+	secondToken := auth.Token
+
+	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", secondToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("unverified user: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var user models.User
+	ts.db.First(&user, "email = ?", "second@example.com")
+	if user.EmailVerificationToken == nil {
+		t.Fatal("expected token to be set")
+	}
+	verifyBody := fmt.Sprintf(`{"token":"%s"}`, *user.EmailVerificationToken)
+	rec = ts.doRequest(http.MethodPost, "/api/auth/verify-email", verifyBody, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("verify email: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", secondToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("verified user: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

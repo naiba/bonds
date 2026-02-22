@@ -43,6 +43,8 @@ func SeedSettingsFromEnv(svc *SystemSettingService, cfg *config.Config) error {
 
 		{"storage.max_size", strconv.FormatInt(cfg.Storage.MaxSize, 10)},
 
+		{"auth.require_email_verification", "true"},
+
 		{"announcement", cfg.Announcement},
 	}
 

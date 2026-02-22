@@ -42,12 +42,22 @@ type TwoFactorStatusResponse struct {
 }
 
 type UserResponse struct {
-	ID                      string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	AccountID               string    `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	FirstName               string    `json:"first_name" example:"John"`
-	LastName                string    `json:"last_name" example:"Doe"`
-	Email                   string    `json:"email" example:"user@example.com"`
-	IsAdmin                 bool      `json:"is_admin" example:"true"`
-	IsInstanceAdministrator bool      `json:"is_instance_administrator" example:"false"`
-	CreatedAt               time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	ID                      string     `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AccountID               string     `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstName               string     `json:"first_name" example:"John"`
+	LastName                string     `json:"last_name" example:"Doe"`
+	Email                   string     `json:"email" example:"user@example.com"`
+	IsAdmin                 bool       `json:"is_admin" example:"true"`
+	IsInstanceAdministrator bool       `json:"is_instance_administrator" example:"false"`
+	EmailVerifiedAt         *time.Time `json:"email_verified_at,omitempty" example:"2026-01-15T10:30:00Z"`
+	CreatedAt               time.Time  `json:"created_at" example:"2026-01-15T10:30:00Z"`
+}
+
+type VerifyEmailRequest struct {
+	Token string `json:"token" validate:"required" example:"550e8400-e29b-41d4-a716-446655440000"`
+}
+
+type VerifyEmailResponse struct {
+	Message string       `json:"message" example:"Email verified successfully"`
+	User    UserResponse `json:"user"`
 }

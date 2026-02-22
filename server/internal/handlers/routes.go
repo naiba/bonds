@@ -94,6 +94,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	adminService := services.NewAdminService(db, cfg.Storage.UploadDir)
 
 	mailer := services.NewDynamicMailer(systemSettingService)
+	authService.SetMailer(mailer)
+	authService.SetSystemSettings(systemSettingService)
 	invitationService := services.NewInvitationService(db, mailer, cfg.App.URL)
 	invitationService.SetSystemSettings(systemSettingService)
 	notificationService.SetMailer(mailer)
@@ -253,6 +255,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	auth.GET("/:provider/callback", oauthHandler.Callback)
 
 	webauthnHandler := NewWebAuthnHandler(webauthnService, authService)
+	auth.POST("/verify-email", authHandler.VerifyEmail)
+	auth.POST("/resend-verification", authHandler.ResendVerification, authMiddleware.Authenticate)
+
 	auth.POST("/webauthn/login/begin", webauthnHandler.BeginLogin)
 	auth.POST("/webauthn/login/finish", webauthnHandler.FinishLogin)
 
@@ -260,7 +265,14 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	api.GET("/instance/info", instanceHandler.GetInfo)
 
-	adminGroup := api.Group("/admin", authMiddleware.Authenticate, authMiddleware.RequireInstanceAdmin)
+	emailVerificationRequired := func() bool {
+		if !systemSettingService.GetBool("auth.require_email_verification", true) {
+			return false
+		}
+		return systemSettingService.GetWithDefault("smtp.host", "") != ""
+	}
+
+	adminGroup := api.Group("/admin", authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired), authMiddleware.RequireInstanceAdmin)
 	adminGroup.GET("/users", adminHandler.ListUsers)
 	adminGroup.PUT("/users/:id/toggle", adminHandler.ToggleUser)
 	adminGroup.PUT("/users/:id/admin", adminHandler.SetAdmin)
@@ -280,7 +292,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	backupGroup.DELETE("/:filename", backupHandler.Delete)
 	backupGroup.POST("/:filename/restore", backupHandler.Restore)
 
-	protected := api.Group("", authMiddleware.Authenticate)
+	protected := api.Group("", authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired))
 
 	protected.GET("/account", accountHandler.GetAccount)
 
@@ -628,7 +640,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	usersGroup := settingsGroup.Group("/users", authMiddleware.RequireAdmin)
 	usersGroup.GET("", userManagementHandler.List)
-	usersGroup.POST("", userManagementHandler.Create)
 	usersGroup.GET("/:id", userManagementHandler.Get)
 	usersGroup.PUT("/:id", userManagementHandler.Update)
 	usersGroup.DELETE("/:id", userManagementHandler.Delete)

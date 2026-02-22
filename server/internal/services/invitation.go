@@ -118,6 +118,7 @@ func (s *InvitationService) Accept(req dto.AcceptInvitationRequest) (*dto.Invita
 			Password:             &hashedStr,
 			InvitationCode:       &invitation.Token,
 			InvitationAcceptedAt: &now,
+			EmailVerifiedAt:      &now,
 		}
 		if err := tx.Create(&user).Error; err != nil {
 			return err

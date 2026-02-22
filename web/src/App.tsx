@@ -8,6 +8,7 @@ import { httpClient } from "@/api";
 // Auth pages
 const Login = lazy(() => import("@/pages/auth/Login"));
 const Register = lazy(() => import("@/pages/auth/Register"));
+const VerifyEmail = lazy(() => import("@/pages/auth/VerifyEmail"));
 
 // Vault pages
 const VaultList = lazy(() => import("@/pages/vault/VaultList"));
@@ -103,6 +104,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           <Route
             element={
