@@ -272,6 +272,14 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	adminGroup.PUT("/oauth-providers/:id", oauthProviderHandler.Update)
 	adminGroup.DELETE("/oauth-providers/:id", oauthProviderHandler.Delete)
 
+	backupGroup := adminGroup.Group("/backups")
+	backupGroup.GET("", backupHandler.List)
+	backupGroup.POST("", backupHandler.Create)
+	backupGroup.GET("/config", backupHandler.GetConfig)
+	backupGroup.GET("/:filename/download", backupHandler.Download)
+	backupGroup.DELETE("/:filename", backupHandler.Delete)
+	backupGroup.POST("/:filename/restore", backupHandler.Restore)
+
 	protected := api.Group("", authMiddleware.Authenticate)
 
 	protected.GET("/account", accountHandler.GetAccount)
@@ -631,14 +639,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	settingsGroup.DELETE("/account", accountCancelHandler.Cancel, authMiddleware.RequireAdmin)
 	settingsGroup.GET("/storage", storageInfoHandler.Get)
-
-	backupGroup := settingsGroup.Group("/backups", authMiddleware.RequireInstanceAdmin)
-	backupGroup.GET("", backupHandler.List)
-	backupGroup.POST("", backupHandler.Create)
-	backupGroup.GET("/config", backupHandler.GetConfig)
-	backupGroup.GET("/:filename/download", backupHandler.Download)
-	backupGroup.DELETE("/:filename", backupHandler.Delete)
-	backupGroup.POST("/:filename/restore", backupHandler.Restore)
 
 	protected.GET("/currencies", currencyHandler.List)
 

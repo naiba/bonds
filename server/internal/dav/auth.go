@@ -39,6 +39,11 @@ func BasicAuthMiddleware(db *gorm.DB) func(next http.Handler) http.Handler {
 				return
 			}
 
+			if user.Disabled {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+
 			ctx := WithUserID(r.Context(), user.ID)
 			ctx = WithAccountID(ctx, user.AccountID)
 			next.ServeHTTP(w, r.WithContext(ctx))

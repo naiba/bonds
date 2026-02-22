@@ -3816,17 +3816,17 @@ func TestBackups_RequiresInstanceAdmin(t *testing.T) {
 	adminToken, _ := ts.registerTestUser(t, "backup-admin@example.com")
 	nonAdminToken, _ := ts.registerTestUser(t, "backup-nonadmin@example.com")
 
-	rec := ts.doRequest(http.MethodGet, "/api/settings/backups", "", adminToken)
+	rec := ts.doRequest(http.MethodGet, "/api/admin/backups", "", adminToken)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("instance admin: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = ts.doRequest(http.MethodGet, "/api/settings/backups", "", nonAdminToken)
+	rec = ts.doRequest(http.MethodGet, "/api/admin/backups", "", nonAdminToken)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("non-admin: expected 403, got %d: %s", rec.Code, rec.Body.String())
 	}
 
-	rec = ts.doRequest(http.MethodGet, "/api/settings/backups/config", "", adminToken)
+	rec = ts.doRequest(http.MethodGet, "/api/admin/backups/config", "", adminToken)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("backup config: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}

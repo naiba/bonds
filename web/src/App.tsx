@@ -49,7 +49,6 @@ const Invitations = lazy(() => import("@/pages/settings/Invitations"));
 const WebAuthn = lazy(() => import("@/pages/settings/WebAuthn"));
 const OAuthProviders = lazy(() => import("@/pages/settings/OAuthProviders"));
 const StorageInfo = lazy(() => import("@/pages/settings/StorageInfo"));
-const Backups = lazy(() => import("@/pages/settings/Backups"));
 
 // Admin pages
 const AdminUsers = lazy(() => import("@/pages/admin/Users"));
@@ -176,7 +175,6 @@ export default function App() {
             <Route path="/settings/webauthn" element={<WebAuthn />} />
             <Route path="/settings/oauth" element={<OAuthProviders />} />
             <Route path="/settings/storage" element={<StorageInfo />} />
-            <Route path="/settings/backups" element={<Backups />} />
             <Route path="/admin/users" element={<AdminUsers />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
             <Route path="/admin/backups" element={<AdminBackups />} />

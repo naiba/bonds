@@ -24,14 +24,14 @@ func NewBackupHandler(svc *services.BackupService) *BackupHandler {
 //
 //	@Summary		List backups
 //	@Description	List all available backup files
-//	@Tags			settings
+//	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Success		200	{object}	response.APIResponse{data=[]dto.BackupResponse}
 //	@Failure		401	{object}	response.APIResponse
 //	@Failure		403	{object}	response.APIResponse
 //	@Failure		500	{object}	response.APIResponse
-//	@Router			/settings/backups [get]
+//	@Router			/admin/backups [get]
 func (h *BackupHandler) List(c echo.Context) error {
 	backups, err := h.backupService.List()
 	if err != nil {
@@ -44,14 +44,14 @@ func (h *BackupHandler) List(c echo.Context) error {
 //
 //	@Summary		Create backup
 //	@Description	Create a new database backup
-//	@Tags			settings
+//	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Success		201	{object}	response.APIResponse{data=dto.BackupResponse}
 //	@Failure		401	{object}	response.APIResponse
 //	@Failure		403	{object}	response.APIResponse
 //	@Failure		500	{object}	response.APIResponse
-//	@Router			/settings/backups [post]
+//	@Router			/admin/backups [post]
 func (h *BackupHandler) Create(c echo.Context) error {
 	backup, err := h.backupService.Create()
 	if err != nil {
@@ -64,12 +64,12 @@ func (h *BackupHandler) Create(c echo.Context) error {
 //
 //	@Summary		Get backup config
 //	@Description	Get current backup configuration
-//	@Tags			settings
+//	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Success		200	{object}	response.APIResponse{data=dto.BackupConfigResponse}
 //	@Failure		401	{object}	response.APIResponse
-//	@Router			/settings/backups/config [get]
+//	@Router			/admin/backups/config [get]
 func (h *BackupHandler) GetConfig(c echo.Context) error {
 	cfg := h.backupService.GetConfig()
 	return response.OK(c, cfg)
@@ -79,7 +79,7 @@ func (h *BackupHandler) GetConfig(c echo.Context) error {
 //
 //	@Summary		Download backup
 //	@Description	Download a backup file
-//	@Tags			settings
+//	@Tags			admin
 //	@Produce		octet-stream
 //	@Security		BearerAuth
 //	@Param			filename	path	string	true	"Backup filename"
@@ -87,7 +87,7 @@ func (h *BackupHandler) GetConfig(c echo.Context) error {
 //	@Failure		400	{object}	response.APIResponse
 //	@Failure		401	{object}	response.APIResponse
 //	@Failure		404	{object}	response.APIResponse
-//	@Router			/settings/backups/{filename}/download [get]
+//	@Router			/admin/backups/{filename}/download [get]
 func (h *BackupHandler) Download(c echo.Context) error {
 	filename := c.Param("filename")
 	fullPath, err := h.backupService.GetFilePath(filename)
@@ -107,7 +107,7 @@ func (h *BackupHandler) Download(c echo.Context) error {
 //
 //	@Summary		Delete backup
 //	@Description	Delete a backup file
-//	@Tags			settings
+//	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			filename	path	string	true	"Backup filename"
@@ -116,7 +116,7 @@ func (h *BackupHandler) Download(c echo.Context) error {
 //	@Failure		401	{object}	response.APIResponse
 //	@Failure		403	{object}	response.APIResponse
 //	@Failure		404	{object}	response.APIResponse
-//	@Router			/settings/backups/{filename} [delete]
+//	@Router			/admin/backups/{filename} [delete]
 func (h *BackupHandler) Delete(c echo.Context) error {
 	filename := c.Param("filename")
 	err := h.backupService.Delete(filename)
@@ -136,7 +136,7 @@ func (h *BackupHandler) Delete(c echo.Context) error {
 //
 //	@Summary		Restore backup
 //	@Description	Restore from a backup file
-//	@Tags			settings
+//	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
 //	@Param			filename	path	string	true	"Backup filename"
@@ -146,7 +146,7 @@ func (h *BackupHandler) Delete(c echo.Context) error {
 //	@Failure		403	{object}	response.APIResponse
 //	@Failure		404	{object}	response.APIResponse
 //	@Failure		500	{object}	response.APIResponse
-//	@Router			/settings/backups/{filename}/restore [post]
+//	@Router			/admin/backups/{filename}/restore [post]
 func (h *BackupHandler) Restore(c echo.Context) error {
 	filename := c.Param("filename")
 	err := h.backupService.Restore(filename)

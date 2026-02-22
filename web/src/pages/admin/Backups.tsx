@@ -49,30 +49,30 @@ export default function AdminBackups() {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const qk = ["settings", "backups"];
+  const qk = ["admin", "backups"];
 
   const { data: backups = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
       const res = await httpClient.instance.get<{ data: BackupItem[] }>(
-        "/settings/backups",
+        "/admin/backups",
       );
       return res.data.data ?? [];
     },
   });
 
   const { data: backupConfig } = useQuery({
-    queryKey: ["settings", "backups", "config"],
+    queryKey: ["admin", "backups", "config"],
     queryFn: async () => {
       const res = await httpClient.instance.get<{ data: BackupConfig }>(
-        "/settings/backups/config",
+        "/admin/backups/config",
       );
       return res.data.data;
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: () => httpClient.instance.post("/settings/backups"),
+    mutationFn: () => httpClient.instance.post("/admin/backups"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("backups.created"));
@@ -82,7 +82,7 @@ export default function AdminBackups() {
 
   const deleteMutation = useMutation({
     mutationFn: (filename: string) =>
-      httpClient.instance.delete(`/settings/backups/${filename}`),
+      httpClient.instance.delete(`/admin/backups/${filename}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("backups.deleted"));
@@ -92,7 +92,7 @@ export default function AdminBackups() {
 
   const restoreMutation = useMutation({
     mutationFn: (filename: string) =>
-      httpClient.instance.post(`/settings/backups/${filename}/restore`),
+      httpClient.instance.post(`/admin/backups/${filename}/restore`),
     onSuccess: () => {
       message.success(t("backups.restored"));
     },
@@ -101,7 +101,7 @@ export default function AdminBackups() {
 
   function handleDownload(filename: string) {
     const token = localStorage.getItem("token");
-    const url = `/api/settings/backups/${filename}/download?token=${token}`;
+    const url = `/api/admin/backups/${filename}/download?token=${token}`;
     window.open(url, "_blank");
   }
 
