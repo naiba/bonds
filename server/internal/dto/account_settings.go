@@ -27,14 +27,6 @@ type NotificationLogResponse struct {
 	CreatedAt   time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 }
 
-type CreateManagedUserRequest struct {
-	Email     string `json:"email" validate:"required,email" example:"user@example.com"`
-	FirstName string `json:"first_name" example:"John"`
-	LastName  string `json:"last_name" example:"Doe"`
-	Password  string `json:"password" validate:"required,min=6" example:"secureP@ss123"`
-	IsAdmin   bool   `json:"is_admin" example:"true"`
-}
-
 type UpdateManagedUserRequest struct {
 	FirstName string `json:"first_name" example:"John"`
 	LastName  string `json:"last_name" example:"Doe"`

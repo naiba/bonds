@@ -38,40 +38,6 @@ func (h *UserManagementHandler) List(c echo.Context) error {
 	return response.OK(c, users)
 }
 
-// Create godoc
-//
-//	@Summary		Create a managed user
-//	@Description	Create a new user in the account
-//	@Tags			users
-//	@Accept			json
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			request	body		dto.CreateManagedUserRequest	true	"User details"
-//	@Success		201		{object}	response.APIResponse{data=dto.UserManagementResponse}
-//	@Failure		400		{object}	response.APIResponse
-//	@Failure		401		{object}	response.APIResponse
-//	@Failure		422		{object}	response.APIResponse
-//	@Failure		500		{object}	response.APIResponse
-//	@Router			/settings/users [post]
-func (h *UserManagementHandler) Create(c echo.Context) error {
-	accountID := middleware.GetAccountID(c)
-	var req dto.CreateManagedUserRequest
-	if err := c.Bind(&req); err != nil {
-		return response.BadRequest(c, "err.invalid_request_body", nil)
-	}
-	if err := validateRequest(req); err != nil {
-		return response.ValidationError(c, map[string]string{"validation": err.Error()})
-	}
-	user, err := h.userManagementService.Create(accountID, req)
-	if err != nil {
-		if errors.Is(err, services.ErrEmailExists) {
-			return response.BadRequest(c, "err.email_already_exists", nil)
-		}
-		return response.InternalError(c, "err.failed_to_create_user")
-	}
-	return response.Created(c, user)
-}
-
 // Update godoc
 //
 //	@Summary		Update a managed user

@@ -18,7 +18,6 @@ import {
 } from "antd";
 import {
   CrownOutlined,
-  PlusOutlined,
   EditOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
@@ -63,23 +62,6 @@ export default function Users() {
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: (values: {
-      email: string;
-      password: string;
-      first_name?: string;
-      last_name?: string;
-      is_admin?: boolean;
-    }) => api.users.usersCreate(values),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
-      message.success(t("settings.users.created"));
-      setOpen(false);
-      form.resetFields();
-    },
-    onError: (e: APIError) => message.error(e.message),
-  });
-
   const updateMutation = useMutation({
     mutationFn: ({ id, ...values }: {
       id: string;
@@ -108,12 +90,6 @@ export default function Users() {
 
   const isAdmin = currentUser?.is_admin === true;
 
-  const openCreate = () => {
-    setEditing(null);
-    form.resetFields();
-    setOpen(true);
-  };
-
   const openEdit = (record: User) => {
     setEditing(record);
     form.setFieldsValue({
@@ -128,8 +104,6 @@ export default function Users() {
     form.validateFields().then((values) => {
       if (editing) {
         updateMutation.mutate({ id: editing.id!, ...values });
-      } else {
-        createMutation.mutate(values);
       }
     });
   };
@@ -239,25 +213,11 @@ export default function Users() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <Title level={4} style={{ marginBottom: 4 }}>
-            {t("settings.users.title")}
-          </Title>
-          <Text type="secondary">{t("settings.users.description")}</Text>
-        </div>
-        {isAdmin && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            {t("settings.users.create")}
-          </Button>
-        )}
+      <div style={{ marginBottom: 24 }}>
+        <Title level={4} style={{ marginBottom: 4 }}>
+          {t("settings.users.title")}
+        </Title>
+        <Text type="secondary">{t("settings.users.description")}</Text>
       </div>
 
       <Card>
@@ -276,11 +236,7 @@ export default function Users() {
       </Card>
 
       <Modal
-        title={
-          editing
-            ? t("settings.users.modal_title_edit")
-            : t("settings.users.modal_title_create")
-        }
+        title={t("settings.users.modal_title_edit")}
         open={open}
         onCancel={() => {
           setOpen(false);
@@ -288,7 +244,7 @@ export default function Users() {
           form.resetFields();
         }}
         onOk={handleSubmit}
-        confirmLoading={createMutation.isPending || updateMutation.isPending}
+        confirmLoading={updateMutation.isPending}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
@@ -304,30 +260,6 @@ export default function Users() {
           >
             <Input />
           </Form.Item>
-          {!editing && (
-            <>
-              <Form.Item
-                name="email"
-                label={t("settings.users.email")}
-                rules={[
-                  { required: true },
-                  { type: "email" },
-                ]}
-              >
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="password"
-                label={t("settings.users.password")}
-                rules={[
-                  { required: true },
-                  { min: 6 },
-                ]}
-              >
-                <Input.Password />
-              </Form.Item>
-            </>
-          )}
           <Form.Item
             name="is_admin"
             label={t("settings.users.is_admin")}

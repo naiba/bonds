@@ -4,10 +4,12 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
+	"gorm.io/gorm"
 )
 
-func setupUserManagementTest(t *testing.T) (*UserManagementService, string, string) {
+func setupUserManagementTest(t *testing.T) (*UserManagementService, *gorm.DB, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -21,11 +23,27 @@ func setupUserManagementTest(t *testing.T) (*UserManagementService, string, stri
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	return NewUserManagementService(db), resp.User.AccountID, resp.User.ID
+	return NewUserManagementService(db), db, resp.User.AccountID, resp.User.ID
+}
+
+func createTestUser(t *testing.T, db *gorm.DB, accountID, email string) models.User {
+	t.Helper()
+	firstName := "Test"
+	password := "$2a$10$eImDhVHVc96dqKMpMfyMruPLaGrGPR6caDyqnCVq1G1u5IUXY1C5e" // bcrypt("password123")
+	user := models.User{
+		AccountID: accountID,
+		FirstName: &firstName,
+		Email:     email,
+		Password:  &password,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+	return user
 }
 
 func TestUserManagementList(t *testing.T) {
-	svc, accountID, _ := setupUserManagementTest(t)
+	svc, _, accountID, _ := setupUserManagementTest(t)
 
 	users, err := svc.List(accountID)
 	if err != nil {
@@ -36,43 +54,12 @@ func TestUserManagementList(t *testing.T) {
 	}
 }
 
-func TestUserManagementCreate(t *testing.T) {
-	svc, accountID, _ := setupUserManagementTest(t)
-
-	user, err := svc.Create(accountID, dto.CreateManagedUserRequest{
-		Email: "new-user@example.com", FirstName: "New", LastName: "User",
-		Password: "password123", IsAdmin: false,
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-	if user.Email != "new-user@example.com" {
-		t.Errorf("Expected email 'new-user@example.com', got '%s'", user.Email)
-	}
-}
-
-func TestUserManagementCreateDuplicate(t *testing.T) {
-	svc, accountID, _ := setupUserManagementTest(t)
-
-	_, err := svc.Create(accountID, dto.CreateManagedUserRequest{
-		Email: "admin-user@example.com", Password: "password123",
-	})
-	if err != ErrEmailExists {
-		t.Errorf("Expected ErrEmailExists, got %v", err)
-	}
-}
-
 func TestUserManagementUpdate(t *testing.T) {
-	svc, accountID, _ := setupUserManagementTest(t)
+	svc, db, accountID, _ := setupUserManagementTest(t)
 
-	created, err := svc.Create(accountID, dto.CreateManagedUserRequest{
-		Email: "update-user@example.com", FirstName: "Old", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	user := createTestUser(t, db, accountID, "update-user@example.com")
 
-	updated, err := svc.Update(created.ID, accountID, dto.UpdateManagedUserRequest{FirstName: "New", IsAdmin: true})
+	updated, err := svc.Update(user.ID, accountID, dto.UpdateManagedUserRequest{FirstName: "New", IsAdmin: true})
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -85,7 +72,7 @@ func TestUserManagementUpdate(t *testing.T) {
 }
 
 func TestUserManagementDeleteCannotDeleteSelf(t *testing.T) {
-	svc, accountID, userID := setupUserManagementTest(t)
+	svc, _, accountID, userID := setupUserManagementTest(t)
 
 	err := svc.Delete(userID, accountID, userID)
 	if err != ErrCannotDeleteSelf {
@@ -94,16 +81,11 @@ func TestUserManagementDeleteCannotDeleteSelf(t *testing.T) {
 }
 
 func TestUserManagementDelete(t *testing.T) {
-	svc, accountID, userID := setupUserManagementTest(t)
+	svc, db, accountID, userID := setupUserManagementTest(t)
 
-	created, err := svc.Create(accountID, dto.CreateManagedUserRequest{
-		Email: "delete-user@example.com", Password: "password123",
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	user := createTestUser(t, db, accountID, "delete-user@example.com")
 
-	if err := svc.Delete(created.ID, accountID, userID); err != nil {
+	if err := svc.Delete(user.ID, accountID, userID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 

@@ -7,27 +7,8 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupUserManagementExtraTest(t *testing.T) (*UserManagementService, string, string) {
-	t.Helper()
-	db := testutil.SetupTestDB(t)
-	cfg := testutil.TestJWTConfig()
-	authSvc := NewAuthService(db, cfg)
-
-	resp, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Admin",
-		LastName:  "User",
-		Email:     "user-mgmt-extra-test@example.com",
-		Password:  "password123",
-	}, "en")
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	return NewUserManagementService(db), resp.User.AccountID, resp.User.ID
-}
-
 func TestUserManagementGet(t *testing.T) {
-	svc, accountID, userID := setupUserManagementExtraTest(t)
+	svc, _, accountID, userID := setupUserManagementTest(t)
 
 	user, err := svc.Get(userID, accountID)
 	if err != nil {
@@ -36,8 +17,8 @@ func TestUserManagementGet(t *testing.T) {
 	if user.ID != userID {
 		t.Errorf("Expected ID '%s', got '%s'", userID, user.ID)
 	}
-	if user.Email != "user-mgmt-extra-test@example.com" {
-		t.Errorf("Expected email 'user-mgmt-extra-test@example.com', got '%s'", user.Email)
+	if user.Email != "admin-user@example.com" {
+		t.Errorf("Expected email 'admin-user@example.com', got '%s'", user.Email)
 	}
 	if user.FirstName != "Admin" {
 		t.Errorf("Expected first name 'Admin', got '%s'", user.FirstName)
@@ -48,7 +29,7 @@ func TestUserManagementGet(t *testing.T) {
 }
 
 func TestUserManagementGetNotFound(t *testing.T) {
-	svc, accountID, _ := setupUserManagementExtraTest(t)
+	svc, _, accountID, _ := setupUserManagementTest(t)
 
 	_, err := svc.Get("non-existent-user-id", accountID)
 	if err != ErrManagedUserNotFound {
@@ -57,7 +38,7 @@ func TestUserManagementGetNotFound(t *testing.T) {
 }
 
 func TestUserManagementGetWrongAccount(t *testing.T) {
-	svc, _, userID := setupUserManagementExtraTest(t)
+	svc, _, _, userID := setupUserManagementTest(t)
 
 	_, err := svc.Get(userID, "wrong-account-id")
 	if err != ErrManagedUserNotFound {
@@ -66,34 +47,24 @@ func TestUserManagementGetWrongAccount(t *testing.T) {
 }
 
 func TestUserManagementGetAnotherUser(t *testing.T) {
-	svc, accountID, _ := setupUserManagementExtraTest(t)
+	svc, db, accountID, _ := setupUserManagementTest(t)
 
-	db := testutil.SetupTestDB(t)
-	svc2 := NewUserManagementService(db)
+	db2 := testutil.SetupTestDB(t)
+	svc2 := NewUserManagementService(db2)
 	cfg := testutil.TestJWTConfig()
-	authSvc := NewAuthService(db, cfg)
+	authSvc2 := NewAuthService(db2, cfg)
 
-	resp, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Second",
-		LastName:  "User",
-		Email:     "second-user@example.com",
-		Password:  "password123",
+	resp2, err := authSvc2.Register(dto.RegisterRequest{
+		FirstName: "Second", LastName: "User",
+		Email: "second-user@example.com", Password: "password123",
 	}, "en")
 	if err != nil {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	created, err := svc.Create(accountID, dto.CreateManagedUserRequest{
-		Email:     "managed-user@example.com",
-		FirstName: "Managed",
-		LastName:  "User",
-		Password:  "password123",
-	})
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	managed := createTestUser(t, db, accountID, "managed-user@example.com")
 
-	got, err := svc.Get(created.ID, accountID)
+	got, err := svc.Get(managed.ID, accountID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -101,7 +72,7 @@ func TestUserManagementGetAnotherUser(t *testing.T) {
 		t.Errorf("Expected email 'managed-user@example.com', got '%s'", got.Email)
 	}
 
-	_, err = svc2.Get(created.ID, resp.User.AccountID)
+	_, err = svc2.Get(managed.ID, resp2.User.AccountID)
 	if err != ErrManagedUserNotFound {
 		t.Errorf("Expected ErrManagedUserNotFound for wrong account, got %v", err)
 	}

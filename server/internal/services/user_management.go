@@ -5,7 +5,6 @@ import (
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -32,33 +31,6 @@ func (s *UserManagementService) List(accountID string) ([]dto.UserManagementResp
 		result[i] = toUserManagementResponse(&u)
 	}
 	return result, nil
-}
-
-func (s *UserManagementService) Create(accountID string, req dto.CreateManagedUserRequest) (*dto.UserManagementResponse, error) {
-	var existing models.User
-	if err := s.db.Where("email = ?", req.Email).First(&existing).Error; err == nil {
-		return nil, ErrEmailExists
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	hashedStr := string(hashedPassword)
-
-	user := models.User{
-		AccountID:              accountID,
-		FirstName:              strPtrOrNil(req.FirstName),
-		LastName:               strPtrOrNil(req.LastName),
-		Email:                  req.Email,
-		Password:               &hashedStr,
-		IsAccountAdministrator: req.IsAdmin,
-	}
-	if err := s.db.Create(&user).Error; err != nil {
-		return nil, err
-	}
-	resp := toUserManagementResponse(&user)
-	return &resp, nil
 }
 
 func (s *UserManagementService) Update(id, accountID string, req dto.UpdateManagedUserRequest) (*dto.UserManagementResponse, error) {

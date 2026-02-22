@@ -2250,19 +2250,6 @@ func TestNonAdminCannotListUsers(t *testing.T) {
 	}
 }
 
-func TestNonAdminCannotCreateUser(t *testing.T) {
-	ts := setupTestServer(t)
-	_, authResp := ts.registerTestUser(t, "admin-usr-create@example.com")
-	nonAdminUser := createSecondUser(t, ts, authResp.User.AccountID, "nonadmin-usr-create@example.com", false)
-	nonAdminToken := generateJWT(nonAdminUser.ID, nonAdminUser.AccountID, nonAdminUser.Email, false, false)
-
-	body := `{"email":"newuser@example.com","password":"password123","first_name":"New","last_name":"User"}`
-	rec := ts.doRequest(http.MethodPost, "/api/settings/users", body, nonAdminToken)
-	if rec.Code != http.StatusForbidden {
-		t.Errorf("expected 403 for non-admin creating user, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
 func TestNonAdminCannotUpdateUser(t *testing.T) {
 	ts := setupTestServer(t)
 	_, authResp := ts.registerTestUser(t, "admin-usr-upd@example.com")
