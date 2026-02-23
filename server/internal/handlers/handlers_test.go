@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -94,6 +95,10 @@ type contactData struct {
 func setupTestServer(t *testing.T) *testServer {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
+	blevePath, err := os.MkdirTemp("", "test-bleve-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir for bleve: %v", err)
+	}
 	cfg := &config.Config{
 		Server:   config.ServerConfig{Port: "8080", Host: "localhost"},
 		Database: config.DatabaseConfig{Driver: "sqlite", DSN: ":memory:"},
@@ -102,17 +107,15 @@ func setupTestServer(t *testing.T) *testServer {
 			ExpiryHrs:  24,
 			RefreshHrs: 168,
 		},
-		App: config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
+		App:   config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
+		Bleve: config.BleveConfig{IndexPath: blevePath + "/test.bleve"},
 	}
-
 	settingSvc := services.NewSystemSettingService(db)
 	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
 		t.Fatalf("failed to seed settings: %v", err)
 	}
-
 	e := echo.New()
 	handlers.RegisterRoutes(e, db, cfg, "test")
-
 	return &testServer{e: e, db: db, cfg: cfg}
 }
 
@@ -1591,6 +1594,73 @@ func TestSearch_Unauthorized(t *testing.T) {
 	}
 }
 
+func TestSearch_FindsCreatedContact(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "search-find@example.com")
+	vault := ts.createTestVault(t, token, "Search Find Vault")
+	ts.createTestContact(t, token, vault.ID, "Findable")
+
+	// Search should find the contact
+	rec := ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/search?q=Findable", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var searchResp struct {
+		Contacts []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"contacts"`
+		Notes []struct{} `json:"notes"`
+		Total int        `json:"total"`
+	}
+	if err := json.Unmarshal(resp.Data, &searchResp); err != nil {
+		t.Fatalf("failed to parse search data: %v", err)
+	}
+	if len(searchResp.Contacts) == 0 {
+		t.Fatal("expected at least 1 contact in search results")
+	}
+	found := false
+	for _, c := range searchResp.Contacts {
+		if strings.Contains(c.Name, "Findable") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected to find 'Findable' in results, got: %+v", searchResp.Contacts)
+	}
+}
+
+func TestSearch_VaultIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "search-iso1@example.com")
+	vault1 := ts.createTestVault(t, token1, "Vault1")
+	ts.createTestContact(t, token1, vault1.ID, "UniqueAlpha")
+
+	token2, _ := ts.registerTestUser(t, "search-iso2@example.com")
+	vault2 := ts.createTestVault(t, token2, "Vault2")
+
+	// Search vault2 should NOT find vault1's contact
+	rec := ts.doRequest(http.MethodGet, "/api/vaults/"+vault2.ID+"/search?q=UniqueAlpha", "", token2)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var searchResp struct {
+		Contacts []struct{ ID string `json:"id"` } `json:"contacts"`
+		Total    int                                  `json:"total"`
+	}
+	json.Unmarshal(resp.Data, &searchResp)
+	if len(searchResp.Contacts) != 0 {
+		t.Errorf("expected 0 contacts in other vault, got %d", len(searchResp.Contacts))
+	}
+}
+
 // ==================== vCard ====================
 
 func TestVCard_ExportContact(t *testing.T) {
@@ -1724,6 +1794,10 @@ func TestTwoFactor_Unauthorized(t *testing.T) {
 func setupTestServerWithStorage(t *testing.T) *testServer {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
+	blevePath, err := os.MkdirTemp("", "test-bleve-storage-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir for bleve: %v", err)
+	}
 	cfg := &config.Config{
 		Server:   config.ServerConfig{Port: "8080", Host: "localhost"},
 		Database: config.DatabaseConfig{Driver: "sqlite", DSN: ":memory:"},
@@ -1734,6 +1808,7 @@ func setupTestServerWithStorage(t *testing.T) *testServer {
 		},
 		App:     config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
 		Storage: config.StorageConfig{UploadDir: t.TempDir(), MaxSize: 10 * 1024 * 1024},
+		Bleve:   config.BleveConfig{IndexPath: blevePath + "/test.bleve"},
 	}
 	settingSvc := services.NewSystemSettingService(db)
 	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
@@ -4155,5 +4230,335 @@ func TestPersonalAccessToken_AuthWithExpiredPAT(t *testing.T) {
 	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", created.Token)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expired PAT: expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+
+// ==================== ListForContact ====================
+
+func TestListForContact_ReturnsOnlyAssigned(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "listforcontact-assigned@example.com")
+	vault := ts.createTestVault(t, token, "LFC Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "LFCAssigned")
+
+	// Create a company
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies",
+		`{"name":"Assigned Corp","type":"tech"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create company: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var company struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Data, &company); err != nil {
+		t.Fatalf("failed to parse company: %v", err)
+	}
+
+	// Create a second company (should NOT be returned)
+	rec = ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies",
+		`{"name":"Other Corp","type":"finance"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create company2: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Assign the first company to the contact via jobInformation
+	rec = ts.doRequest(http.MethodPut,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobInformation", vault.ID, contact.ID),
+		fmt.Sprintf(`{"company_id":%d,"job_position":"Engineer"}`, company.ID), token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("assign job: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// ListForContact should return only the assigned company
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/companies/list", vault.ID, contact.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list for contact: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var companies []struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Data, &companies); err != nil {
+		t.Fatalf("failed to parse companies: %v", err)
+	}
+	if len(companies) != 1 {
+		t.Fatalf("expected 1 company, got %d", len(companies))
+	}
+	if companies[0].ID != company.ID {
+		t.Errorf("expected company ID %d, got %d", company.ID, companies[0].ID)
+	}
+	if companies[0].Name != "Assigned Corp" {
+		t.Errorf("expected company name 'Assigned Corp', got '%s'", companies[0].Name)
+	}
+}
+
+func TestListForContact_ReturnsEmptyWhenNoCompany(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "listforcontact-empty@example.com")
+	vault := ts.createTestVault(t, token, "LFC Empty Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "LFCEmpty")
+
+	// Create a company in the vault (should NOT appear since not assigned)
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies",
+		`{"name":"Unrelated Corp"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create company: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// ListForContact should return empty array
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/companies/list", vault.ID, contact.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list for contact: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var companies []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &companies); err != nil {
+		t.Fatalf("failed to parse companies: %v", err)
+	}
+	if len(companies) != 0 {
+		t.Errorf("expected 0 companies for unassigned contact, got %d", len(companies))
+	}
+}
+
+func TestTimelineEvent_CRUD(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "timeline-crud@example.com")
+	vault := ts.createTestVault(t, token, "Timeline Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "TimelineContact")
+
+	// Create timeline event with RFC3339 date
+	body := `{"started_at":"2026-06-15T00:00:00Z","label":"Summer Trip"}`
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", body, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create timeline: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var teData struct {
+		ID      uint   `json:"id"`
+		VaultID string `json:"vault_id"`
+		Label   string `json:"label"`
+	}
+	if err := json.Unmarshal(resp.Data, &teData); err != nil {
+		t.Fatalf("failed to parse timeline event: %v", err)
+	}
+	if teData.ID == 0 {
+		t.Fatal("expected non-zero timeline event ID")
+	}
+	if teData.Label != "Summer Trip" {
+		t.Errorf("expected label 'Summer Trip', got '%s'", teData.Label)
+	}
+
+	// List timeline events
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list timelines: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true on list")
+	}
+
+	// Toggle timeline collapsed state
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/toggle", vault.ID, contact.ID, teData.ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("toggle timeline: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Delete timeline event
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d", vault.ID, contact.ID, teData.ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete timeline: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Verify it's gone
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", "", token)
+	resp = parseResponse(t, rec)
+	var listed []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &listed); err != nil {
+		t.Fatalf("failed to parse listed timelines: %v", err)
+	}
+	if len(listed) != 0 {
+		t.Errorf("expected 0 timelines after delete, got %d", len(listed))
+	}
+}
+
+func TestLifeEvent_CreateWithValidType(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "life-event-type@example.com")
+	vault := ts.createTestVault(t, token, "Life Event Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "LifeContact")
+
+	// Create timeline first
+	tlBody := `{"started_at":"2026-06-15T00:00:00Z","label":"Test Timeline"}`
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", tlBody, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create timeline: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var teData struct{ ID uint `json:"id"` }
+	if err := json.Unmarshal(resp.Data, &teData); err != nil {
+		t.Fatalf("failed to parse timeline: %v", err)
+	}
+
+	// Get a valid LifeEventType ID from the vault's seed data
+	var typeID uint
+	ts.db.Raw("SELECT id FROM life_event_types LIMIT 1").Scan(&typeID)
+	if typeID == 0 {
+		t.Fatal("no life event types found in seed data")
+	}
+
+	// Create life event with valid type and RFC3339 date
+	leBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-06-20T00:00:00Z","summary":"Got promoted"}`, typeID)
+	rec = ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents", vault.ID, contact.ID, teData.ID), leBody, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create life event: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true on create life event")
+	}
+	var leData struct {
+		ID              uint   `json:"id"`
+		TimelineEventID uint   `json:"timeline_event_id"`
+		Summary         string `json:"summary"`
+	}
+	if err := json.Unmarshal(resp.Data, &leData); err != nil {
+		t.Fatalf("failed to parse life event: %v", err)
+	}
+	if leData.ID == 0 {
+		t.Fatal("expected non-zero life event ID")
+	}
+	if leData.Summary != "Got promoted" {
+		t.Errorf("expected summary 'Got promoted', got '%s'", leData.Summary)
+	}
+
+	// Update the life event
+	updateBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-07-01T00:00:00Z","summary":"Got a raise","description":"Big promotion"}`, typeID)
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents/%d", vault.ID, contact.ID, teData.ID, leData.ID), updateBody, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update life event: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updatedLE struct {
+		Summary     string `json:"summary"`
+		Description string `json:"description"`
+	}
+	if err := json.Unmarshal(resp.Data, &updatedLE); err != nil {
+		t.Fatalf("failed to parse updated life event: %v", err)
+	}
+	if updatedLE.Summary != "Got a raise" {
+		t.Errorf("expected updated summary 'Got a raise', got '%s'", updatedLE.Summary)
+	}
+
+	// Toggle life event collapsed state
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents/%d/toggle", vault.ID, contact.ID, teData.ID, leData.ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("toggle life event: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Delete the life event
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents/%d", vault.ID, contact.ID, teData.ID, leData.ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete life event: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestLifeEvent_NonexistentTimeline(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "life-event-invalid@example.com")
+	vault := ts.createTestVault(t, token, "Invalid Type Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "InvalidContact")
+	// Try creating life event on a non-existent timeline
+	rec := ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/99999/lifeEvents", vault.ID, contact.ID),
+		`{"life_event_type_id":1,"happened_at":"2026-01-15T00:00:00Z","summary":"test"}`, token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for non-existent timeline, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestTimelineEvent_BadDateFormat(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "timeline-baddate@example.com")
+	vault := ts.createTestVault(t, token, "BadDate Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "BadDateContact")
+
+	// Send YYYY-MM-DD format (the old buggy format from frontend) — should fail with bad request
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents",
+		`{"started_at":"2026-06-15","label":"Bad Date"}`, token)
+	if rec.Code == http.StatusCreated {
+		t.Fatal("expected failure with YYYY-MM-DD date format, but got 201 — Go time.Time should reject non-RFC3339")
+	}
+	// Verify RFC3339 format works
+	rec = ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents",
+		`{"started_at":"2026-06-15T00:00:00Z","label":"Good Date"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("RFC3339 date: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestLifeEvent_ListViaTimeline(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "life-event-list@example.com")
+	vault := ts.createTestVault(t, token, "List Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "ListContact")
+
+	// Create timeline
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents",
+		`{"started_at":"2026-01-01T00:00:00Z","label":"Timeline"}`, token)
+	resp := parseResponse(t, rec)
+	var teData struct{ ID uint `json:"id"` }
+	json.Unmarshal(resp.Data, &teData)
+
+	// Get valid type ID
+	var typeID uint
+	ts.db.Raw("SELECT id FROM life_event_types LIMIT 1").Scan(&typeID)
+
+	// Create two life events
+	for i, summary := range []string{"Event A", "Event B"} {
+		leBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-0%d-15T00:00:00Z","summary":"%s"}`, typeID, i+1, summary)
+		rec = ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents", vault.ID, contact.ID, teData.ID), leBody, token)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create life event %d: expected 201, got %d: %s", i, rec.Code, rec.Body.String())
+		}
+	}
+
+	// List timeline events — should include life events via preload
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var timelines []struct {
+		ID         uint `json:"id"`
+		LifeEvents []struct {
+			ID      uint   `json:"id"`
+			Summary string `json:"summary"`
+		} `json:"life_events"`
+	}
+	if err := json.Unmarshal(resp.Data, &timelines); err != nil {
+		t.Fatalf("failed to parse timelines: %v", err)
+	}
+	if len(timelines) != 1 {
+		t.Fatalf("expected 1 timeline, got %d", len(timelines))
+	}
+	if len(timelines[0].LifeEvents) != 2 {
+		t.Errorf("expected 2 life events in timeline, got %d", len(timelines[0].LifeEvents))
 	}
 }
