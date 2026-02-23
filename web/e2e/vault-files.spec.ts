@@ -50,15 +50,12 @@ test.describe('Vault Files', () => {
     await page.waitForLoadState('networkidle');
 
     await page.getByText('Photos', { exact: true }).click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.ant-segmented-item-selected').getByText('Photos')).toBeVisible({ timeout: 5000 });
 
     await page.getByText('Documents', { exact: true }).click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.ant-segmented-item-selected').getByText('Documents')).toBeVisible({ timeout: 5000 });
 
     await page.getByText('All', { exact: true }).click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.ant-segmented-item-selected').getByText('All')).toBeVisible({ timeout: 5000 });
   });
 

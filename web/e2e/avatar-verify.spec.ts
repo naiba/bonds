@@ -38,7 +38,7 @@ test.describe('Avatar Display (#11)', () => {
     });
 
     await registerAndSetup(page, 'urlcheck');
-    await page.waitForTimeout(2000);
+    await expect(page.locator('img[alt="Avatar"]')).toBeVisible({ timeout: 10000 });
 
     for (const url of avatarGetUrls) {
       expect(url).not.toContain('/api/api/');
@@ -49,8 +49,7 @@ test.describe('Avatar Display (#11)', () => {
 
   test('uploaded avatar should display after upload', async ({ page }) => {
     await registerAndSetup(page, 'upload');
-    await page.waitForTimeout(2000);
-    await expect(page.locator('img[alt="Avatar"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('img[alt="Avatar"]')).toBeVisible({ timeout: 10000 });
 
     const tmpDir = fs.mkdtempSync('/tmp/avatar-e2e-');
     const imgPath = path.join(tmpDir, 'avatar.png');
@@ -63,8 +62,7 @@ test.describe('Avatar Display (#11)', () => {
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles(imgPath);
     await expect(page.getByText(/avatar.*updated/i)).toBeVisible({ timeout: 10000 });
-    await page.waitForTimeout(1000);
-    await expect(page.locator('img[alt="Avatar"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('img[alt="Avatar"]')).toBeVisible({ timeout: 10000 });
 
     fs.rmSync(tmpDir, { recursive: true });
   });

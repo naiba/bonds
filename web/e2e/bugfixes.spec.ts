@@ -293,8 +293,8 @@ test.describe('Bugfixes', () => {
     const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(15);
     await dateCell.click();
 
-    // Wait a moment for the form to register the value
-    await page.waitForTimeout(500);
+    // Close the date picker dropdown before submitting
+    await modal.locator('.ant-modal-header').click();
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
@@ -386,7 +386,7 @@ test.describe('Bugfixes', () => {
     // Click a non-disabled date cell
     const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(10);
     await dateCell.click();
-    await page.waitForTimeout(500);
+    await modal.locator('.ant-modal-header').click();
 
     const dateResp = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
@@ -409,7 +409,6 @@ test.describe('Bugfixes', () => {
 
     // Wait for year data to load
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
 
     // Verify that the year view shows at least one badge/event indicator
     const badges = page.locator('.ant-picker-calendar .ant-badge');
@@ -480,7 +479,7 @@ test.describe('Bugfixes', () => {
 
     const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(10);
     await dateCell.click();
-    await page.waitForTimeout(500);
+    await dateModal.locator('.ant-modal-header').click();
 
     const dateResp = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'

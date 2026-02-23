@@ -9,7 +9,7 @@ async function enableAlternativeCalendar(page: import('@playwright/test').Page) 
     await toggle.click();
   }
   await page.getByRole('button', { name: /save/i }).click();
-  await page.waitForTimeout(500);
+  await page.waitForLoadState('networkidle');
 }
 
 async function setupContactPage(page: import('@playwright/test').Page) {
@@ -78,7 +78,7 @@ test.describe('Calendar System', () => {
     const typeFormItem = modal.locator('.ant-form-item').filter({ hasText: /type/i });
     await typeFormItem.locator('.ant-select').click();
     await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
-    await page.waitForTimeout(300);
+    await modal.locator('.ant-modal-header').click();
 
     await modal.getByRole('textbox').first().fill('Lunar Birthday');
 
@@ -90,7 +90,6 @@ test.describe('Calendar System', () => {
     await compactSelects.nth(1).click();
     await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
     await modal.locator('.ant-modal-header').click();
-    await page.waitForTimeout(500);
 
     await modal.getByRole('button', { name: /ok/i }).click();
 
@@ -118,12 +117,12 @@ test.describe('Calendar System', () => {
 
     await compactSelects.nth(1).click();
     await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
-    await page.waitForTimeout(300);
+    await modal.locator('.ant-modal-header').click();
 
     const freqFormItem = modal.locator('.ant-form-item').filter({ hasText: /frequency/i });
     await freqFormItem.locator('.ant-select').click();
     await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').filter({ hasText: /yearly/i }).click();
-    await page.waitForTimeout(300);
+    await modal.locator('.ant-modal-header').click();
 
     await modal.getByRole('button', { name: /ok/i }).click();
 

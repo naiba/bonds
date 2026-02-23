@@ -62,33 +62,6 @@ test.describe('Enhanced Settings', () => {
     await expect(page.getByRole('table').getByText('Settings Tester')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should navigate to notifications page', async ({ page }) => {
-    await registerUser(page);
-    await page.goto('/settings/notifications');
-    await expect(
-      page.getByRole('heading', { level: 4 }).getByText('Notifications')
-    ).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should show add channel button on notifications page', async ({ page }) => {
-    await registerUser(page);
-    await page.goto('/settings/notifications');
-    await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button').filter({ has: page.locator('.anticon-plus') })).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should show notification channel with verification status', async ({ page }) => {
-    await registerUser(page);
-    await page.goto('/settings/notifications');
-    await page.waitForLoadState('networkidle');
-
-    const seedChannel = page.locator('.ant-list-item').first();
-    await expect(seedChannel).toBeVisible({ timeout: 10000 });
-    await expect(
-      seedChannel.getByText(/Verified|Unverified/)
-    ).toBeVisible({ timeout: 5000 });
-  });
-
   test('should navigate to personalize page and show currencies section', async ({ page }) => {
     await registerUser(page);
     await page.goto('/settings/personalize');

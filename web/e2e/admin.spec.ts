@@ -240,8 +240,7 @@ test.describe('Admin Features', () => {
     await page.goto('/admin/users');
     await page.waitForLoadState('networkidle');
 
-    await page.waitForTimeout(2000);
-    await expect(page.getByRole('table').getByText(adminEmail)).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('table').getByText(adminEmail)).not.toBeVisible({ timeout: 10000 });
   });
 
   test('non-admin user cannot access admin settings page', async ({ page }) => {
@@ -250,12 +249,7 @@ test.describe('Admin Features', () => {
     await page.goto('/admin/settings');
     await page.waitForLoadState('networkidle');
 
-    await page.waitForTimeout(2000);
-    const appNameInput = page.locator('#app\\.name');
-    const count = await appNameInput.count();
-    if (count > 0) {
-      await expect(appNameInput).toHaveValue('', { timeout: 5000 });
-    }
+    await expect(page.locator('#app\\.name')).not.toBeVisible({ timeout: 10000 });
   });
 });
 
