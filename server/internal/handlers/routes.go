@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -127,7 +128,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	if cfg.Bleve.IndexPath != "" {
 		bleveEngine, err := search.NewBleveEngine(cfg.Bleve.IndexPath)
 		if err != nil {
-			log.Printf("WARNING: Failed to initialize Bleve search: %v — search disabled", err)
+			log.Printf("WARNING: Failed to initialize Bleve search: %v \u2014 search disabled", err)
 			searchEngine = &search.NoopEngine{}
 		} else {
 			searchEngine = bleveEngine
@@ -238,9 +239,12 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	e.Use(middleware.CORS())
 
-	if cfg.Debug {
-		e.GET("/swagger/*", echoSwagger.WrapHandler)
-	}
+	e.GET("/swagger/*", func(c echo.Context) error {
+		if !systemSettingService.GetBool("swagger.enabled", cfg.Debug) {
+			return c.NoContent(http.StatusNotFound)
+		}
+		return echoSwagger.WrapHandler(c)
+	})
 
 	api := e.Group("/api")
 

@@ -1176,11 +1176,15 @@
       "section_geocoding": "地理编码",
       "section_storage": "存储",
       "section_backup": "备份",
+      "section_swagger": "Swagger API",
       "app": {
         "name": "应用名称",
         "url": "应用地址"
       },
       "announcement": "公告横幅",
+      "swagger": {
+        "enabled": "Swagger API 文档"
+      },
       "auth": {
         "password": {
           "enabled": "密码登录"

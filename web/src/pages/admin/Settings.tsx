@@ -20,6 +20,7 @@ const KNOWN_SETTINGS: SettingDef[] = [
   { key: "app.name", section: "app" },
   { key: "app.url", section: "app" },
   { key: "announcement", type: "textarea", section: "app" },
+  { key: "swagger.enabled", type: "boolean", section: "app" },
 
   // Authentication
   { key: "auth.password.enabled", type: "boolean", section: "auth" },
@@ -72,6 +73,7 @@ const SECTIONS = [
   "geocoding",
   "storage",
   "backup",
+  "swagger",
 ] as const;
 
 export default function AdminSettings() {
