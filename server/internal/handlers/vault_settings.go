@@ -1094,7 +1094,7 @@ func (h *VaultSettingsHandler) UpdateLifeEventType(c echo.Context) error {
 //	@Failure		401				{object}	response.APIResponse
 //	@Failure		404				{object}	response.APIResponse
 //	@Failure		500				{object}	response.APIResponse
-//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{categoryId}/types/{typeId}/position [post]
+//	@Router			/vaults/{vault_id}/settings/lifeEventCategories/{categoryId}/lifeEventTypes/{typeId}/position [post]
 func (h *VaultSettingsHandler) UpdateLifeEventTypeOrder(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	categoryID, err := strconv.ParseUint(c.Param("categoryId"), 10, 64)

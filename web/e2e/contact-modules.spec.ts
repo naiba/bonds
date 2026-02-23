@@ -173,6 +173,29 @@ test.describe('Contact Modules - Addresses', () => {
     await setupVault(page, 'address');
     await goToContacts(page);
     await createContact(page, 'AddressTest', 'User');
+    await navigateToTab(page, 'Contact information');
+
+    const addressCard = page.locator('.ant-card').filter({ hasText: /Addresses/ });
+    await expect(addressCard).toBeVisible({ timeout: 10000 });
+    await addressCard.getByRole('button', { name: /add/i }).click();
+
+    const modal = page.locator('.ant-modal');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await modal.getByLabel(/address line 1/i).fill('123 Main St');
+    await modal.getByLabel(/city/i).fill('San Francisco');
+    await modal.getByLabel(/country/i).fill('USA');
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/addresses') && resp.request().method() === 'POST'
+    );
+    await modal.getByRole('button', { name: /ok/i }).click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+  });
+
+  test('should add and delete an address', async ({ page }) => {
+    await setupVault(page, 'addr-del');
+    await goToContacts(page);
+    await createContact(page, 'AddrDelTest', 'User');
 
     await navigateToTab(page, 'Contact information');
 
@@ -183,18 +206,27 @@ test.describe('Contact Modules - Addresses', () => {
     const modal = page.locator('.ant-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
 
-    await modal.getByLabel(/address line 1/i).fill('123 Main St');
-    await modal.getByLabel(/city/i).fill('San Francisco');
+    await modal.getByLabel(/address line 1/i).fill('742 Evergreen Terrace');
+    await modal.getByLabel(/city/i).fill('Springfield');
     await modal.getByLabel(/country/i).fill('USA');
 
-    const responsePromise = page.waitForResponse(
+    const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/addresses') && resp.request().method() === 'POST'
     );
     await modal.getByRole('button', { name: /ok/i }).click();
-    const resp = await responsePromise;
-    expect(resp.status()).toBeLessThan(400);
+    await createResp;
 
-    await expect(addressCard.getByText('123 Main St')).toBeVisible({ timeout: 10000 });
+    await expect(addressCard.getByText('742 Evergreen Terrace')).toBeVisible({ timeout: 10000 });
+
+    const addressItem = addressCard.locator('.ant-list-item').filter({ hasText: '742 Evergreen Terrace' });
+    await addressItem.locator('[aria-label="delete"]').click();
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/addresses') && resp.request().method() === 'DELETE'
+    );
+    await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
+    await deleteResp;
+
+    await expect(addressCard.getByText('742 Evergreen Terrace')).not.toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -356,6 +388,42 @@ test.describe('Contact Modules - Contact Information', () => {
   });
 });
 
+test.describe('Contact Modules - Contact Information Delete', () => {
+  test('should add and delete a contact info entry', async ({ page }) => {
+    await setupVault(page, 'cinfo-del');
+    await goToContacts(page);
+    await createContact(page, 'CInfoDelTest', 'User');
+
+    await navigateToTab(page, 'Contact information');
+
+    const infoCard = page.locator('.ant-card').filter({ hasText: 'Contact Information' });
+    await expect(infoCard).toBeVisible({ timeout: 10000 });
+    await infoCard.getByRole('button', { name: /add/i }).click();
+
+    const valueInput = infoCard.getByPlaceholder(/value/i);
+    await expect(valueInput).toBeVisible({ timeout: 5000 });
+    await valueInput.fill('+1-555-0199');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/contactInformation') && resp.request().method() === 'POST'
+    );
+    await infoCard.getByRole('button', { name: /save/i }).click();
+    await createResp;
+
+    await expect(infoCard.getByText('+1-555-0199')).toBeVisible({ timeout: 10000 });
+
+    const infoItem = infoCard.locator('.ant-list-item').filter({ hasText: '+1-555-0199' });
+    await infoItem.locator('[aria-label="delete"]').click();
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/contactInformation') && resp.request().method() === 'DELETE'
+    );
+    await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
+    await deleteResp;
+
+    await expect(infoCard.getByText('+1-555-0199')).not.toBeVisible({ timeout: 10000 });
+  });
+});
+
 test.describe('Contact Modules - Tasks Toggle', () => {
   test('should show toggle button for completed tasks', async ({ page }) => {
     await setupVault(page, 'task-toggle');
@@ -400,5 +468,111 @@ test.describe('Contact Modules - Tasks Toggle', () => {
     await tasksCard.getByText(/show completed/i).click();
     await expect(tasksCard.getByText(/hide completed/i)).toBeVisible({ timeout: 10000 });
     await expect(tasksCard.getByText('Complete me').first()).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Labels', () => {
+  test('should add and remove a label from a contact', async ({ page }) => {
+    await setupVault(page, 'labels');
+    const vaultUrl = page.url();
+
+    // First create a label in vault settings
+    await page.goto(vaultUrl + '/settings');
+    await expect(page.locator('.ant-tabs')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('tab', { name: 'Labels' }).click();
+    await page.waitForLoadState('networkidle');
+
+    const nameInput = page.getByPlaceholder('Name');
+    await expect(nameInput).toBeVisible({ timeout: 10000 });
+    await nameInput.fill('e2e-test-label');
+
+    const labelResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/labels') && resp.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Add' }).click();
+    await labelResponse;
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByText('e2e-test-label')).toBeVisible({ timeout: 10000 });
+
+    // Now create a contact and add the label
+    await page.goto(vaultUrl);
+    await page.waitForLoadState('networkidle');
+    await goToContacts(page);
+    await createContact(page, 'LabelTest', 'User');
+
+    await navigateToTab(page, 'Contact information');
+
+    const labelsCard = page.locator('.ant-card').filter({ hasText: 'Labels' });
+    await expect(labelsCard).toBeVisible({ timeout: 10000 });
+    await labelsCard.getByRole('button', { name: /add/i }).click();
+
+    const modal = page.locator('.ant-modal').filter({ hasText: /add label/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Select the label from dropdown
+    await modal.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'e2e-test-label' }).click();
+
+    const addResp = page.waitForResponse(
+      (resp) => resp.url().includes('/labels') && resp.request().method() === 'POST'
+    );
+    await modal.getByRole('button', { name: /save/i }).click();
+    await addResp;
+
+    // Verify label appears as a tag
+    await expect(labelsCard.locator('.ant-tag').filter({ hasText: 'e2e-test-label' })).toBeVisible({ timeout: 10000 });
+
+    // Delete the label from the contact
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/labels') && resp.request().method() === 'DELETE'
+    );
+    await labelsCard.locator('.ant-tag').filter({ hasText: 'e2e-test-label' }).locator('[aria-label="delete"]').click();
+    await deleteResp;
+
+    await expect(labelsCard.locator('.ant-tag').filter({ hasText: 'e2e-test-label' })).not.toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Important Dates', () => {
+  test('should add and delete an important date', async ({ page }) => {
+    await setupVault(page, 'idate');
+    await goToContacts(page);
+    await createContact(page, 'DateTest', 'User');
+
+    await navigateToTab(page, 'Contact information');
+
+    const datesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
+    await expect(datesCard).toBeVisible({ timeout: 10000 });
+
+    await datesCard.getByRole('button', { name: /add/i }).click();
+
+    const modal = page.locator('.ant-modal').filter({ hasText: /important date/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    await modal.getByLabel(/label/i).fill('Graduation Day');
+
+    // CalendarDatePicker renders an Ant Design DatePicker when alternative calendar is disabled (default)
+    await modal.locator('.ant-picker').click();
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first();
+    await dateCell.click();
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
+    );
+    await modal.getByRole('button', { name: /ok/i }).click();
+    await createResp;
+
+    await expect(datesCard.getByText('Graduation Day')).toBeVisible({ timeout: 10000 });
+
+    // Delete the important date (skip seed dates Birthdate/Deceased date, target our created one)
+    const dateItem = datesCard.locator('.ant-list-item').filter({ hasText: 'Graduation Day' });
+    await dateItem.locator('[aria-label="delete"]').click();
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/dates') && resp.request().method() === 'DELETE'
+    );
+    await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
+    await deleteResp;
+
+    await expect(datesCard.getByText('Graduation Day')).not.toBeVisible({ timeout: 10000 });
   });
 });

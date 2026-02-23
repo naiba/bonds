@@ -234,6 +234,83 @@ test.describe('Admin Features', () => {
     await expect(reloadedInput).toHaveValue('Test Bonds App', { timeout: 10000 });
   });
 
+
+  test('backups page loads with config', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/backups');
+    await expect(page).toHaveURL(/\/admin\/backups/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Backups' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /create backup/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Configuration')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Database', { exact: true })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('admin can create and delete a backup', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/backups');
+    await expect(page.getByRole('heading', { name: 'Backups' })).toBeVisible({ timeout: 10000 });
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/admin/backups') && resp.request().method() === 'POST'
+    );
+    await page.getByRole('button', { name: /create backup/i }).click();
+    const resp = await createResp;
+    expect(resp.status()).toBeLessThan(400);
+    await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 15000 });
+
+    const firstRow = page.locator('.ant-table-row').first();
+    await firstRow.locator('.anticon-delete').click();
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/admin/backups') && resp.request().method() === 'DELETE'
+    );
+    await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
+    const delResp = await deleteResp;
+    expect(delResp.status()).toBeLessThan(400);
+    await expect(page.getByText('No backups yet')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('OAuth providers page loads', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/oauth-providers');
+    await expect(page).toHaveURL(/\/admin\/oauth-providers/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /add provider/i })).toBeVisible({ timeout: 5000 });
+  });
+
+  test('admin can create and delete an OAuth provider', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/oauth-providers');
+    await expect(page.getByRole('heading', { name: 'OAuth Providers' })).toBeVisible({ timeout: 10000 });
+
+    await page.getByRole('button', { name: /add provider/i }).click();
+    const modal = page.locator('.ant-modal').filter({ hasText: /add provider/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await modal.locator('.ant-select').first().click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /github/i }).click();
+    await modal.getByPlaceholder('Client ID').fill('test-client-id-123');
+    await modal.locator('input[type="password"]').fill('test-secret-456');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/oauth-providers') && resp.request().method() === 'POST'
+    );
+    await modal.getByRole('button', { name: /ok/i }).click();
+    const resp = await createResp;
+    expect(resp.status()).toBeLessThan(400);
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('github').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Active').first()).toBeVisible({ timeout: 10000 });
+
+    const firstRow = page.locator('.ant-table-row').first();
+    await firstRow.locator('.anticon-delete').click();
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/oauth-providers') && resp.request().method() === 'DELETE'
+    );
+    await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
+    const delResp = await deleteResp;
+    expect(delResp.status()).toBeLessThan(400);
+    await expect(page.locator('.ant-table-row')).not.toBeVisible({ timeout: 10000 });
+  });
+
   test('non-admin user cannot access admin users page', async ({ page }) => {
     await loginUser(page, secondUserEmail);
 

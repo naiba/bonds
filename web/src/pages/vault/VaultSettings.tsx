@@ -107,7 +107,7 @@ export default function VaultSettings() {
           await api.vaultSettings.settingsLifeEventCategoriesPositionCreate(vid, id, { position });
           break;
         case "lifeEventTypes":
-          await api.vaultSettings.settingsLifeEventCategoriesTypesPositionCreate(vid, categoryId!, id, { position });
+          await api.vaultSettings.settingsLifeEventCategoriesLifeEventTypesPositionCreate(vid, categoryId!, id, { position });
           break;
         case "moodParams":
           await api.vaultSettings.settingsMoodParamsPositionCreate(vid, id, { position });
