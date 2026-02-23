@@ -1,0 +1,57 @@
+name: "✨ Feature Request / 功能建议"
+description: "Suggest a new feature or improvement. Please use text descriptions, not screenshots. / 提出新功能或改进建议。请使用文字描述，不要贴截图。"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **⚠️ This project is maintained by AI agents. AI cannot interpret screenshots or images. Please describe everything in text.**
+        >
+        > **⚠️ 本项目由 AI Agent 维护。AI 无法识别截图或图片，请务必使用文字描述。**
+        >
+        > If your issue was closed but not fully resolved, please **reopen** it or **create a new issue** — don't just comment on a closed issue, as comments may not trigger AI processing.
+        >
+        > 如果您的 Issue 已关闭但问题未完全解决，请**重新打开**或**创建新 Issue**——仅评论已关闭的 Issue 可能不会触发 AI 处理。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description / 功能描述"
+      description: "A clear text description of the feature you'd like. / 用文字清晰描述你想要的功能。"
+      placeholder: |
+        e.g. I'd like to be able to filter contacts by tags on the main contact list page.
+        例如：我希望能在联系人列表页面按标签筛选联系人。
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Motivation / 动机"
+      description: "Why is this feature needed? What problem does it solve? / 为什么需要这个功能？它解决什么问题？"
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: "Proposed Solution / 建议方案"
+      description: "How do you think this should work? / 你认为这个功能应该如何运作？"
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered / 备选方案"
+      description: "Any alternative solutions or features you've considered. / 你考虑过的其他方案。"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Additional Context / 补充信息"
+      description: "Any other relevant information (in text, not screenshots). / 其他相关信息（请用文字，不要截图）。"
+    validations:
+      required: false

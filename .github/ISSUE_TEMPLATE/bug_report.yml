@@ -1,0 +1,74 @@
+name: "🐛 Bug Report / 缺陷报告"
+description: "Report a bug. Please use text descriptions, not screenshots. / 报告缺陷。请使用文字描述，不要贴截图。"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > **⚠️ This project is maintained by AI agents. AI cannot interpret screenshots or images. Please describe everything in text.**
+        >
+        > **⚠️ 本项目由 AI Agent 维护。AI 无法识别截图或图片，请务必使用文字描述。**
+        >
+        > If your issue was closed but not fully resolved, please **reopen** it or **create a new issue** — don't just comment on a closed issue, as comments may not trigger AI processing.
+        >
+        > 如果您的 Issue 已关闭但问题未完全解决，请**重新打开**或**创建新 Issue**——仅评论已关闭的 Issue 可能不会触发 AI 处理。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description / 问题描述"
+      description: "A clear text description of the bug. / 用文字清晰描述该缺陷。"
+      placeholder: |
+        e.g. When I search for a contact name with special characters, no results are returned.
+        例如：搜索包含特殊字符的联系人姓名时，没有返回任何结果。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to Reproduce / 复现步骤"
+      description: "Step-by-step instructions to reproduce the issue. / 逐步描述如何复现该问题。"
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Enter '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected Behavior / 期望行为"
+      description: "What you expected to happen. / 你期望发生什么。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Actual Behavior / 实际行为"
+      description: "What actually happened. / 实际发生了什么。"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment / 环境信息"
+      description: "Browser, OS, deployment method, etc. / 浏览器、操作系统、部署方式等。"
+      placeholder: |
+        - Browser: Chrome 120
+        - OS: macOS 14
+        - Deployment: Docker
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: "Additional Context / 补充信息"
+      description: "Any other relevant information. Error messages, log output, etc. (in text, not screenshots) / 其他相关信息，如错误信息、日志输出等（请用文字，不要截图）"
+    validations:
+      required: false
