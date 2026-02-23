@@ -150,3 +150,124 @@ test.describe('Contact Operations', () => {
     await expect(page.getByText('DeleteMe User')).not.toBeVisible({ timeout: 5000 });
   });
 });
+
+test.describe('Contact Modules - Religion', () => {
+  test('should update contact religion via select', async ({ page }) => {
+    await setupVault(page, 'religion');
+    await goToContacts(page);
+    await createContact(page, 'Rel', 'Tester');
+
+    // Dynamic tab name from seed: "Contact information"
+    await navigateToTab(page, 'Contact information');
+
+    // ExtraInfoModule renders multiple cards: Religion, Job Info, Companies.
+    // Use card title text precisely to avoid matching contact name.
+    const religionCard = page.locator('.ant-card').filter({
+      has: page.locator('h5', { hasText: 'Religion' }),
+    });
+    await expect(religionCard).toBeVisible({ timeout: 10000 });
+
+    await religionCard.getByRole('button', { name: /edit/i }).click();
+
+    // The modal title is "Religion"
+    const modal = page.locator('.ant-modal').filter({
+      has: page.locator('.ant-modal-title', { hasText: 'Religion' }),
+    });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Select a religion from the dropdown
+    await modal.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/religion') && resp.request().method() === 'PUT'
+    );
+    await modal.getByRole('button', { name: /save/i }).click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+
+    // After save, "No religion set" should be gone
+    await expect(religionCard.getByText('No religion set')).not.toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Job Information', () => {
+  test('should update job position', async ({ page }) => {
+    await setupVault(page, 'jobinfo');
+    await goToContacts(page);
+    await createContact(page, 'Job', 'Tester');
+
+    await navigateToTab(page, 'Contact information');
+
+    // Job Info card has title "Job Information" (i18n: contact.detail.job_info)
+    const jobCard = page.locator('.ant-card').filter({
+      has: page.locator('h5', { hasText: 'Job Information' }),
+    });
+    await expect(jobCard).toBeVisible({ timeout: 10000 });
+
+    await jobCard.getByRole('button', { name: /edit/i }).click();
+
+    // Modal title is "Edit Job Info" (i18n: contact.detail.edit_job)
+    const modal = page.locator('.ant-modal').filter({
+      has: page.locator('.ant-modal-title', { hasText: 'Edit Job Info' }),
+    });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // The form field label is "Position" (i18n: contact.detail.job_position)
+    await modal.getByLabel('Position').fill('Software Engineer');
+
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/jobInformation') && resp.request().method() === 'PUT'
+    );
+    await modal.getByRole('button', { name: /save/i }).click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(jobCard.getByText('Software Engineer')).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Documents', () => {
+  test('should show documents module with upload area', async ({ page }) => {
+    await setupVault(page, 'docs');
+    await goToContacts(page);
+    await createContact(page, 'Docs', 'Tester');
+
+    // Dynamic tab: "Information" (exact match to avoid "Contact information")
+    await navigateToTab(page, 'Information', true);
+
+    // Documents card title is "Documents"
+    const docsCard = page.locator('.ant-card').filter({
+      has: page.locator('span', { hasText: 'Documents' }),
+    }).filter({
+      has: page.locator('.ant-upload-drag'),
+    });
+    await expect(docsCard).toBeVisible({ timeout: 10000 });
+
+    await expect(docsCard.locator('.ant-upload-drag')).toBeVisible({ timeout: 5000 });
+    await expect(docsCard.getByText('No documents')).toBeVisible({ timeout: 5000 });
+  });
+});
+
+test.describe('Contact Modules - Photos', () => {
+  test('should show photos module with upload area', async ({ page }) => {
+    await setupVault(page, 'photos');
+    await goToContacts(page);
+    // Avoid "Photos" in contact name to prevent selector ambiguity
+    await createContact(page, 'Pic', 'Tester');
+
+    // Dynamic tab: "Information" (exact match)
+    await navigateToTab(page, 'Information', true);
+
+    // Photos card — match by title span text AND presence of upload area
+    const photosCard = page.locator('.ant-card').filter({
+      has: page.locator('span', { hasText: 'Photos' }),
+    }).filter({
+      has: page.locator('.ant-upload-drag'),
+    });
+    await expect(photosCard).toBeVisible({ timeout: 10000 });
+
+    await expect(photosCard.locator('.ant-upload-drag')).toBeVisible({ timeout: 5000 });
+    await expect(photosCard.getByText('No photos uploaded')).toBeVisible({ timeout: 5000 });
+  });
+});

@@ -60,7 +60,7 @@ test.describe('Groups', () => {
     await expect(modal).toBeVisible({ timeout: 5000 });
     await expect(modal.getByText('New Group')).toBeVisible();
 
-    await modal.getByRole('textbox').fill('Family');
+    await modal.locator('input#name').fill('Family');
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/groups') && resp.request().method() === 'POST'
@@ -81,7 +81,7 @@ test.describe('Groups', () => {
     await page.getByRole('button', { name: /new group/i }).click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
-    await modal.getByRole('textbox').fill('Friends');
+    await modal.locator('input#name').fill('Friends');
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/groups') && resp.request().method() === 'POST'

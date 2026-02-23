@@ -222,3 +222,19 @@ test.describe('Vault Extended Features', () => {
     await expect(page.getByText('Deceased date', { exact: true })).toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Vault Reports', () => {
+  test('should render reports with data sections', async ({ page }) => {
+    await registerAndCreateVault(page, 'reports');
+
+    await page.getByText('Reports').click();
+    await expect(page).toHaveURL(/\/reports/, { timeout: 10000 });
+
+    await expect(page.getByRole('heading', { name: 'Reports' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ant-statistic').first()).toBeVisible({ timeout: 10000 });
+
+    await expect(page.getByText('Address Distribution')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Important Dates Overview')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Mood Trends')).toBeVisible({ timeout: 5000 });
+  });
+});

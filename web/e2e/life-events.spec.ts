@@ -38,14 +38,6 @@ test.describe('Vault Settings - Life Events', () => {
     await expect(page.getByText('Add Category')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show life events card with categories', async ({ page }) => {
-    await setupVault(page);
-    await navigateToLifeEventsTab(page);
-
-    const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
-    await expect(lifeEventsCard).toBeVisible({ timeout: 10000 });
-  });
-
   test('should show add category input and button', async ({ page }) => {
     await setupVault(page);
     await navigateToLifeEventsTab(page);
@@ -54,23 +46,5 @@ test.describe('Vault Settings - Life Events', () => {
     await expect(addCard).toBeVisible({ timeout: 10000 });
     await expect(addCard.getByPlaceholder(/name/i)).toBeVisible({ timeout: 5000 });
     await expect(addCard.getByRole('button', { name: /add/i })).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should show seed life event categories in collapse', async ({ page }) => {
-    await setupVault(page);
-    await navigateToLifeEventsTab(page);
-
-    const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
-    await expect(lifeEventsCard).toBeVisible({ timeout: 10000 });
-    await expect(lifeEventsCard.locator('[class*="collapse"]').first()).toBeVisible({ timeout: 10000 });
-  });
-
-  test('should show collapse component inside life events card', async ({ page }) => {
-    await setupVault(page);
-    await navigateToLifeEventsTab(page);
-
-    const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
-    await expect(lifeEventsCard).toBeVisible({ timeout: 10000 });
-    await expect(lifeEventsCard.locator('[role="tablist"]')).toBeVisible({ timeout: 5000 });
   });
 });

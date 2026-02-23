@@ -355,3 +355,50 @@ test.describe('Contact Modules - Contact Information', () => {
     await expect(infoCard.getByText('test@example.com')).toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Contact Modules - Tasks Toggle', () => {
+  test('should show toggle button for completed tasks', async ({ page }) => {
+    await setupVault(page, 'task-toggle');
+    await goToContacts(page);
+    await createContact(page, 'TaskToggle', 'User');
+
+    await navigateToTab(page, 'Information', true);
+
+    const tasksCard = page.locator('.ant-card').filter({ hasText: /^Tasks/ });
+    await expect(tasksCard).toBeVisible({ timeout: 10000 });
+    await expect(tasksCard.getByText(/show completed/i)).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should create task, toggle it, and see it in completed section', async ({ page }) => {
+    await setupVault(page, 'task-complete');
+    await goToContacts(page);
+    await createContact(page, 'TaskComplete', 'User');
+
+    await navigateToTab(page, 'Information', true);
+
+    const tasksCard = page.locator('.ant-card').filter({ hasText: /^Tasks/ });
+    await expect(tasksCard).toBeVisible({ timeout: 10000 });
+
+    await tasksCard.getByRole('button', { name: /add/i }).click();
+    const input = tasksCard.getByPlaceholder(/task/i);
+    await expect(input).toBeVisible({ timeout: 5000 });
+    await input.fill('Complete me');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/tasks') && resp.request().method() === 'POST'
+    );
+    await tasksCard.getByRole('button', { name: /save|add|ok/i }).first().click();
+    await createResp;
+    await expect(tasksCard.getByText('Complete me')).toBeVisible({ timeout: 10000 });
+
+    const toggleResp = page.waitForResponse(
+      (resp) => resp.url().includes('/toggle') && resp.request().method() === 'PUT'
+    );
+    await tasksCard.locator('.ant-checkbox').first().click();
+    await toggleResp;
+
+    await tasksCard.getByText(/show completed/i).click();
+    await expect(tasksCard.getByText(/hide completed/i)).toBeVisible({ timeout: 10000 });
+    await expect(tasksCard.getByText('Complete me').first()).toBeVisible({ timeout: 10000 });
+  });
+});
