@@ -13,6 +13,7 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Contact, PaginationMeta, LabelResponse } from "@/api";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
@@ -54,6 +55,7 @@ export default function ContactList() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const { data: labels = [] } = useQuery({
     queryKey: ["vault", vaultId, "labels"],
     queryFn: async () => (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
@@ -136,7 +138,7 @@ export default function ContactList() {
               updatedAt={record.updated_at}
             />
             <span style={{ fontWeight: 500 }}>
-              {record.first_name} {record.last_name}
+              {formatContactName(nameOrder, record)}
             </span>
             {record.is_favorite && (
               <StarFilled style={{ color: token.colorWarning, fontSize: 13 }} />

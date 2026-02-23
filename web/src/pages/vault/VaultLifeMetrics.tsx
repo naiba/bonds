@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ export default function VaultLifeMetrics() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const [form] = Form.useForm();
   const [contactForm] = Form.useForm();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -201,7 +203,7 @@ export default function VaultLifeMetrics() {
                         navigate(`/vaults/${vaultId}/contacts/${contact.id}`);
                       }}
                     >
-                      {contact.first_name} {contact.last_name}
+                      {formatContactName(nameOrder, contact)}
                     </a>
                   </Tag>
                 ))}

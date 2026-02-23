@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -23,6 +24,7 @@ export default function VaultReminders() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
 
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "reminders"],
@@ -69,7 +71,7 @@ export default function VaultReminders() {
                   navigate(`/vaults/${vaultId}/contacts/${record.contact_id}`);
                 }}
               >
-                {record.contact_first_name} {record.contact_last_name}
+                {formatContactName(nameOrder, { first_name: record.contact_first_name, last_name: record.contact_last_name })}
               </a>
             ),
           },

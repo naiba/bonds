@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme, Dropdown, Modal, Form, Input, Popconfirm, App, List } from "antd";
 import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, CloudServerOutlined } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
@@ -16,6 +17,7 @@ export default function VaultDetail() {
   const vaultId = id!;
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [form] = Form.useForm();
   const { message } = App.useApp();
@@ -191,7 +193,7 @@ export default function VaultDetail() {
                       }}
                     >
                       <span>
-                        {contact.first_name} {contact.last_name}
+                        {formatContactName(nameOrder, contact)}
                       </span>
                       <span style={{ color: token.colorTextSecondary, fontSize: 12 }}>
                         {dayjs(contact.updated_at).format("MMM D")}
@@ -242,7 +244,7 @@ export default function VaultDetail() {
                         size={32}
                       />
                     }
-                    title={`${item.first_name} ${item.last_name}`}
+                    title={formatContactName(nameOrder, item)}
                   />
                 </List.Item>
               )}

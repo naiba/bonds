@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import {
   Card,
   Typography,
@@ -37,6 +38,7 @@ export default function VaultReports() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
 
   // Queries
   const { data: reportOverview } = useQuery({
@@ -115,7 +117,7 @@ export default function VaultReports() {
               key: "name",
               render: (_, item) => (
                 <a onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.contact_id}`)}>
-                  {item.first_name} {item.last_name}
+                  {formatContactName(nameOrder, item)}
                 </a>
               ),
             },
@@ -247,7 +249,7 @@ export default function VaultReports() {
                     key: "contact",
                     render: (_, r) => (
                       <a onClick={() => navigate(`/vaults/${vaultId}/contacts/${r.contact_id}`)}>
-                        {r.first_name} {r.last_name}
+                        {formatContactName(nameOrder, r)}
                       </a>
                     ),
                   },

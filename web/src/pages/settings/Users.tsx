@@ -28,6 +28,7 @@ import type { User, APIError } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/stores/auth";
 import dayjs from "dayjs";
+import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 
 const { Title, Text } = Typography;
 
@@ -46,6 +47,7 @@ function getAvatarColor(name: string): string {
 export default function Users() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const { user: currentUser } = useAuth();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -113,11 +115,8 @@ export default function Users() {
       title: t("settings.users.col_name"),
       key: "name",
       render: (_, record) => {
-        const fullName = `${record.first_name ?? ""} ${record.last_name ?? ""}`.trim();
-        const initials = [record.first_name?.[0], record.last_name?.[0]]
-          .filter(Boolean)
-          .join("")
-          .toUpperCase();
+        const fullName = formatContactName(nameOrder, record);
+        const initials = formatContactInitials(nameOrder, record);
         const color = getAvatarColor(fullName || "U");
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

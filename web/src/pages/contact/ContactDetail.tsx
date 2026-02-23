@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -98,6 +99,7 @@ export default function ContactDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -272,7 +274,7 @@ export default function ContactDetail() {
 
   if (!contact) return null;
 
-  const initials = `${contact.first_name?.charAt(0) ?? ""}${contact.last_name?.charAt(0) ?? ""}`.toUpperCase();
+  const initials = formatContactInitials(nameOrder, contact);
   const moduleProps = { vaultId, contactId: cId };
 
   const overviewCard = (
@@ -512,7 +514,7 @@ export default function ContactDetail() {
             </div>
             <div style={{ minWidth: 0 }}>
               <Title level={3} style={{ margin: 0 }}>
-                {contact.first_name} {contact.last_name}
+                {formatContactName(nameOrder, contact)}
               </Title>
               {contact.nickname && (
                 <Text type="secondary" style={{ fontSize: 15 }}>

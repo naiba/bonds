@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -49,6 +50,7 @@ export default function VaultSettings() {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const nameOrder = useNameOrder();
 
   const [activeTab, setActiveTab] = useState("general");
 
@@ -347,7 +349,7 @@ export default function VaultSettings() {
                 ]}
               >
                 <List.Item.Meta
-                  title={`${user.first_name} ${user.last_name}`}
+                  title={formatContactName(nameOrder, user)}
                   description={user.email}
                 />
               </List.Item>

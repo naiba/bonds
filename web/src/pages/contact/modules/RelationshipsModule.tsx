@@ -14,6 +14,7 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, UserOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { api } from "@/api";
 import NetworkGraph from "@/components/NetworkGraph";
 import type { Relationship, Contact, APIError } from "@/api";
@@ -34,6 +35,7 @@ export default function RelationshipsModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const qk = ["vaults", vaultId, "contacts", contactId, "relationships"];
 
   const { data: relationships = [], isLoading } = useQuery({
@@ -108,7 +110,7 @@ export default function RelationshipsModule({
     .filter((c: Contact) => c.id !== contactId)
     .map((c: Contact) => ({
       value: c.id,
-      label: `${c.first_name} ${c.last_name}`.trim(),
+      label: formatContactName(nameOrder, c),
     }));
 
   return (
@@ -171,7 +173,7 @@ export default function RelationshipsModule({
           >
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              title={<span style={{ fontWeight: 500 }}>{(() => { const c = contactMap.get(r.related_contact_id ?? ""); return c ? `${c.first_name} ${c.last_name}`.trim() : r.related_contact_id; })()}</span>}
+              title={<span style={{ fontWeight: 500 }}>{(() => { const c = contactMap.get(r.related_contact_id ?? ""); return c ? formatContactName(nameOrder, c) : r.related_contact_id; })()}</span>}
               description={<Tag color="blue">{typeMap.get(r.relationship_type_id ?? 0)?.name ?? ""}</Tag>}
             />
           </List.Item>

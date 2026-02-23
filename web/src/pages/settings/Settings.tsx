@@ -1,6 +1,7 @@
 import { Card, Typography, Descriptions, Button, App, theme, Modal, Input, Form } from "antd";
 import { LogoutOutlined, UserOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
+import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { api } from "@/api";
@@ -14,6 +15,7 @@ export default function Settings() {
   const { modal, message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const [deleteForm] = Form.useForm();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -43,10 +45,7 @@ export default function Settings() {
     }
   }
 
-  const initials = [user?.first_name?.[0], user?.last_name?.[0]]
-    .filter(Boolean)
-    .join("")
-    .toUpperCase();
+  const initials = user ? formatContactInitials(nameOrder, user) : "";
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
@@ -102,7 +101,7 @@ export default function Settings() {
                 lineHeight: 1.3,
               }}
             >
-              {user?.first_name} {user?.last_name}
+              {formatContactName(nameOrder, user ?? {})}
             </Text>
             <Text type="secondary">{user?.email}</Text>
           </div>
@@ -122,7 +121,7 @@ export default function Settings() {
           }}
         >
           <Descriptions.Item label={t("settings.account.name")}>
-            {user?.first_name} {user?.last_name}
+            {formatContactName(nameOrder, user ?? {})}
           </Descriptions.Item>
           <Descriptions.Item label={t("settings.account.email")}>
             {user?.email}

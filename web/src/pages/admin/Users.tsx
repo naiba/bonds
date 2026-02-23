@@ -28,6 +28,7 @@ import type { AdminUser, APIError } from "@/api";
 import { useAuth } from "@/stores/auth";
 import { filesize } from "filesize";
 import type { ColumnsType } from "antd/es/table";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 
 const { Title, Text } = Typography;
 
@@ -37,6 +38,7 @@ export default function AdminUsers() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const nameOrder = useNameOrder();
   const qk = ["admin", "users"];
 
   const { data: users = [], isLoading } = useQuery({
@@ -94,7 +96,7 @@ export default function AdminUsers() {
       title: t("admin.users.name"),
       key: "name",
       render: (_: unknown, record: AdminUser) =>
-        `${record.first_name ?? ""} ${record.last_name ?? ""}`.trim() || "-",
+        formatContactName(nameOrder, record),
     },
     {
       title: t("admin.users.email"),

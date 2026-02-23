@@ -3,7 +3,7 @@ package dto
 import "time"
 
 type PreferencesResponse struct {
-	NameOrder                 string `json:"name_order" example:"first_last"`
+	NameOrder                 string `json:"name_order" example:"%first_name% %last_name%"`
 	DateFormat                string `json:"date_format" example:"YYYY-MM-DD"`
 	Timezone                  string `json:"timezone" example:"America/New_York"`
 	Locale                    string `json:"locale" example:"en"`
@@ -15,7 +15,7 @@ type PreferencesResponse struct {
 }
 
 type UpdateNameOrderRequest struct {
-	NameOrder string `json:"name_order" validate:"required" example:"first_last"`
+	NameOrder string `json:"name_order" validate:"required" example:"%first_name% %last_name%"`
 }
 
 type UpdateDateFormatRequest struct {
@@ -31,7 +31,7 @@ type UpdateLocaleRequest struct {
 }
 
 type UpdatePreferencesRequest struct {
-	NameOrder                 string `json:"name_order" example:"first_last"`
+	NameOrder                 string `json:"name_order" example:"%first_name% %last_name%"`
 	DateFormat                string `json:"date_format" example:"YYYY-MM-DD"`
 	Timezone                  string `json:"timezone" example:"America/New_York"`
 	Locale                    string `json:"locale" example:"en"`

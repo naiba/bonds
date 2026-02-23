@@ -204,12 +204,22 @@ func (s *DavClientService) GetDecryptedPassword(id, vaultID string) (sub *models
 
 func (s *DavClientService) ListDue() ([]models.AddressBookSubscription, error) {
 	var subs []models.AddressBookSubscription
+	if err := s.db.Where("active = ?", true).Find(&subs).Error; err != nil {
+		return nil, err
+	}
 	now := time.Now()
-	err := s.db.Where(
-		"active = ? AND (last_synchronized_at IS NULL OR datetime(last_synchronized_at, '+' || frequency || ' minutes') <= ?)",
-		true, now.Format("2006-01-02 15:04:05"),
-	).Find(&subs).Error
-	return subs, err
+	due := make([]models.AddressBookSubscription, 0, len(subs))
+	for _, sub := range subs {
+		if sub.LastSynchronizedAt == nil {
+			due = append(due, sub)
+			continue
+		}
+		nextSync := sub.LastSynchronizedAt.Add(time.Duration(sub.Frequency) * time.Minute)
+		if !now.Before(nextSync) {
+			due = append(due, sub)
+		}
+	}
+	return due, nil
 }
 
 func (s *DavClientService) UpdateSyncStatus(id string, syncToken *string) error {

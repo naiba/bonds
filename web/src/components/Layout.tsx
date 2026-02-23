@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
+import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import {
   Layout as AntLayout,
   Dropdown,
@@ -34,6 +35,7 @@ import {
   CloudServerOutlined,
   LinkOutlined,
   HeartOutlined,
+  KeyOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import { useAuth } from "@/stores/auth";
@@ -50,6 +52,7 @@ export default function Layout() {
   const location = useLocation();
   const { id: vaultId } = useParams();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const { t, i18n } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
 
@@ -100,6 +103,7 @@ export default function Layout() {
     { key: "/settings/webauthn", icon: <LockOutlined />, label: t("nav.webauthn") },
     { key: "/settings/oauth", icon: <LinkOutlined />, label: t("nav.oauth") },
     { key: "/settings/storage", icon: <CloudServerOutlined />, label: t("nav.storage") },
+    { key: "/settings/tokens", icon: <KeyOutlined />, label: t("nav.api_tokens") },
     ...(user?.is_instance_administrator
       ? [
           { type: "divider" as const },
@@ -120,9 +124,7 @@ export default function Layout() {
     i18n.changeLanguage(next);
   };
 
-  const initials = user
-    ? `${(user.first_name ?? '').charAt(0)}${(user.last_name ?? '').charAt(0)}`.toUpperCase()
-    : "";
+  const initials = user ? formatContactInitials(nameOrder, user) : "";
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
@@ -156,7 +158,7 @@ export default function Layout() {
               onClick={() => navigate("/vaults")}
             >
               <span style={{ fontWeight: 600, color: token.colorText }}>
-                {user?.first_name} {user?.last_name}
+                {formatContactName(nameOrder, user ?? {})}
               </span>
               {isInVault && vaultId && (
                 <>

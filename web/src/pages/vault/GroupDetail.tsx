@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import {
   Card,
   Typography,
@@ -38,6 +39,7 @@ export default function GroupDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
 
   const { data: group, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "groups", gId],
@@ -171,7 +173,7 @@ export default function GroupDetail() {
               onChange={setSelectedContact}
               options={availableContacts.map((c: Contact) => ({
                 value: c.id,
-                label: `${c.first_name} ${c.last_name}`.trim(),
+                label: formatContactName(nameOrder, c),
               }))}
               filterOption={(input, option) =>
                 (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
@@ -204,7 +206,7 @@ export default function GroupDetail() {
           dataSource={group.contacts ?? []}
           locale={{ emptyText: <Empty description={t("vault.group_detail.no_members")} style={{ padding: 32 }} /> }}
           renderItem={(member: GroupContact) => {
-            const contactName = `${member.first_name ?? ''} ${member.last_name ?? ''}`.trim() || '?';
+            const contactName = formatContactName(nameOrder, member);
             return (
               <List.Item
                 style={{

@@ -62,7 +62,8 @@
     "lifeMetrics": "Life Metrics",
     "logout": "Logout",
     "admin": "Administration",
-    "davSubscriptions": "DAV Sync"
+    "davSubscriptions": "DAV Sync",
+    "api_tokens": "API Tokens"
   },
   "auth": {
     "login": {
@@ -787,6 +788,13 @@
       "saved": "Preferences saved",
       "name_first_last": "First name Last name",
       "name_last_first": "Last name First name",
+      "name_order_first_last": "First name Last name",
+      "name_order_last_first": "Last name First name",
+      "name_order_first_last_nickname": "First name Last name (Nickname)",
+      "name_order_nickname": "Nickname",
+      "name_order_custom": "Custom",
+      "name_order_custom_help": "Available variables: %first_name%, %last_name%, %middle_name%, %nickname%, %maiden_name%",
+      "name_order_preview": "Preview",
       "default_map_site": "Default map service",
       "distance_format": "Distance unit",
       "number_format": "Number format",
@@ -930,6 +938,23 @@
       "remaining": "Remaining",
       "usage_percent": "{{percent}}% used"
     }
+  },
+  "api_tokens": {
+    "title": "API Tokens",
+    "description": "Create tokens to access the API programmatically.",
+    "create": "Create Token",
+    "name": "Token Name",
+    "name_placeholder": "e.g. CI/CD, Automation",
+    "expires_at": "Expires At",
+    "token_hint": "Token",
+    "last_used": "Last Used",
+    "never_used": "Never",
+    "no_expiry": "Never expires",
+    "created_title": "Token Created",
+    "created_warning": "Copy this token now. You won't be able to see it again.",
+    "copied": "Copied!",
+    "delete_confirm": "Delete this token? Any applications using it will lose access.",
+    "token_name_duplicate": "Token name already exists"
   },
   "twoFactor": {
     "title": "Two-Factor Authentication",

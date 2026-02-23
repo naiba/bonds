@@ -62,7 +62,8 @@
     "lifeMetrics": "生活指标",
     "logout": "退出登录",
     "admin": "系统管理",
-    "davSubscriptions": "DAV 同步"
+    "davSubscriptions": "DAV 同步",
+    "api_tokens": "API 令牌"
   },
   "auth": {
     "login": {
@@ -787,6 +788,13 @@
       "saved": "偏好设置已保存",
       "name_first_last": "名 姓",
       "name_last_first": "姓 名",
+      "name_order_first_last": "名 姓",
+      "name_order_last_first": "姓 名",
+      "name_order_first_last_nickname": "名 姓（昵称）",
+      "name_order_nickname": "昵称",
+      "name_order_custom": "自定义",
+      "name_order_custom_help": "可用变量：%first_name%, %last_name%, %middle_name%, %nickname%, %maiden_name%",
+      "name_order_preview": "预览",
       "default_map_site": "默认地图服务",
       "distance_format": "距离单位",
       "number_format": "数字格式",
@@ -930,6 +938,23 @@
       "remaining": "剩余",
       "usage_percent": "已使用 {{percent}}%"
     }
+  },
+  "api_tokens": {
+    "title": "API 令牌",
+    "description": "创建令牌以编程方式访问 API。",
+    "create": "创建令牌",
+    "name": "令牌名称",
+    "name_placeholder": "例如 CI/CD、自动化",
+    "expires_at": "过期时间",
+    "token_hint": "令牌",
+    "last_used": "最后使用",
+    "never_used": "从未使用",
+    "no_expiry": "永不过期",
+    "created_title": "令牌已创建",
+    "created_warning": "请立即复制此令牌，之后将无法再查看。",
+    "copied": "已复制！",
+    "delete_confirm": "删除此令牌？使用该令牌的应用将无法访问。",
+    "token_name_duplicate": "令牌名称已存在"
   },
   "twoFactor": {
     "title": "双因素认证",

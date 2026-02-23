@@ -2,10 +2,24 @@ package services
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrInvalidNameOrder = errors.New("name_order must contain at least one variable like %first_name%")
+
+	// validNameOrderVars lists all allowed template variables for name_order.
+	validNameOrderVars = map[string]bool{
+		"first_name":  true,
+		"last_name":   true,
+		"middle_name": true,
+		"nickname":    true,
+		"maiden_name": true,
+	}
 )
 
 type PreferenceService struct {
@@ -42,6 +56,9 @@ func (s *PreferenceService) Get(userID string) (*dto.PreferencesResponse, error)
 }
 
 func (s *PreferenceService) UpdateNameOrder(userID string, req dto.UpdateNameOrderRequest) error {
+	if err := ValidateNameOrder(req.NameOrder); err != nil {
+		return err
+	}
 	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("name_order", req.NameOrder).Error
 }
 
@@ -73,9 +90,38 @@ func (s *PreferenceService) UpdateHelpShown(userID string, req dto.UpdateHelpSho
 	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("help_shown", req.HelpShown).Error
 }
 
+// ValidateNameOrder checks that a name_order template string contains at least
+// one valid %variable% and all %...% tokens reference known fields.
+func ValidateNameOrder(nameOrder string) error {
+	if strings.Count(nameOrder, "%") < 2 {
+		return ErrInvalidNameOrder
+	}
+	if strings.Count(nameOrder, "%")%2 != 0 {
+		return ErrInvalidNameOrder
+	}
+	// Extract variables between % pairs
+	foundVar := false
+	parts := strings.Split(nameOrder, "%")
+	// parts[0] is before first %, parts[1] is var name, parts[2] is between, etc.
+	for i := 1; i < len(parts); i += 2 {
+		varName := parts[i]
+		if !validNameOrderVars[varName] {
+			return errors.New("unknown variable in name_order: %" + varName + "%")
+		}
+		foundVar = true
+	}
+	if !foundVar {
+		return ErrInvalidNameOrder
+	}
+	return nil
+}
+
 func (s *PreferenceService) UpdateAll(userID string, req dto.UpdatePreferencesRequest) (*dto.PreferencesResponse, error) {
 	updates := map[string]interface{}{}
 	if req.NameOrder != "" {
+		if err := ValidateNameOrder(req.NameOrder); err != nil {
+			return nil, err
+		}
 		updates["name_order"] = req.NameOrder
 	}
 	if req.DateFormat != "" {

@@ -103,7 +103,7 @@ func TestPreferenceUpdateAll(t *testing.T) {
 	svc, userID := setupPreferenceTest(t)
 
 	prefs, err := svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
-		NameOrder:  "last_first",
+		NameOrder:  "%last_name% %first_name%",
 		DateFormat: "DD/MM/YYYY",
 		Timezone:   "Asia/Shanghai",
 		Locale:     "zh",
@@ -111,8 +111,8 @@ func TestPreferenceUpdateAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdateAll failed: %v", err)
 	}
-	if prefs.NameOrder != "last_first" {
-		t.Errorf("Expected name_order 'last_first', got '%s'", prefs.NameOrder)
+	if prefs.NameOrder != "%last_name% %first_name%" {
+		t.Errorf("Expected name_order '%%last_name%% %%first_name%%', got '%s'", prefs.NameOrder)
 	}
 	if prefs.DateFormat != "DD/MM/YYYY" {
 		t.Errorf("Expected date_format 'DD/MM/YYYY', got '%s'", prefs.DateFormat)
@@ -177,5 +177,81 @@ func TestPreferenceEnableAlternativeCalendar(t *testing.T) {
 	}
 	if prefs.EnableAlternativeCalendar {
 		t.Error("Expected enable_alternative_calendar to be false after update")
+	}
+}
+
+func TestValidateNameOrder(t *testing.T) {
+	tests := []struct {
+		name      string
+		nameOrder string
+		wantErr   bool
+	}{
+		{"valid: first_last", "%first_name% %last_name%", false},
+		{"valid: last_first", "%last_name% %first_name%", false},
+		{"valid: with nickname", "%first_name% %last_name% (%nickname%)", false},
+		{"valid: nickname only", "%nickname%", false},
+		{"valid: all fields", "%first_name% %middle_name% %last_name%", false},
+		{"valid: with maiden_name", "%first_name% (%maiden_name%) %last_name%", false},
+		{"invalid: empty", "", true},
+		{"invalid: no variables", "hello world", true},
+		{"invalid: odd percent", "%first_name", true},
+		{"invalid: unknown variable", "%unknown%", true},
+		{"invalid: mixed valid and unknown", "%first_name% %foo%", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateNameOrder(tt.nameOrder)
+			if tt.wantErr && err == nil {
+				t.Error("Expected error but got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("Expected no error but got: %v", err)
+			}
+		})
+	}
+}
+
+func TestPreferenceUpdateNameOrderRejectsInvalid(t *testing.T) {
+	svc, userID := setupPreferenceTest(t)
+
+	err := svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "no variables here"})
+	if err == nil {
+		t.Error("Expected error for invalid name_order, got nil")
+	}
+
+	err = svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "%unknown_var%"})
+	if err == nil {
+		t.Error("Expected error for unknown variable, got nil")
+	}
+
+	err = svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "%nickname%"})
+	if err != nil {
+		t.Errorf("Expected no error for valid name_order, got: %v", err)
+	}
+	prefs, _ := svc.Get(userID)
+	if prefs.NameOrder != "%nickname%" {
+		t.Errorf("Expected name_order '%%nickname%%', got '%s'", prefs.NameOrder)
+	}
+}
+
+func TestPreferenceUpdateAllRejectsInvalidNameOrder(t *testing.T) {
+	svc, userID := setupPreferenceTest(t)
+
+	_, err := svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
+		NameOrder: "invalid no variables",
+	})
+	if err == nil {
+		t.Error("Expected error for invalid name_order in UpdateAll, got nil")
+	}
+
+	prefs, err := svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
+		NameOrder: "%last_name%, %first_name%",
+	})
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
+	if prefs.NameOrder != "%last_name%, %first_name%" {
+		t.Errorf("Expected '%%last_name%%, %%first_name%%', got '%s'", prefs.NameOrder)
 	}
 }

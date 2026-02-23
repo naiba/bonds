@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -38,6 +39,7 @@ export default function VaultCompanies() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { token } = theme.useToken();
+  const nameOrder = useNameOrder();
   const [form] = Form.useForm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
@@ -182,7 +184,7 @@ export default function VaultCompanies() {
                         navigate(`/vaults/${vaultId}/contacts/${contact.id}`);
                       }}
                     >
-                      {contact.first_name} {contact.last_name}
+                      {formatContactName(nameOrder, contact)}
                     </span>
                   </Tag>
                 ))}
@@ -304,7 +306,7 @@ export default function VaultCompanies() {
                         updatedAt={item.updated_at}
                       />
                     }
-                    title={`${item.first_name} ${item.last_name}`}
+                    title={formatContactName(nameOrder, item)}
                     description={item.job_title}
                     />
                 </List.Item>

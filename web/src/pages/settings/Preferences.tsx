@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   Typography,
@@ -8,12 +9,16 @@ import {
   App,
   Spin,
   Divider,
+  Radio,
+  Input,
   theme,
 } from "antd";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { UserPreferences, APIError } from "@/api";
+import { formatContactName } from "@/utils/nameFormat";
+import type { ContactNameFields } from "@/utils/nameFormat";
 
 const { Title, Text } = Typography;
 
@@ -65,17 +70,31 @@ const numberFormats = [
   { value: "1 234,56", label: "1 234,56" },
 ];
 
+const NAME_ORDER_PRESETS = [
+  "%first_name% %last_name%",
+  "%last_name% %first_name%",
+  "%first_name% %last_name% (%nickname%)",
+  "%nickname%",
+] as const;
+
+const CUSTOM_SENTINEL = "__custom__";
+
+const SAMPLE_CONTACT: ContactNameFields = {
+  first_name: "James",
+  last_name: "Bond",
+  middle_name: "Herbert",
+  nickname: "007",
+  maiden_name: "",
+  prefix: "",
+  suffix: "",
+};
+
 export default function Preferences() {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-
-  const nameOrders = [
-    { value: "first_last", label: t("settings.preferences.name_first_last") },
-    { value: "last_first", label: t("settings.preferences.name_last_first") },
-  ];
 
   const { data: prefs, isLoading } = useQuery({
     queryKey: ["settings", "preferences"],
@@ -95,6 +114,17 @@ export default function Preferences() {
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const initialNameOrder = prefs?.name_order || "%first_name% %last_name%";
+  const isPreset = (NAME_ORDER_PRESETS as readonly string[]).includes(initialNameOrder);
+
+  const [radioValue, setRadioValue] = useState<string>(
+    isPreset ? initialNameOrder : CUSTOM_SENTINEL,
+  );
+  const [customTemplate, setCustomTemplate] = useState<string>(
+    isPreset ? "" : initialNameOrder,
+  );
+  const activeTemplate = radioValue === CUSTOM_SENTINEL ? customTemplate : radioValue;
+
   if (isLoading) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
@@ -106,6 +136,23 @@ export default function Preferences() {
   const labelStyle: React.CSSProperties = {
     fontWeight: 500,
     color: token.colorText,
+  };
+
+  const presetLabels: Record<string, string> = {
+    [NAME_ORDER_PRESETS[0]]: t("settings.preferences.name_order_first_last"),
+    [NAME_ORDER_PRESETS[1]]: t("settings.preferences.name_order_last_first"),
+    [NAME_ORDER_PRESETS[2]]: t("settings.preferences.name_order_first_last_nickname"),
+    [NAME_ORDER_PRESETS[3]]: t("settings.preferences.name_order_nickname"),
+  };
+
+  const presetExamples: Record<string, string> = {
+    [NAME_ORDER_PRESETS[0]]: "James Bond",
+    [NAME_ORDER_PRESETS[1]]: "Bond James",
+    [NAME_ORDER_PRESETS[2]]: "James Bond (007)",
+    [NAME_ORDER_PRESETS[3]]: "007",
+  };
+  const handleFinish = (values: Record<string, unknown>) => {
+    updateMutation.mutate({ ...values, name_order: activeTemplate } as Partial<UserPreferences>);
   };
 
   return (
@@ -122,14 +169,70 @@ export default function Preferences() {
           form={form}
           layout="vertical"
           initialValues={prefs}
-          onFinish={(v) => updateMutation.mutate(v)}
+          onFinish={handleFinish}
         >
           <Form.Item
-            name="name_order"
             label={<span style={labelStyle}>{t("settings.preferences.name_order")}</span>}
           >
-            <Select options={nameOrders} />
+            <Radio.Group
+              value={radioValue}
+              onChange={(e) => {
+                setRadioValue(e.target.value as string);
+              }}
+              style={{ display: "flex", flexDirection: "column", gap: 8 }}
+            >
+              {NAME_ORDER_PRESETS.map((preset) => (
+                <Radio key={preset} value={preset}>
+                  <span style={{ fontWeight: 500 }}>{presetLabels[preset]}</span>
+                  <Text type="secondary" style={{ marginLeft: 8, fontSize: 13 }}>
+                    — {presetExamples[preset]}
+                  </Text>
+                </Radio>
+              ))}
+              <Radio value={CUSTOM_SENTINEL}>
+                <span style={{ fontWeight: 500 }}>
+                  {t("settings.preferences.name_order_custom")}
+                </span>
+              </Radio>
+            </Radio.Group>
+
+            {radioValue === CUSTOM_SENTINEL && (
+              <div style={{ marginTop: 12, paddingLeft: 24 }}>
+                <Input
+                  value={customTemplate}
+                  onChange={(e) => setCustomTemplate(e.target.value)}
+                  placeholder="%first_name% %last_name%"
+                  style={{ marginBottom: 8 }}
+                />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {t("settings.preferences.name_order_custom_help")}
+                </Text>
+              </div>
+            )}
+
+            {/* Live preview */}
+            {activeTemplate && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "8px 12px",
+                  background: token.colorFillQuaternary,
+                  borderRadius: token.borderRadius,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <Text type="secondary" style={{ fontSize: 13, flexShrink: 0 }}>
+                  {t("settings.preferences.name_order_preview")}:
+                </Text>
+                <Text strong style={{ fontSize: 14 }}>
+                  {formatContactName(activeTemplate, SAMPLE_CONTACT)}
+                </Text>
+              </div>
+            )}
           </Form.Item>
+
           <Form.Item
             name="date_format"
             label={<span style={labelStyle}>{t("settings.preferences.date_format")}</span>}
