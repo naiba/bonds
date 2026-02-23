@@ -283,3 +283,93 @@ func TestCompanyDeleteUnlinksContacts(t *testing.T) {
 		t.Errorf("Expected contact CompanyID to be nil after company delete, got %v", *after.CompanyID)
 	}
 }
+
+
+func TestListForContact_NoCompany(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("Jane"),
+		LastName:  strPtrOrNil("Doe"),
+	}
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	companies, err := ctx.svc.ListForContact(contact.ID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("ListForContact failed: %v", err)
+	}
+	if len(companies) != 0 {
+		t.Errorf("Expected 0 companies for contact without company, got %d", len(companies))
+	}
+}
+
+func TestListForContact_WithCompany(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("John"),
+		LastName:  strPtrOrNil("Doe"),
+		CompanyID: &ctx.company.ID,
+	}
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	companies, err := ctx.svc.ListForContact(contact.ID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("ListForContact failed: %v", err)
+	}
+	if len(companies) != 1 {
+		t.Fatalf("Expected 1 company, got %d", len(companies))
+	}
+	if companies[0].ID != ctx.company.ID {
+		t.Errorf("Expected company ID %d, got %d", ctx.company.ID, companies[0].ID)
+	}
+	if companies[0].Name != "Acme Corp" {
+		t.Errorf("Expected company name 'Acme Corp', got '%s'", companies[0].Name)
+	}
+}
+
+func TestListForContact_MultipleCompanies(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	// Create a second company
+	compType := "finance"
+	company2 := &models.Company{
+		VaultID: ctx.vaultID,
+		Name:    "Beta Inc",
+		Type:    &compType,
+	}
+	if err := ctx.db.Create(company2).Error; err != nil {
+		t.Fatalf("Create company2 failed: %v", err)
+	}
+
+	// Assign only the second company to the contact
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("Alice"),
+		LastName:  strPtrOrNil("Smith"),
+		CompanyID: &company2.ID,
+	}
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	companies, err := ctx.svc.ListForContact(contact.ID, ctx.vaultID)
+	if err != nil {
+		t.Fatalf("ListForContact failed: %v", err)
+	}
+	if len(companies) != 1 {
+		t.Fatalf("Expected 1 company, got %d", len(companies))
+	}
+	if companies[0].ID != company2.ID {
+		t.Errorf("Expected company ID %d (Beta Inc), got %d", company2.ID, companies[0].ID)
+	}
+	if companies[0].Name != "Beta Inc" {
+		t.Errorf("Expected company name 'Beta Inc', got '%s'", companies[0].Name)
+	}
+}

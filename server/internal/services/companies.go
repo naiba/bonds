@@ -30,6 +30,28 @@ func (s *CompanyService) List(vaultID string) ([]dto.CompanyResponse, error) {
 	return result, nil
 }
 
+
+func (s *CompanyService) ListForContact(contactID, vaultID string) ([]dto.CompanyResponse, error) {
+	var contact models.Contact
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return []dto.CompanyResponse{}, nil
+		}
+		return nil, err
+	}
+	if contact.CompanyID == nil {
+		return []dto.CompanyResponse{}, nil
+	}
+	var company models.Company
+	if err := s.db.First(&company, *contact.CompanyID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return []dto.CompanyResponse{}, nil
+		}
+		return nil, err
+	}
+	return []dto.CompanyResponse{toCompanyResponse(&company)}, nil
+}
+
 func (s *CompanyService) Get(id uint) (*dto.CompanyResponse, error) {
 	var company models.Company
 	if err := s.db.Preload("Contacts").First(&company, id).Error; err != nil {

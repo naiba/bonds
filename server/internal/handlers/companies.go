@@ -54,7 +54,8 @@ func (h *CompanyHandler) List(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/companies/list [get]
 func (h *CompanyHandler) ListForContact(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	companies, err := h.companyService.List(vaultID)
+	contactID := c.Param("contact_id")
+	companies, err := h.companyService.ListForContact(contactID, vaultID)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_companies")
 	}
