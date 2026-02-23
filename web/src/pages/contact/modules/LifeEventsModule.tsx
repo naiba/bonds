@@ -26,7 +26,7 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { TimelineEvent as TEvent, PaginationMeta, APIError } from "@/api";
+import type { TimelineEvent as TEvent, PaginationMeta, APIError, LifeEventCategoryResponse } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -54,6 +54,20 @@ export default function LifeEventsModule({
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "timelineEvents"];
 
+  // Fetch life event categories to get a valid type ID (instead of hardcoded 1)
+  const { data: lifeEventCategories } = useQuery({
+    queryKey: ["vault", vaultId, "lifeEventCategories"],
+    queryFn: async () => {
+      const res = await api.vaultSettings.settingsLifeEventCategoriesList(String(vaultId));
+      return (res.data ?? []) as LifeEventCategoryResponse[];
+    },
+  });
+
+  // Use the first available life event type ID from seed data
+  const defaultLifeEventTypeId = lifeEventCategories
+    ?.flatMap((cat) => cat.types ?? [])
+    ?.find((t) => t.id)?.id ?? 0;
+
   const resetPagination = useCallback(() => {
     setPage(1);
     setAllTimelines([]);
@@ -75,7 +89,7 @@ export default function LifeEventsModule({
     mutationFn: (values: { label: string; started_at: dayjs.Dayjs }) =>
       api.lifeEvents.contactsTimelineEventsCreate(String(vaultId), String(contactId), {
         label: values.label,
-        started_at: values.started_at.format("YYYY-MM-DD"),
+        started_at: values.started_at.toISOString(),
       }),
     onSuccess: () => {
       resetPagination();
@@ -102,9 +116,9 @@ export default function LifeEventsModule({
       if (!selectedTimeline) throw new Error("No timeline");
       const data = {
         summary: values.label,
-        happened_at: values.happened_at.format("YYYY-MM-DD"),
+        happened_at: values.happened_at.toISOString(),
         description: values.description,
-        life_event_type_id: 1,
+        life_event_type_id: defaultLifeEventTypeId,
       };
       if (editingLeId) {
         return api.lifeEvents.contactsTimelineEventsLifeEventsUpdate(String(vaultId), String(contactId), selectedTimeline, editingLeId, data);
