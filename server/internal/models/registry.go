@@ -106,5 +106,6 @@ func AllModels() []interface{} {
 
 		&OAuthProvider{},
 		&SystemSetting{},
+		&PersonalAccessToken{},
 	}
 }

@@ -1,7 +1,10 @@
 package middleware
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
@@ -29,6 +32,8 @@ func NewAuthMiddleware(secret string, db *gorm.DB) *AuthMiddleware {
 	return &AuthMiddleware{secret: []byte(secret), db: db}
 }
 
+const patPrefix = "bonds_"
+
 func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var tokenString string
@@ -45,45 +50,101 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 			return response.Unauthorized(c, "err.missing_authorization_header")
 		}
 
-		claims := &JWTClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return m.secret, nil
-		})
 
-		if err != nil || !token.Valid {
+		if strings.HasPrefix(tokenString, patPrefix) {
+			return m.authenticateWithPAT(c, next, tokenString)
+		}
+
+		return m.authenticateWithJWT(c, next, tokenString)
+	}
+}
+
+func (m *AuthMiddleware) authenticateWithJWT(c echo.Context, next echo.HandlerFunc, tokenString string) error {
+	claims := &JWTClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return m.secret, nil
+	})
+
+	if err != nil || !token.Valid {
+		return response.Unauthorized(c, "err.invalid_or_expired_token")
+	}
+
+	// Block access if 2FA verification is still pending.
+	// The temp token is only valid for the /auth/2fa/verify endpoint.
+	if claims.TwoFactorPending {
+		return response.Forbidden(c, "err.two_factor_required")
+	}
+
+	user := &models.User{}
+	if err := m.db.Select("disabled, email_verified_at").Where("id = ?", claims.UserID).First(user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return response.Unauthorized(c, "err.user_not_found")
+		}
+		return response.InternalError(c, "err.database_error")
+	}
+	if user.Disabled {
+		return response.Forbidden(c, "err.user_account_disabled")
+	}
+
+	c.Set("user_id", claims.UserID)
+	c.Set("account_id", claims.AccountID)
+	c.Set("email", claims.Email)
+	c.Set("is_admin", claims.IsAdmin)
+	c.Set("is_instance_admin", claims.IsInstanceAdmin)
+	c.Set("email_verified", user.EmailVerifiedAt != nil)
+	c.Set("claims", claims)
+
+	return next(c)
+}
+
+func (m *AuthMiddleware) authenticateWithPAT(c echo.Context, next echo.HandlerFunc, rawToken string) error {
+	hash := sha256Hash(rawToken)
+
+	var pat models.PersonalAccessToken
+	if err := m.db.Where("token_hash = ?", hash).First(&pat).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
 			return response.Unauthorized(c, "err.invalid_or_expired_token")
 		}
-
-		// Block access if 2FA verification is still pending.
-		// The temp token is only valid for the /auth/2fa/verify endpoint.
-		if claims.TwoFactorPending {
-			return response.Forbidden(c, "err.two_factor_required")
-		}
-
-		user := &models.User{}
-		if err := m.db.Select("disabled, email_verified_at").Where("id = ?", claims.UserID).First(user).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return response.Unauthorized(c, "err.user_not_found")
-			}
-			return response.InternalError(c, "err.database_error")
-		}
-		if user.Disabled {
-			return response.Forbidden(c, "err.user_account_disabled")
-		}
-
-		c.Set("user_id", claims.UserID)
-		c.Set("account_id", claims.AccountID)
-		c.Set("email", claims.Email)
-		c.Set("is_admin", claims.IsAdmin)
-		c.Set("is_instance_admin", claims.IsInstanceAdmin)
-		c.Set("email_verified", user.EmailVerifiedAt != nil)
-		c.Set("claims", claims)
-
-		return next(c)
+		return response.InternalError(c, "err.database_error")
 	}
+
+	if pat.ExpiresAt != nil && time.Now().After(*pat.ExpiresAt) {
+		return response.Unauthorized(c, "err.invalid_or_expired_token")
+	}
+
+	var user models.User
+
+	if err := m.db.Where("id = ?", pat.UserID).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return response.Unauthorized(c, "err.user_not_found")
+		}
+		return response.InternalError(c, "err.database_error")
+	}
+	if user.Disabled {
+		return response.Forbidden(c, "err.user_account_disabled")
+	}
+
+	now := time.Now()
+
+	m.db.Model(&pat).Update("last_used_at", &now)
+
+	c.Set("user_id", user.ID)
+	c.Set("account_id", user.AccountID)
+	c.Set("email", user.Email)
+	c.Set("is_admin", user.IsAccountAdministrator)
+	c.Set("is_instance_admin", user.IsInstanceAdministrator)
+	c.Set("email_verified", user.EmailVerifiedAt != nil)
+	c.Set("auth_type", "pat")
+
+	return next(c)
+}
+
+func sha256Hash(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:])
 }
 
 func (m *AuthMiddleware) RequireAdmin(next echo.HandlerFunc) echo.HandlerFunc {

@@ -3956,3 +3956,204 @@ func TestUnverifiedUserBlockedFromProtectedEndpoints(t *testing.T) {
 		t.Fatalf("verified user: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// --- Personal Access Token handler integration tests ---
+
+func TestPersonalAccessToken_Create(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "pat-create@example.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Test Token"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var data struct {
+		ID        uint   `json:"id"`
+		Name      string `json:"name"`
+		Token     string `json:"token"`
+		TokenHint string `json:"token_hint"`
+	}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse token data: %v", err)
+	}
+	if data.ID == 0 {
+		t.Error("expected non-zero token ID")
+	}
+	if data.Name != "Test Token" {
+		t.Errorf("expected name=Test Token, got %s", data.Name)
+	}
+	if !strings.HasPrefix(data.Token, "bonds_") {
+		t.Errorf("expected token to start with bonds_, got %s", data.Token)
+	}
+	if data.TokenHint == "" {
+		t.Error("expected non-empty token_hint")
+	}
+}
+
+func TestPersonalAccessToken_List(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "pat-list@example.com")
+
+	// Create two tokens
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Token One"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create token 1: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Token Two"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create token 2: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// List tokens
+	rec = ts.doRequest(http.MethodGet, "/api/settings/tokens", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var items []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &items); err != nil {
+		t.Fatalf("failed to parse token list: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 tokens, got %d", len(items))
+	}
+
+	// Verify no raw token value is exposed in list response
+	listBody := string(resp.Data)
+	if strings.Contains(listBody, "bonds_") {
+		t.Error("list response should not contain raw token value")
+	}
+}
+
+func TestPersonalAccessToken_Delete(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "pat-delete@example.com")
+
+	// Create a token
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"To Delete"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create token: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var created struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created token: %v", err)
+	}
+
+	// Delete it
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/settings/tokens/%d", created.ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Verify list is empty
+	rec = ts.doRequest(http.MethodGet, "/api/settings/tokens", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list after delete: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var items []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &items); err != nil {
+		t.Fatalf("failed to parse token list: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected 0 tokens after delete, got %d", len(items))
+	}
+}
+
+func TestPersonalAccessToken_CreateDuplicateName(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "pat-dup@example.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Dup Token"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("first create: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Create again with same name
+	rec = ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Dup Token"}`, token)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false for duplicate name")
+	}
+	if resp.Error == nil || resp.Error.Code != "CONFLICT" {
+		t.Errorf("expected error code CONFLICT, got %+v", resp.Error)
+	}
+}
+
+func TestPersonalAccessToken_AuthWithPAT(t *testing.T) {
+	ts := setupTestServer(t)
+	jwtToken, _ := ts.registerTestUser(t, "pat-auth@example.com")
+
+	// Create a vault first (needed for GET /api/vaults to return something)
+	ts.createTestVault(t, jwtToken, "PAT Vault")
+
+	// Create a PAT
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Auth Token"}`, jwtToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create PAT: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var created struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created token: %v", err)
+	}
+
+	// Use PAT as Bearer token to access a protected endpoint
+	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", created.Token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PAT auth: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true when using PAT auth")
+	}
+}
+
+func TestPersonalAccessToken_AuthWithExpiredPAT(t *testing.T) {
+	ts := setupTestServer(t)
+	jwtToken, _ := ts.registerTestUser(t, "pat-expired@example.com")
+
+	// Create a PAT with an already-expired time
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Expired Token","expires_at":"2020-01-01T00:00:00Z"}`, jwtToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create expired PAT: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var created struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created token: %v", err)
+	}
+
+	// Try to use expired PAT — should get 401
+	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", created.Token)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expired PAT: expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

@@ -93,6 +93,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	davPushService := services.NewDavPushService(db, davClientService, vcardService)
 	adminService := services.NewAdminService(db, cfg.Storage.UploadDir)
 
+	patService := services.NewPersonalAccessTokenService(db)
+
 	mailer := services.NewDynamicMailer(systemSettingService)
 	authService.SetMailer(mailer)
 	authService.SetSystemSettings(systemSettingService)
@@ -231,6 +233,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	})
 	oauthProviderHandler := NewOAuthProviderHandler(oauthProviderService)
 	instanceHandler := NewInstanceHandler(systemSettingService, oauthService, webauthnService, version)
+
+	patHandler := NewPersonalAccessTokenHandler(patService)
 
 	e.Use(middleware.CORS())
 
@@ -637,6 +641,11 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	twoFactorGroup.POST("/confirm", twoFactorHandler.Confirm)
 	twoFactorGroup.POST("/disable", twoFactorHandler.Disable)
 	twoFactorGroup.GET("/status", twoFactorHandler.Status)
+
+	tokenGroup := settingsGroup.Group("/tokens")
+	tokenGroup.GET("", patHandler.List)
+	tokenGroup.POST("", patHandler.Create)
+	tokenGroup.DELETE("/:id", patHandler.Delete)
 
 	usersGroup := settingsGroup.Group("/users", authMiddleware.RequireAdmin)
 	usersGroup.GET("", userManagementHandler.List)
