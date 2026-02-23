@@ -12,7 +12,6 @@ import {
   Empty,
   Badge,
   theme,
-  Tag,
   Select,
   Switch,
 } from "antd";
@@ -349,6 +348,14 @@ function ModulesPanel({ templateId, pageId }: { templateId: number; pageId: numb
     onError: (e: APIError) => message.error(e.message),
   });
 
+
+  const modulePositionMutation = useMutation({
+    mutationFn: ({ moduleId, position }: { moduleId: number; position: number }) =>
+      api.templatePages.personalizeTemplatesPagesModulesPositionCreate(templateId, pageId, moduleId, { position }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: modulesQk }),
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   const assignedModuleIds = new Set(pageModules.map((m: Record<string, unknown>) => m.module_id as number));
   const unassignedModules = availableModules.filter((m: PersonalizeItem) => !assignedModuleIds.has(m.id!));
 
@@ -363,20 +370,44 @@ function ModulesPanel({ templateId, pageId }: { templateId: number; pageId: numb
           {t("settings.personalize.no_modules")}
         </Text>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
-          {pageModules.map((mod) => (
-            <Tag
-              key={mod.module_id as number}
-              closable
-              onClose={(e) => {
-                e.preventDefault();
-                removeModuleMutation.mutate(mod.module_id as number);
-              }}
+        <List
+          size="small"
+          dataSource={pageModules}
+          renderItem={(mod: Record<string, unknown>, index: number) => (
+            <List.Item
+              style={{ padding: "4px 0" }}
+              actions={[
+                <Button
+                  key="up"
+                  type="text"
+                  size="small"
+                  icon={<ArrowUpOutlined />}
+                  title={t("settings.personalize.move_up")}
+                  disabled={index === 0}
+                  onClick={() => modulePositionMutation.mutate({ moduleId: mod.module_id as number, position: index - 1 })}
+                />,
+                <Button
+                  key="down"
+                  type="text"
+                  size="small"
+                  icon={<ArrowDownOutlined />}
+                  title={t("settings.personalize.move_down")}
+                  disabled={index === pageModules.length - 1}
+                  onClick={() => modulePositionMutation.mutate({ moduleId: mod.module_id as number, position: index + 1 })}
+                />,
+                <Popconfirm
+                  key="d"
+                  title={t("settings.personalize.delete_confirm")}
+                  onConfirm={() => removeModuleMutation.mutate(mod.module_id as number)}
+                >
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
             >
-              {(mod.module_name as string) ?? `Module #${mod.module_id}`}
-            </Tag>
-          ))}
-        </div>
+              <span style={{ fontSize: 13 }}>{(mod.module_name as string) ?? `Module #${mod.module_id}`}</span>
+            </List.Item>
+          )}
+        />
       )}
 
       {unassignedModules.length > 0 && (

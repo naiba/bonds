@@ -94,6 +94,8 @@ export default function VaultFiles() {
         res = await api.files.filesPhotosList(String(vaultId), params);
       } else if (filterType === "documents") {
         res = await api.files.filesDocumentsList(String(vaultId), params);
+      } else if (filterType === "avatars") {
+        res = await api.files.filesAvatarsList(String(vaultId), params);
       } else {
         res = await api.files.filesList(String(vaultId));
       }
@@ -211,6 +213,7 @@ export default function VaultFiles() {
             { label: t("vault.files.filter_all"), value: "all" },
             { label: t("vault.files.filter_photos"), value: "photos" },
             { label: t("vault.files.filter_documents"), value: "documents" },
+            { label: t("vault.files.filter_avatars"), value: "avatars" },
           ]}
         />
       </div>

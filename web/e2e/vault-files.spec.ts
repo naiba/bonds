@@ -41,6 +41,7 @@ test.describe('Vault Files', () => {
     await expect(page.getByText('All', { exact: true })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Photos', { exact: true })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Documents', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Avatars', { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
   test('should switch between filter tabs', async ({ page }) => {
@@ -54,6 +55,12 @@ test.describe('Vault Files', () => {
 
     await page.getByText('Documents', { exact: true }).click();
     await expect(page.locator('.ant-segmented-item-selected').getByText('Documents')).toBeVisible({ timeout: 5000 });
+
+    await page.getByText('All', { exact: true }).click();
+    await expect(page.locator('.ant-segmented-item-selected').getByText('All')).toBeVisible({ timeout: 5000 });
+
+    await page.getByText('Avatars', { exact: true }).click();
+    await expect(page.locator('.ant-segmented-item-selected').getByText('Avatars')).toBeVisible({ timeout: 5000 });
 
     await page.getByText('All', { exact: true }).click();
     await expect(page.locator('.ant-segmented-item-selected').getByText('All')).toBeVisible({ timeout: 5000 });
