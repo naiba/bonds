@@ -19,12 +19,17 @@ func (s *MostConsultedService) List(vaultID, userID string) ([]dto.MostConsulted
 		ContactID     string  `gorm:"column:contact_id"`
 		FirstName     *string `gorm:"column:first_name"`
 		LastName      *string `gorm:"column:last_name"`
+		MiddleName    *string `gorm:"column:middle_name"`
+		Nickname      *string `gorm:"column:nickname"`
+		MaidenName    *string `gorm:"column:maiden_name"`
+		Prefix        *string `gorm:"column:prefix"`
+		Suffix        *string `gorm:"column:suffix"`
 		NumberOfViews int     `gorm:"column:number_of_views"`
 	}
 
 	var rows []row
 	err := s.db.Model(&models.ContactVaultUser{}).
-		Select("contact_vault_user.contact_id, contacts.first_name, contacts.last_name, contact_vault_user.number_of_views").
+		Select("contact_vault_user.contact_id, contacts.first_name, contacts.last_name, contacts.middle_name, contacts.nickname, contacts.maiden_name, contacts.prefix, contacts.suffix, contact_vault_user.number_of_views").
 		Joins("JOIN contacts ON contacts.id = contact_vault_user.contact_id").
 		Where("contact_vault_user.vault_id = ? AND contact_vault_user.user_id = ? AND contact_vault_user.number_of_views > 0", vaultID, userID).
 		Order("contact_vault_user.number_of_views DESC").
@@ -40,6 +45,11 @@ func (s *MostConsultedService) List(vaultID, userID string) ([]dto.MostConsulted
 			ContactID:     r.ContactID,
 			FirstName:     ptrToStr(r.FirstName),
 			LastName:      ptrToStr(r.LastName),
+			MiddleName:    ptrToStr(r.MiddleName),
+			Nickname:      ptrToStr(r.Nickname),
+			MaidenName:    ptrToStr(r.MaidenName),
+			Prefix:        ptrToStr(r.Prefix),
+			Suffix:        ptrToStr(r.Suffix),
 			NumberOfViews: r.NumberOfViews,
 		}
 	}

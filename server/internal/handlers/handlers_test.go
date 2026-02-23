@@ -4562,3 +4562,78 @@ func TestLifeEvent_ListViaTimeline(t *testing.T) {
 		t.Errorf("expected 2 life events in timeline, got %d", len(timelines[0].LifeEvents))
 	}
 }
+
+func TestMostConsulted_ReturnsAllNameFields(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "mc-names@example.com")
+	vault := ts.createTestVault(t, token, "MC Names Vault")
+
+	// Create contact with all name fields via API
+	body := `{"first_name":"John","last_name":"Doe","middle_name":"Michael","nickname":"Johnny","maiden_name":"Smith","prefix":"Dr.","suffix":"Jr."}`
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts", body, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create contact failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var contact contactData
+	if err := json.Unmarshal(resp.Data, &contact); err != nil {
+		t.Fatalf("parse contact: %v", err)
+	}
+
+	// Visit the contact to increment view count
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID, "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get contact failed: %d", rec.Code)
+	}
+
+	// Fetch most consulted
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/search/mostConsulted", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var items []struct {
+		ContactID  string `json:"contact_id"`
+		FirstName  string `json:"first_name"`
+		LastName   string `json:"last_name"`
+		MiddleName string `json:"middle_name"`
+		Nickname   string `json:"nickname"`
+		MaidenName string `json:"maiden_name"`
+		Prefix     string `json:"prefix"`
+		Suffix     string `json:"suffix"`
+	}
+	if err := json.Unmarshal(resp.Data, &items); err != nil {
+		t.Fatalf("parse most consulted: %v", err)
+	}
+	if len(items) == 0 {
+		t.Fatal("expected at least 1 most consulted item")
+	}
+
+	_ = auth // suppress unused
+	item := items[0]
+	if item.FirstName != "John" {
+		t.Errorf("expected first_name=John, got %s", item.FirstName)
+	}
+	if item.LastName != "Doe" {
+		t.Errorf("expected last_name=Doe, got %s", item.LastName)
+	}
+	if item.MiddleName != "Michael" {
+		t.Errorf("expected middle_name=Michael, got %s", item.MiddleName)
+	}
+	if item.Nickname != "Johnny" {
+		t.Errorf("expected nickname=Johnny, got %s", item.Nickname)
+	}
+	if item.MaidenName != "Smith" {
+		t.Errorf("expected maiden_name=Smith, got %s", item.MaidenName)
+	}
+	if item.Prefix != "Dr." {
+		t.Errorf("expected prefix=Dr., got %s", item.Prefix)
+	}
+	if item.Suffix != "Jr." {
+		t.Errorf("expected suffix=Jr., got %s", item.Suffix)
+	}
+}

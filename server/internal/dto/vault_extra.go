@@ -21,6 +21,11 @@ type MostConsultedContactItem struct {
 	ContactID     string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	FirstName     string `json:"first_name" example:"John"`
 	LastName      string `json:"last_name" example:"Doe"`
+	MiddleName    string `json:"middle_name" example:"Michael"`
+	Nickname      string `json:"nickname" example:"Johnny"`
+	MaidenName    string `json:"maiden_name" example:"Smith"`
+	Prefix        string `json:"prefix" example:"Dr."`
+	Suffix        string `json:"suffix" example:"Jr."`
 	NumberOfViews int    `json:"number_of_views" example:"10"`
 }
 
