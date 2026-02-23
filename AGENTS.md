@@ -436,7 +436,7 @@ defer cleanup()
 - CI（`.github/workflows/test.yml`）在 `go vet` / `go build` 之前执行 `swag init`，否则构建失败。
 - Dockerfile 同样在 `go build` 前执行 `swag init`（行 20）。
 - 安装 swag：`go install github.com/swaggo/swag/cmd/swag@latest`
-- Swagger UI 仅在 `DEBUG=true` 时注册（`/swagger/index.html`），生产环境不暴露。
+ Swagger UI 默认在 `DEBUG=true` 时启用，也可通过管理后台 **Admin → Settings → Swagger** 的 `swagger.enabled` 开关控制（运行时生效，无需重启）。
 - 使用 `echo-swagger` **v1.4.1**（对应 Echo v4）。v1.5.0+ 依赖 Echo v5，不兼容。
 - **swag 类型解析陷阱**：handler 文件中的 `@Success ... dto.XxxResponse` 注解要求该文件能解析到 `dto` 包。如果 handler 的 Go 代码本身不 import `dto`（如 `currencies.go`、`vault_files.go`），swag 会报 `cannot find type definition`。解决方法：在文件中添加 `import "github.com/naiba/bonds/internal/dto"` + `var _ dto.XxxResponse`（类型锚点，防止 unused import 编译错误）。当前已有此模式的文件：`currencies.go`、`storage_info.go`、`user_management_extra.go`、`webauthn.go`、`avatar.go`、`calendar.go`、`companies.go`、`contact_photos.go`、`feed.go`、`post_photos.go`、`reports.go`、`vault_files.go`、`vault_tasks.go`、`vcard.go`。
 - 全局注解（`@title`、`@BasePath`、`@securityDefinitions`）在 `cmd/server/main.go` 的 `func main()` 上方。
@@ -528,7 +528,7 @@ defer cleanup()
 
 参见 `server/.env.example`，包含所有可配置项及默认值。分组：
 
-- **Debug**：`DEBUG`（默认 `false`）— 启用 Echo 请求日志、GORM SQL 日志、Swagger UI
+ **Debug**：`DEBUG`（默认 `false`）— 启用 Echo 请求日志、GORM SQL 日志、Swagger UI（默认开启，也可通过管理后台 `swagger.enabled` 独立控制）
 - **Core**：`SERVER_PORT`、`DB_DSN`、`JWT_SECRET`、`APP_ENV`、`APP_URL`
 - **SMTP**：`SMTP_HOST`、`SMTP_PORT`、`SMTP_USERNAME`、`SMTP_PASSWORD`、`SMTP_FROM`
 - **Storage**：`STORAGE_UPLOAD_DIR`（默认 `uploads`）、`STORAGE_MAX_SIZE`（默认 10MB）

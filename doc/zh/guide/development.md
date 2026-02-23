@@ -117,12 +117,16 @@ cd web && bunx playwright test
 ```
 
 ## API 文档（Swagger）
+Bonds 自动生成覆盖全部 286 个 API 端点的 OpenAPI 文档。
 
-Bonds 自动生成覆盖全部 286 个 API 端点的 OpenAPI 文档：
-
+访问 Swagger UI，可通过调试模式或管理后台开关：
 ```bash
+# 方式一：调试模式（Swagger 默认开启）
 DEBUG=true ./bonds-server
-# 打开 http://localhost:8080/swagger/index.html
+# 方式二：管理后台开启（无需调试模式）
+# 进入 管理员 > 系统设置 > Swagger > 启用
 ```
 
-Swagger UI 仅在 `DEBUG=true` 时可用。
+然后打开 http://localhost:8080/swagger/index.html
+
+> Swagger UI 默认跟随 `DEBUG` 标志，也可在管理后台设置页面独立控制。

@@ -117,12 +117,16 @@ cd web && bunx playwright test
 ```
 
 ## API Documentation (Swagger)
+Bonds auto-generates OpenAPI docs covering all 286 API endpoints.
 
-Bonds auto-generates OpenAPI docs covering all 286 API endpoints:
-
+To access the Swagger UI, either enable debug mode or toggle it on in Admin > Settings > Swagger:
 ```bash
+# Option 1: Debug mode (Swagger enabled by default)
 DEBUG=true ./bonds-server
-# Open http://localhost:8080/swagger/index.html
+# Option 2: Enable via Admin UI without debug mode
+# Go to Admin > Settings > Swagger > Enable
 ```
 
-Swagger UI is only available when `DEBUG=true`.
+Then open http://localhost:8080/swagger/index.html
+
+> Swagger UI defaults to the `DEBUG` flag, but can be independently toggled from the Admin Settings page.

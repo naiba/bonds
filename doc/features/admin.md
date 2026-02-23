@@ -28,6 +28,7 @@ As of v0.2.0, most configuration has moved from environment variables to databas
 | **Telegram** | Bot token for notifications |
 | **Geocoding** | Provider selection and API key |
 | **Backup** | Cron schedule, retention period |
+| **Swagger** | Enable/disable API documentation UI |
 
 ::: tip
 On first startup, these settings are seeded from environment variables if present. After that, changes are made exclusively through the admin panel.

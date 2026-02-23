@@ -108,7 +108,7 @@ cp server/.env.example server/.env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEBUG` | `false` | Enable debug mode: Echo request logging, GORM SQL logging, Swagger UI |
+| `DEBUG` | `false` | Enable debug mode: Echo request logging, GORM SQL logging, Swagger UI (default on) |
 | `JWT_SECRET` | — | **Required in production.** Signing key for auth tokens |
 | `SERVER_PORT` | `8080` | Port the server listens on |
 | `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
@@ -133,6 +133,7 @@ The following are managed from the **Admin > System Settings** page after login:
 - **Geocoding** — Provider (Nominatim/LocationIQ), API key
 - **Storage** — Max upload size
 - **Backup** — Cron schedule, Retention days
+ **Swagger** — Enable/disable API documentation UI
 
 ## Development
 
@@ -188,14 +189,17 @@ make setup         # Install all dependencies
 
 Bonds provides auto-generated OpenAPI/Swagger documentation covering all 286 API endpoints.
 
-To access the Swagger UI, enable debug mode and start the server:
-
+To access the Swagger UI, either enable debug mode or toggle it on in Admin > Settings > Swagger:
 ```bash
+# Option 1: Debug mode (Swagger enabled by default)
 DEBUG=true ./bonds-server
-# Open http://localhost:8080/swagger/index.html
+# Option 2: Enable via Admin UI without debug mode
+# Go to Admin > Settings > Swagger > Enable
 ```
 
-> Swagger UI is only available when `DEBUG=true`. It is not exposed in production.
+Then open http://localhost:8080/swagger/index.html
+
+> Swagger UI defaults to the `DEBUG` flag, but can be independently toggled from the Admin Settings page.
 
 ## Relationship to Monica
 

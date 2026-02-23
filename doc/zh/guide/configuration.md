@@ -14,7 +14,7 @@ cp server/.env.example server/.env
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `DEBUG` | `false` | 调试模式：启用请求日志、SQL 日志、Swagger UI |
+| `DEBUG` | `false` | 调试模式：启用请求日志、SQL 日志、Swagger UI（默认开启） |
 | `JWT_SECRET` | — | **生产环境必填。** 认证令牌签名密钥 |
 | `SERVER_PORT` | `8080` | 服务端口 |
 | `SERVER_HOST` | `0.0.0.0` | 监听地址 |
@@ -56,6 +56,7 @@ DB_DSN="host=localhost port=5432 user=bonds password=secret dbname=bonds sslmode
 - **地理编码** — 服务提供商和 API Key
 - **公告** — 全局公告横幅文字
 - **备份** — Cron 调度、保留天数
+ **Swagger** — 独立于调试模式启用/禁用 API 文档界面
 
 ::: tip 从环境变量迁移
 首次启动时，Bonds 会从环境变量中读取这些设置作为初始值写入数据库。之后所有修改都通过管理面板进行。环境变量仅作为初始种子值使用。

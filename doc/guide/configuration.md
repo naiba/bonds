@@ -14,7 +14,7 @@ cp server/.env.example server/.env
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DEBUG` | `false` | Enable debug mode: request logging, SQL logging, Swagger UI |
+| `DEBUG` | `false` | Enable debug mode: request logging, SQL logging, Swagger UI (default on) |
 | `JWT_SECRET` | — | **Required in production.** Signing key for auth tokens |
 | `SERVER_PORT` | `8080` | Port the server listens on |
 | `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
@@ -56,6 +56,7 @@ Most application settings are configured through the **Admin Settings** panel, a
 - **Geocoding** — Provider and API key for address geocoding
 - **Announcement** — Global banner text displayed to all users
 - **Backup** — Cron schedule, retention period for automatic backups
+ **Swagger** — Enable/disable API documentation UI independently of debug mode
 
 ::: tip Migration from Environment Variables
 On first startup, Bonds seeds these admin settings from environment variables if present. After that, all changes are made through the admin panel. Environment variables for these settings are only used as initial seed values.

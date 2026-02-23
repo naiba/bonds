@@ -109,7 +109,7 @@ cp server/.env.example server/.env
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `DEBUG` | `false` | 调试模式：启用 Echo 请求日志、GORM SQL 日志、Swagger UI |
+| `DEBUG` | `false` | 调试模式：启用 Echo 请求日志、GORM SQL 日志、Swagger UI（默认开启） |
 | `JWT_SECRET` | — | **生产环境必填。** 认证令牌签名密钥 |
 | `SERVER_PORT` | `8080` | 服务端口 |
 | `SERVER_HOST` | `0.0.0.0` | 服务器监听地址 |
@@ -134,6 +134,7 @@ cp server/.env.example server/.env
 - **地理编码** — 服务商（Nominatim/LocationIQ）、API Key
 - **存储** — 最大上传大小
 - **备份** — Cron 定时计划、保留天数
+ **Swagger** — 启用/禁用 API 文档界面
 
 ## 开发
 
@@ -189,14 +190,17 @@ make setup         # 安装所有依赖
 
 Bonds 提供自动生成的 OpenAPI/Swagger 文档，覆盖全部 286 个 API 端点。
 
-启用调试模式后访问 Swagger UI：
-
+访问 Swagger UI，可通过调试模式或管理后台开关：
 ```bash
+# 方式一：调试模式（Swagger 默认开启）
 DEBUG=true ./bonds-server
-# 打开 http://localhost:8080/swagger/index.html
+# 方式二：管理后台开启（无需调试模式）
+# 进入 管理员 > 系统设置 > Swagger > 启用
 ```
 
-> Swagger UI 仅在 `DEBUG=true` 时可用，生产环境不暴露。
+然后打开 http://localhost:8080/swagger/index.html
+
+> Swagger UI 默认跟随 `DEBUG` 标志，也可在管理后台设置页面独立控制。
 
 ## 与 Monica 的关系
 
