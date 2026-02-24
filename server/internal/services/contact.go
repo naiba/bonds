@@ -40,9 +40,20 @@ func (s *ContactService) SetDavPushService(ps *DavPushService) {
 	s.davPushService = ps
 }
 
-func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort string) ([]dto.ContactResponse, response.Meta, error) {
+func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort, filter string) ([]dto.ContactResponse, response.Meta, error) {
 	query := s.db.Where("vault_id = ?", vaultID)
-
+	// Apply filter
+	switch filter {
+	case "archived":
+		query = query.Where("listed = ?", false)
+	case "all":
+		// no filter
+	case "favorites":
+		query = query.Where("listed = ?", true)
+		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)
+	default: // "active" or empty
+		query = query.Where("listed = ?", true)
+	}
 	if search != "" {
 		query = query.Where(
 			s.db.Where("first_name LIKE ?", "%"+search+"%").
@@ -50,12 +61,10 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 				Or("nickname LIKE ?", "%"+search+"%"),
 		)
 	}
-
 	var total int64
 	if err := query.Model(&models.Contact{}).Count(&total).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
-
 	if page < 1 {
 		page = 1
 	}
@@ -63,19 +72,18 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 		perPage = 15
 	}
 	offset := (page - 1) * perPage
-
 	orderClause := contactSortOrder(sort)
-
+	// Prepend favorites-first sorting
+	favOrder := "CASE WHEN id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = '" + userID + "' AND is_favorite = 1) THEN 0 ELSE 1 END"
+	finalOrder := favOrder + ", " + orderClause
 	var contacts []models.Contact
-	if err := query.Offset(offset).Limit(perPage).Order(orderClause).Find(&contacts).Error; err != nil {
+	if err := query.Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
-
 	contactIDs := make([]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
 	}
-
 	favoriteMap := make(map[string]bool)
 	if len(contactIDs) > 0 {
 		var cvus []models.ContactVaultUser
@@ -86,21 +94,18 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 	}
 
 	birthdayMap, groupMap := s.fetchBirthdayAndGroupMaps(contactIDs)
-
 	result := make([]dto.ContactResponse, len(contacts))
 	for i, c := range contacts {
 		result[i] = toContactResponse(&c, favoriteMap[c.ID])
 	}
 
 	enrichContactsWithBirthdayAndGroups(result, contacts, birthdayMap, groupMap)
-
 	meta := response.Meta{
 		Page:       page,
 		PerPage:    perPage,
 		Total:      total,
 		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
 	}
-
 	return result, meta, nil
 }
 
@@ -303,14 +308,24 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 	return &resp, nil
 }
 
-func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uint, page, perPage int, sort string) ([]dto.ContactResponse, response.Meta, error) {
+func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uint, page, perPage int, sort, filter string) ([]dto.ContactResponse, response.Meta, error) {
 	query := s.db.Where("vault_id = ? AND id IN (SELECT contact_id FROM contact_label WHERE label_id = ?)", vaultID, labelID)
-
+	// Apply filter
+	switch filter {
+	case "archived":
+		query = query.Where("listed = ?", false)
+	case "all":
+		// no filter
+	case "favorites":
+		query = query.Where("listed = ?", true)
+		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)
+	default: // "active" or empty
+		query = query.Where("listed = ?", true)
+	}
 	var total int64
 	if err := query.Model(&models.Contact{}).Count(&total).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
-
 	if page < 1 {
 		page = 1
 	}
@@ -318,19 +333,18 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 		perPage = 15
 	}
 	offset := (page - 1) * perPage
-
 	orderClause := contactSortOrder(sort)
-
+	// Prepend favorites-first sorting
+	favOrder := "CASE WHEN id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = '" + userID + "' AND is_favorite = 1) THEN 0 ELSE 1 END"
+	finalOrder := favOrder + ", " + orderClause
 	var contacts []models.Contact
-	if err := query.Offset(offset).Limit(perPage).Order(orderClause).Find(&contacts).Error; err != nil {
+	if err := query.Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
-
 	contactIDs := make([]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
 	}
-
 	favoriteMap := make(map[string]bool)
 	if len(contactIDs) > 0 {
 		var cvus []models.ContactVaultUser
@@ -341,21 +355,18 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	}
 
 	birthdayMap, groupMap := s.fetchBirthdayAndGroupMaps(contactIDs)
-
 	result := make([]dto.ContactResponse, len(contacts))
 	for i, c := range contacts {
 		result[i] = toContactResponse(&c, favoriteMap[c.ID])
 	}
 
 	enrichContactsWithBirthdayAndGroups(result, contacts, birthdayMap, groupMap)
-
 	meta := response.Meta{
 		Page:       page,
 		PerPage:    perPage,
 		Total:      total,
 		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
 	}
-
 	return result, meta, nil
 }
 

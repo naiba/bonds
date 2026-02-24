@@ -410,7 +410,12 @@
       "col_birthday": "Birthday",
       "col_age": "Age",
       "col_groups": "Groups",
-      "columns": "Columns"
+      "columns": "Columns",
+      "filter_status": "Filter by status",
+      "filter_active": "Active",
+      "filter_archived": "Archived",
+      "filter_all": "All",
+      "filter_favorites": "Favorites"
     },
     "create": {
       "title": "Add a contact",

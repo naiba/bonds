@@ -933,6 +933,75 @@ func TestContactList_Pagination(t *testing.T) {
 	}
 }
 
+
+func TestContactList_FilterArchived(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "cfilter@example.com")
+	vault := ts.createTestVault(t, token, "Filter Vault")
+
+	// Create 2 active contacts
+	ts.createTestContact(t, token, vault.ID, "Alice")
+	ts.createTestContact(t, token, vault.ID, "Bob")
+
+	// Create 1 contact and archive it
+	charlie := ts.createTestContact(t, token, vault.ID, "Charlie")
+	rec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+charlie.ID+"/archive", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// Default (no filter) should return only active
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var contacts []contactData
+	if err := json.Unmarshal(resp.Data, &contacts); err != nil {
+		t.Fatalf("failed to parse contacts: %v", err)
+	}
+	if len(contacts) != 2 {
+		t.Errorf("expected 2 active contacts with default filter, got %d", len(contacts))
+	}
+
+	// filter=archived should return only archived
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts?filter=archived", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var archived []contactData
+	if err := json.Unmarshal(resp.Data, &archived); err != nil {
+		t.Fatalf("failed to parse contacts: %v", err)
+	}
+	if len(archived) != 1 {
+		t.Errorf("expected 1 archived contact, got %d", len(archived))
+	}
+	if len(archived) > 0 && archived[0].FirstName != "Charlie" {
+		t.Errorf("expected archived contact 'Charlie', got '%s'", archived[0].FirstName)
+	}
+
+	// filter=all should return all 3
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts?filter=all", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var all []contactData
+	if err := json.Unmarshal(resp.Data, &all); err != nil {
+		t.Fatalf("failed to parse contacts: %v", err)
+	}
+	if len(all) != 3 {
+		t.Errorf("expected 3 contacts with filter=all, got %d", len(all))
+	}
+	if resp.Meta == nil {
+		t.Fatal("expected meta")
+	}
+	if resp.Meta.Total != 3 {
+		t.Errorf("expected total=3, got %d", resp.Meta.Total)
+	}
+}
+
 // ==================== Notes ====================
 
 func TestNoteCreate_Success(t *testing.T) {

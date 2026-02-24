@@ -51,6 +51,7 @@ export default function ContactList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [labelFilter, setLabelFilter] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadVisibleColumns);
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -62,12 +63,13 @@ export default function ContactList() {
   });
 
   const { data: contactsResponse, isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", labelFilter, currentPage, pageSize, sortBy, search],
+    queryKey: ["vaults", vaultId, "contacts", labelFilter, currentPage, pageSize, sortBy, search, statusFilter],
     queryFn: async () => {
       if (labelFilter) {
         const res = await api.contacts.contactsLabelsDetail(String(vaultId), labelFilter, {
           page: currentPage,
           per_page: pageSize,
+          filter: statusFilter,
         });
         return {
           contacts: (res.data as { contacts?: Contact[] })?.contacts ?? [],
@@ -78,6 +80,7 @@ export default function ContactList() {
         page: currentPage,
         per_page: pageSize,
         sort: SORT_MAP[sortBy] ?? "updated_at",
+        filter: statusFilter,
         ...(search.length > 2 ? { search } : {}),
       });
       return {
@@ -375,6 +378,18 @@ export default function ContactList() {
             {labels.map((l: LabelResponse) => (
                 <Option key={l.id} value={l.id}>{l.name}</Option>
             ))}
+        </Select>
+        <Select
+            data-testid="status-filter"
+            placeholder={t("contact.list.filter_status")}
+            value={statusFilter}
+            onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}
+            style={{ width: 160 }}
+        >
+            <Option value="active">{t("contact.list.filter_active")}</Option>
+            <Option value="favorites">{t("contact.list.filter_favorites")}</Option>
+            <Option value="archived">{t("contact.list.filter_archived")}</Option>
+            <Option value="all">{t("contact.list.filter_all")}</Option>
         </Select>
       </div>
 

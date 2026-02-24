@@ -410,7 +410,12 @@
       "col_birthday": "生日",
       "col_age": "年龄",
       "col_groups": "群组",
-      "columns": "列设置"
+      "columns": "列设置",
+      "filter_status": "状态筛选",
+      "filter_active": "活跃",
+      "filter_archived": "已归档",
+      "filter_all": "全部",
+      "filter_favorites": "收藏"
     },
     "create": {
       "title": "添加联系人",

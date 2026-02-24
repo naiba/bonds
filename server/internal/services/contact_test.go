@@ -73,7 +73,7 @@ func TestListContacts(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	contacts, meta, err := svc.ListContacts(vaultID, userID, 1, 15, "", "")
+	contacts, meta, err := svc.ListContacts(vaultID, userID, 1, 15, "", "", "")
 	if err != nil {
 		t.Fatalf("ListContacts failed: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestListContactsSortByFirstName(t *testing.T) {
 	svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Alice"})
 	svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Bob"})
 
-	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "first_name")
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "first_name", "")
 	if err != nil {
 		t.Fatalf("ListContacts failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestDeleteContact(t *testing.T) {
 		t.Fatalf("DeleteContact failed: %v", err)
 	}
 
-	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "")
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "", "")
 	if err != nil {
 		t.Fatalf("ListContacts failed: %v", err)
 	}
@@ -533,7 +533,7 @@ func TestListContacts_BirthdayAgeGroups(t *testing.T) {
 		t.Fatalf("AddContactToGroup failed: %v", err)
 	}
 
-	contacts, _, err := contactSvc.ListContacts(vaultID, userID, 1, 20, "", "first_name")
+	contacts, _, err := contactSvc.ListContacts(vaultID, userID, 1, 20, "", "first_name", "")
 	if err != nil {
 		t.Fatalf("ListContacts failed: %v", err)
 	}
