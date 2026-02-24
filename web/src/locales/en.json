@@ -1228,7 +1228,11 @@
       "backup": {
         "cron": "Backup Schedule (cron)",
         "retention": "Retention (days)"
-      }
+      },
+      "section_search": "Search",
+      "rebuild_index": "Rebuild Search Index",
+      "rebuild_index_description": "Re-index all contacts and notes for full-text search. Use this if search results seem incomplete or incorrect.",
+      "rebuild_index_success": "Search index rebuilt: {{contacts}} contacts, {{notes}} notes indexed"
     }
   },
   "verify_email": {

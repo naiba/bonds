@@ -106,7 +106,7 @@ test.describe('Contact List - Status Filter', () => {
     const token = await getAuthToken(page);
 
     // Create two contacts via API
-    const aliceId = await createContactViaAPI(page, vaultId, token, 'Alice', 'Active');
+    await createContactViaAPI(page, vaultId, token, 'Alice', 'Active');
     const bobId = await createContactViaAPI(page, vaultId, token, 'Bob', 'Archived');
 
     // Archive Bob
@@ -132,7 +132,7 @@ test.describe('Contact List - Status Filter', () => {
     const vaultId = await getVaultId(page);
     const token = await getAuthToken(page);
 
-    const aliceId = await createContactViaAPI(page, vaultId, token, 'AllAlice', 'Smith');
+    await createContactViaAPI(page, vaultId, token, 'AllAlice', 'Smith');
     const bobId = await createContactViaAPI(page, vaultId, token, 'AllBob', 'Jones');
 
     // Archive Bob
@@ -158,7 +158,7 @@ test.describe('Contact List - Status Filter', () => {
     const token = await getAuthToken(page);
 
     const aliceId = await createContactViaAPI(page, vaultId, token, 'FavAlice', 'Star');
-    const bobId = await createContactViaAPI(page, vaultId, token, 'FavBob', 'Normal');
+    await createContactViaAPI(page, vaultId, token, 'FavBob', 'Normal');
 
     // Favorite Alice
     await toggleFavoriteViaAPI(page, vaultId, token, aliceId);
@@ -184,7 +184,7 @@ test.describe('Contact List - Status Filter', () => {
 
     // Create contacts — "Zzz" sorts after "Aaa" alphabetically
     const zzzId = await createContactViaAPI(page, vaultId, token, 'Zzz', 'Later');
-    const aaaId = await createContactViaAPI(page, vaultId, token, 'Aaa', 'First');
+    await createContactViaAPI(page, vaultId, token, 'Aaa', 'First');
 
     // Favorite Zzz (would normally sort last alphabetically)
     await toggleFavoriteViaAPI(page, vaultId, token, zzzId);

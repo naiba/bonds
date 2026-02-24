@@ -23,6 +23,11 @@ func (e *NoopEngine) Search(vaultID, query string, limit, offset int) (*SearchRe
 	}, nil
 }
 
+
+func (e *NoopEngine) Rebuild() error {
+	return nil
+}
+
 func (e *NoopEngine) Close() error {
 	return nil
 }

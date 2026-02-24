@@ -1,5 +1,5 @@
 import { Card, Typography, Button, App, Spin, Form, Input, Select, Collapse, InputNumber, Segmented } from "antd";
-import { SettingOutlined, TeamOutlined, DatabaseOutlined, KeyOutlined } from "@ant-design/icons";
+import { SettingOutlined, TeamOutlined, DatabaseOutlined, KeyOutlined, SearchOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -104,6 +104,18 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("admin.settings.saved"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+  const rebuildSearchMutation = useMutation({
+    mutationFn: () => api.admin.searchRebuildCreate(),
+    onSuccess: (res) => {
+      message.success(
+        t("admin.settings.rebuild_index_success", {
+          contacts: res.data?.contacts_indexed ?? 0,
+          notes: res.data?.notes_indexed ?? 0,
+        })
+      );
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -234,6 +246,30 @@ export default function AdminSettings() {
             </Button>
           </Form.Item>
         </Form>
+      </Card>
+
+      <Card
+        title={
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <SearchOutlined />
+            {t("admin.settings.section_search")}
+          </div>
+        }
+        style={{ marginTop: 24 }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            {t("admin.settings.rebuild_index_description")}
+          </Text>
+        </div>
+        <Button
+          type="primary"
+          icon={<SearchOutlined />}
+          onClick={() => rebuildSearchMutation.mutate()}
+          loading={rebuildSearchMutation.isPending}
+        >
+          {t("admin.settings.rebuild_index")}
+        </Button>
       </Card>
     </div>
   );

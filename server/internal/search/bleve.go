@@ -13,7 +13,8 @@ import (
 )
 
 type BleveEngine struct {
-	index bleve.Index
+	index     bleve.Index
+	indexPath string
 }
 
 type bleveDocument struct {
@@ -62,7 +63,7 @@ func NewBleveEngine(indexPath string) (*BleveEngine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open/create bleve index: %w", err)
 	}
-	return &BleveEngine{index: idx}, nil
+	return &BleveEngine{index: idx, indexPath: indexPath}, nil
 }
 
 func (e *BleveEngine) IndexContact(id, vaultID, firstName, lastName, nickname, jobPosition string) error {
@@ -145,6 +146,21 @@ func (e *BleveEngine) Search(vaultID, query string, limit, offset int) (*SearchR
 
 func (e *BleveEngine) Close() error {
 	return e.index.Close()
+}
+
+func (e *BleveEngine) Rebuild() error {
+	if err := e.index.Close(); err != nil {
+		return fmt.Errorf("failed to close bleve index: %w", err)
+	}
+	if err := os.RemoveAll(e.indexPath); err != nil {
+		return fmt.Errorf("failed to remove bleve index directory: %w", err)
+	}
+	idx, err := bleve.New(e.indexPath, newIndexMapping())
+	if err != nil {
+		return fmt.Errorf("failed to recreate bleve index: %w", err)
+	}
+	e.index = idx
+	return nil
 }
 
 func entityTypeFromHit(hit *bleveSearch.DocumentMatch) string {

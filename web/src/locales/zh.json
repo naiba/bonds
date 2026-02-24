@@ -1228,7 +1228,11 @@
       "backup": {
         "cron": "备份计划（Cron 表达式）",
         "retention": "保留天数"
-      }
+      },
+      "section_search": "搜索",
+      "rebuild_index": "重建搜索索引",
+      "rebuild_index_description": "重新索引所有联系人和笔记以供全文搜索。当搜索结果不完整或不正确时使用。",
+      "rebuild_index_success": "搜索索引已重建：已索引 {{contacts}} 个联系人，{{notes}} 条笔记"
     }
   },
   "verify_email": {

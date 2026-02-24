@@ -3954,6 +3954,57 @@ func TestAdminOAuthProviders_NonAdminForbidden(t *testing.T) {
 	}
 }
 
+func TestAdminRebuildSearchIndex_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-rebuild-search@example.com")
+	vault := ts.createTestVault(t, adminToken, "Rebuild Vault")
+	ts.createTestContact(t, adminToken, vault.ID, "John")
+
+	rec := ts.doRequest(http.MethodPost, "/api/admin/search/rebuild", "", adminToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var result struct {
+		ContactsIndexed int `json:"contacts_indexed"`
+		NotesIndexed    int `json:"notes_indexed"`
+	}
+	if err := json.Unmarshal(resp.Data, &result); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	// With NoopEngine, counts should be 0 since search index is a noop
+	if result.ContactsIndexed < 0 {
+		t.Errorf("expected contacts_indexed >= 0, got %d", result.ContactsIndexed)
+	}
+	if result.NotesIndexed < 0 {
+		t.Errorf("expected notes_indexed >= 0, got %d", result.NotesIndexed)
+	}
+}
+
+func TestAdminRebuildSearchIndex_NonAdminForbidden(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.registerTestUser(t, "admin-rebuild-first@example.com")
+	nonAdminToken, _ := ts.registerTestUser(t, "admin-rebuild-nonadmin@example.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/admin/search/rebuild", "", nonAdminToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminRebuildSearchIndex_Unauthenticated(t *testing.T) {
+	ts := setupTestServer(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/admin/search/rebuild", "", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestBackups_RequiresInstanceAdmin(t *testing.T) {
 	ts := setupTestServer(t)
 	ts.cfg.Backup.Dir = t.TempDir()

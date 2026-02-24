@@ -5,6 +5,7 @@ import (
 
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/search"
+	"gorm.io/gorm"
 )
 
 type SearchService struct {
@@ -45,4 +46,37 @@ func (s *SearchService) DeleteContact(id string) error {
 
 func (s *SearchService) DeleteNote(id uint) error {
 	return s.engine.DeleteDocument(fmt.Sprintf("note:%d", id))
+}
+
+// RebuildIndex clears the search index and re-indexes all contacts and notes.
+func (s *SearchService) RebuildIndex(db *gorm.DB) (int, int, error) {
+	if err := s.engine.Rebuild(); err != nil {
+		return 0, 0, fmt.Errorf("failed to rebuild index: %w", err)
+	}
+
+	var contacts []models.Contact
+	if err := db.Find(&contacts).Error; err != nil {
+		return 0, 0, fmt.Errorf("failed to load contacts: %w", err)
+	}
+	contactCount := 0
+	for i := range contacts {
+		if err := s.IndexContact(&contacts[i]); err != nil {
+			return contactCount, 0, fmt.Errorf("failed to index contact %s: %w", contacts[i].ID, err)
+		}
+		contactCount++
+	}
+
+	var notes []models.Note
+	if err := db.Find(&notes).Error; err != nil {
+		return contactCount, 0, fmt.Errorf("failed to load notes: %w", err)
+	}
+	noteCount := 0
+	for i := range notes {
+		if err := s.IndexNote(&notes[i]); err != nil {
+			return contactCount, noteCount, fmt.Errorf("failed to index note %d: %w", notes[i].ID, err)
+		}
+		noteCount++
+	}
+
+	return contactCount, noteCount, nil
 }

@@ -223,7 +223,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	currencyHandler := NewCurrencyHandler(currencyService)
 	templatePageHandler := NewTemplatePageHandler(templatePageService)
 	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
-	adminHandler := NewAdminHandler(adminService, systemSettingService)
+	adminHandler := NewAdminHandler(adminService, systemSettingService, searchService, db)
 	adminHandler.RegisterReloader(func() {
 		oauthProviderService.ReloadProviders()
 	})
@@ -292,6 +292,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	adminGroup.PUT("/oauth-providers/:id", oauthProviderHandler.Update)
 	adminGroup.DELETE("/oauth-providers/:id", oauthProviderHandler.Delete)
 
+	adminGroup.POST("/search/rebuild", adminHandler.RebuildSearchIndex)
 	backupGroup := adminGroup.Group("/backups")
 	backupGroup.GET("", backupHandler.List)
 	backupGroup.POST("", backupHandler.Create)

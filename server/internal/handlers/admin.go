@@ -8,16 +8,19 @@ import (
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
+	"gorm.io/gorm"
 )
 
 type AdminHandler struct {
 	adminService   *services.AdminService
 	settingService *services.SystemSettingService
+	searchService  *services.SearchService
+	db             *gorm.DB
 	reloaders      []func()
 }
 
-func NewAdminHandler(adminService *services.AdminService, settingService *services.SystemSettingService) *AdminHandler {
-	return &AdminHandler{adminService: adminService, settingService: settingService}
+func NewAdminHandler(adminService *services.AdminService, settingService *services.SystemSettingService, searchService *services.SearchService, db *gorm.DB) *AdminHandler {
+	return &AdminHandler{adminService: adminService, settingService: settingService, searchService: searchService, db: db}
 }
 
 func (h *AdminHandler) RegisterReloader(fn func()) {
@@ -215,4 +218,27 @@ func (h *AdminHandler) UpdateSettings(c echo.Context) error {
 		return response.InternalError(c, "err.failed_to_get_settings")
 	}
 	return response.OK(c, dto.SystemSettingsResponse{Settings: settings})
+}
+
+// RebuildSearchIndex godoc
+//
+//	@Summary		Rebuild search index
+//	@Description	Rebuild the full-text search index by re-indexing all contacts and notes (instance admin only)
+//	@Tags			admin
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=dto.RebuildSearchIndexResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		403	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/admin/search/rebuild [post]
+func (h *AdminHandler) RebuildSearchIndex(c echo.Context) error {
+	contactCount, noteCount, err := h.searchService.RebuildIndex(h.db)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_rebuild_search_index")
+	}
+	return response.OK(c, dto.RebuildSearchIndexResponse{
+		ContactsIndexed: contactCount,
+		NotesIndexed:    noteCount,
+	})
 }

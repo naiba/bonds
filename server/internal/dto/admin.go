@@ -47,3 +47,8 @@ type InstanceInfoResponse struct {
 	WebAuthnEnabled     bool     `json:"webauthn_enabled" example:"true"`
 	AppName             string   `json:"app_name" example:"Bonds"`
 }
+
+type RebuildSearchIndexResponse struct {
+	ContactsIndexed int `json:"contacts_indexed" example:"150"`
+	NotesIndexed    int `json:"notes_indexed" example:"320"`
+}

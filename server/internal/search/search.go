@@ -20,5 +20,6 @@ type Engine interface {
 	IndexNote(id string, vaultID, contactID, title, body string) error
 	DeleteDocument(id string) error
 	Search(vaultID, query string, limit, offset int) (*SearchResponse, error)
+	Rebuild() error
 	Close() error
 }
