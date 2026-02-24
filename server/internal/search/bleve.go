@@ -9,6 +9,7 @@ import (
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/analysis/lang/cjk"
 	"github.com/blevesearch/bleve/v2/mapping"
+	"github.com/blevesearch/bleve/v2/search/query"
 	bleveSearch "github.com/blevesearch/bleve/v2/search"
 )
 
@@ -93,14 +94,36 @@ func (e *BleveEngine) DeleteDocument(id string) error {
 	return e.index.Delete(id)
 }
 
+// buildTextQuery creates a query that supports both exact word and prefix matching.
+// For each token in the query, it creates a disjunction of MatchQuery (exact) and
+// PrefixQuery (prefix), so "Ali" matches "Alice". Multiple tokens are AND-ed together.
+func buildTextQuery(q string) query.Query {
+	tokens := strings.Fields(strings.ToLower(q))
+	if len(tokens) == 0 {
+		return bleve.NewMatchNoneQuery()
+	}
+
+	perTokenQueries := make([]query.Query, 0, len(tokens))
+	for _, token := range tokens {
+		mq := bleve.NewMatchQuery(token)
+		pq := bleve.NewPrefixQuery(token)
+		perTokenQueries = append(perTokenQueries, bleve.NewDisjunctionQuery(mq, pq))
+	}
+
+	if len(perTokenQueries) == 1 {
+		return perTokenQueries[0]
+	}
+	return bleve.NewConjunctionQuery(perTokenQueries...)
+}
+
 func (e *BleveEngine) Search(vaultID, query string, limit, offset int) (*SearchResponse, error) {
 	start := time.Now()
-
-	matchQuery := bleve.NewMatchQuery(query)
+	// Bug #31 fix: Use both MatchQuery (exact word) and PrefixQuery (prefix/partial)
+	// so that typing "Ali" matches "Alice", matching user expectations from SQL LIKE search.
+	textQuery := buildTextQuery(query)
 	vaultQuery := bleve.NewTermQuery(vaultID)
 	vaultQuery.SetField("vault_id")
-
-	conjunction := bleve.NewConjunctionQuery(matchQuery, vaultQuery)
+	conjunction := bleve.NewConjunctionQuery(textQuery, vaultQuery)
 
 	searchRequest := bleve.NewSearchRequestOptions(conjunction, limit, offset, false)
 	searchRequest.Highlight = bleve.NewHighlightWithStyle("html")

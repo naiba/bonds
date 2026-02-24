@@ -128,3 +128,71 @@ func TestDeleteDocument(t *testing.T) {
 		t.Errorf("Expected 0 results after deletion, got %d", resp.Total)
 	}
 }
+
+// Bug #31: Partial/prefix search must return results.
+// e.g. searching "Ali" should find "Alice", "Bet" should find "Beton".
+func TestSearchPartialMatch(t *testing.T) {
+	dir := t.TempDir()
+	engine, err := NewBleveEngine(dir + "/test.bleve")
+	if err != nil {
+		t.Fatalf("NewBleveEngine failed: %v", err)
+	}
+	defer engine.Close()
+
+	if err := engine.IndexContact("c1", "v1", "Alice", "Smith", "", "Engineer"); err != nil {
+		t.Fatalf("IndexContact failed: %v", err)
+	}
+	if err := engine.IndexContact("c2", "v1", "Jantje", "Beton", "", ""); err != nil {
+		t.Fatalf("IndexContact failed: %v", err)
+	}
+	if err := engine.IndexNote("n1", "v1", "c1", "Meeting notes", "Discussion about project"); err != nil {
+		t.Fatalf("IndexNote failed: %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		query  string
+		wantID string
+		wantOK bool
+	}{
+		{"prefix of first name", "Ali", "c1", true},
+		{"prefix of last name", "Smi", "c1", true},
+		{"prefix of last name Beton", "Bet", "c2", true},
+		{"prefix of note title", "Meet", "n1", true},
+		{"full match still works", "Alice", "c1", true},
+		{"no match", "Zzzzz", "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := engine.Search("v1", tt.query, 10, 0)
+			if err != nil {
+				t.Fatalf("Search failed: %v", err)
+			}
+			if !tt.wantOK {
+				if resp.Total != 0 {
+					t.Errorf("Expected 0 results for %q, got %d", tt.query, resp.Total)
+				}
+				return
+			}
+			if resp.Total == 0 {
+				t.Fatalf("Expected results for prefix %q, got 0", tt.query)
+			}
+			found := false
+			for _, r := range resp.Contacts {
+				if r.ID == tt.wantID {
+					found = true
+				}
+			}
+			for _, r := range resp.Notes {
+				if r.ID == tt.wantID {
+					found = true
+				}
+			}
+			if !found {
+				t.Errorf("Expected to find %s for query %q, contacts=%+v notes=%+v",
+					tt.wantID, tt.query, resp.Contacts, resp.Notes)
+			}
+		})
+	}
+}

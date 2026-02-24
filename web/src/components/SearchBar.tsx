@@ -10,23 +10,26 @@ export default function SearchBar() {
   const [options, setOptions] = useState<
     { label: string; options: { value: string; label: string }[] }[]
   >([]);
+  // Bug #31 fix: Controlled value prevents Ant Design AutoComplete from writing
+  // the selected option value (e.g. "contact:uuid") back into the input field.
+  const [value, setValue] = useState("");
   const { id: vaultId } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearch = useCallback(
-    (value: string) => {
+    (searchText: string) => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
-      if (!value || !vaultId) {
+      if (!searchText || !vaultId) {
         setOptions([]);
         return;
       }
       timerRef.current = setTimeout(async () => {
         try {
-          const res = await api.search.searchList(String(vaultId), { q: value });
+          const res = await api.search.searchList(String(vaultId), { q: searchText });
           const data = res.data as {
             contacts?: SearchResult[];
             notes?: SearchResult[];
@@ -61,12 +64,13 @@ export default function SearchBar() {
   );
 
   const handleSelect = useCallback(
-    (value: string) => {
+    (selectedValue: string) => {
       if (!vaultId) return;
-      const [type, id] = value.split(":");
+      const [type, id] = selectedValue.split(":");
       if (type === "contact" || type === "note") {
         navigate(`/vaults/${vaultId}/contacts/${id}`);
       }
+      setValue("");
       setOptions([]);
     },
     [vaultId, navigate],
@@ -76,9 +80,11 @@ export default function SearchBar() {
 
   return (
     <AutoComplete
+      value={value}
       options={options}
       onSearch={handleSearch}
       onSelect={handleSelect}
+      onChange={setValue}
       style={{ width: 280 }}
     >
       <Input
