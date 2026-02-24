@@ -95,6 +95,12 @@ export default function VaultDetail() {
       },
     },
     {
+      key: "settings",
+      icon: <SettingOutlined />,
+      label: t("vault_settings.title"),
+      onClick: () => navigate(`/vaults/${vaultId}/settings`),
+    },
+    {
       key: "dav-sync",
       icon: <CloudServerOutlined />,
       label: t("vault.dav_subscriptions.title"),
