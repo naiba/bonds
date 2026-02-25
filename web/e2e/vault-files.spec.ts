@@ -82,7 +82,7 @@ test.describe('Vault Files', () => {
     await page.goto(vaultUrl + '/files');
     await page.waitForLoadState('networkidle');
 
-    await expect(page.getByRole('button', { name: /upload file/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /upload file/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should show back button', async ({ page }) => {
