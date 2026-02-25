@@ -13,6 +13,8 @@ interface SettingDef {
   type?: "boolean" | "password" | "number" | "textarea" | "select";
   options?: { value: string; label: string }[];
   section: string;
+  /** Explicit placeholder shown in the input; falls back to the label if omitted. */
+  placeholder?: string;
 }
 
 const KNOWN_SETTINGS: SettingDef[] = [
@@ -39,9 +41,9 @@ const KNOWN_SETTINGS: SettingDef[] = [
   { key: "smtp.from", section: "smtp" },
 
   // WebAuthn
-  { key: "webauthn.rp_id", section: "webauthn" },
-  { key: "webauthn.rp_display_name", section: "webauthn" },
-  { key: "webauthn.rp_origins", section: "webauthn" },
+  { key: "webauthn.rp_id", section: "webauthn", placeholder: "e.g. bonds.example.com" },
+  { key: "webauthn.rp_display_name", section: "webauthn", placeholder: "e.g. Bonds" },
+  { key: "webauthn.rp_origins", section: "webauthn", placeholder: "e.g. https://bonds.example.com" },
 
   // Geocoding
   {
@@ -129,7 +131,7 @@ export default function AdminSettings() {
   }
 
   function renderField(def: SettingDef) {
-    const label = t(`admin.settings.${def.key}`);
+    const label = t(`admin.settings.${def.key}`);    const ph = def.placeholder ?? label;
     switch (def.type) {
       case "boolean":
         return (
@@ -147,19 +149,19 @@ export default function AdminSettings() {
       case "password":
         return (
           <Form.Item key={def.key} name={def.key} label={label}>
-            <Input.Password placeholder={label} />
+            <Input.Password placeholder={ph} />
           </Form.Item>
         );
       case "number":
         return (
           <Form.Item key={def.key} name={def.key} label={label}>
-            <InputNumber style={{ width: "100%" }} min={0} placeholder={label} />
+            <InputNumber style={{ width: "100%" }} min={0} placeholder={ph} />
           </Form.Item>
         );
       case "textarea":
         return (
           <Form.Item key={def.key} name={def.key} label={label}>
-            <Input.TextArea rows={3} placeholder={label} />
+            <Input.TextArea rows={3} placeholder={ph} />
           </Form.Item>
         );
       case "select":
@@ -177,7 +179,7 @@ export default function AdminSettings() {
       default:
         return (
           <Form.Item key={def.key} name={def.key} label={label}>
-            <Input placeholder={label} />
+            <Input placeholder={ph} />
           </Form.Item>
         );
     }
