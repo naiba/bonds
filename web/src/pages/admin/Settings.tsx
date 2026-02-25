@@ -73,7 +73,6 @@ const SECTIONS = [
   "geocoding",
   "storage",
   "backup",
-  "swagger",
 ] as const;
 
 export default function AdminSettings() {

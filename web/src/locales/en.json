@@ -1182,7 +1182,6 @@
       "section_geocoding": "Geocoding",
       "section_storage": "Storage",
       "section_backup": "Backup",
-      "section_swagger": "Swagger API",
       "app": {
         "name": "Application Name",
         "url": "Application URL"
