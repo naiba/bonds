@@ -71,7 +71,9 @@ describe("SearchBar", () => {
     renderSearchBarInVault();
     const user = userEvent.setup();
 
-    const input = screen.getByPlaceholderText(/search/i);
+    // AutoComplete without child <Input> renders placeholder as a separate div,
+    // so use role="combobox" to find the actual input element.
+    const input = screen.getByRole("combobox");
     await user.type(input, "Alice");
 
     // Wait for debounced search results to appear

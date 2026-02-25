@@ -31,7 +31,6 @@ import {
   DesktopOutlined,
   CheckSquareOutlined,
   DashboardOutlined,
-  RightOutlined,
   CrownOutlined,
   CloudServerOutlined,
   LinkOutlined,
@@ -165,37 +164,42 @@ export default function Layout() {
           style={{
             background: token.colorBgContainer,
             borderBottom: isInVault ? "none" : `1px solid ${token.colorBorderSecondary}`,
-            padding: "0 24px",
+            padding: "0 12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             height: 48,
             lineHeight: "48px",
+            /* Fix: prevent header from exceeding viewport width on mobile */
+            maxWidth: "100vw",
+            overflow: "hidden",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* Left side: breadcrumb + search — allow shrinking on mobile */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: 6,
+                gap: 4,
                 cursor: "pointer",
                 userSelect: "none",
-                padding: "3px 10px",
-                borderRadius: token.borderRadius,
-                border: `1px solid ${token.colorBorderSecondary}`,
-                background: token.colorBgLayout,
+                padding: "4px 8px",
+                borderRadius: token.borderRadiusSM,
                 fontSize: 13,
+                transition: "background 0.2s",
+                flexShrink: 0,
               }}
+              className="nav-breadcrumb-trigger"
               onClick={() => navigate("/vaults")}
             >
-              <span style={{ fontWeight: 600, color: token.colorText }}>
+              <span style={{ fontWeight: 600, color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>
                 {formatContactName(nameOrder, user ?? {})}
               </span>
               {isInVault && vaultId && (
                 <>
-                  <RightOutlined style={{ fontSize: 10, color: token.colorTextQuaternary }} />
-                  <span style={{ color: token.colorTextSecondary }}>
+                  <span style={{ color: token.colorTextQuaternary, fontSize: 11, margin: "0 2px", fontWeight: 400 }}>/</span>
+                  <span style={{ color: token.colorTextSecondary, fontWeight: 500 }}>
                     {t("nav.vault")}
                   </span>
                 </>
@@ -204,7 +208,8 @@ export default function Layout() {
             <SearchBar />
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {/* Right side: actions — never shrink */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
             <Tooltip title={themeModeLabels[themeMode]}>
               <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
             </Tooltip>
@@ -252,7 +257,7 @@ export default function Layout() {
             style={{
               background: token.colorBgContainer,
               borderBottom: `1px solid ${token.colorBorderSecondary}`,
-              padding: "0 24px",
+              padding: "0 12px",
               display: "flex",
               alignItems: "center",
               gap: 2,
@@ -290,7 +295,7 @@ export default function Layout() {
 
       <Content
         style={{
-          padding: "24px 28px",
+          padding: "24px 16px",
           background: token.colorBgLayout,
           minHeight: 280,
           overflow: "auto",

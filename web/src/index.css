@@ -195,6 +195,15 @@ html[data-theme="dark"] .vault-nav-pill--active {
   font-size: 13px;
 }
 
+/* ---- Nav breadcrumb trigger (top-left account/vault) ---- */
+.nav-breadcrumb-trigger:hover {
+  background: rgba(74, 124, 89, 0.06);
+}
+
+html[data-theme="dark"] .nav-breadcrumb-trigger:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* ---- Page header area ---- */
 .bonds-page-header {
   display: flex;
@@ -233,4 +242,50 @@ html[data-theme="dark"] .vault-nav-pill--active {
   margin-left: auto;
   margin-right: auto;
   line-height: 1.6;
+}
+
+/* ---- SearchBar (bonds-search-bar) ---- */
+/* Wrapper provides prefix icon + subtle background, replacing nested <Input> inside
+   AutoComplete which caused double-input rendering on mobile. */
+.bonds-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+  max-width: 280px;
+  flex: 1;
+}
+
+.bonds-search-bar-icon {
+  position: absolute;
+  left: 10px;
+  z-index: 1;
+  color: rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+html[data-theme="dark"] .bonds-search-bar-icon {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.bonds-search-bar .ant-select {
+  width: 100% !important;
+}
+
+/* Offset the input text so it doesn't overlap with the search icon */
+.bonds-search-bar .ant-select .ant-select-selection-search-input,
+.bonds-search-bar .ant-select .ant-select-selection-placeholder {
+  padding-left: 22px !important;
+}
+
+/* ---- Mobile responsive: header & content ---- */
+@media (max-width: 480px) {
+  /* Hide vault nav pill labels, show icon only */
+  .vault-nav-pill span:last-child {
+    display: none;
+  }
+  .vault-nav-pill {
+    padding: 6px 10px;
+  }
 }

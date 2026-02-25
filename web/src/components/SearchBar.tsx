@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { AutoComplete, Input } from "antd";
+import { AutoComplete } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -79,19 +79,23 @@ export default function SearchBar() {
   if (!vaultId) return null;
 
   return (
-    <AutoComplete
-      value={value}
-      options={options}
-      onSearch={handleSearch}
-      onSelect={handleSelect}
-      onChange={setValue}
-      style={{ width: 280 }}
-    >
-      <Input
-        prefix={<SearchOutlined />}
+    // Fix: Don't nest <Input prefix={...}> inside AutoComplete — it causes double-input
+    // rendering when the component re-renders with value changes. Using AutoComplete's
+    // own props (placeholder, allowClear) avoids the issue entirely. The search icon
+    // is applied via a CSS class on the wrapper.
+    <div className="bonds-search-bar">
+      <SearchOutlined className="bonds-search-bar-icon" />
+      <AutoComplete
+        value={value}
+        options={options}
+        onSearch={handleSearch}
+        onSelect={handleSelect}
+        onChange={setValue}
         placeholder={t("search.placeholder")}
         allowClear
+        style={{ width: "100%" }}
+        variant="borderless"
       />
-    </AutoComplete>
+    </div>
   );
 }
