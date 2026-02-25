@@ -23,7 +23,8 @@ test.describe('Vaults', () => {
     await page.getByPlaceholder(/e\.g\. family/i).fill('Personal');
     await page.getByPlaceholder(/what is this vault/i).fill('My personal contacts');
     await page.getByRole('button', { name: /create vault/i }).click();
-    await expect(page.getByText('Personal', { exact: true })).toBeVisible({ timeout: 10000 });
+    // Fix: nav now also shows vault name, so getByText matches 2 elements. Use heading role for precision.
+    await expect(page.getByRole('heading', { name: 'Personal' })).toBeVisible({ timeout: 10000 });
   });
 
   test('should navigate to vault detail', async ({ page }) => {
