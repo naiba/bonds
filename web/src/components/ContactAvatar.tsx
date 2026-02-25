@@ -66,7 +66,7 @@ export default function ContactAvatar({
   const containerStyle: React.CSSProperties = {
     width: size,
     height: size,
-    borderRadius: "50%",
+    borderRadius: Math.max(8, size * 0.25),
     backgroundColor: bgColor,
     color: "#fff",
     display: "flex",

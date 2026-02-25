@@ -260,8 +260,8 @@ export default function ContactList() {
               style={{
                 width: 40,
                 height: 40,
-                borderRadius: 10,
-                backgroundColor: token.colorPrimaryBg,
+                borderRadius: 12,
+                backgroundColor: token.colorPrimaryBg, boxShadow: `inset 0 0 0 1px ${token.colorPrimary}20`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

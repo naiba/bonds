@@ -185,7 +185,7 @@ export default function Register() {
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          padding: "48px 40px",
+          padding: "64px 48px",
           background: "linear-gradient(160deg, #3a6347 0%, #4a7c59 35%, #5e9a6f 65%, #3d6a4c 100%)",
         }}
       >
@@ -278,7 +278,7 @@ export default function Register() {
           </div>
 
           <h1 style={{
-            fontSize: 32, fontWeight: 300, color: "#fff", lineHeight: 1.3,
+            fontSize: 34, fontWeight: 400, color: "#fff", lineHeight: 1.3, fontFamily: "\x27Playfair Display\x27, serif",
             margin: "0 0 16px 0", letterSpacing: "-0.01em",
           }}>
             {t("auth.register.hero_title", { defaultValue: "Begin your journey of meaningful connections" })}
@@ -305,7 +305,7 @@ export default function Register() {
           flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
-          padding: "48px 24px",
+          padding: "64px 40px",
           background: token.colorBgContainer,
           position: "relative",
           overflowY: "auto",
@@ -324,7 +324,7 @@ export default function Register() {
         <div style={{ width: "100%", maxWidth: 400 }}>
           {/* Header */}
           <div style={{ marginBottom: 36, ...fadeIn(0) }}>
-            <Title level={3} style={{ marginBottom: 6 }}>
+            <Title level={2} style={{ marginBottom: 8, fontFamily: "\x27Playfair Display\x27, serif" }}>
               {t("auth.register.title")}
             </Title>
             <Text type="secondary">{t("auth.register.subtitle")}</Text>
