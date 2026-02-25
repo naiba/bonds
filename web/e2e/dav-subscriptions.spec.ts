@@ -76,8 +76,9 @@ test.describe('DAV Subscriptions', () => {
     await modal.getByLabel('Username').fill('deleteuser');
     await modal.getByLabel('Password').fill('deletepass');
     await modal.getByRole('button', { name: 'OK' }).click();
-
-    await expect(page.getByRole('cell', { name: /delete-me\.example\.com/ })).toBeVisible({ timeout: 10000 });
+    // Wait for modal to close and table to update
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: /delete-me\.example\.com/ })).toBeVisible({ timeout: 15000 });
 
     await page.getByRole('button', { name: 'delete' }).click();
     await page.getByRole('button', { name: 'OK' }).click();

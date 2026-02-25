@@ -54,6 +54,15 @@ export default function VaultReminders() {
         rowKey="id"
         loading={isLoading}
         pagination={{ pageSize: 20 }}
+        locale={{ emptyText: (
+          <div className="bonds-empty-hero">
+            <div className="bonds-empty-hero-icon" style={{ background: token.colorPrimaryBg }}>
+              <BellOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
+            </div>
+            <div className="bonds-empty-hero-title">{t("vault.reminders.title")}</div>
+            <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.reminders")}</div>
+          </div>
+        ) }}
         columns={[
           {
             title: t("vault.reminders.label"),

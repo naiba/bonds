@@ -106,7 +106,8 @@
       "no_vaults": "No vaults yet",
       "no_vaults_desc": "Create your first vault to start managing your contacts.",
       "create_vault": "Create vault",
-      "load_failed": "Failed to load vaults"
+      "load_failed": "Failed to load vaults",
+      "description": "Manage your personal relationship vaults"
     },
     "create": {
       "title": "Create a vault",
@@ -1244,5 +1245,14 @@
     "success": "Email verified successfully! Redirecting...",
     "invalid_token": "Invalid or expired verification link",
     "logout": "Sign out"
+  },
+  "empty": {
+    "groups": "Create groups to organize your contacts",
+    "tasks": "Track tasks and to-dos for your contacts",
+    "companies": "Add companies your contacts work at",
+    "reminders": "Set reminders to stay in touch",
+    "files": "Upload and manage shared files",
+    "feed": "Activity feed will appear as you interact with contacts",
+    "journal": "Start journaling to capture your thoughts"
   }
 }

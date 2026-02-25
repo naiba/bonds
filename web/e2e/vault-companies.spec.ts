@@ -34,7 +34,7 @@ test.describe('Vault - Companies CRUD', () => {
     await expect(page.getByRole('heading', { name: /Companies/i })).toBeVisible({ timeout: 10000 });
 
     // Button text is "Add Company"
-    await page.getByRole('button', { name: /add company/i }).click();
+    await page.getByRole('button', { name: /add company/i }).first().click();
 
     const modal = page.locator('.ant-modal');
     await expect(modal).toBeVisible({ timeout: 5000 });
@@ -62,7 +62,7 @@ test.describe('Vault - Companies CRUD', () => {
     await expect(page.getByRole('heading', { name: /Companies/i })).toBeVisible({ timeout: 10000 });
 
     // Create a company first
-    await page.getByRole('button', { name: /add company/i }).click();
+    await page.getByRole('button', { name: /add company/i }).first().click();
     const modal = page.locator('.ant-modal');
     await modal.getByLabel(/company name/i).fill('Old Name');
     const createResp = page.waitForResponse(
@@ -99,7 +99,7 @@ test.describe('Vault - Companies CRUD', () => {
     await page.goto(vaultUrl + '/companies');
 
     // Create first
-    await page.getByRole('button', { name: /add company/i }).click();
+    await page.getByRole('button', { name: /add company/i }).first().click();
     const modal = page.locator('.ant-modal');
     await modal.getByLabel(/company name/i).fill('Delete Me Corp');
     const createResp = page.waitForResponse(

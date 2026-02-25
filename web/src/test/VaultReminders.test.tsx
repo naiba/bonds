@@ -60,6 +60,7 @@ describe("VaultReminders", () => {
   it("renders page title", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderVaultReminders();
-    expect(screen.getByText("All Reminders")).toBeInTheDocument();
+    // Page heading and empty hero title may both contain the text
+    expect(screen.getAllByText("All Reminders").length).toBeGreaterThanOrEqual(1);
   });
 });

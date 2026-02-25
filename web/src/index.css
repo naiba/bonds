@@ -1,41 +1,54 @@
+/* ============================================
+   Bonds — Design System Foundation
+   Warm botanical aesthetic with editorial precision
+   ============================================ */
+
+/* Google Fonts: DM Sans — geometric, modern, excellent CJK fallback */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+/* ---- Reset & Base ---- */
 body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 html[data-theme="dark"] body {
-  background-color: #141414;
+  background-color: #0f1210;
 }
 
 #root {
   min-height: 100vh;
 }
 
-/* Smooth page transitions */
+/* ---- Global Transitions ---- */
 .ant-spin-nested-loading > div > .ant-spin {
   max-height: none;
 }
 
-/* Card hover effects */
+/* ---- Card System ---- */
 .ant-card {
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.25s ease;
 }
 
-/* Clickable cards */
 .ant-card-hoverable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px rgba(74, 124, 89, 0.08),
+              0 2px 8px rgba(0, 0, 0, 0.04) !important;
 }
 
 html[data-theme="dark"] .ant-card-hoverable:hover {
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35),
+              0 2px 8px rgba(74, 124, 89, 0.1) !important;
 }
 
-/* Better scrollbar */
+/* ---- Scrollbar ---- */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -46,48 +59,178 @@ html[data-theme="dark"] .ant-card-hoverable:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: rgba(74, 124, 89, 0.15);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(74, 124, 89, 0.3);
 }
 
 html[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.22);
 }
 
-/* Smoother table rows */
+/* ---- Table ---- */
 .ant-table-tbody > tr {
   transition: background-color 0.15s ease;
 }
 
-/* Tag refinements */
+/* ---- Tags ---- */
 .ant-tag {
-  border-radius: 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
-/* List items */
+/* ---- List ---- */
 .ant-list-item {
   transition: background-color 0.15s ease;
 }
 
-/* Tabs */
+/* ---- Tabs ---- */
 .ant-tabs-tab {
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, font-weight 0.2s ease;
 }
 
-/* Button press feedback */
+/* ---- Button ---- */
+.ant-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.01em;
+}
+
 .ant-btn:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
-/* Breadcrumb-like back buttons */
 .ant-btn-text {
   transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+/* ---- Primary button glow on hover ---- */
+.ant-btn-primary:not(:disabled):hover {
+  box-shadow: 0 4px 16px rgba(74, 124, 89, 0.25);
+}
+
+html[data-theme="dark"] .ant-btn-primary:not(:disabled):hover {
+  box-shadow: 0 4px 16px rgba(74, 124, 89, 0.35);
+}
+
+/* ---- Empty state refinements ---- */
+.ant-empty-description {
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+}
+
+html[data-theme="dark"] .ant-empty-description {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ---- Selection color ---- */
+::selection {
+  background: rgba(74, 124, 89, 0.2);
+  color: inherit;
+}
+
+/* ---- Focus ring refinement ---- */
+.ant-input:focus,
+.ant-input-focused,
+.ant-select-focused .ant-select-selector {
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.12) !important;
+}
+
+html[data-theme="dark"] .ant-input:focus,
+html[data-theme="dark"] .ant-input-focused,
+html[data-theme="dark"] .ant-select-focused .ant-select-selector {
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.2) !important;
+}
+
+/* ---- Vault navigation pills ---- */
+.vault-nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.vault-nav-pill:hover:not(.vault-nav-pill--active) {
+  background: rgba(74, 124, 89, 0.06);
+}
+
+html[data-theme="dark"] .vault-nav-pill:hover:not(.vault-nav-pill--active) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.vault-nav-pill--active {
+  background: #4a7c59;
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(74, 124, 89, 0.25);
+}
+
+html[data-theme="dark"] .vault-nav-pill--active {
+  box-shadow: 0 2px 12px rgba(74, 124, 89, 0.4);
+}
+
+/* Divider between nav groups */
+.vault-nav-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.vault-nav-pill .anticon {
+  font-size: 13px;
+}
+
+/* ---- Page header area ---- */
+.bonds-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+/* ---- Empty state hero ---- */
+.bonds-empty-hero {
+  text-align: center;
+  padding: 56px 24px;
+}
+
+.bonds-empty-hero-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  font-size: 32px;
+}
+
+.bonds-empty-hero-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.bonds-empty-hero-desc {
+  font-size: 14px;
+  margin-bottom: 24px;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
 }

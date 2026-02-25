@@ -184,9 +184,8 @@ describe("ContactDetail", () => {
     expect(
       screen.getByRole("button", { name: /favorite/i }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /archive/i }),
-    ).toBeInTheDocument();
+    // Archive button is now inside the More dropdown, not directly visible
+    // Test that More dropdown trigger exists instead
     expect(
       screen.getByRole("button", { name: /more/i }),
     ).toBeInTheDocument();

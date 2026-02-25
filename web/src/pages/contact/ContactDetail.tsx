@@ -7,7 +7,6 @@ import {
   Spin,
   Button,
   Tabs,
-  Descriptions,
   Space,
   Popconfirm,
   App,
@@ -277,52 +276,40 @@ export default function ContactDetail() {
   const initials = formatContactInitials(nameOrder, contact);
   const moduleProps = { vaultId, contactId: cId };
 
+  // Compact overview card — only shows fields that have values,
+  // timestamps rendered as subtle footer text to save vertical space.
+  const overviewFields = [
+    contact.prefix && { label: t("contact.detail.prefix"), value: contact.prefix },
+    { label: t("contact.detail.first_name"), value: contact.first_name },
+    contact.middle_name && { label: t("contact.detail.middle_name"), value: contact.middle_name },
+    contact.last_name && { label: t("contact.detail.last_name"), value: contact.last_name },
+    contact.suffix && { label: t("contact.detail.suffix"), value: contact.suffix },
+    contact.nickname && { label: t("contact.detail.nickname"), value: `\u201C${contact.nickname}\u201D` },
+    contact.maiden_name && { label: t("contact.detail.maiden_name"), value: contact.maiden_name },
+  ].filter(Boolean) as { label: string; value: string }[];
+
   const overviewCard = (
-    <Card>
-      <Descriptions column={{ xs: 1, sm: 2 }}>
-        {contact.prefix && (
-          <Descriptions.Item label={t("contact.detail.prefix")}>
-            {contact.prefix}
-          </Descriptions.Item>
+    <Card size="small" styles={{ body: { padding: "12px 16px" } }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "6px 24px" }}>
+        {overviewFields.map((f) => (
+          <div key={f.label} style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+            <Text type="secondary" style={{ fontSize: 13, flexShrink: 0 }}>{f.label}:</Text>
+            <Text style={{ fontSize: 13 }}>{f.value}</Text>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 8, display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {contact.is_archived ? (
+          <Tag color="default" style={{ margin: 0 }}>{t("common.archived")}</Tag>
+        ) : (
+          <Tag color="green" style={{ margin: 0 }}>{t("common.active")}</Tag>
         )}
-        <Descriptions.Item label={t("contact.detail.first_name")}>
-          {contact.first_name}
-        </Descriptions.Item>
-        {contact.middle_name && (
-          <Descriptions.Item label={t("contact.detail.middle_name")}>
-            {contact.middle_name}
-          </Descriptions.Item>
-        )}
-        <Descriptions.Item label={t("contact.detail.last_name")}>
-          {contact.last_name || "\u2014"}
-        </Descriptions.Item>
-        {contact.suffix && (
-          <Descriptions.Item label={t("contact.detail.suffix")}>
-            {contact.suffix}
-          </Descriptions.Item>
-        )}
-        <Descriptions.Item label={t("contact.detail.nickname")}>
-          {contact.nickname || "\u2014"}
-        </Descriptions.Item>
-        {contact.maiden_name && (
-          <Descriptions.Item label={t("contact.detail.maiden_name")}>
-            {contact.maiden_name}
-          </Descriptions.Item>
-        )}
-        <Descriptions.Item label={t("contact.detail.status")}>
-          {contact.is_archived ? (
-            <Tag color="default">{t("common.archived")}</Tag>
-          ) : (
-            <Tag color="green">{t("common.active")}</Tag>
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label={t("common.created")}>
-          {dayjs(contact.created_at).format("MMMM D, YYYY")}
-        </Descriptions.Item>
-        <Descriptions.Item label={t("common.last_updated")}>
-          {dayjs(contact.updated_at).format("MMMM D, YYYY")}
-        </Descriptions.Item>
-      </Descriptions>
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {t("common.created")} {dayjs(contact.created_at).format("MMM D, YYYY")}
+          {" · "}
+          {t("common.last_updated")} {dayjs(contact.updated_at).format("MMM D, YYYY")}
+        </Text>
+      </div>
     </Card>
   );
 
@@ -535,90 +522,76 @@ export default function ContactDetail() {
 
         <div
           style={{
-            padding: "12px 24px",
+            padding: "8px 24px",
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
-            flexWrap: "wrap",
-            gap: 8,
+            gap: 4,
             borderTop: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          <Space size={4} wrap>
-            <Button
-              icon={<EditOutlined />}
-              type="text"
-              onClick={() => {
-                editForm.setFieldsValue({
-                  prefix: contact.prefix,
-                  first_name: contact.first_name,
-                  middle_name: contact.middle_name,
-                  last_name: contact.last_name,
-                  suffix: contact.suffix,
-                  nickname: contact.nickname,
-                  maiden_name: contact.maiden_name,
-                });
-                setIsEditModalOpen(true);
-              }}
-            >
-              {t("common.edit")}
-            </Button>
-            <Button
-              icon={<ExportOutlined />}
-              type="text"
-              onClick={() => {
-                setIsMoveModalOpen(true);
-              }}
-            >
-              {t("contact.detail.move")}
-            </Button>
-            <Button
-              icon={contact.is_favorite ? <StarFilled /> : <StarOutlined />}
-              type="text"
-              onClick={() => toggleFavoriteMutation.mutate()}
-            >
-              {contact.is_favorite ? t("contact.detail.unfavorite") : t("contact.detail.favorite")}
-            </Button>
-          </Space>
-
-          <span style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: "0 4px", flexShrink: 0 }} />
-
-          <Space size={4} wrap>
-            <Button
-              icon={<DownloadOutlined />}
-              type="text"
-              onClick={async () => {
-                try {
-                  const res = await api.vcard.contactsVcardList(String(vaultId), String(cId));
-                  const blob = new Blob([res as BlobPart]);
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `${contact.first_name}_${contact.last_name}.vcf`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                } catch {
-                  message.error(t("contact.detail.delete_failed"));
-                }
-              }}
-            >
-              {t("vcard.export")}
-            </Button>
-            <Button
-              icon={<InboxOutlined />}
-              type="text"
-              onClick={() => toggleArchiveMutation.mutate()}
-              loading={toggleArchiveMutation.isPending}
-            >
-              {contact.is_archived ? t("contact.detail.unarchive") : t("contact.detail.archive")}
-            </Button>
-          </Space>
-
-          <span style={{ width: 1, height: 20, background: token.colorBorderSecondary, margin: "0 4px", flexShrink: 0 }} />
+          <Button
+            icon={<EditOutlined />}
+            type="text"
+            size="small"
+            onClick={() => {
+              editForm.setFieldsValue({
+                prefix: contact.prefix,
+                first_name: contact.first_name,
+                middle_name: contact.middle_name,
+                last_name: contact.last_name,
+                suffix: contact.suffix,
+                nickname: contact.nickname,
+                maiden_name: contact.maiden_name,
+              });
+              setIsEditModalOpen(true);
+            }}
+          >
+            {t("common.edit")}
+          </Button>
+          <Button
+            icon={contact.is_favorite ? <StarFilled /> : <StarOutlined />}
+            type="text"
+            size="small"
+            onClick={() => toggleFavoriteMutation.mutate()}
+          >
+            {contact.is_favorite ? t("contact.detail.unfavorite") : t("contact.detail.favorite")}
+          </Button>
 
           <Dropdown
             menu={{
               items: [
+                {
+                  key: "move",
+                  label: t("contact.detail.move"),
+                  icon: <ExportOutlined />,
+                  onClick: () => setIsMoveModalOpen(true),
+                },
+                {
+                  key: "export",
+                  label: t("vcard.export"),
+                  icon: <DownloadOutlined />,
+                  onClick: async () => {
+                    try {
+                      const res = await api.vcard.contactsVcardList(String(vaultId), String(cId));
+                      const blob = new Blob([res as BlobPart]);
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `${contact.first_name}_${contact.last_name}.vcf`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      message.error(t("contact.detail.delete_failed"));
+                    }
+                  },
+                },
+                {
+                  key: "archive",
+                  label: contact.is_archived ? t("contact.detail.unarchive") : t("contact.detail.archive"),
+                  icon: <InboxOutlined />,
+                  onClick: () => toggleArchiveMutation.mutate(),
+                },
                 {
                   key: "template",
                   label: t("contact.detail.change_template"),
@@ -651,7 +624,7 @@ export default function ContactDetail() {
             }}
             trigger={["click"]}
           >
-            <Button icon={<MoreOutlined />} type="text" />
+            <Button icon={<MoreOutlined />} type="text" size="small" />
           </Dropdown>
         </div>
       </Card>

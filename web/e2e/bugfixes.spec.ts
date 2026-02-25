@@ -54,7 +54,7 @@ async function createGroup(page: import('@playwright/test').Page, vaultUrl: stri
   await page.goto(vaultUrl + '/groups');
   await page.waitForLoadState('networkidle');
 
-  await page.getByRole('button', { name: /new group/i }).click();
+  await page.getByRole('button', { name: /new group/i }).first().click();
   const modal = page.getByRole('dialog');
   await expect(modal).toBeVisible({ timeout: 5000 });
 
@@ -158,7 +158,7 @@ test.describe('Bugfixes', () => {
     await page.waitForLoadState('networkidle');
 
     // Open new group modal
-    await page.getByRole('button', { name: /new group/i }).click();
+    await page.getByRole('button', { name: /new group/i }).first().click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
 

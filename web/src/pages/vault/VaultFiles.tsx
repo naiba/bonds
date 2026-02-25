@@ -7,7 +7,6 @@ import {
   Table,
   Tag,
   Spin,
-  Empty,
   theme,
   Upload,
   Popconfirm,
@@ -240,7 +239,20 @@ export default function VaultFiles() {
               size: "small",
             }}
             style={{ marginTop: -8 }}
-            locale={{ emptyText: <Empty description={t("vault.files.no_files")} /> }}
+            locale={{ emptyText: (
+              <div className="bonds-empty-hero">
+                <div className="bonds-empty-hero-icon" style={{ background: token.colorPrimaryBg }}>
+                  <FolderOpenOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
+                </div>
+                <div className="bonds-empty-hero-title">{t("vault.files.no_files")}</div>
+                <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.files")}</div>
+                <Upload beforeUpload={handleUpload} showUploadList={false}>
+                  <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+                    {t("vault.files.upload")}
+                  </Button>
+                </Upload>
+              </div>
+            ) }}
           />
         )}
       </Card>

@@ -103,7 +103,12 @@ test.describe('Contacts - CRUD', () => {
     await goToContacts(page);
     await createContact(page, 'MoveTest', 'User');
 
-    await expect(page.getByRole('button', { name: 'Move' })).toBeVisible({ timeout: 5000 });
+    // Move button is now inside the More dropdown (icon-only button with MoreOutlined)
+    // Find the more button by its icon aria-label
+    const moreBtn = page.locator('button').filter({ has: page.locator('[aria-label="more"]') });
+    await expect(moreBtn).toBeVisible({ timeout: 5000 });
+    await moreBtn.click();
+    await expect(page.getByText('Move', { exact: true })).toBeVisible({ timeout: 5000 });
   });
 });
 

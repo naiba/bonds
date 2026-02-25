@@ -117,17 +117,21 @@ test.describe('Contact Operations', () => {
     await goToContacts(page);
     await createContact(page, 'ArchiveTest', 'User');
 
-    const archiveButton = page.getByRole('button', { name: /Archive/i }).first();
-    await expect(archiveButton).toBeVisible({ timeout: 10000 });
+    // Archive button is now inside the More dropdown (ellipsis menu)
+    await page.locator('button').filter({ has: page.locator('.anticon-more') }).click();
+    const archiveMenuItem = page.locator('.ant-dropdown-menu-item').filter({ hasText: /Archive/i });
+    await expect(archiveMenuItem).toBeVisible({ timeout: 10000 });
 
     const archiveResp = page.waitForResponse(
       (resp) => resp.url().includes('/archive') && resp.request().method() === 'PUT'
     );
-    await archiveButton.click();
+    await archiveMenuItem.click();
     const resp = await archiveResp;
     expect(resp.status()).toBeLessThan(400);
 
-    await expect(page.getByRole('button', { name: /Unarchive/i })).toBeVisible({ timeout: 10000 });
+    // After archiving, the More menu should now show Unarchive
+    await page.locator('button').filter({ has: page.locator('.anticon-more') }).click();
+    await expect(page.locator('.ant-dropdown-menu-item').filter({ hasText: /Unarchive/i })).toBeVisible({ timeout: 10000 });
   });
 
   test('should delete a contact', async ({ page }) => {

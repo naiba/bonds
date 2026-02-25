@@ -151,6 +151,18 @@ export default function VaultCompanies() {
         rowKey="id"
         loading={isLoading}
         pagination={false}
+        locale={{ emptyText: (
+          <div className="bonds-empty-hero">
+            <div className="bonds-empty-hero-icon" style={{ background: token.colorPrimaryBg }}>
+              <BankOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
+            </div>
+            <div className="bonds-empty-hero-title">{t("vault.companies.title")}</div>
+            <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.companies")}</div>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingCompany(null); form.resetFields(); setIsModalOpen(true); }}>
+              {t("vault.companies.create")}
+            </Button>
+          </div>
+        ) }}
         onRow={(record) => ({
           onClick: () => setSelectedCompany(record),
           style: { cursor: "pointer" },

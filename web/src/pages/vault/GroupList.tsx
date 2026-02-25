@@ -10,7 +10,6 @@ import {
   Select,
   Popconfirm,
   App,
-  Empty,
   Spin,
   Tag,
   theme,
@@ -124,7 +123,18 @@ export default function GroupList() {
       >
         <List
           dataSource={groups}
-          locale={{ emptyText: <Empty description={t("vault.group_list.no_groups")} style={{ padding: 32 }} /> }}
+          locale={{ emptyText: (
+            <div className="bonds-empty-hero">
+              <div className="bonds-empty-hero-icon" style={{ background: token.colorPrimaryBg }}>
+                <TeamOutlined style={{ color: token.colorPrimary }} />
+              </div>
+              <div className="bonds-empty-hero-title">{t("vault.group_list.no_groups")}</div>
+              <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.groups")}</div>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+                {t("vault.group_list.new_group")}
+              </Button>
+            </div>
+          ) }}
           renderItem={(group: Group) => (
             <List.Item
               style={{

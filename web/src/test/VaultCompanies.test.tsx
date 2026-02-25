@@ -58,12 +58,14 @@ describe("VaultCompanies", () => {
   it("renders empty table", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderVaultCompanies();
-    expect(document.querySelector(".ant-empty")).toBeInTheDocument();
+    // Empty state uses bonds-empty-hero instead of ant-empty
+    expect(document.querySelector(".bonds-empty-hero, .ant-empty")).toBeInTheDocument();
   });
 
   it("renders company title", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderVaultCompanies();
-    expect(screen.getByText("Companies")).toBeInTheDocument();
+    // Page heading and empty hero title both say "Companies"
+    expect(screen.getAllByText("Companies").length).toBeGreaterThanOrEqual(1);
   });
 });

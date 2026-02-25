@@ -106,7 +106,8 @@
       "no_vaults": "暂无保险库",
       "no_vaults_desc": "创建你的第一个保险库，开始管理联系人。",
       "create_vault": "创建保险库",
-      "load_failed": "加载保险库失败"
+      "load_failed": "加载保险库失败",
+      "description": "管理你的个人关系库"
     },
     "create": {
       "title": "创建保险库",
@@ -1244,5 +1245,14 @@
     "success": "邮箱验证成功！正在跳转...",
     "invalid_token": "无效或已过期的验证链接",
     "logout": "退出登录"
+  },
+  "empty": {
+    "groups": "创建分组来组织你的联系人",
+    "tasks": "为联系人追踪待办事项",
+    "companies": "添加联系人所在的公司",
+    "reminders": "设置提醒保持联系",
+    "files": "上传和管理文件",
+    "feed": "与联系人互动后活动记录将显示在这里",
+    "journal": "开始记录日志来捕捉你的想法"
   }
 }

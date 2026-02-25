@@ -45,7 +45,7 @@ test.describe('Groups', () => {
     const vaultUrl = getVaultUrl(page);
     await page.goto(vaultUrl + '/groups');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('button', { name: /new group/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('button', { name: /new group/i }).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should create a new group', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('Groups', () => {
     await page.goto(vaultUrl + '/groups');
     await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: /new group/i }).click();
+    await page.getByRole('button', { name: /new group/i }).first().click();
 
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
@@ -78,7 +78,7 @@ test.describe('Groups', () => {
     await page.goto(vaultUrl + '/groups');
     await page.waitForLoadState('networkidle');
 
-    await page.getByRole('button', { name: /new group/i }).click();
+    await page.getByRole('button', { name: /new group/i }).first().click();
     const modal = page.getByRole('dialog');
     await expect(modal).toBeVisible({ timeout: 5000 });
     await modal.locator('input#name').fill('Friends');

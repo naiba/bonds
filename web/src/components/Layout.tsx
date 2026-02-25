@@ -1,3 +1,4 @@
+import React from "react";
 import { Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import {
@@ -84,6 +85,37 @@ export default function Layout() {
         { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
         { key: `/vaults/${vaultId}/life-metrics`, icon: <HeartOutlined />, label: t("nav.lifeMetrics") },
         { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
+      ]
+    : [];
+
+  // Grouped nav: Core | Content | Management | Activity
+  // Groups separated by thin dividers for visual hierarchy
+  const vaultNavGroups: { key: string; icon: React.ReactNode; label: string }[][] = vaultId
+    ? [
+        // Core
+        [
+          { key: `/vaults/${vaultId}`, icon: <DashboardOutlined />, label: t("nav.dashboard") },
+          { key: `/vaults/${vaultId}/contacts`, icon: <TeamOutlined />, label: t("nav.contacts") },
+        ],
+        // Content
+        [
+          { key: `/vaults/${vaultId}/journals`, icon: <EditOutlined />, label: t("nav.journal") },
+          { key: `/vaults/${vaultId}/groups`, icon: <UsergroupAddOutlined />, label: t("nav.groups") },
+          { key: `/vaults/${vaultId}/calendar`, icon: <CalendarOutlined />, label: t("nav.calendar") },
+        ],
+        // Management
+        [
+          { key: `/vaults/${vaultId}/tasks`, icon: <CheckSquareOutlined />, label: t("nav.tasks") },
+          { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
+          { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
+        ],
+        // Activity
+        [
+          { key: `/vaults/${vaultId}/feed`, icon: <UnorderedListOutlined />, label: t("nav.feed") },
+          { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
+          { key: `/vaults/${vaultId}/life-metrics`, icon: <HeartOutlined />, label: t("nav.lifeMetrics") },
+          { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
+        ],
       ]
     : [];
 
@@ -223,43 +255,35 @@ export default function Layout() {
               padding: "0 24px",
               display: "flex",
               alignItems: "center",
-              gap: 4,
-              height: 40,
+              gap: 2,
+              height: 44,
               overflowX: "auto",
             }}
           >
-            {vaultNavItems.map((item) => {
-              const isActive = item.key === activeVaultKey;
-              return (
-                <div
-                  key={item.key}
-                  onClick={() => navigate(item.key)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    padding: "4px 12px",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    fontWeight: isActive ? 500 : 400,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    color: isActive ? "#fff" : token.colorText,
-                    background: isActive ? token.colorPrimary : "transparent",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) e.currentTarget.style.background = token.colorFillSecondary;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <span style={{ fontSize: 13 }}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </div>
-              );
-            })}
+            {vaultNavGroups.map((group, groupIdx) => (
+              <React.Fragment key={groupIdx}>
+                {groupIdx > 0 && (
+                  <div
+                    className="vault-nav-divider"
+                    style={{ background: token.colorBorderSecondary }}
+                  />
+                )}
+                {group.map((item) => {
+                  const isActive = item.key === activeVaultKey;
+                  return (
+                    <div
+                      key={item.key}
+                      className={`vault-nav-pill${isActive ? " vault-nav-pill--active" : ""}`}
+                      style={!isActive ? { color: token.colorText } : undefined}
+                      onClick={() => navigate(item.key)}
+                    >
+                      <span>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </nav>
         )}
       </div>

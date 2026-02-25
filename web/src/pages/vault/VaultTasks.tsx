@@ -7,7 +7,6 @@ import {
   Checkbox,
   Tag,
   Spin,
-  Empty,
   Divider,
   theme,
 } from "antd";
@@ -71,7 +70,15 @@ export default function VaultTasks() {
       >
         <List
           dataSource={pending}
-          locale={{ emptyText: <Empty description={t("vault.tasks.no_pending")} /> }}
+          locale={{ emptyText: (
+            <div className="bonds-empty-hero">
+              <div className="bonds-empty-hero-icon" style={{ background: token.colorPrimaryBg }}>
+                <CheckSquareOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
+              </div>
+              <div className="bonds-empty-hero-title">{t("vault.tasks.no_pending")}</div>
+              <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.tasks")}</div>
+            </div>
+          ) }}
           renderItem={(task: Task) => (
             <List.Item
               style={{

@@ -63,7 +63,7 @@ export default function VaultList() {
               type="secondary"
               style={{ marginTop: 6, display: "block", fontSize: 14 }}
             >
-              {t("vault.list.no_vaults_desc")}
+              {vaults.length > 0 ? t("vault.list.description") : t("vault.list.no_vaults_desc")}
             </Text>
           </div>
           <Button
