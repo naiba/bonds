@@ -484,7 +484,7 @@ export default function ContactDetail() {
                 position: "relative",
                 width: 80,
                 height: 80,
-                borderRadius: "50%",
+                borderRadius: 24,
                 flexShrink: 0,
                 boxShadow: `0 4px 12px ${token.colorPrimaryBorder}`,
               }}
@@ -499,8 +499,8 @@ export default function ContactDetail() {
                 isUploading={avatarUploadMutation.isPending}
               />
             </div>
-            <div style={{ minWidth: 0 }}>
-              <Title level={3} style={{ margin: 0 }}>
+            <div style={{ minWidth: 0, paddingTop: 4 }}>
+              <Title level={2} style={{ margin: 0, fontFamily: "\x27Playfair Display\x27, serif" }}>
                 {formatContactName(nameOrder, contact)}
               </Title>
               {contact.nickname && (
@@ -857,7 +857,7 @@ function AvatarImageLoader({
       style={{
         position: "absolute",
         inset: 0,
-        borderRadius: "50%",
+        borderRadius: 24,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

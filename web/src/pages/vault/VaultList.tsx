@@ -78,7 +78,7 @@ export default function VaultList() {
       </div>
 
       {vaults.length === 0 ? (
-        <Card
+        <Card className="bonds-vault-card"
           style={{
             textAlign: "center",
             padding: "48px 24px",
@@ -92,8 +92,8 @@ export default function VaultList() {
                 style={{
                   width: 88,
                   height: 88,
-                  borderRadius: "50%",
-                  background: token.colorPrimaryBg,
+                  borderRadius: 16,
+                  background: token.colorPrimaryBg, boxShadow: `inset 0 0 0 1px ${token.colorPrimary}20`,
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -132,12 +132,12 @@ export default function VaultList() {
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {vaults.map((vault: any) => (
             <Col xs={24} sm={12} lg={8} key={vault.id}>
-              <Card
+              <Card className="bonds-vault-card"
                 hoverable
                 onClick={() => navigate(`/vaults/${vault.id}`)}
                 style={{
                   height: "100%",
-                  borderTop: `3px solid ${token.colorPrimary}`,
+                  borderTop: "none",
                   cursor: "pointer",
                 }}
                 styles={{
@@ -149,8 +149,8 @@ export default function VaultList() {
                     style={{
                       width: 42,
                       height: 42,
-                      borderRadius: "50%",
-                      background: token.colorPrimaryBg,
+                      borderRadius: 16,
+                      background: token.colorPrimaryBg, boxShadow: `inset 0 0 0 1px ${token.colorPrimary}20`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",

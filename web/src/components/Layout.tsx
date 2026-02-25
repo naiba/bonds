@@ -162,14 +162,14 @@ export default function Layout() {
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Header
           style={{
-            background: token.colorBgContainer,
+            background: token.Layout?.headerBg || token.colorBgContainer,
             borderBottom: isInVault ? "none" : `1px solid ${token.colorBorderSecondary}`,
-            padding: "0 12px",
+            padding: "0 16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            height: 48,
-            lineHeight: "48px",
+            height: 56,
+            lineHeight: "56px",
             /* Fix: prevent header from exceeding viewport width on mobile */
             maxWidth: "100vw",
             overflow: "hidden",
@@ -255,13 +255,13 @@ export default function Layout() {
         {isInVault && vaultNavItems.length > 0 && (
           <nav
             style={{
-              background: token.colorBgContainer,
+              background: token.Layout?.headerBg || token.colorBgContainer,
               borderBottom: `1px solid ${token.colorBorderSecondary}`,
-              padding: "0 12px",
+              padding: "0 16px",
               display: "flex",
               alignItems: "center",
               gap: 2,
-              height: 44,
+              height: 52,
               overflowX: "auto",
             }}
           >

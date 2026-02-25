@@ -1,252 +1,230 @@
 /* ============================================
    Bonds — Design System Foundation
-   Warm botanical aesthetic with editorial precision
+   Refined botanical aesthetic with striking editorial precision
    ============================================ */
 
-/* Google Fonts: DM Sans — geometric, modern, excellent CJK fallback */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Playfair+Display:ital,wght@0,400..800;1,400..800&display=swap');
 
 /* ---- Reset & Base ---- */
 body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  background-color: #f4f5f2; /* Default soft paper background */
 }
 
 html[data-theme="dark"] body {
-  background-color: #0f1210;
+  background-color: #0c0e0c; /* Deep rich forest dark */
 }
 
 #root {
   min-height: 100vh;
 }
 
-/* ---- Global Transitions ---- */
-.ant-spin-nested-loading > div > .ant-spin {
-  max-height: none;
+/* Background Texture Pattern */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Subtle grid overlay for structure */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.015) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(0, 0, 0, 0.015) 1px, transparent 1px);
+}
+
+html[data-theme="dark"] body::after {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+}
+
+/* Typography Enhancements */
+h1, h2, h3, .ant-typography h1, .ant-typography h2, .ant-typography h3 {
+  font-family: 'Playfair Display', serif !important;
+  letter-spacing: -0.02em;
+}
+
+h4, h5, h6, .ant-typography h4, .ant-typography h5, .ant-typography h6 {
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
 }
 
 /* ---- Card System ---- */
 .ant-card {
-  transition: box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.25s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(0, 0, 0, 0.04) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02), 0 8px 24px rgba(0, 0, 0, 0.02) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(10px);
+}
+
+html[data-theme="dark"] .ant-card {
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  background: rgba(20, 24, 21, 0.7) !important;
+}
+
+.ant-card-head {
+  border-bottom: 1px dashed rgba(0,0,0,0.08) !important;
+}
+html[data-theme="dark"] .ant-card-head {
+  border-bottom: 1px dashed rgba(255,255,255,0.08) !important;
 }
 
 .ant-card-hoverable:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 30px rgba(74, 124, 89, 0.08),
-              0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 12px 36px rgba(74, 124, 89, 0.08),
+              0 4px 12px rgba(0, 0, 0, 0.05) !important;
+  border-color: rgba(74, 124, 89, 0.2) !important;
 }
 
 html[data-theme="dark"] .ant-card-hoverable:hover {
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35),
-              0 2px 8px rgba(74, 124, 89, 0.1) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5),
+              0 4px 12px rgba(74, 124, 89, 0.15) !important;
+  border-color: rgba(74, 124, 89, 0.3) !important;
 }
 
-/* ---- Scrollbar ---- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(74, 124, 89, 0.15);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(74, 124, 89, 0.3);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-/* ---- Table ---- */
-.ant-table-tbody > tr {
-  transition: background-color 0.15s ease;
-}
-
-/* ---- Tags ---- */
-.ant-tag {
-  border-radius: 8px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-/* ---- List ---- */
+/* Elegant list items */
 .ant-list-item {
-  transition: background-color 0.15s ease;
+  transition: all 0.3s ease;
+  border-bottom-color: rgba(0,0,0,0.04) !important;
 }
 
-/* ---- Tabs ---- */
-.ant-tabs-tab {
-  transition: color 0.2s ease, font-weight 0.2s ease;
+html[data-theme="dark"] .ant-list-item {
+  border-bottom-color: rgba(255,255,255,0.04) !important;
 }
 
-/* ---- Button ---- */
+.ant-list-item:hover {
+  background-color: rgba(74, 124, 89, 0.02);
+}
+
+html[data-theme="dark"] .ant-list-item:hover {
+  background-color: rgba(74, 124, 89, 0.08);
+}
+
+/* Vault List Distinctive Styling */
+.bonds-vault-card {
+  position: relative;
+  overflow: hidden;
+  border-top: none !important;
+}
+
+.bonds-vault-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4a7c59, #8eb59a);
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.bonds-vault-card:hover::before {
+  opacity: 1;
+}
+
+/* Buttons with distinct character */
 .ant-btn {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  letter-spacing: 0.01em;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.02em;
 }
 
 .ant-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
-.ant-btn-text {
-  transition: color 0.15s ease, background-color 0.15s ease;
+.ant-btn-primary {
+  background: linear-gradient(135deg, #4a7c59, #3d6a4c) !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(74, 124, 89, 0.3) !important;
 }
 
-/* ---- Primary button glow on hover ---- */
 .ant-btn-primary:not(:disabled):hover {
-  box-shadow: 0 4px 16px rgba(74, 124, 89, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(74, 124, 89, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2) inset !important;
+  background: linear-gradient(135deg, #568f66, #427553) !important;
 }
 
-html[data-theme="dark"] .ant-btn-primary:not(:disabled):hover {
-  box-shadow: 0 4px 16px rgba(74, 124, 89, 0.35);
+/* Beautiful tag design */
+.ant-tag {
+  border-radius: 6px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border: 1px solid rgba(0,0,0,0.06);
+  backdrop-filter: blur(4px);
 }
 
-/* ---- Empty state refinements ---- */
-.ant-empty-description {
-  color: rgba(0, 0, 0, 0.35);
-  font-size: 13px;
+html[data-theme="dark"] .ant-tag {
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
-html[data-theme="dark"] .ant-empty-description {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-/* ---- Selection color ---- */
-::selection {
-  background: rgba(74, 124, 89, 0.2);
-  color: inherit;
-}
-
-/* ---- Focus ring refinement ---- */
-.ant-input:focus,
-.ant-input-focused,
-.ant-select-focused .ant-select-selector {
-  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.12) !important;
-}
-
-html[data-theme="dark"] .ant-input:focus,
-html[data-theme="dark"] .ant-input-focused,
-html[data-theme="dark"] .ant-select-focused .ant-select-selector {
-  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.2) !important;
-}
-
-/* ---- Vault navigation pills ---- */
+/* Vault navigation pills */
 .vault-nav-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 12px;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  color: rgba(0,0,0,0.65);
+}
+
+html[data-theme="dark"] .vault-nav-pill {
+  color: rgba(255,255,255,0.65);
 }
 
 .vault-nav-pill:hover:not(.vault-nav-pill--active) {
-  background: rgba(74, 124, 89, 0.06);
+  background: rgba(74, 124, 89, 0.08);
+  color: #4a7c59;
 }
 
 html[data-theme="dark"] .vault-nav-pill:hover:not(.vault-nav-pill--active) {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(142, 181, 154, 0.15);
+  color: #8eb59a;
 }
 
 .vault-nav-pill--active {
   background: #4a7c59;
   color: #fff;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(74, 124, 89, 0.25);
+  box-shadow: 0 4px 12px rgba(74, 124, 89, 0.3);
 }
 
-html[data-theme="dark"] .vault-nav-pill--active {
-  box-shadow: 0 2px 12px rgba(74, 124, 89, 0.4);
-}
-
-/* Divider between nav groups */
 .vault-nav-divider {
   width: 1px;
   height: 20px;
-  margin: 0 4px;
+  margin: 0 6px;
+  background: rgba(0,0,0,0.06);
   flex-shrink: 0;
 }
-
-.vault-nav-pill .anticon {
-  font-size: 13px;
+html[data-theme="dark"] .vault-nav-divider {
+  background: rgba(255,255,255,0.06);
 }
 
-/* ---- Nav breadcrumb trigger (top-left account/vault) ---- */
-.nav-breadcrumb-trigger:hover {
-  background: rgba(74, 124, 89, 0.06);
-}
-
-html[data-theme="dark"] .nav-breadcrumb-trigger:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* ---- Page header area ---- */
-.bonds-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-/* ---- Empty state hero ---- */
-.bonds-empty-hero {
-  text-align: center;
-  padding: 56px 24px;
-}
-
-.bonds-empty-hero-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 20px;
-  font-size: 32px;
-}
-
-.bonds-empty-hero-title {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.bonds-empty-hero-desc {
-  font-size: 14px;
-  margin-bottom: 24px;
-  max-width: 360px;
-  margin-left: auto;
-  margin-right: auto;
-  line-height: 1.6;
-}
-
-/* ---- SearchBar (bonds-search-bar) ---- */
-/* Wrapper provides prefix icon + subtle background, replacing nested <Input> inside
-   AutoComplete which caused double-input rendering on mobile. */
+/* Animated SearchBar wrapper */
 .bonds-search-bar {
   position: relative;
   display: flex;
@@ -254,38 +232,104 @@ html[data-theme="dark"] .nav-breadcrumb-trigger:hover {
   min-width: 120px;
   max-width: 280px;
   flex: 1;
+  transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bonds-search-bar:focus-within {
+  max-width: 320px;
 }
 
 .bonds-search-bar-icon {
   position: absolute;
-  left: 10px;
+  left: 12px;
   z-index: 1;
   color: rgba(0, 0, 0, 0.3);
   font-size: 13px;
   pointer-events: none;
+  transition: color 0.3s;
+}
+.bonds-search-bar:focus-within .bonds-search-bar-icon {
+  color: #4a7c59;
 }
 
 html[data-theme="dark"] .bonds-search-bar-icon {
   color: rgba(255, 255, 255, 0.3);
 }
 
-.bonds-search-bar .ant-select {
-  width: 100% !important;
+/* Empty state styling */
+.bonds-empty-hero {
+  text-align: center;
+  padding: 64px 24px;
 }
 
-/* Offset the input text so it doesn't overlap with the search icon */
-.bonds-search-bar .ant-select .ant-select-selection-search-input,
-.bonds-search-bar .ant-select .ant-select-selection-placeholder {
-  padding-left: 22px !important;
+.bonds-empty-hero-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  font-size: 36px;
+  transform: rotate(-5deg);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* ---- Mobile responsive: header & content ---- */
-@media (max-width: 480px) {
-  /* Hide vault nav pill labels, show icon only */
-  .vault-nav-pill span:last-child {
-    display: none;
-  }
-  .vault-nav-pill {
-    padding: 6px 10px;
-  }
+.bonds-empty-hero:hover .bonds-empty-hero-icon {
+  transform: rotate(5deg) scale(1.05);
+}
+
+.bonds-empty-hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(74, 124, 89, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(74, 124, 89, 0.3);
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Inputs & Form */
+.ant-input, .ant-input-password, .ant-select-selector {
+  border-color: rgba(0,0,0,0.1) !important;
+  background-color: rgba(255,255,255,0.7) !important;
+  backdrop-filter: blur(4px);
+}
+html[data-theme="dark"] .ant-input, html[data-theme="dark"] .ant-input-password, html[data-theme="dark"] .ant-select-selector {
+  border-color: rgba(255,255,255,0.1) !important;
+  background-color: rgba(0,0,0,0.2) !important;
+}
+
+.ant-input:focus, .ant-input-focused, .ant-select-focused .ant-select-selector {
+  border-color: #4a7c59 !important;
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.15) !important;
+  background-color: #fff !important;
+}
+
+html[data-theme="dark"] .ant-input:focus, html[data-theme="dark"] .ant-input-focused, html[data-theme="dark"] .ant-select-focused .ant-select-selector {
+  background-color: #1a1e1b !important;
+}
+
+::selection {
+  background: rgba(74, 124, 89, 0.25);
+  color: inherit;
 }
