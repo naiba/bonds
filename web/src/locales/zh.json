@@ -1058,6 +1058,7 @@
     "tab_calendar": "日历",
     "tab_tasks": "任务",
     "tab_files": "文件",
+    "show_tab": "显示 {{tab}} 标签页",
     "tab_group": "群组",
     "template": "保险库模板",
     "template_updated": "保险库模板已更新",

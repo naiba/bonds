@@ -43,6 +43,8 @@ import { useTheme } from "@/stores/theme";
 import type { ThemeMode } from "@/stores/theme";
 import { useTranslation } from "react-i18next";
 import SearchBar from "@/components/SearchBar";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/api";
 
 const { Header, Content } = AntLayout;
 
@@ -123,6 +125,16 @@ export default function Layout() {
     .sort((a, b) => b.key.length - a.key.length)
     .find((item) => location.pathname.startsWith(item.key))?.key ?? "";
 
+  
+  const { data: currentVault } = useQuery({
+    queryKey: ["vaults", vaultId],
+    queryFn: async () => {
+      const res = await api.vaults.vaultsDetail(String(vaultId));
+      return res.data;
+    },
+    enabled: !!vaultId,
+  });
+
   const userMenuItems: MenuProps["items"] = [
     { key: "/settings", icon: <SettingOutlined />, label: t("nav.account") },
     { key: "/settings/preferences", icon: <ControlOutlined />, label: t("nav.preferences") },
@@ -179,7 +191,7 @@ export default function Layout() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: 1 }}>
             <div
               style={{
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
                 gap: 4,
                 cursor: "pointer",
@@ -188,19 +200,20 @@ export default function Layout() {
                 borderRadius: token.borderRadiusSM,
                 fontSize: 13,
                 transition: "background 0.2s",
-                flexShrink: 0,
+                flexShrink: 1,
+                minWidth: 0,
               }}
               className="nav-breadcrumb-trigger"
               onClick={() => navigate("/vaults")}
             >
-              <span style={{ fontWeight: 600, color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 120 }}>
+              <span style={{ fontWeight: 600, color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 1, maxWidth: 120 }}>
                 {formatContactName(nameOrder, user ?? {})}
               </span>
               {isInVault && vaultId && (
                 <>
                   <span style={{ color: token.colorTextQuaternary, fontSize: 11, margin: "0 2px", fontWeight: 400 }}>/</span>
-                  <span style={{ color: token.colorTextSecondary, fontWeight: 500 }}>
-                    {t("nav.vault")}
+                  <span style={{ color: token.colorTextSecondary, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0, maxWidth: "max-content" }}>
+                    {currentVault?.name || t("nav.vault")}
                   </span>
                 </>
               )}

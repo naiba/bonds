@@ -1058,6 +1058,7 @@
     "tab_calendar": "Calendar",
     "tab_tasks": "Tasks",
     "tab_files": "Files",
+    "show_tab": "Show {{tab}} tab",
     "tab_group": "Groups",
     "template": "Vault Template",
     "template_updated": "Vault template updated",
