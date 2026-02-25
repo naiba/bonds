@@ -19,6 +19,7 @@ import {
   Select,
   ColorPicker,
   Collapse,
+  theme,
 } from "antd";
 import {
   SaveOutlined,
@@ -51,6 +52,7 @@ export default function VaultSettings() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const nameOrder = useNameOrder();
+  const { token } = theme.useToken();
 
   const [activeTab, setActiveTab] = useState("general");
 
@@ -918,7 +920,7 @@ export default function VaultSettings() {
         onChange={setActiveTab}
         items={tabItems}
         tabPosition="left"
-        style={{ background: "#fff", padding: 16, borderRadius: 8 }}
+        style={{ background: token.colorBgContainer, padding: 16, borderRadius: 8 }}
       />
     </div>
   );

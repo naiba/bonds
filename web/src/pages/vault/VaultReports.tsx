@@ -78,9 +78,9 @@ export default function VaultReports() {
 
   const statCards = [
     { icon: <TeamOutlined />, bg: token.colorPrimaryBg, color: token.colorPrimary, title: t("vault.reports.total_contacts"), value: reportOverview?.total_contacts ?? 0 },
-    { icon: <EnvironmentOutlined />, bg: "#fff7e6", color: "#fa8c16", title: t("vault.reports.total_addresses"), value: reportOverview?.total_addresses ?? 0 },
-    { icon: <CalendarOutlined />, bg: "#e6f4ff", color: "#1677ff", title: t("vault.reports.total_dates"), value: reportOverview?.total_important_dates ?? 0 },
-    { icon: <SmileOutlined />, bg: "#f6ffed", color: "#52c41a", title: t("vault.reports.mood_entries"), value: reportOverview?.total_mood_entries ?? 0 },
+    { icon: <EnvironmentOutlined />, bg: "rgba(250, 140, 22, 0.15)", color: "#fa8c16", title: t("vault.reports.total_addresses"), value: reportOverview?.total_addresses ?? 0 },
+    { icon: <CalendarOutlined />, bg: "rgba(22, 119, 255, 0.15)", color: "#1677ff", title: t("vault.reports.total_dates"), value: reportOverview?.total_important_dates ?? 0 },
+    { icon: <SmileOutlined />, bg: "rgba(82, 196, 26, 0.15)", color: "#52c41a", title: t("vault.reports.mood_entries"), value: reportOverview?.total_mood_entries ?? 0 },
   ];
 
   const AddressDrillDown = ({ record }: { record: AddressReportItem }) => {

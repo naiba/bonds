@@ -1,4 +1,4 @@
-import { Card, Typography, Progress, Spin, Statistic, Row, Col } from "antd";
+import { Card, Typography, Progress, Spin, Statistic, Row, Col, theme } from "antd";
 import { DatabaseOutlined, HddOutlined } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -9,6 +9,7 @@ const { Title, Text } = Typography;
 
 export default function StorageInfo() {
   const { t } = useTranslation();
+  const { token } = theme.useToken();
 
   const { data: usage, isLoading } = useQuery({
     queryKey: ["settings", "storage"],
@@ -61,7 +62,7 @@ export default function StorageInfo() {
 
         <Row gutter={16}>
           <Col span={12}>
-            <Card style={{ background: "#f5f5f5" }}>
+            <Card style={{ background: token.colorBgLayout }}>
               <Statistic
                 title={t("settings.storage.remaining")}
                 value={remaining}
@@ -70,7 +71,7 @@ export default function StorageInfo() {
             </Card>
           </Col>
           <Col span={12}>
-            <Card style={{ background: "#f5f5f5" }}>
+            <Card style={{ background: token.colorBgLayout }}>
               <Statistic
                 title={t("settings.storage.usage_percent")}
                 value={percent}

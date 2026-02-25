@@ -49,12 +49,12 @@ const channelIconMap: Record<
   string,
   { icon: React.ReactNode; color: string; bg: string }
 > = {
-  email: { icon: <MailOutlined />, color: "#1677ff", bg: "#e6f4ff" },
-  telegram: { icon: <SendOutlined />, color: "#0088cc", bg: "#e6f7ff" },
-  ntfy: { icon: <NotificationOutlined />, color: "#52c41a", bg: "#f6ffed" },
-  gotify: { icon: <BellOutlined />, color: "#fa8c16", bg: "#fff7e6" },
-  webhook: { icon: <ApiOutlined />, color: "#722ed1", bg: "#f9f0ff" },
-  shoutrrr: { icon: <ApiOutlined />, color: "#722ed1", bg: "#f9f0ff" },
+  email: { icon: <MailOutlined />, color: "#1677ff", bg: "rgba(22, 119, 255, 0.15)" },
+  telegram: { icon: <SendOutlined />, color: "#0088cc", bg: "rgba(0, 136, 204, 0.15)" },
+  ntfy: { icon: <NotificationOutlined />, color: "#52c41a", bg: "rgba(82, 196, 26, 0.15)" },
+  gotify: { icon: <BellOutlined />, color: "#fa8c16", bg: "rgba(250, 140, 22, 0.15)" },
+  webhook: { icon: <ApiOutlined />, color: "#722ed1", bg: "rgba(114, 46, 209, 0.15)" },
+  shoutrrr: { icon: <ApiOutlined />, color: "#722ed1", bg: "rgba(114, 46, 209, 0.15)" },
 };
 
 function getShoutrrrIcon(content: string): { icon: React.ReactNode; color: string; bg: string } {
