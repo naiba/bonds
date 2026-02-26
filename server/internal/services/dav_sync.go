@@ -286,7 +286,7 @@ func (s *DavSyncService) processIncrementalSync(
 	}
 
 	if len(syncResp.Deleted) > 0 {
-		s.processDeletedPaths(syncResp.Deleted, sub.ID, vaultID, result)
+		s.processDeletedPaths(syncResp.Deleted, sub.ID, sub.SyncWay, vaultID, result)
 	}
 }
 
@@ -412,7 +412,9 @@ func (s *DavSyncService) upsertFromObject(
 
 func (s *DavSyncService) processDeletedPaths(
 	deletedPaths []string,
-	subID, vaultID string,
+	subID string,
+	syncWay uint8,
+	vaultID string,
 	result *dto.TriggerSyncResponse,
 ) {
 	if len(deletedPaths) == 0 {
@@ -423,14 +425,32 @@ func (s *DavSyncService) processDeletedPaths(
 	s.db.Where("vault_id = ? AND distant_uri IN ?", vaultID, deletedPaths).Find(&contacts)
 
 	for _, contact := range contacts {
+		contactID := contact.ID
+
+		// Pull-only 模式下远端删除不应删除本地联系人，只解除同步关联。
+		// 用户选择 pull-only 意味着 Bonds 是数据主副本，远端删除不应传播为本地删除。
+		if syncWay == SyncWayPull {
+			if err := s.db.Model(&contact).Updates(map[string]interface{}{
+				"distant_uri":  nil,
+				"distant_etag": nil,
+				"distant_uuid": nil,
+			}).Error; err != nil {
+				errMsg := fmt.Sprintf("unlink failed: %v", err)
+				s.logSyncAction(subID, &contactID, ptrToStr(contact.DistantURI), "", "error", errMsg)
+				result.Errors++
+				continue
+			}
+			s.logSyncAction(subID, &contactID, ptrToStr(contact.DistantURI), "", "unlinked", "")
+			result.Skipped++
+			continue
+		}
+
 		if err := s.db.Delete(&contact).Error; err != nil {
 			errMsg := fmt.Sprintf("delete failed: %v", err)
-			contactID := contact.ID
 			s.logSyncAction(subID, &contactID, ptrToStr(contact.DistantURI), "", "error", errMsg)
 			result.Errors++
 			continue
 		}
-		contactID := contact.ID
 		s.logSyncAction(subID, &contactID, ptrToStr(contact.DistantURI), "", "deleted", "")
 		result.Deleted++
 	}

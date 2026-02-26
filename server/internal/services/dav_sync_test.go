@@ -363,6 +363,7 @@ func TestDavSyncService_SyncSubscription_Deletion(t *testing.T) {
 		URI:      "https://dav.example.com/contacts/",
 		Username: "user",
 		Password: "pwd",
+		SyncWay:  SyncWayBoth, // Bidirectional: remote deletions should soft-delete locally
 	})
 	if err != nil {
 		t.Fatalf("Create subscription failed: %v", err)
@@ -798,5 +799,142 @@ func TestDavSyncService_SyncSubscription_DiscoverPath(t *testing.T) {
 	syncSvc.db.First(&updatedSub, "id = ?", sub.ID)
 	if updatedSub.AddressBookPath != discoveredPath {
 		t.Errorf("expected AddressBookPath cached as %q, got %q", discoveredPath, updatedSub.AddressBookPath)
+	}
+}
+
+func TestDavSyncService_SyncSubscription_PullOnlySkipsDeletion(t *testing.T) {
+	syncSvc, clientSvc, _, vaultID, userID, _ := setupDavSyncTest(t)
+
+	// Pull-only subscription (SyncWay=SyncWayPull, which is the default)
+	sub, err := clientSvc.Create(vaultID, userID, dto.CreateDavSubscriptionRequest{
+		URI:      "https://dav.example.com/contacts/",
+		Username: "user",
+		Password: "pwd",
+	})
+	if err != nil {
+		t.Fatalf("Create subscription failed: %v", err)
+	}
+
+	// Verify subscription is pull-only
+	var subCheck models.AddressBookSubscription
+	syncSvc.db.First(&subCheck, "id = ?", sub.ID)
+	if subCheck.SyncWay != SyncWayPull {
+		t.Fatalf("expected SyncWay=%d (pull-only), got %d", SyncWayPull, subCheck.SyncWay)
+	}
+
+	token := "sync-token-1"
+	syncSvc.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).Update("distant_sync_token", token)
+
+	// Create a contact that will be "deleted" on remote
+	contact := models.Contact{
+		VaultID:     vaultID,
+		FirstName:   strPtrOrNil("PullOnlyContact"),
+		DistantURI:  strPtrOrNil("/contacts/pull-only-delete.vcf"),
+		DistantEtag: strPtrOrNil("etag1"),
+	}
+	syncSvc.db.Create(&contact)
+
+	mc := &mockCardDAVClient{
+		syncCollFn: func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
+			return &carddav.SyncResponse{
+				SyncToken: "sync-token-2",
+				Deleted:   []string{"/contacts/pull-only-delete.vcf"},
+			}, nil
+		},
+		multiGetFn: func(ctx context.Context, path string, mg *carddav.AddressBookMultiGet) ([]carddav.AddressObject, error) {
+			return nil, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.SyncSubscription(context.Background(), sub.ID, vaultID)
+	if err != nil {
+		t.Fatalf("SyncSubscription failed: %v", err)
+	}
+
+	// Pull-only mode: remote deletion should NOT delete local contact,
+	// should only unlink the sync association
+	if result.Deleted != 0 {
+		t.Errorf("pull-only mode should not report deletions, got %d", result.Deleted)
+	}
+
+	// Contact should still exist and be accessible (not soft-deleted)
+	var existing models.Contact
+	err = syncSvc.db.Where("id = ?", contact.ID).First(&existing).Error
+	if err != nil {
+		t.Fatalf("pull-only: contact should still exist after remote deletion, got: %v", err)
+	}
+
+	// Sync association should be cleared (unlinked from remote)
+	if existing.DistantURI != nil {
+		t.Error("pull-only: DistantURI should be cleared after remote deletion")
+	}
+	if existing.DistantEtag != nil {
+		t.Error("pull-only: DistantEtag should be cleared after remote deletion")
+	}
+
+	// Sync log should record "unlinked" action, not "deleted"
+	var logEntry models.DavSyncLog
+	err = syncSvc.db.Where("address_book_subscription_id = ? AND action = ?", sub.ID, "unlinked").First(&logEntry).Error
+	if err != nil {
+		t.Error("expected sync log with action='unlinked' for pull-only remote deletion")
+	}
+}
+
+func TestDavSyncService_SyncSubscription_BidirectionalStillDeletes(t *testing.T) {
+	syncSvc, clientSvc, _, vaultID, userID, _ := setupDavSyncTest(t)
+
+	// Create bidirectional subscription
+	sub, err := clientSvc.Create(vaultID, userID, dto.CreateDavSubscriptionRequest{
+		URI:      "https://dav.example.com/contacts/",
+		Username: "user",
+		Password: "pwd",
+		SyncWay:  SyncWayBoth,
+	})
+	if err != nil {
+		t.Fatalf("Create subscription failed: %v", err)
+	}
+
+	token := "sync-token-1"
+	syncSvc.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).Update("distant_sync_token", token)
+
+	contact := models.Contact{
+		VaultID:     vaultID,
+		FirstName:   strPtrOrNil("BiDirContact"),
+		DistantURI:  strPtrOrNil("/contacts/bidir-delete.vcf"),
+		DistantEtag: strPtrOrNil("etag1"),
+	}
+	syncSvc.db.Create(&contact)
+
+	mc := &mockCardDAVClient{
+		syncCollFn: func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
+			return &carddav.SyncResponse{
+				SyncToken: "sync-token-2",
+				Deleted:   []string{"/contacts/bidir-delete.vcf"},
+			}, nil
+		},
+		multiGetFn: func(ctx context.Context, path string, mg *carddav.AddressBookMultiGet) ([]carddav.AddressObject, error) {
+			return nil, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.SyncSubscription(context.Background(), sub.ID, vaultID)
+	if err != nil {
+		t.Fatalf("SyncSubscription failed: %v", err)
+	}
+
+	// Bidirectional mode: remote deletion SHOULD soft-delete the contact
+	if result.Deleted != 1 {
+		t.Errorf("expected 1 deleted in bidirectional mode, got %d", result.Deleted)
+	}
+
+	var deletedContact models.Contact
+	err = syncSvc.db.Unscoped().Where("id = ?", contact.ID).First(&deletedContact).Error
+	if err != nil {
+		t.Fatalf("failed to find soft-deleted contact: %v", err)
+	}
+	if !deletedContact.DeletedAt.Valid {
+		t.Error("expected contact to be soft-deleted in bidirectional mode")
 	}
 }
