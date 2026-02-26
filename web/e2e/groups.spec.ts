@@ -45,24 +45,6 @@ async function navigateToTab(page: import('@playwright/test').Page, tabName: str
   await page.waitForLoadState('networkidle');
 }
 
-// Workaround: the NetworkGraph component crashes when the graph API returns null arrays.
-// Intercept the graph/kinship endpoints to return empty arrays so the Social tab renders.
-async function interceptGraphApi(page: import('@playwright/test').Page) {
-  await page.route('**/relationships/graph', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: { nodes: [], edges: [] } }),
-    });
-  });
-  await page.route('**/relationships/kinship/**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: { degree: null, path: [] } }),
-    });
-  });
-}
 
 async function createGroup(page: import('@playwright/test').Page, vaultUrl: string, groupName: string) {
   await page.goto(vaultUrl + '/groups');

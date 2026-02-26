@@ -45,9 +45,6 @@ async function navigateToTab(page: import('@playwright/test').Page, tabName: str
   await page.waitForLoadState('networkidle');
 }
 
-function getVaultUrl(page: import('@playwright/test').Page): string {
-  return page.url().replace(/\/contacts.*$/, '');
-}
 
 async function createGroup(page: import('@playwright/test').Page, vaultUrl: string, groupName: string) {
   await page.goto(vaultUrl + '/groups');

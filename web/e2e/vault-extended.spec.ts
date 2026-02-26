@@ -740,8 +740,6 @@ test.describe('Vault Feed - Contact Names', () => {
     const feedList = page.locator('.ant-list');
     await expect(feedList).toBeVisible({ timeout: 10000 });
     const feedContent = await feedList.textContent();
-    // UUID pattern: 8-4-4-4-12 hex characters — should not appear as a standalone contact reference
-    const uuidOnlyPattern = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/;
     // Feed may contain UUIDs in URLs, but the visible contact name should be 'FeedName Tester'
     expect(feedContent).toContain('FeedName Tester');
   });
