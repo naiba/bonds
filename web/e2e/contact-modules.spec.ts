@@ -576,3 +576,50 @@ test.describe('Contact Modules - Important Dates', () => {
     await expect(datesCard.getByText('Graduation Day')).not.toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Contact Modules - Important Date Auto-fill', () => {
+  test('important date with seed type auto-fills label', async ({ page }) => {
+    await setupVault(page, 'idate-autofill');
+    await goToContacts(page);
+    await createContact(page, 'Date', 'Test');
+
+    await navigateToTab(page, 'Contact information');
+
+    const datesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
+    await expect(datesCard).toBeVisible({ timeout: 10000 });
+
+    await datesCard.getByRole('button', { name: /add/i }).click();
+
+    const modal = page.locator('.ant-modal:visible');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Select "Birthdate" from the date type dropdown (must select type FIRST, it auto-fills label)
+    const dateTypeSelect = modal.locator('.ant-form-item').filter({ hasText: 'Date Type' }).locator('.ant-select');
+    await dateTypeSelect.click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Birthdate' }).click();
+
+    // Label auto-filled with "Birthdate"
+    const labelInput = modal.locator('.ant-form-item').filter({ hasText: 'Label' }).locator('input');
+    await expect(labelInput).toHaveValue('Birthdate', { timeout: 5000 });
+
+    // Set date via the DatePicker
+    const datePicker = modal.locator('.ant-picker');
+    await datePicker.click();
+
+    // Click a non-disabled, non-today date cell to trigger onChange
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(15);
+    await dateCell.click();
+
+    // Close the date picker dropdown before submitting
+    await modal.locator('.ant-modal-header').click();
+
+    const responsePromise = page.waitForResponse(
+      (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
+    );
+    await modal.getByRole('button', { name: /ok/i }).click();
+    const resp = await responsePromise;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(datesCard.getByText('Birthdate').first()).toBeVisible({ timeout: 10000 });
+  });
+});

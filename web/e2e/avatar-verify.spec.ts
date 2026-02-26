@@ -67,3 +67,27 @@ test.describe('Avatar Display (#11)', () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 });
+
+test.describe('Avatar Display - Contact Detail', () => {
+  test('avatar area is visible on contact detail and endpoint returns 200', async ({ page }) => {
+    await registerAndSetup(page, 'avatar-detail');
+
+    // The avatar area renders either an <img> (backend generates initials PNG) or
+    // a <span> with text initials. Check for either one inside the circular container.
+    const avatarImg = page.locator('img[alt="Avatar"]').first();
+    const avatarInitials = page.locator('div').filter({ hasText: /^AT$/ }).first();
+    await expect(avatarImg.or(avatarInitials)).toBeVisible({ timeout: 10000 });
+
+    // Verify the avatar endpoint returns a 200 response via direct API call
+    const contactUrl = page.url();
+    const match = contactUrl.match(/\/vaults\/([^/]+)\/contacts\/([^/]+)/);
+    expect(match).toBeTruthy();
+    const [, vid, cid] = match!;
+
+    const token = await page.evaluate(() => localStorage.getItem('token'));
+    const resp = await page.request.get(`http://localhost:8080/api/vaults/${vid}/contacts/${cid}/avatar`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(resp.status()).toBe(200);
+  });
+});

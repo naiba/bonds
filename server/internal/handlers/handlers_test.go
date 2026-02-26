@@ -4757,3 +4757,50 @@ func TestMostConsulted_ReturnsAllNameFields(t *testing.T) {
 		t.Errorf("expected suffix=Jr., got %s", item.Suffix)
 	}
 }
+
+// ==================== File Serve Preview ====================
+
+func TestFileServePreview(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "file-preview@example.com")
+	vault := ts.createTestVault(t, token, "File Preview Vault")
+
+	// Upload an image file
+	pngData := []byte("\x89PNG\r\n\x1a\n" + strings.Repeat("x", 100))
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/files",
+		token, "file", "preview-test.png", "image/png", pngData)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload failed: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+
+	// Extract file ID from upload response
+	resp := parseResponse(t, rec)
+	var fileData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &fileData); err != nil {
+		t.Fatalf("failed to parse file data: %v", err)
+	}
+	fileID := fmt.Sprintf("%.0f", fileData["id"].(float64))
+
+	// Test preview=true returns Content-Disposition: inline for image
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/files/"+fileID+"/download?preview=true", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview download: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	cd := rec.Header().Get("Content-Disposition")
+	if !strings.Contains(cd, "inline") {
+		t.Errorf("preview=true: expected Content-Disposition to contain 'inline', got %q", cd)
+	}
+
+	// Test without preview param returns Content-Disposition: attachment
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/files/"+fileID+"/download", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("attachment download: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	cd = rec.Header().Get("Content-Disposition")
+	if !strings.Contains(cd, "attachment") {
+		t.Errorf("no preview: expected Content-Disposition to contain 'attachment', got %q", cd)
+	}
+}

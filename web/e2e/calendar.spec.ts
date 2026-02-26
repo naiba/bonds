@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+let counter = 0;
+
+function uniqueEmail(prefix: string): string {
+  return `${prefix}-${Date.now()}-${++counter}-${Math.random().toString(36).slice(2, 6)}@example.com`;
+}
+
 async function enableAlternativeCalendar(page: import('@playwright/test').Page) {
   await page.goto('/settings/preferences');
   await page.waitForLoadState('networkidle');
@@ -13,7 +19,7 @@ async function enableAlternativeCalendar(page: import('@playwright/test').Page) 
 }
 
 async function setupContactPage(page: import('@playwright/test').Page) {
-  const email = `calendar-${Date.now()}@example.com`;
+  const email = uniqueEmail('calendar');
   await page.goto('/register');
   await page.getByPlaceholder('First name').fill('Calendar');
   await page.getByPlaceholder('Last name').fill('Tester');

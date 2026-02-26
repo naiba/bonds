@@ -45,6 +45,30 @@ async function navigateToTab(page: import('@playwright/test').Page, tabName: str
   await page.waitForLoadState('networkidle');
 }
 
+function getVaultUrl(page: import('@playwright/test').Page): string {
+  return page.url().replace(/\/contacts.*$/, '');
+}
+
+async function createGroup(page: import('@playwright/test').Page, vaultUrl: string, groupName: string) {
+  await page.goto(vaultUrl + '/groups');
+  await page.waitForLoadState('networkidle');
+
+  await page.getByRole('button', { name: /new group/i }).first().click();
+  const modal = page.getByRole('dialog');
+  await expect(modal).toBeVisible({ timeout: 5000 });
+
+  await modal.locator('input#name').fill(groupName);
+
+  const responsePromise = page.waitForResponse(
+    (resp) => resp.url().includes('/groups') && resp.request().method() === 'POST'
+  );
+  await modal.getByRole('button', { name: /ok/i }).click();
+  const resp = await responsePromise;
+  expect(resp.status()).toBeLessThan(400);
+
+  await expect(page.locator('.ant-list').getByText(groupName)).toBeVisible({ timeout: 15000 });
+}
+
 test.describe('Contact Modules - Relationships', () => {
   test('should create a relationship between two contacts', async ({ page }) => {
     await setupVault(page, 'rel-create');
@@ -273,5 +297,144 @@ test.describe('Contact Modules - Photos', () => {
 
     await expect(photosCard.locator('.ant-upload-drag')).toBeVisible({ timeout: 5000 });
     await expect(photosCard.getByText('No photos uploaded')).toBeVisible({ timeout: 5000 });
+  });
+});
+
+test.describe('Contact Modules - Groups', () => {
+  test('contact groups module shows empty state and allows adding groups', async ({ page }) => {
+    await setupVault(page, 'grp-module');
+    const vaultUrl = page.url();
+
+    // Create a group first
+    await createGroup(page, vaultUrl, 'Work');
+
+    // Create a contact
+    await page.goto(vaultUrl);
+    await page.waitForLoadState('networkidle');
+    await goToContacts(page);
+    await createContact(page, 'Grp', 'Contact');
+
+    // Navigate to Social tab
+    await navigateToTab(page, 'Social');
+
+    // Assert: Groups card is visible — use "Not in any group" text to uniquely identify
+    const groupsCard = page.locator('.ant-card').filter({ hasText: 'Not in any group' });
+    await expect(groupsCard).toBeVisible({ timeout: 10000 });
+
+    // Assert: empty state
+    await expect(groupsCard.getByText('Not in any group')).toBeVisible({ timeout: 5000 });
+
+    // Click Add button
+    await groupsCard.getByRole('button', { name: /add/i }).click();
+
+    // Wait for modal
+    const groupModal = page.locator('.ant-modal:visible');
+    await expect(groupModal).toBeVisible({ timeout: 5000 });
+
+    // Select "Work" group from dropdown
+    await groupModal.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Work' }).click();
+
+    // Save
+    const addResp = page.waitForResponse(
+      (resp) => resp.url().includes('/groups') && resp.request().method() === 'POST'
+    );
+    await groupModal.getByRole('button', { name: /save/i }).click();
+    const resp = await addResp;
+    expect(resp.status()).toBeLessThan(400);
+
+    // Assert: "Work" tag appears in the card
+    const updatedGroupsCard = page.locator('.ant-card').filter({ hasText: 'Work' }).filter({ has: page.locator('.ant-tag') });
+    await expect(updatedGroupsCard.locator('.ant-tag').filter({ hasText: 'Work' })).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Job Information Company', () => {
+  test('job information company dropdown shows created companies', async ({ page }) => {
+    await setupVault(page, 'job-company');
+    const vaultUrl = page.url();
+
+    // Create a company first via the companies page
+    await page.goto(vaultUrl + '/companies');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /add company/i }).first().click();
+
+    const companyModal = page.locator('.ant-modal');
+    await expect(companyModal).toBeVisible({ timeout: 5000 });
+    await companyModal.getByLabel(/company name/i).fill('TestCorp Inc');
+
+    const companyResp = page.waitForResponse(
+      (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'
+    );
+    await companyModal.getByRole('button', { name: /ok/i }).click();
+    const cResp = await companyResp;
+    expect(cResp.status()).toBeLessThan(400);
+    await expect(page.getByText('TestCorp Inc')).toBeVisible({ timeout: 10000 });
+
+    // Create a contact
+    await page.goto(vaultUrl);
+    await page.waitForLoadState('networkidle');
+    await goToContacts(page);
+    await createContact(page, 'JobCo', 'Tester');
+
+    // Navigate to Contact information tab
+    await navigateToTab(page, 'Contact information');
+
+    // Open Job Info edit modal
+    const jobCard = page.locator('.ant-card').filter({
+      has: page.locator('h5', { hasText: 'Job Information' }),
+    });
+    await expect(jobCard).toBeVisible({ timeout: 10000 });
+    await jobCard.getByRole('button', { name: /edit/i }).click();
+
+    const modal = page.locator('.ant-modal').filter({
+      has: page.locator('.ant-modal-title', { hasText: 'Edit Job Info' }),
+    });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Click the company select dropdown and verify TestCorp Inc appears
+    await modal.locator('.ant-select').first().click();
+    await expect(
+      page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'TestCorp Inc' })
+    ).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('Contact Modules - Relationship Manage Types', () => {
+  test('relationship modal shows manage types link', async ({ page }) => {
+    await setupVault(page, 'rel-manage');
+    await goToContacts(page);
+
+    // Need two contacts for relationship creation
+    await createContact(page, 'RelMgmt', 'Alice');
+
+    await page.getByRole('button', { name: /back/i }).first().click();
+    await expect(page).toHaveURL(/\/contacts$/, { timeout: 5000 });
+
+    await createContact(page, 'RelMgmt', 'Bob');
+
+    await page.getByRole('button', { name: /back/i }).first().click();
+    await expect(page).toHaveURL(/\/contacts$/, { timeout: 5000 });
+
+    // Go to Alice's page
+    await page.getByText('RelMgmt Alice').click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
+
+    // Navigate to Social tab
+    await navigateToTab(page, 'Social');
+
+    const relCard = page.locator('.ant-card').filter({ hasText: /Relationships/ });
+    await expect(relCard).toBeVisible({ timeout: 10000 });
+
+    // Open Add Relationship modal
+    await relCard.locator('.ant-card-extra button').click();
+
+    const modal = page.locator('.ant-modal').filter({ hasText: /relationship/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Verify "Manage Types" link is present
+    await expect(modal.getByText('Manage Types')).toBeVisible({ timeout: 5000 });
+    // Verify the hint text is also present
+    await expect(modal.getByText(/Configure relationship types/i)).toBeVisible({ timeout: 5000 });
   });
 });

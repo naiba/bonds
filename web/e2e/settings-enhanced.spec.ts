@@ -195,3 +195,30 @@ test.describe('Enhanced Settings', () => {
     }
   });
 });
+
+test.describe('Enhanced Settings - Personalize', () => {
+  test('personalize modules section shows module names', async ({ page }) => {
+    await registerUser(page);
+
+    await page.goto('/settings/personalize');
+    await page.waitForLoadState('networkidle');
+
+    // Find the Modules collapse panel and expand it
+    const modulesPanel = page.locator('.ant-collapse-item').filter({ hasText: 'Modules' });
+    await expect(modulesPanel).toBeVisible({ timeout: 10000 });
+    await modulesPanel.locator('.ant-collapse-header').click();
+
+    // Wait for the list items to load
+    await expect(modulesPanel.locator('.ant-list-item').first()).toBeVisible({ timeout: 15000 });
+
+    // Verify known module names from seed data are present
+    const moduleNames = ['Avatar', 'Contact name', 'Notes', 'Feed'];
+    for (const name of moduleNames) {
+      await expect(modulesPanel.getByText(name, { exact: false }).first()).toBeVisible({ timeout: 5000 });
+    }
+
+    // Verify list is not empty
+    const count = await modulesPanel.locator('.ant-list-item').count();
+    expect(count).toBeGreaterThan(0);
+  });
+});

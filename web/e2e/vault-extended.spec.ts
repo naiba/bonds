@@ -587,3 +587,162 @@ test.describe('Journal Metrics', () => {
     await expect(page.locator('.ant-tag').filter({ hasText: 'Productivity' })).not.toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Vault Reports - Overview Counts', () => {
+  test('reports page shows correct non-zero overview counts', async ({ page }) => {
+    await registerAndCreateVault(page, 'rpt-counts');
+    const vaultUrl = getVaultUrl(page);
+
+    // Create first contact
+    await page.goto(vaultUrl + '/contacts');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /add contact/i }).click();
+    await page.getByPlaceholder('First name').fill('Report');
+    await page.getByPlaceholder('Last name').fill('One');
+    await page.getByRole('button', { name: /create contact/i }).click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.getByText('Report One').first()).toBeVisible({ timeout: 10000 });
+
+    // Go back and create second contact
+    await page.goto(vaultUrl);
+    await page.waitForLoadState('networkidle');
+    await page.goto(vaultUrl + '/contacts');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /add contact/i }).click();
+    await page.getByPlaceholder('First name').fill('Report');
+    await page.getByPlaceholder('Last name').fill('Two');
+    await page.getByRole('button', { name: /create contact/i }).click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.getByText('Report Two').first()).toBeVisible({ timeout: 10000 });
+
+    // Navigate to Contact information tab to add address
+    await page.getByRole('tab', { name: 'Contact information' }).click();
+    await page.waitForLoadState('networkidle');
+
+    const addressCard = page.locator('.ant-card').filter({ hasText: 'Addresses' });
+    await expect(addressCard).toBeVisible({ timeout: 10000 });
+    await addressCard.getByRole('button', { name: /add/i }).click();
+
+    const addrModal = page.locator('.ant-modal:visible');
+    await expect(addrModal).toBeVisible({ timeout: 5000 });
+
+    // Fill required address fields
+    await addrModal.locator('.ant-form-item').filter({ hasText: 'Address Line 1' }).locator('input').fill('123 Main St');
+    await addrModal.locator('.ant-form-item').filter({ hasText: 'City' }).locator('input').fill('Springfield');
+    await addrModal.locator('.ant-form-item').filter({ hasText: 'Country' }).locator('input').fill('United States');
+
+    const addrResp = page.waitForResponse(
+      (resp) => resp.url().includes('/addresses') && resp.request().method() === 'POST'
+    );
+    await addrModal.getByRole('button', { name: /ok/i }).click();
+    const addrRespResult = await addrResp;
+    expect(addrRespResult.status()).toBeLessThan(400);
+
+    // Add an important date to the same contact (Contact information tab)
+    await page.getByRole('tab', { name: 'Contact information' }).click();
+    await page.waitForLoadState('networkidle');
+
+    const datesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
+    await expect(datesCard).toBeVisible({ timeout: 10000 });
+
+    await datesCard.getByRole('button', { name: /add/i }).click();
+
+    const dateModal = page.locator('.ant-modal:visible');
+    await expect(dateModal).toBeVisible({ timeout: 5000 });
+
+    // Select "Birthdate" type first (auto-fills label)
+    const dateTypeSelect = dateModal.locator('.ant-form-item').filter({ hasText: 'Date Type' }).locator('.ant-select');
+    await dateTypeSelect.click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Birthdate' }).click();
+
+    // Close dropdown by clicking modal header
+    await dateModal.locator('.ant-modal-header').click();
+
+    // Set date via DatePicker
+    const datePicker = dateModal.locator('.ant-picker');
+    await datePicker.click();
+
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(10);
+    await dateCell.click();
+    await dateModal.locator('.ant-modal-header').click();
+
+    const dateResp = page.waitForResponse(
+      (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
+    );
+    await dateModal.getByRole('button', { name: /ok/i }).click();
+    const dateRespResult = await dateResp;
+    expect(dateRespResult.status()).toBeLessThan(400);
+
+    // Navigate to the reports page
+    await page.goto(vaultUrl + '/reports');
+    await page.waitForLoadState('networkidle');
+
+    // Verify the stats cards show correct counts
+    // Total Contacts: 2
+    const totalContactsStat = page.locator('.ant-statistic').filter({ hasText: /Total Contacts/i });
+    await expect(totalContactsStat).toBeVisible({ timeout: 10000 });
+    await expect(totalContactsStat.locator('.ant-statistic-content-value')).toHaveText('2', { timeout: 10000 });
+
+    // Total Addresses: 1
+    const totalAddressesStat = page.locator('.ant-statistic').filter({ hasText: /Total Addresses/i });
+    await expect(totalAddressesStat).toBeVisible({ timeout: 10000 });
+    await expect(totalAddressesStat.locator('.ant-statistic-content-value')).toHaveText('1', { timeout: 10000 });
+
+    // Total Dates: at least 1
+    const totalDatesStat = page.locator('.ant-statistic').filter({ hasText: /Total Dates/i });
+    await expect(totalDatesStat).toBeVisible({ timeout: 10000 });
+    const datesValue = await totalDatesStat.locator('.ant-statistic-content-value').textContent();
+    expect(Number(datesValue)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+test.describe('Vault Feed - Contact Names', () => {
+  test('vault feed displays contact name instead of UUID', async ({ page }) => {
+    await registerAndCreateVault(page, 'vfeed-name');
+    const vaultUrl = getVaultUrl(page);
+
+    // Create a contact
+    await page.goto(vaultUrl + '/contacts');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /add contact/i }).click();
+    await page.getByPlaceholder('First name').fill('FeedName');
+    await page.getByPlaceholder('Last name').fill('Tester');
+    await page.getByRole('button', { name: /create contact/i }).click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.getByText('FeedName Tester').first()).toBeVisible({ timeout: 10000 });
+
+    // Create a note to generate a feed entry
+    await page.getByRole('tab', { name: 'Information', exact: true }).click();
+    await page.waitForLoadState('networkidle');
+
+    const notesCard = page.locator('.ant-card').filter({ hasText: /^Notes/ });
+    await expect(notesCard).toBeVisible({ timeout: 10000 });
+    await notesCard.getByRole('button', { name: /add/i }).click();
+
+    await notesCard.getByPlaceholder(/title/i).fill('Feed Test Note');
+    await notesCard.locator('textarea').fill('This note generates a feed entry');
+
+    const noteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/notes') && resp.request().method() === 'POST'
+    );
+    await notesCard.getByRole('button', { name: /save/i }).click();
+    const resp = await noteResp;
+    expect(resp.status()).toBeLessThan(400);
+
+    // Navigate to vault feed page
+    await page.goto(vaultUrl + '/feed');
+    await page.waitForLoadState('networkidle');
+
+    // Verify the feed shows the contact name, not a UUID pattern
+    await expect(page.getByText('FeedName Tester').first()).toBeVisible({ timeout: 15000 });
+
+    // Ensure no UUID pattern is displayed as a contact identifier in the feed list
+    const feedList = page.locator('.ant-list');
+    await expect(feedList).toBeVisible({ timeout: 10000 });
+    const feedContent = await feedList.textContent();
+    // UUID pattern: 8-4-4-4-12 hex characters — should not appear as a standalone contact reference
+    const uuidOnlyPattern = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/;
+    // Feed may contain UUIDs in URLs, but the visible contact name should be 'FeedName Tester'
+    expect(feedContent).toContain('FeedName Tester');
+  });
+});

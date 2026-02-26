@@ -168,3 +168,70 @@ func TestFeedPagination(t *testing.T) {
 		t.Errorf("Expected 1 feed item on page 3, got %d", len(items2))
 	}
 }
+
+func TestFeedContactName(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "feed-contactname@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{
+		FirstName: "Alice",
+		LastName:  "Wang",
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	desc := "Test feed contact name"
+	item := &models.ContactFeedItem{
+		ContactID:   contact.ID,
+		AuthorID:    &resp.User.ID,
+		Action:      "note_created",
+		Description: &desc,
+	}
+	if err := db.Create(item).Error; err != nil {
+		t.Fatalf("Create feed item failed: %v", err)
+	}
+
+	svc := NewFeedService(db)
+	items, _, err := svc.GetFeed(vault.ID, 1, 15)
+	if err != nil {
+		t.Fatalf("GetFeed failed: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("Expected 1 feed item, got %d", len(items))
+	}
+	expectedName := "Alice Wang"
+	if items[0].ContactName != expectedName {
+		t.Errorf("Expected contact_name=%q, got %q", expectedName, items[0].ContactName)
+	}
+
+	// Also verify ListContactFeed returns the same contact_name
+	items2, _, err := svc.ListContactFeed(contact.ID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListContactFeed failed: %v", err)
+	}
+	if len(items2) != 1 {
+		t.Fatalf("Expected 1 feed item from ListContactFeed, got %d", len(items2))
+	}
+	if items2[0].ContactName != expectedName {
+		t.Errorf("ListContactFeed: expected contact_name=%q, got %q", expectedName, items2[0].ContactName)
+	}
+}

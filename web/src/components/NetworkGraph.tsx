@@ -119,8 +119,9 @@ export default function NetworkGraph({ vaultId, contactId }: NetworkGraphProps) 
     const chargeStrength = isMobile ? -200 : -400;
     const linkDistance = isMobile ? 80 : 120;
 
-    const nodes: GraphNode[] = graphData.nodes.map((n) => ({ ...n }));
-    const edges: GraphEdge[] = graphData.edges.map((e) => ({ ...e }));
+    // 防御性处理：API 可能返回 nodes/edges 为 null 的情况
+    const nodes: GraphNode[] = (graphData.nodes ?? []).map((n) => ({ ...n }));
+    const edges: GraphEdge[] = (graphData.edges ?? []).map((e) => ({ ...e }));
 
     const g = svg.append("g");
 
