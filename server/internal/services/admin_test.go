@@ -346,3 +346,60 @@ func TestAdminDeleteUser_SharedAccount_OnlyDeletesTargetUser(t *testing.T) {
 		t.Error("expected deleted user's UserVault to be removed")
 	}
 }
+
+func TestAdminSetStorageLimit(t *testing.T) {
+	adminSvc, authSvc, _ := setupAdminTest(t)
+	resp := registerTestUser(t, authSvc, "storage-limit@example.com")
+
+	// Default should be 0 (unlimited)
+	var account models.Account
+	adminSvc.db.First(&account, "id = ?", resp.User.AccountID)
+	if account.StorageLimitInMB != 0 {
+		t.Fatalf("expected default storage_limit_in_mb=0, got %d", account.StorageLimitInMB)
+	}
+
+	// Set storage limit
+	if err := adminSvc.SetStorageLimit(resp.User.ID, 1024); err != nil {
+		t.Fatalf("SetStorageLimit failed: %v", err)
+	}
+
+	adminSvc.db.First(&account, "id = ?", resp.User.AccountID)
+	if account.StorageLimitInMB != 1024 {
+		t.Errorf("expected storage_limit_in_mb=1024, got %d", account.StorageLimitInMB)
+	}
+
+	// Verify it appears in ListUsers response
+	users, err := adminSvc.ListUsers()
+	if err != nil {
+		t.Fatalf("ListUsers failed: %v", err)
+	}
+	found := false
+	for _, u := range users {
+		if u.ID == resp.User.ID {
+			found = true
+			if u.StorageLimitInMB != 1024 {
+				t.Errorf("expected StorageLimitInMB=1024 in response, got %d", u.StorageLimitInMB)
+			}
+		}
+	}
+	if !found {
+		t.Error("user not found in ListUsers")
+	}
+
+	// Set back to 0 (unlimited)
+	if err := adminSvc.SetStorageLimit(resp.User.ID, 0); err != nil {
+		t.Fatalf("SetStorageLimit to 0 failed: %v", err)
+	}
+	adminSvc.db.First(&account, "id = ?", resp.User.AccountID)
+	if account.StorageLimitInMB != 0 {
+		t.Errorf("expected storage_limit_in_mb=0 after reset, got %d", account.StorageLimitInMB)
+	}
+}
+
+func TestAdminSetStorageLimit_UserNotFound(t *testing.T) {
+	adminSvc, _, _ := setupAdminTest(t)
+	err := adminSvc.SetStorageLimit("nonexistent-id", 1024)
+	if err != ErrAdminUserNotFound {
+		t.Errorf("expected ErrAdminUserNotFound, got %v", err)
+	}
+}

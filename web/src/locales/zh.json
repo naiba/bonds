@@ -944,7 +944,8 @@
       "description": "查看文件存储使用情况和限制。",
       "used": "已使用",
       "remaining": "剩余",
-      "usage_percent": "已使用 {{percent}}%"
+      "usage_percent": "已使用 {{percent}}%",
+      "unlimited": "无限制"
     }
   },
   "api_tokens": {
@@ -1163,7 +1164,12 @@
       "admin_removed": "已取消管理员权限",
       "deleted": "用户已删除",
       "cannot_delete_self": "不能删除自己的账户",
-      "cannot_disable_self": "不能禁用自己的账户"
+      "cannot_disable_self": "不能禁用自己的账户",
+      "storage_limit_updated": "存储限额已更新",
+      "set_storage_limit": "设置限额",
+      "storage_limit_hint": "设置此用户的存储配额（MB）。输入 0 表示无限制。",
+      "storage_limit_placeholder": "0 = 无限制",
+      "unlimited": "无限制"
     },
     "settings": {
       "title": "系统设置",

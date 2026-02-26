@@ -14,6 +14,7 @@ type AdminUserResponse struct {
 	ContactCount            int64     `json:"contact_count" example:"42"`
 	StorageUsed             int64     `json:"storage_used" example:"10485760"`
 	VaultCount              int64     `json:"vault_count" example:"2"`
+	StorageLimitInMB        int       `json:"storage_limit_in_mb" example:"0"`
 	CreatedAt               time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 }
 
@@ -23,6 +24,10 @@ type AdminToggleUserRequest struct {
 
 type AdminSetAdminRequest struct {
 	IsInstanceAdministrator bool `json:"is_instance_administrator" example:"true"`
+}
+
+type AdminSetStorageLimitRequest struct {
+	StorageLimitInMB int `json:"storage_limit_in_mb" example:"1024"`
 }
 
 type SystemSettingItem struct {

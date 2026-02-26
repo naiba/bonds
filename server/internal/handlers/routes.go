@@ -154,7 +154,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactService.SetDavPushService(davPushService)
 	noteService.SetSearchService(searchService)
 
-	postPhotoHandler := NewPostPhotoHandler(vaultFileService)
+	postPhotoHandler := NewPostPhotoHandler(vaultFileService, storageInfoService)
 	contactPhotoHandler := NewContactPhotoHandler(vaultFileService)
 	contactDocumentHandler := NewContactDocumentHandler(vaultFileService)
 
@@ -180,7 +180,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	journalHandler := NewJournalHandler(journalService)
 	postHandler := NewPostHandler(postService)
 	vaultTaskHandler := NewVaultTaskHandler(vaultTaskService)
-	vaultFileHandler := NewVaultFileHandler(vaultFileService)
+	vaultFileHandler := NewVaultFileHandler(vaultFileService, storageInfoService)
 	avatarHandler := NewAvatarHandler(db, vaultFileService)
 	companyHandler := NewCompanyHandler(companyService)
 	calendarHandler := NewCalendarHandler(calendarService)
@@ -285,6 +285,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	adminGroup.PUT("/users/:id/toggle", adminHandler.ToggleUser)
 	adminGroup.PUT("/users/:id/admin", adminHandler.SetAdmin)
 	adminGroup.DELETE("/users/:id", adminHandler.DeleteUser)
+	adminGroup.PUT("/users/:id/storage-limit", adminHandler.SetStorageLimit)
 	adminGroup.GET("/settings", adminHandler.GetSettings)
 	adminGroup.PUT("/settings", adminHandler.UpdateSettings)
 	adminGroup.GET("/oauth-providers", oauthProviderHandler.List)

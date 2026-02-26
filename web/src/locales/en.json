@@ -944,7 +944,8 @@
       "description": "View your file storage usage and limits.",
       "used": "Used",
       "remaining": "Remaining",
-      "usage_percent": "{{percent}}% used"
+      "usage_percent": "{{percent}}% used",
+      "unlimited": "Unlimited"
     }
   },
   "api_tokens": {
@@ -1163,7 +1164,12 @@
       "admin_removed": "Admin privileges removed",
       "deleted": "User deleted",
       "cannot_delete_self": "You cannot delete your own account",
-      "cannot_disable_self": "You cannot disable your own account"
+      "cannot_disable_self": "You cannot disable your own account",
+      "storage_limit_updated": "Storage limit updated",
+      "set_storage_limit": "Set Limit",
+      "storage_limit_hint": "Set storage quota for this user in MB. Enter 0 for unlimited.",
+      "storage_limit_placeholder": "0 = unlimited",
+      "unlimited": "Unlimited"
     },
     "settings": {
       "title": "System Settings",

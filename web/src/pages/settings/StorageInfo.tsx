@@ -29,10 +29,14 @@ export default function StorageInfo() {
 
   if (!usage) return null;
 
-  const percent = Math.round((usage.used_bytes / usage.limit_bytes) * 100);
+  // limit_bytes=0 表示无限制，避免除零导致 NaN/Infinity
+  const isUnlimited = !usage.limit_bytes;
+  const percent = isUnlimited ? 0 : Math.round((usage.used_bytes / usage.limit_bytes) * 100);
   const used = filesize(usage.used_bytes) as string;
-  const limit = filesize(usage.limit_bytes) as string;
-  const remaining = filesize(usage.limit_bytes - usage.used_bytes) as string;
+  const limit = isUnlimited ? t("settings.storage.unlimited") : (filesize(usage.limit_bytes) as string);
+  const remaining = isUnlimited
+    ? t("settings.storage.unlimited")
+    : (filesize(usage.limit_bytes - usage.used_bytes) as string);
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
@@ -48,9 +52,10 @@ export default function StorageInfo() {
           <Progress
             type="dashboard"
             percent={percent}
-            status={percent > 90 ? "exception" : "normal"}
+            status={!isUnlimited && percent > 90 ? "exception" : "normal"}
             strokeWidth={10}
             size={200}
+            format={() => isUnlimited ? "∞" : `${percent}%`}
           />
           <div style={{ marginTop: 16 }}>
             <Title level={3} style={{ margin: 0 }}>
@@ -74,10 +79,10 @@ export default function StorageInfo() {
             <Card style={{ background: token.colorBgLayout }}>
               <Statistic
                 title={t("settings.storage.usage_percent")}
-                value={percent}
-                suffix="%"
+                value={isUnlimited ? "∞" : percent}
+                suffix={isUnlimited ? "" : "%"}
                 prefix={<DatabaseOutlined />}
-                valueStyle={{ color: percent > 90 ? "#cf1322" : "inherit" }}
+                valueStyle={{ color: !isUnlimited && percent > 90 ? "#cf1322" : "inherit" }}
               />
             </Card>
           </Col>

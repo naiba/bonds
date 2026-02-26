@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
@@ -15,11 +16,12 @@ import (
 var _ dto.VaultFileResponse
 
 type PostPhotoHandler struct {
-	vaultFileService *services.VaultFileService
+	vaultFileService  *services.VaultFileService
+	storageInfoService *services.StorageInfoService
 }
 
-func NewPostPhotoHandler(vaultFileService *services.VaultFileService) *PostPhotoHandler {
-	return &PostPhotoHandler{vaultFileService: vaultFileService}
+func NewPostPhotoHandler(vaultFileService *services.VaultFileService, storageInfoService *services.StorageInfoService) *PostPhotoHandler {
+	return &PostPhotoHandler{vaultFileService: vaultFileService, storageInfoService: storageInfoService}
 }
 
 // List godoc
@@ -81,6 +83,15 @@ func (h *PostPhotoHandler) Upload(c echo.Context) error {
 		return response.BadRequest(c, "err.file_too_large", map[string]string{
 			"max_size": fmt.Sprintf("%d MB", maxUploadSize/(1024*1024)),
 		})
+	}
+
+	// 检查账户存储配额。limit_bytes=0 表示无限制。
+	accountID := middleware.GetAccountID(c)
+	storageInfo, sErr := h.storageInfoService.Get(accountID)
+	if sErr == nil && storageInfo.LimitBytes > 0 {
+		if storageInfo.UsedBytes+fileHeader.Size > storageInfo.LimitBytes {
+			return response.BadRequest(c, "err.storage_quota_exceeded", nil)
+		}
 	}
 
 	mimeType := fileHeader.Header.Get("Content-Type")

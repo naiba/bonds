@@ -30,11 +30,12 @@ var allowedMimeTypes = map[string]bool{
 const maxUploadSize = 10 * 1024 * 1024
 
 type VaultFileHandler struct {
-	vaultFileService *services.VaultFileService
+	vaultFileService  *services.VaultFileService
+	storageInfoService *services.StorageInfoService
 }
 
-func NewVaultFileHandler(vaultFileService *services.VaultFileService) *VaultFileHandler {
-	return &VaultFileHandler{vaultFileService: vaultFileService}
+func NewVaultFileHandler(vaultFileService *services.VaultFileService, storageInfoService *services.StorageInfoService) *VaultFileHandler {
+	return &VaultFileHandler{vaultFileService: vaultFileService, storageInfoService: storageInfoService}
 }
 
 // List godoc
@@ -150,6 +151,15 @@ func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, file
 		return response.BadRequest(c, "err.file_too_large", map[string]string{
 			"max_size": fmt.Sprintf("%d MB", maxUploadSize/(1024*1024)),
 		})
+	}
+
+	// 检查账户存储配额。limit_bytes=0 表示无限制。
+	accountID := middleware.GetAccountID(c)
+	storageInfo, err := h.storageInfoService.Get(accountID)
+	if err == nil && storageInfo.LimitBytes > 0 {
+		if storageInfo.UsedBytes+fileHeader.Size > storageInfo.LimitBytes {
+			return response.BadRequest(c, "err.storage_quota_exceeded", nil)
+		}
 	}
 
 	mimeType := fileHeader.Header.Get("Content-Type")

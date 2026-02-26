@@ -9,6 +9,8 @@ import {
   Space,
   Spin,
   Segmented,
+  InputNumber,
+  Modal,
 } from "antd";
 import {
   CrownOutlined,
@@ -19,6 +21,7 @@ import {
   TeamOutlined,
   DatabaseOutlined,
   KeyOutlined,
+  CloudOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -29,6 +32,7 @@ import { useAuth } from "@/stores/auth";
 import { filesize } from "filesize";
 import type { ColumnsType } from "antd/es/table";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { useState } from "react";
 
 const { Title, Text } = Typography;
 
@@ -40,6 +44,8 @@ export default function AdminUsers() {
   const navigate = useNavigate();
   const nameOrder = useNameOrder();
   const qk = ["admin", "users"];
+  const [storageLimitModalUser, setStorageLimitModalUser] = useState<AdminUser | null>(null);
+  const [storageLimitValue, setStorageLimitValue] = useState<number>(0);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: qk,
@@ -91,6 +97,17 @@ export default function AdminUsers() {
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const storageLimitMutation = useMutation({
+    mutationFn: ({ id, storage_limit_in_mb }: { id: string; storage_limit_in_mb: number }) =>
+      api.admin.usersStorageLimitUpdate(id, { storage_limit_in_mb }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      message.success(t("admin.users.storage_limit_updated"));
+      setStorageLimitModalUser(null);
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   const columns: ColumnsType<AdminUser> = [
     {
       title: t("admin.users.name"),
@@ -119,10 +136,31 @@ export default function AdminUsers() {
     },
     {
       title: t("admin.users.storage"),
-      dataIndex: "storage_used",
-      key: "storage_used",
-      width: 120,
-      render: (v: number) => (v ? (filesize(v) as string) : "0 B"),
+      key: "storage",
+      width: 160,
+      render: (_: unknown, record: AdminUser) => {
+        const used = record.storage_used ? (filesize(record.storage_used) as string) : "0 B";
+        const limitMB = record.storage_limit_in_mb ?? 0;
+        // storage_limit_in_mb=0 表示无限制
+        const limitStr = limitMB > 0 ? (filesize(limitMB * 1024 * 1024) as string) : t("admin.users.unlimited");
+        return (
+          <Space direction="vertical" size={0}>
+            <span>{used} / {limitStr}</span>
+            <Button
+              type="link"
+              size="small"
+              style={{ padding: 0, height: "auto" }}
+              icon={<CloudOutlined />}
+              onClick={() => {
+                setStorageLimitModalUser(record);
+                setStorageLimitValue(limitMB);
+              }}
+            >
+              {t("admin.users.set_storage_limit")}
+            </Button>
+          </Space>
+        );
+      },
     },
     {
       title: t("admin.users.role"),
@@ -265,6 +303,33 @@ export default function AdminUsers() {
           scroll={{ x: 900 }}
         />
       </Card>
+
+      <Modal
+        title={t("admin.users.set_storage_limit")}
+        open={!!storageLimitModalUser}
+        onCancel={() => setStorageLimitModalUser(null)}
+        onOk={() => {
+          if (storageLimitModalUser?.id) {
+            storageLimitMutation.mutate({
+              id: storageLimitModalUser.id,
+              storage_limit_in_mb: storageLimitValue,
+            });
+          }
+        }}
+        confirmLoading={storageLimitMutation.isPending}
+      >
+        <Typography.Paragraph type="secondary">
+          {t("admin.users.storage_limit_hint")}
+        </Typography.Paragraph>
+        <InputNumber
+          value={storageLimitValue}
+          onChange={(v) => setStorageLimitValue(v ?? 0)}
+          min={0}
+          addonAfter="MB"
+          style={{ width: "100%" }}
+          placeholder={t("admin.users.storage_limit_placeholder")}
+        />
+      </Modal>
     </div>
   );
 }

@@ -130,6 +130,45 @@ func (h *AdminHandler) SetAdmin(c echo.Context) error {
 	return response.OK(c, map[string]string{"status": "ok"})
 }
 
+// SetStorageLimit godoc
+//
+//	@Summary		Set storage limit for a user's account
+//	@Description	Set the storage quota (in MB) for a user's account. 0 means unlimited.
+//	@Tags			admin
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id		path		string								true	"User ID"
+//	@Param			request	body		dto.AdminSetStorageLimitRequest	true	"Storage limit request"
+//	@Success		200		{object}	response.APIResponse
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		403		{object}	response.APIResponse
+//	@Failure		404		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/admin/users/{id}/storage-limit [put]
+func (h *AdminHandler) SetStorageLimit(c echo.Context) error {
+	targetID := c.Param("id")
+
+	var req dto.AdminSetStorageLimitRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if req.StorageLimitInMB < 0 {
+		return response.BadRequest(c, "err.invalid_storage_limit", nil)
+	}
+
+	err := h.adminService.SetStorageLimit(targetID, req.StorageLimitInMB)
+	if err != nil {
+		if errors.Is(err, services.ErrAdminUserNotFound) {
+			return response.NotFound(c, "err.user_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_set_storage_limit")
+	}
+
+	return response.OK(c, map[string]string{"status": "ok"})
+}
+
 // DeleteUser godoc
 //
 //	@Summary		Delete a user

@@ -53,6 +53,9 @@ func (s *AdminService) toAdminUserResponse(u models.User) dto.AdminUserResponse 
 
 	storageUsed := s.calculateStorageUsed(u.AccountID)
 
+	var account models.Account
+	s.db.First(&account, "id = ?", u.AccountID)
+
 	return dto.AdminUserResponse{
 		ID:                      u.ID,
 		AccountID:               u.AccountID,
@@ -64,6 +67,7 @@ func (s *AdminService) toAdminUserResponse(u models.User) dto.AdminUserResponse 
 		Disabled:                u.Disabled,
 		ContactCount:            contactCount,
 		StorageUsed:             storageUsed,
+		StorageLimitInMB:        account.StorageLimitInMB,
 		VaultCount:              vaultCount,
 		CreatedAt:               u.CreatedAt,
 	}
@@ -113,6 +117,18 @@ func (s *AdminService) SetAdmin(actorID, targetID string, isAdmin bool) error {
 	}
 
 	return s.db.Model(&user).Update("is_instance_administrator", isAdmin).Error
+}
+
+
+func (s *AdminService) SetStorageLimit(targetID string, limitMB int) error {
+	var user models.User
+	if err := s.db.First(&user, "id = ?", targetID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrAdminUserNotFound
+		}
+		return err
+	}
+	return s.db.Model(&models.Account{}).Where("id = ?", user.AccountID).Update("storage_limit_in_mb", limitMB).Error
 }
 
 func (s *AdminService) DeleteUser(actorID, targetID string) error {
