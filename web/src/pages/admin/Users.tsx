@@ -141,8 +141,8 @@ export default function AdminUsers() {
       render: (_: unknown, record: AdminUser) => {
         const used = record.storage_used ? (filesize(record.storage_used) as string) : "0 B";
         const limitMB = record.storage_limit_in_mb ?? 0;
-        // storage_limit_in_mb=0 表示无限制
-        const limitStr = limitMB > 0 ? (filesize(limitMB * 1024 * 1024) as string) : t("admin.users.unlimited");
+        // storage_limit_in_mb=0 表示使用实例默认限制
+        const limitStr = limitMB > 0 ? (filesize(limitMB * 1024 * 1024) as string) : t("admin.users.instance_default");
         return (
           <Space direction="vertical" size={0}>
             <span>{used} / {limitStr}</span>

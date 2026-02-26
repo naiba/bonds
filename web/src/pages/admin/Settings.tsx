@@ -60,6 +60,7 @@ const KNOWN_SETTINGS: SettingDef[] = [
 
   // Storage
   { key: "storage.max_size", type: "number", section: "storage" },
+  { key: "storage.default_limit_mb", type: "number", section: "storage", placeholder: "0 = unlimited" },
 
   // Backup
   { key: "backup.cron", section: "backup" },

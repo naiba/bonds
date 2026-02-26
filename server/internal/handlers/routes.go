@@ -85,7 +85,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultQuickFactTplService := services.NewVaultQuickFactTemplateService(db)
 	userManagementService := services.NewUserManagementService(db)
 	accountCancelService := services.NewAccountCancelService(db)
-	storageInfoService := services.NewStorageInfoService(db)
+	storageInfoService := services.NewStorageInfoService(db, systemSettingService)
 	backupService := services.NewBackupService(db, cfg)
 	currencyService := services.NewCurrencyService(db)
 	templatePageService := services.NewTemplatePageService(db)

@@ -944,7 +944,7 @@
       "description": "查看文件存储使用情况和限制。",
       "used": "已使用",
       "remaining": "剩余",
-      "usage_percent": "已使用 {{percent}}%",
+      "usage_percent": "使用率",
       "unlimited": "无限制"
     }
   },
@@ -1167,9 +1167,10 @@
       "cannot_disable_self": "不能禁用自己的账户",
       "storage_limit_updated": "存储限额已更新",
       "set_storage_limit": "设置限额",
-      "storage_limit_hint": "设置此用户的存储配额（MB）。输入 0 表示无限制。",
-      "storage_limit_placeholder": "0 = 无限制",
-      "unlimited": "无限制"
+      "storage_limit_hint": "设置此用户的存储配额（MB）。输入 0 表示使用实例默认限额。",
+      "storage_limit_placeholder": "0 = 使用实例默认",
+      "unlimited": "无限制",
+      "instance_default": "实例默认"
     },
     "settings": {
       "title": "系统设置",
@@ -1232,7 +1233,8 @@
         "locationiq": "LocationIQ"
       },
       "storage": {
-        "max_size": "最大上传大小（字节）"
+        "max_size": "最大上传大小（字节）",
+        "default_limit_mb": "默认用户储存限额（MB，0 = 无限制）"
       },
       "backup": {
         "cron": "备份计划（Cron 表达式）",

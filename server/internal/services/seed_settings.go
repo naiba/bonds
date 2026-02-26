@@ -42,6 +42,7 @@ func SeedSettingsFromEnv(svc *SystemSettingService, cfg *config.Config) error {
 		{"jwt.refresh_hrs", strconv.Itoa(cfg.JWT.RefreshHrs)},
 
 		{"storage.max_size", strconv.FormatInt(cfg.Storage.MaxSize, 10)},
+		{"storage.default_limit_mb", "0"},
 		{"auth.require_email_verification", "false"},
 		{"registration.enabled", "true"},
 		{"auth.password.enabled", "true"},

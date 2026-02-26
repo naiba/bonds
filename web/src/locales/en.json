@@ -944,7 +944,7 @@
       "description": "View your file storage usage and limits.",
       "used": "Used",
       "remaining": "Remaining",
-      "usage_percent": "{{percent}}% used",
+      "usage_percent": "Usage",
       "unlimited": "Unlimited"
     }
   },
@@ -1167,9 +1167,10 @@
       "cannot_disable_self": "You cannot disable your own account",
       "storage_limit_updated": "Storage limit updated",
       "set_storage_limit": "Set Limit",
-      "storage_limit_hint": "Set storage quota for this user in MB. Enter 0 for unlimited.",
-      "storage_limit_placeholder": "0 = unlimited",
-      "unlimited": "Unlimited"
+      "storage_limit_hint": "Set storage quota for this user in MB. Enter 0 to use the instance default limit.",
+      "storage_limit_placeholder": "0 = use instance default",
+      "unlimited": "Unlimited",
+      "instance_default": "Instance Default"
     },
     "settings": {
       "title": "System Settings",
@@ -1232,7 +1233,8 @@
         "locationiq": "LocationIQ"
       },
       "storage": {
-        "max_size": "Max Upload Size (bytes)"
+        "max_size": "Max Upload Size (bytes)",
+        "default_limit_mb": "Default Storage Limit per Account (MB, 0 = unlimited)"
       },
       "backup": {
         "cron": "Backup Schedule (cron)",
