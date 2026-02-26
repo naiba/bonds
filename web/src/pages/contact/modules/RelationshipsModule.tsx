@@ -203,6 +203,14 @@ export default function RelationshipsModule({
               options={relationshipTypes.map((rt) => ({ value: rt.id!, label: rt.name ?? "" }))}
             />
           </Form.Item>
+          <div style={{ marginTop: -12, marginBottom: 24 }}>
+            <a onClick={() => window.open("/settings/personalize", "_blank")} style={{ fontSize: 12, color: token.colorPrimary }}>
+              {t("modules.relationships.manage_types")}
+            </a>
+            <div style={{ fontSize: 12, color: token.colorTextSecondary, marginTop: 4 }}>
+              {t("modules.relationships.manage_types_hint")}
+            </div>
+          </div>
         </Form>
       </Modal>
     </Card>

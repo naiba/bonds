@@ -696,6 +696,8 @@
       "contact": "联系人",
       "select_contact": "选择联系人",
       "relationship_type": "关系类型",
+      "manage_types": "管理类型",
+      "manage_types_hint": "在设置中配置关系类型、亲属层级和反向关系",
       "graph_title": "关系网络",
       "graph_empty": "暂无关系可视化",
       "kinship_degree": "亲等度数: {{degree}}",

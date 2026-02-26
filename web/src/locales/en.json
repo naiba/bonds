@@ -696,6 +696,8 @@
       "contact": "Contact",
       "select_contact": "Select a contact",
       "relationship_type": "Relationship Type",
+      "manage_types": "Manage Types",
+      "manage_types_hint": "Configure relationship types, degrees and reverse relationships in Settings",
       "graph_title": "Relationship Network",
       "graph_empty": "No relationships to visualize",
       "kinship_degree": "Kinship Degree: {{degree}}",
