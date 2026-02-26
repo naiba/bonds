@@ -12,6 +12,7 @@ import {
   Popconfirm,
   App,
   Segmented,
+  Image,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -112,19 +113,7 @@ export default function VaultFiles() {
       key: "name",
       render: (name: string, record: Document) => (
         <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: token.borderRadius,
-              background: token.colorFillSecondary,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {getFileIcon(record.mime_type ?? '')}
-          </div>
+          {record.mime_type?.startsWith("image/") ? ( <Image width={36} height={36} src={`/api/vaults/${vaultId}/files/${record.id}/download?token=${localStorage.getItem("token")}&preview=true`} style={{ objectFit: "cover", borderRadius: token.borderRadius }} preview={{ src: `/api/vaults/${vaultId}/files/${record.id}/download?token=${localStorage.getItem("token")}&preview=true` }} /> ) : ( <div style={{ width: 36, height: 36, borderRadius: token.borderRadius, background: token.colorFillSecondary, display: "flex", alignItems: "center", justifyContent: "center", }} > {getFileIcon(record.mime_type ?? '')} </div> )}
           <span style={{ fontWeight: 500 }}>{name}</span>
         </span>
       ),

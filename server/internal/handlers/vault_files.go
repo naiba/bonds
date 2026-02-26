@@ -202,5 +202,8 @@ func (h *VaultFileHandler) Serve(c echo.Context) error {
 	}
 
 	filePath := filepath.Join(h.vaultFileService.UploadDir(), file.UUID)
+	if c.QueryParam("preview") == "true" && strings.HasPrefix(file.MimeType, "image/") {
+		return c.Inline(filePath, file.Name)
+	}
 	return c.Attachment(filePath, file.Name)
 }
