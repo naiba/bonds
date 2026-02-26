@@ -110,6 +110,7 @@ export default function FeedModule({ vaultId, contactId }: FeedModuleProps) {
                   >
                     {item.action}
                   </Tag>
+                  {item.contact_name && <Text strong>{item.contact_name}</Text>}
                   <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                     <ClockCircleOutlined style={{ fontSize: 11, color: token.colorTextQuaternary }} />
                     <Text type="secondary" style={{ fontSize: 12 }}>
