@@ -32,6 +32,8 @@ func (s *MostConsultedService) List(vaultID, userID string) ([]dto.MostConsulted
 		Select("contact_vault_user.contact_id, contacts.first_name, contacts.last_name, contacts.middle_name, contacts.nickname, contacts.maiden_name, contacts.prefix, contacts.suffix, contact_vault_user.number_of_views").
 		Joins("JOIN contacts ON contacts.id = contact_vault_user.contact_id").
 		Where("contact_vault_user.vault_id = ? AND contact_vault_user.user_id = ? AND contact_vault_user.number_of_views > 0", vaultID, userID).
+		// 手动 JOIN 不会触发 GORM 软删除自动过滤，必须显式排除已删除和已归档的联系人。
+		Where("contacts.deleted_at IS NULL AND contacts.listed = ?", true).
 		Order("contact_vault_user.number_of_views DESC").
 		Limit(10).
 		Scan(&rows).Error

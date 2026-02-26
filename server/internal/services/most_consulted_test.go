@@ -152,3 +152,43 @@ func TestMostConsulted_OrderByViews(t *testing.T) {
 		t.Errorf("expected second result first_name=John, got %s", result[1].FirstName)
 	}
 }
+
+func TestMostConsulted_ExcludesDeletedContacts(t *testing.T) {
+	ctx := setupMostConsultedTest(t)
+
+	// Soft-delete the contact
+	if err := ctx.db.Delete(&models.Contact{}, "id = ?", ctx.contactID).Error; err != nil {
+		t.Fatalf("Delete contact failed: %v", err)
+	}
+
+	result, err := ctx.svc.List(ctx.vaultID, ctx.userID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	// Soft-deleted contact should NOT appear in most consulted
+	for _, item := range result {
+		if item.ContactID == ctx.contactID {
+			t.Error("soft-deleted contact should not appear in most consulted list")
+		}
+	}
+}
+
+func TestMostConsulted_ExcludesArchivedContacts(t *testing.T) {
+	ctx := setupMostConsultedTest(t)
+
+	// Archive the contact (Listed = false)
+	if err := ctx.db.Model(&models.Contact{}).Where("id = ?", ctx.contactID).Update("listed", false).Error; err != nil {
+		t.Fatalf("Archive contact failed: %v", err)
+	}
+
+	result, err := ctx.svc.List(ctx.vaultID, ctx.userID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	// Archived contact should NOT appear in most consulted
+	for _, item := range result {
+		if item.ContactID == ctx.contactID {
+			t.Error("archived contact should not appear in most consulted list")
+		}
+	}
+}
