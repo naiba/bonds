@@ -76,7 +76,7 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
     queryKey: ["vaults", vaultId, "companies"],
     queryFn: async () => {
       const res = await api.companies.companiesList(String(vaultId));
-      return res.data?.data || [];
+      return res.data ?? [];
     },
     enabled: isJobModalOpen,
   });
