@@ -3,13 +3,14 @@ package handlers
 import (
 	"net/http"
 	"path/filepath"
-	"strings"
+	
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/internal/utils"
 	"github.com/naiba/bonds/pkg/avatar"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
@@ -54,7 +55,7 @@ func (h *AvatarHandler) GetAvatar(c echo.Context) error {
 		}
 	}
 
-	name := buildContactName(&contact)
+	name := utils.BuildContactName(&contact)
 	pngData := avatar.GenerateInitials(name, 128)
 
 	return c.Blob(http.StatusOK, "image/png", pngData)
@@ -143,18 +144,4 @@ func (h *AvatarHandler) DeleteAvatar(c echo.Context) error {
 	}
 
 	return response.NoContent(c)
-}
-
-func buildContactName(c *models.Contact) string {
-	var parts []string
-	if c.FirstName != nil && *c.FirstName != "" {
-		parts = append(parts, *c.FirstName)
-	}
-	if c.LastName != nil && *c.LastName != "" {
-		parts = append(parts, *c.LastName)
-	}
-	if len(parts) == 0 && c.Nickname != nil && *c.Nickname != "" {
-		parts = append(parts, *c.Nickname)
-	}
-	return strings.Join(parts, " ")
 }

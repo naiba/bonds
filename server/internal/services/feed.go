@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/naiba/bonds/internal/utils"
 	"math"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -46,7 +47,7 @@ func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItem
 	offset := (page - 1) * perPage
 
 	var items []models.ContactFeedItem
-	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&items).Error; err != nil {
+	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Preload("Contact").Find(&items).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -63,6 +64,7 @@ func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItem
 		result[i] = dto.FeedItemResponse{
 			ID:          item.ID,
 			ContactID:   item.ContactID,
+			ContactName: utils.BuildContactName(&item.Contact),
 			AuthorID:    authorID,
 			Action:      item.Action,
 			Description: desc,
@@ -96,7 +98,7 @@ func (s *FeedService) ListContactFeed(contactID string, page, perPage int) ([]dt
 	offset := (page - 1) * perPage
 
 	var items []models.ContactFeedItem
-	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Find(&items).Error; err != nil {
+	if err := query.Offset(offset).Limit(perPage).Order("created_at DESC").Preload("Contact").Find(&items).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -113,6 +115,7 @@ func (s *FeedService) ListContactFeed(contactID string, page, perPage int) ([]dt
 		result[i] = dto.FeedItemResponse{
 			ID:          item.ID,
 			ContactID:   item.ContactID,
+			ContactName: utils.BuildContactName(&item.Contact),
 			AuthorID:    authorID,
 			Action:      item.Action,
 			Description: desc,

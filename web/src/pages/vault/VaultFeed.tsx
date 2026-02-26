@@ -129,7 +129,7 @@ export default function VaultFeed() {
                           )
                         }
                       >
-                        {item.contact_id}
+                        {item.contact_name || item.contact_id}
                       </a>
                     )}
                   </div>
