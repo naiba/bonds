@@ -49,7 +49,7 @@ export default function NetworkGraph({ vaultId, contactId }: NetworkGraphProps) 
     queryKey: ["vaults", vaultId, "contacts", contactId, "graph"],
     queryFn: async () => {
       const res = await httpClient.instance.get<{ success: boolean; data: GraphData }>(
-        `/vaults/${vaultId}/contacts/${contactId}/graph`
+        `/vaults/${vaultId}/contacts/${contactId}/relationships/graph`
       );
       const data = res.data?.data ?? res.data;
       if (data && "nodes" in data && "edges" in data) {
@@ -70,7 +70,7 @@ export default function NetworkGraph({ vaultId, contactId }: NetworkGraphProps) 
 
       httpClient.instance
         .get<{ success: boolean; data: KinshipResult }>(
-          `/vaults/${vaultId}/contacts/${nodeIds[0]}/kinship/${nodeIds[1]}`
+          `/vaults/${vaultId}/contacts/${nodeIds[0]}/relationships/kinship/${nodeIds[1]}`
         )
         .then((res) => {
           const data = res.data?.data ?? res.data;
