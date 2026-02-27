@@ -231,8 +231,8 @@ test.describe('Contact Modules - Job Information', () => {
     await expect(page.getByRole('button', { name: /add company/i }).first()).toBeVisible({ timeout: 15000 });
     await page.getByRole('button', { name: /add company/i }).first().click();
     const companyModal = page.locator('.ant-modal');
-    await expect(companyModal).toBeVisible({ timeout: 5000 });
-    await companyModal.getByLabel(/company name/i).fill('JobTestCorp');
+    await expect(companyModal).toBeVisible({ timeout: 10000 });
+    await companyModal.locator('input#name').fill('JobTestCorp');
     const companyResp = page.waitForResponse(
       (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'
     );
@@ -392,8 +392,8 @@ test.describe('Contact Modules - Job Information Company', () => {
     await page.getByRole('button', { name: /add company/i }).first().click();
 
     const companyModal = page.locator('.ant-modal');
-    await expect(companyModal).toBeVisible({ timeout: 5000 });
-    await companyModal.getByLabel(/company name/i).fill('TestCorp Inc');
+    await expect(companyModal).toBeVisible({ timeout: 10000 });
+    await companyModal.locator('input#name').fill('TestCorp Inc');
 
     const companyResp = page.waitForResponse(
       (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'

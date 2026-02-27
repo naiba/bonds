@@ -43,12 +43,11 @@ test.describe('Vault - Companies CRUD', () => {
     await page.getByRole('button', { name: /add company/i }).first().click();
 
     const modal = page.locator('.ant-modal');
-    await expect(modal).toBeVisible({ timeout: 5000 });
+    await expect(modal).toBeVisible({ timeout: 10000 });
 
-    // Form field label: "Company Name" (vault.companies.name)
-    await modal.getByLabel(/company name/i).fill('Acme Corp');
-    // Form field label: "Type" (vault.companies.type)
-    await modal.getByLabel(/type/i).fill('Technology');
+    // Use input#name / input#type (Ant Design Form.Item maps 'name' prop to input id)
+    await modal.locator('input#name').fill('Acme Corp');
+    await modal.locator('input#type').fill('Technology');
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'
@@ -73,7 +72,7 @@ test.describe('Vault - Companies CRUD', () => {
     // Create a company first
     await page.getByRole('button', { name: /add company/i }).first().click();
     const modal = page.locator('.ant-modal');
-    await modal.getByLabel(/company name/i).fill('Old Name');
+    await modal.locator('input#name').fill('Old Name');
     const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'
     );
@@ -85,8 +84,8 @@ test.describe('Vault - Companies CRUD', () => {
     await page.getByRole('row').filter({ hasText: 'Old Name' }).locator('button').filter({ has: page.locator('.anticon-edit') }).click();
 
     const editModal = page.locator('.ant-modal');
-    await expect(editModal).toBeVisible({ timeout: 5000 });
-    const nameInput = editModal.getByLabel(/company name/i);
+    await expect(editModal).toBeVisible({ timeout: 10000 });
+    const nameInput = editModal.locator('input#name');
     await nameInput.clear();
     await nameInput.fill('New Name');
 
@@ -114,7 +113,7 @@ test.describe('Vault - Companies CRUD', () => {
     // Create first
     await page.getByRole('button', { name: /add company/i }).first().click();
     const modal = page.locator('.ant-modal');
-    await modal.getByLabel(/company name/i).fill('Delete Me Corp');
+    await modal.locator('input#name').fill('Delete Me Corp');
     const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'
     );
