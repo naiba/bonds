@@ -217,37 +217,62 @@ test.describe('Contact Modules - Religion', () => {
 });
 
 test.describe('Contact Modules - Job Information', () => {
-  test('should update job position', async ({ page }) => {
+  test('should add and update job position', async ({ page }) => {
     await setupVault(page, 'jobinfo');
+    const vaultUrl = page.url();
+
+    // Create a company first so we can assign a job
+    await page.goto(vaultUrl + '/companies');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /add company/i }).first().click();
+    const companyModal = page.locator('.ant-modal');
+    await expect(companyModal).toBeVisible({ timeout: 5000 });
+    await companyModal.getByLabel(/company name/i).fill('JobTestCorp');
+    const companyResp = page.waitForResponse(
+      (resp) => resp.url().includes('/companies') && resp.request().method() === 'POST'
+    );
+    await companyModal.getByRole('button', { name: /ok/i }).click();
+    await companyResp;
+    await expect(page.getByText('JobTestCorp')).toBeVisible({ timeout: 10000 });
+
+    // Create a contact
+    await page.goto(vaultUrl);
+    await page.waitForLoadState('networkidle');
     await goToContacts(page);
     await createContact(page, 'Job', 'Tester');
 
     await navigateToTab(page, 'Contact information');
 
-    // Job Info card has title "Job Information" (i18n: contact.detail.job_info)
+    // Job Info card has title "Job Information"
     const jobCard = page.locator('.ant-card').filter({
       has: page.locator('h5', { hasText: 'Job Information' }),
     });
     await expect(jobCard).toBeVisible({ timeout: 10000 });
 
-    await jobCard.getByRole('button', { name: /edit/i }).click();
+    // New UI: click "Add Job" button (PlusOutlined icon + text)
+    await jobCard.getByRole('button', { name: /add job/i }).click();
 
-    // Modal title is "Edit Job Info" (i18n: contact.detail.edit_job)
-    const modal = page.locator('.ant-modal').filter({
-      has: page.locator('.ant-modal-title', { hasText: 'Edit Job Info' }),
+    // Modal title is "Add Job"
+    const addModal = page.locator('.ant-modal').filter({
+      has: page.locator('.ant-modal-title', { hasText: 'Add Job' }),
     });
-    await expect(modal).toBeVisible({ timeout: 5000 });
+    await expect(addModal).toBeVisible({ timeout: 5000 });
 
-    // The form field label is "Position" (i18n: contact.detail.job_position)
-    await modal.getByLabel('Position').fill('Software Engineer');
+    // Select a company from the dropdown
+    await addModal.locator('.ant-select').first().click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'JobTestCorp' }).click();
 
-    const responsePromise = page.waitForResponse(
-      (resp) => resp.url().includes('/jobInformation') && resp.request().method() === 'PUT'
+    // Fill position
+    await addModal.getByLabel('Position').fill('Software Engineer');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/jobs') && resp.request().method() === 'POST'
     );
-    await modal.getByRole('button', { name: /save/i }).click();
-    const resp = await responsePromise;
+    await addModal.getByRole('button', { name: /save/i }).click();
+    const resp = await createResp;
     expect(resp.status()).toBeLessThan(400);
 
+    // Verify job appears in the list
     await expect(jobCard.getByText('Software Engineer')).toBeVisible({ timeout: 10000 });
   });
 });
@@ -377,15 +402,16 @@ test.describe('Contact Modules - Job Information Company', () => {
     // Navigate to Contact information tab
     await navigateToTab(page, 'Contact information');
 
-    // Open Job Info edit modal
+    // Job Info card — new UI has "Add Job" button instead of "Edit"
     const jobCard = page.locator('.ant-card').filter({
       has: page.locator('h5', { hasText: 'Job Information' }),
     });
     await expect(jobCard).toBeVisible({ timeout: 10000 });
-    await jobCard.getByRole('button', { name: /edit/i }).click();
+    await jobCard.getByRole('button', { name: /add job/i }).click();
 
+    // Modal title is "Add Job" (new multi-job UI)
     const modal = page.locator('.ant-modal').filter({
-      has: page.locator('.ant-modal-title', { hasText: 'Edit Job Info' }),
+      has: page.locator('.ant-modal-title', { hasText: 'Add Job' }),
     });
     await expect(modal).toBeVisible({ timeout: 5000 });
 
