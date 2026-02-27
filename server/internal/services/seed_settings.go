@@ -6,8 +6,6 @@ import (
 	"strconv"
 
 	"github.com/naiba/bonds/internal/config"
-	"github.com/naiba/bonds/internal/models"
-	"gorm.io/gorm"
 )
 
 type settingSeed struct {
@@ -80,60 +78,4 @@ func joinStrings(ss []string) string {
 		result += "," + s
 	}
 	return result
-}
-
-// MigrateOAuthSettingsToProviders migrates legacy oauth_* system settings
-// to the OAuthProvider table. Runs once: skips if any providers already exist.
-// After migration, the legacy settings are deleted from system_settings.
-func MigrateOAuthSettingsToProviders(db *gorm.DB, settings *SystemSettingService) {
-	var count int64
-	db.Model(&models.OAuthProvider{}).Count(&count)
-	if count > 0 {
-		return
-	}
-
-	legacyKeys := []string{
-		"oauth_github_key", "oauth_github_secret",
-		"oauth_google_key", "oauth_google_secret",
-		"oidc_client_id", "oidc_client_secret", "oidc_discovery_url", "oidc_name",
-	}
-
-	ghKey := settings.GetWithDefault("oauth_github_key", "")
-	ghSecret := settings.GetWithDefault("oauth_github_secret", "")
-	if ghKey != "" && ghSecret != "" {
-		db.Create(&models.OAuthProvider{
-			Type: "github", Name: "github", ClientID: ghKey, ClientSecret: ghSecret,
-			DisplayName: "GitHub", Enabled: true,
-		})
-	}
-
-	goKey := settings.GetWithDefault("oauth_google_key", "")
-	goSecret := settings.GetWithDefault("oauth_google_secret", "")
-	if goKey != "" && goSecret != "" {
-		db.Create(&models.OAuthProvider{
-			Type: "google", Name: "google", ClientID: goKey, ClientSecret: goSecret,
-			DisplayName: "Google", Enabled: true,
-		})
-	}
-
-	oidcKey := settings.GetWithDefault("oidc_client_id", "")
-	oidcSecret := settings.GetWithDefault("oidc_client_secret", "")
-	oidcDiscovery := settings.GetWithDefault("oidc_discovery_url", "")
-	oidcName := settings.GetWithDefault("oidc_name", "SSO")
-	if oidcKey != "" && oidcSecret != "" && oidcDiscovery != "" {
-		db.Create(&models.OAuthProvider{
-			Type: "oidc", Name: "openid-connect", ClientID: oidcKey, ClientSecret: oidcSecret,
-			DisplayName: oidcName, DiscoveryURL: oidcDiscovery, Enabled: true,
-		})
-	}
-
-	migrated := false
-	for _, key := range legacyKeys {
-		if err := settings.Delete(key); err == nil {
-			migrated = true
-		}
-	}
-	if migrated {
-		log.Println("Migrated legacy OAuth settings to OAuthProvider table")
-	}
 }
