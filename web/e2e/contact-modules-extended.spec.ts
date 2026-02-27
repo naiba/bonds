@@ -217,6 +217,8 @@ test.describe('Contact Modules - Religion', () => {
 });
 
 test.describe('Contact Modules - Job Information', () => {
+  // Companies are inside VaultSettings tab — extra navigation adds time.
+  test.setTimeout(60000);
   test('should add and update job position', async ({ page }) => {
     await setupVault(page, 'jobinfo');
     const vaultUrl = page.url();
@@ -375,6 +377,8 @@ test.describe('Contact Modules - Groups', () => {
 });
 
 test.describe('Contact Modules - Job Information Company', () => {
+  // Companies are inside VaultSettings tab — extra navigation adds time.
+  test.setTimeout(60000);
   test('job information company dropdown shows created companies', async ({ page }) => {
     await setupVault(page, 'job-company');
     const vaultUrl = page.url();

@@ -26,6 +26,9 @@ async function setupVault(page: import('@playwright/test').Page, prefix: string)
 }
 
 test.describe('Vault - Companies CRUD', () => {
+  // Companies are now inside VaultSettings tab — navigation is slower than direct route.
+  // Increase timeout to account for: register + vault creation + settings page load + tab activation.
+  test.setTimeout(60000);
   test('should create a company', async ({ page }) => {
     await setupVault(page, 'company-create');
 
