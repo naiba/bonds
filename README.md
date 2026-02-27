@@ -17,7 +17,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **Fast & lightweight** — Single binary, starts in milliseconds, minimal memory
 - **Easy to deploy** — One binary + SQLite. No PHP, no Composer, no Node runtime
 - **Modern UI** — React 19 + TypeScript, smooth SPA experience
-- **Well tested** — 347 backend tests, 54 frontend tests, 6 E2E spec files
+- **Well tested** — 835 backend tests, 129 frontend tests, 156 E2E tests
 - **Community first** — Built for contributions and fast iteration
 
 > **Credits**: Bonds stands on the shoulders of [@djaiss](https://github.com/djaiss), [@asbiin](https://github.com/asbiin), and the entire Monica community. The original Monica remains available under AGPL-3.0 at [monicahq/monica](https://github.com/monicahq/monica).
@@ -187,7 +187,7 @@ make setup         # Install all dependencies
 
 ### API Documentation
 
-Bonds provides auto-generated OpenAPI/Swagger documentation covering all 286 API endpoints.
+Bonds provides auto-generated OpenAPI/Swagger documentation covering all 342 API endpoints.
 
 To access the Swagger UI, either enable debug mode or toggle it on in Admin > Settings > Swagger:
 ```bash

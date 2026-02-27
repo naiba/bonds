@@ -67,7 +67,7 @@ server/                    # Go 后端（模块：github.com/naiba/bonds）
     dav/                    # CardDAV/CalDAV 服务器（emersion/go-webdav），Basic Auth + Backend 接口实现
     frontend/               # 内嵌前端静态文件（go:embed dist）
     i18n/                   # 国际化：embed 加载 en.json/zh.json，中间件解析 Accept-Language
-    models/                 # 85+ GORM 结构体，registry.go 列出所有迁移模型
+    models/                 # 55 model 文件，registry.go 列出所有迁移模型
       seed.go               # 全局种子：SeedCurrencies（货币表）
       seed_account.go       # 账户级种子：SeedAccountDefaults（注册时调用）
       seed_vault.go         # Vault 级种子：SeedVaultDefaults（创建 vault 时调用）
@@ -227,7 +227,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 ### E2E（Playwright）
 
-- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`file-upload.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`new-features.spec.ts`、`vault-features.spec.ts`、`vault-files.spec.ts`、`bugfixes.spec.ts`、`contact-modules.spec.ts`、`contact-modules-extended.spec.ts`、`missing-features.spec.ts`、`vault-extended.spec.ts`。
+- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`file-upload.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`new-features.spec.ts`、`vault-features.spec.ts`、`vault-files.spec.ts`、`bugfixes.spec.ts`、`contact-modules.spec.ts`、`contact-modules-extended.spec.ts`、`missing-features.spec.ts`、`vault-extended.spec.ts`、`vault-companies.spec.ts`。
 - Playwright 自动启动 Go 服务器（端口 8080）和 Vite 开发服务器（端口 5173）。
 - Ant Design 表单：使用 `page.getByPlaceholder(...)` 而非 `getByLabel(...)`。
 - **E2E 自动清理旧 DB**：`playwright.config.ts` 的 `webServer.command` 会在启动 Go 服务器前自动删除 `server/bonds.db*`。CI 环境下始终生效；本地 `reuseExistingServer=true` 时跳过（复用已运行的服务器）。
@@ -270,7 +270,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 - 上传端点：`POST /api/vaults/:vault_id/files`、`POST .../contacts/:contact_id/photos`、`POST .../documents`
 - MIME 白名单：image/jpeg, image/png, image/gif, image/webp, application/pdf 等
-- 大小限制：10MB（可配置 `STORAGE_MAX_SIZE`）
+- 大小限制：可配置，通过管理后台 Admin → Settings → Storage 设置
 - 存储结构：`{uploadDir}/{yyyy/MM/dd}/{uuid}{ext}`
 - 下载：`GET /api/vaults/:vault_id/files/:id/download`
 
@@ -358,30 +358,31 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 | 维度 | 数量 |
 |------|------|
-| Go Model 文件 | 49 |
-| Go Handler 文件 | 67（含 swag 注解） |
-| Go Service 文件 | 89（非测试） |
-| Go DTO 文件 | 44（含 example 标签） |
-| API 路由（Swagger 统计） | 194 paths / 286 operations |
-| React 页面组件 | 43 |
-| 前端 API 客户端 | 23 |
-| i18n 翻译键 | ~576（en + zh 各一份） |
+| Go Model 文件 | 55 |
+| Go Handler 文件 | 72（含 swag 注解） |
+| Go Service 文件 | 96（非测试） |
+| Go DTO 文件 | 49（含 example 标签） |
+| API 路由（Swagger 统计） | 229 paths / 342 operations |
+| React 页面组件 | 61 |
+| 前端 API 客户端 | 58 |
+| i18n 翻译键 | ~1101（en + zh 各一份） |
 
 ### 测试数量明细
 
 | 层级 | 文件数 | 测试函数数 |
 |------|--------|-----------|
-| Go Service 测试 | 84 | ~425 |
-| Go Handler 集成测试 | 1 | 109 |
-| Go Cron 测试 | 1 | 7 |
-| Go DAV 测试 | 2 | 20 |
-| Go Search 测试 | 1 | 4 |
+| Go Service 测试 | 96 | ~609 |
+| Go Handler 集成测试 | 1 | 168 |
+| Go Cron 测试 | 1 | 6 |
+| Go DAV 测试 | 2 | 26 |
+| Go Search 测试 | 1 | 5 |
 | Go Avatar 测试 | 1 | 7 |
 | Go Calendar 测试 | 1 | 13 |
-| **Go 后端总计** | **91** | **~585** |
-| React Vitest | 24 | 82 |
-| Playwright E2E | 18 | 104 |
-| **全部总计** | **133** | **771+** |
+| Go Utils 测试 | 1 | 1 |
+| **Go 后端总计** | **105** | **~835** |
+| React Vitest | 30 | 129 |
+| Playwright E2E | 19 | 156 |
+| **全部总计** | **154** | **1120+** |
 
 ## 已知坑和注意事项
 
@@ -440,7 +441,7 @@ defer cleanup()
 - 使用 `echo-swagger` **v1.4.1**（对应 Echo v4）。v1.5.0+ 依赖 Echo v5，不兼容。
 - **swag 类型解析陷阱**：handler 文件中的 `@Success ... dto.XxxResponse` 注解要求该文件能解析到 `dto` 包。如果 handler 的 Go 代码本身不 import `dto`（如 `currencies.go`、`vault_files.go`），swag 会报 `cannot find type definition`。解决方法：在文件中添加 `import "github.com/naiba/bonds/internal/dto"` + `var _ dto.XxxResponse`（类型锚点，防止 unused import 编译错误）。当前已有此模式的文件：`currencies.go`、`storage_info.go`、`user_management_extra.go`、`webauthn.go`、`avatar.go`、`calendar.go`、`companies.go`、`contact_photos.go`、`feed.go`、`post_photos.go`、`reports.go`、`vault_files.go`、`vault_tasks.go`、`vcard.go`。
 - 全局注解（`@title`、`@BasePath`、`@securityDefinitions`）在 `cmd/server/main.go` 的 `func main()` 上方。
-- 当前统计：194 paths、286 operations、184 definitions。
+- 当前统计：229 paths、342 operations、229 definitions。
 
 ### 前端 i18n 注意事项
 
@@ -469,72 +470,3 @@ defer cleanup()
 - **表单 auto-fill 与 E2E 操作顺序**：`ImportantDatesModule` 选择 `internal_type=true` 的 date type 时会自动覆写 label 字段。E2E 测试中必须**先选 type 再填 label**，否则用户输入的 label 会被 auto-fill 覆盖。类似的 auto-fill 逻辑在其他模块中也可能存在，写 E2E 时需注意表单字段间的联动副作用。
 - **Contact Detail 动态 Tab 名称**：Tab 名来自后端 seed 数据的 `TemplatePage.Name`（"Contact information"、"Feed"、"Social"、"Life & goals"、"Information"），与前端 fallback tabs 的 i18n 翻译名不同。E2E 选择 tab 时必须用 seed 数据中的名称，且注意 "Contact information" 和 "Information" 两个 tab 共存，用 `{ name: 'Information', exact: true }` 精确匹配。
 - **Contact Detail 页面多个同名按钮**：动态 tabs 加载后，第一个 tab 默认展开所有模块，每个模块可能有 "Edit" 按钮。选择顶部操作栏的 Edit 按钮时用 `.first()`。
-
-### 项目规模（供参考）
-
-| 维度 | 数量 |
-|------|------|
-| Go Model 文件 | 49 |
-| Go Handler 文件 | 67（含 swag 注解） |
-| Go Service 文件 | 89（非测试） |
-| Go DTO 文件 | 44（含 example 标签） |
-| API 路由（Swagger 统计） | 194 paths / 286 operations |
-| React 页面组件 | 43 |
-| 前端 API 客户端 | 23 |
-| i18n 翻译键 | ~576（en + zh 各一份） |
-
-## 关键依赖版本
-
-### Go 后端（go 1.25.2）
-
-| 依赖 | 版本 | 用途 |
-|------|------|------|
-| `labstack/echo/v4` | v4.15.0 | HTTP 框架 |
-| `gorm.io/gorm` | v1.31.1 | ORM |
-| `gorm.io/driver/sqlite` | v1.6.0 | SQLite 驱动 |
-| `blevesearch/bleve/v2` | v2.5.7 | 全文搜索 |
-| `emersion/go-webdav` | v0.7.0 | CardDAV/CalDAV |
-| `emersion/go-vcard` | latest | vCard 解析 |
-| `emersion/go-ical` | latest | iCal 解析 |
-| `go-webauthn/webauthn` | v0.15.0 | FIDO2/WebAuthn |
-| `markbates/goth` | v1.82.0 | OAuth |
-| `pquerna/otp` | v1.5.0 | TOTP 2FA |
-| `robfig/cron/v3` | v3.0.1 | Cron 调度器 |
-| `jordan-wright/email` | v4.0.1 | SMTP 发送 |
-| `golang-jwt/jwt/v5` | v5.3.1 | JWT |
-| `golang.org/x/crypto` | v0.48.0 | bcrypt 等 |
-| `swaggo/swag` | v1.16.6 | Swagger 文档生成 |
-| `swaggo/echo-swagger` | v1.4.1 | Swagger UI 中间件（必须 v1.4.x，v1.5+ 依赖 Echo v5） |
-| `6tail/lunar-go` | v1.4.6 | 农历转换 |
-
-### React 前端
-
-| 依赖 | 版本 | 用途 |
-|------|------|------|
-| `react` | ^19.2.0 | UI 框架 |
-| `antd` | ^6.3.0 | 组件库 |
-| `@tanstack/react-query` | ^5.90.21 | 数据请求 |
-| `react-router-dom` | ^7.13.0 | 路由 |
-| `axios` | ^1.13.5 | HTTP 客户端 |
-| `i18next` + `react-i18next` | ^25.8.7 / ^16.5.4 | 国际化 |
-| `vite` | ^7.3.1 | 构建工具 |
-| `vitest` | ^4.0.18 | 测试框架 |
-| `@playwright/test` | ^1.58.2 | E2E 测试 |
-| `typescript` | ~5.9.3 | 类型系统 |
-| `filesize` | ^11.0.13 | 文件大小格式化 |
-| `@simplewebauthn/browser` | ^13.2.2 | WebAuthn 客户端 |
-
-## 环境变量完整列表
-
-参见 `server/.env.example`，包含所有可配置项及默认值。分组：
-
- **Debug**：`DEBUG`（默认 `false`）— 启用 Echo 请求日志、GORM SQL 日志、Swagger UI（默认开启，也可通过管理后台 `swagger.enabled` 独立控制）
-- **Core**：`SERVER_PORT`、`DB_DSN`、`JWT_SECRET`、`APP_ENV`、`APP_URL`
-- **SMTP**：`SMTP_HOST`、`SMTP_PORT`、`SMTP_USERNAME`、`SMTP_PASSWORD`、`SMTP_FROM`
-- **Storage**：`STORAGE_UPLOAD_DIR`（默认 `uploads`）、`STORAGE_MAX_SIZE`（默认 10MB）
-- **Search**：`BLEVE_INDEX_PATH`（默认 `data/bonds.bleve`）
-- **Telegram**：`TELEGRAM_BOT_TOKEN`
-- **OAuth**：`OAUTH_GITHUB_KEY/SECRET`、`OAUTH_GOOGLE_KEY/SECRET`
-- **Geocoding**：`GEOCODING_PROVIDER`（nominatim/locationiq）、`GEOCODING_API_KEY`
-- **WebAuthn**：`WEBAUTHN_RP_ID`、`WEBAUTHN_RP_DISPLAY_NAME`、`WEBAUTHN_RP_ORIGINS`
-- **其他**：`ANNOUNCEMENT`（全局公告横幅文字）
