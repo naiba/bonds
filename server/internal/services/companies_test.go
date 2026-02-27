@@ -253,9 +253,12 @@ func TestCompanyDeleteWrongVault(t *testing.T) {
 	}
 }
 
-func TestCompanyDeleteUnlinksContacts(t *testing.T) {
+// TestCompanyDeleteCleansUpContactCompanyRows verifies that deleting a company
+// removes related ContactCompany join table rows and nullifies legacy Contact.CompanyID.
+func TestCompanyDeleteCleansUpContactCompanyRows(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
+	// Create a contact with legacy CompanyID set
 	contact := models.Contact{
 		VaultID:   ctx.vaultID,
 		FirstName: strPtrOrNil("John"),
@@ -266,10 +269,13 @@ func TestCompanyDeleteUnlinksContacts(t *testing.T) {
 		t.Fatalf("Create contact failed: %v", err)
 	}
 
-	var before models.Contact
-	ctx.db.First(&before, "id = ?", contact.ID)
-	if before.CompanyID == nil {
-		t.Fatal("Expected contact to have CompanyID before delete")
+	// Also create a ContactCompany join table row
+	cc := models.ContactCompany{
+		ContactID: contact.ID,
+		CompanyID: ctx.company.ID,
+	}
+	if err := ctx.db.Create(&cc).Error; err != nil {
+		t.Fatalf("Create ContactCompany failed: %v", err)
 	}
 
 	err := ctx.svc.Delete(ctx.company.ID, ctx.vaultID)
@@ -277,14 +283,22 @@ func TestCompanyDeleteUnlinksContacts(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
+	// Verify legacy CompanyID nullified
 	var after models.Contact
 	ctx.db.First(&after, "id = ?", contact.ID)
 	if after.CompanyID != nil {
 		t.Errorf("Expected contact CompanyID to be nil after company delete, got %v", *after.CompanyID)
 	}
+
+	// Verify ContactCompany rows deleted
+	var count int64
+	ctx.db.Model(&models.ContactCompany{}).Where("company_id = ?", ctx.company.ID).Count(&count)
+	if count != 0 {
+		t.Errorf("Expected 0 ContactCompany rows after delete, got %d", count)
+	}
 }
 
-
+// TestListForContact_NoCompany verifies empty result when contact has no jobs via join table.
 func TestListForContact_NoCompany(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
@@ -306,6 +320,7 @@ func TestListForContact_NoCompany(t *testing.T) {
 	}
 }
 
+// TestListForContact_WithCompany verifies ListForContact uses the ContactCompany join table.
 func TestListForContact_WithCompany(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
@@ -313,10 +328,18 @@ func TestListForContact_WithCompany(t *testing.T) {
 		VaultID:   ctx.vaultID,
 		FirstName: strPtrOrNil("John"),
 		LastName:  strPtrOrNil("Doe"),
-		CompanyID: &ctx.company.ID,
 	}
 	if err := ctx.db.Create(&contact).Error; err != nil {
 		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	// Create join table entry instead of using legacy CompanyID
+	cc := models.ContactCompany{
+		ContactID: contact.ID,
+		CompanyID: ctx.company.ID,
+	}
+	if err := ctx.db.Create(&cc).Error; err != nil {
+		t.Fatalf("Create ContactCompany failed: %v", err)
 	}
 
 	companies, err := ctx.svc.ListForContact(contact.ID, ctx.vaultID)
@@ -334,10 +357,10 @@ func TestListForContact_WithCompany(t *testing.T) {
 	}
 }
 
+// TestListForContact_MultipleCompanies verifies a contact can have multiple companies via join table.
 func TestListForContact_MultipleCompanies(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
-	// Create a second company
 	compType := "finance"
 	company2 := &models.Company{
 		VaultID: ctx.vaultID,
@@ -348,28 +371,69 @@ func TestListForContact_MultipleCompanies(t *testing.T) {
 		t.Fatalf("Create company2 failed: %v", err)
 	}
 
-	// Assign only the second company to the contact
 	contact := models.Contact{
 		VaultID:   ctx.vaultID,
 		FirstName: strPtrOrNil("Alice"),
 		LastName:  strPtrOrNil("Smith"),
-		CompanyID: &company2.ID,
 	}
 	if err := ctx.db.Create(&contact).Error; err != nil {
 		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	// Assign both companies via join table
+	for _, cID := range []uint{ctx.company.ID, company2.ID} {
+		cc := models.ContactCompany{ContactID: contact.ID, CompanyID: cID}
+		if err := ctx.db.Create(&cc).Error; err != nil {
+			t.Fatalf("Create ContactCompany failed: %v", err)
+		}
 	}
 
 	companies, err := ctx.svc.ListForContact(contact.ID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("ListForContact failed: %v", err)
 	}
-	if len(companies) != 1 {
-		t.Fatalf("Expected 1 company, got %d", len(companies))
+	if len(companies) != 2 {
+		t.Fatalf("Expected 2 companies, got %d", len(companies))
 	}
-	if companies[0].ID != company2.ID {
-		t.Errorf("Expected company ID %d (Beta Inc), got %d", company2.ID, companies[0].ID)
+}
+
+// TestCompanyGet_WithEmployees verifies Get returns employees from the join table.
+func TestCompanyGet_WithEmployees(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("John"),
+		LastName:  strPtrOrNil("Doe"),
 	}
-	if companies[0].Name != "Beta Inc" {
-		t.Errorf("Expected company name 'Beta Inc', got '%s'", companies[0].Name)
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	pos := "Engineer"
+	cc := models.ContactCompany{
+		ContactID:   contact.ID,
+		CompanyID:   ctx.company.ID,
+		JobPosition: &pos,
+	}
+	if err := ctx.db.Create(&cc).Error; err != nil {
+		t.Fatalf("Create ContactCompany failed: %v", err)
+	}
+
+	got, err := ctx.svc.Get(ctx.company.ID)
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if len(got.Contacts) != 1 {
+		t.Fatalf("Expected 1 employee, got %d", len(got.Contacts))
+	}
+	if got.Contacts[0].ID != contact.ID {
+		t.Errorf("Expected contact ID '%s', got '%s'", contact.ID, got.Contacts[0].ID)
+	}
+	if got.Contacts[0].JobPosition != "Engineer" {
+		t.Errorf("Expected job position 'Engineer', got '%s'", got.Contacts[0].JobPosition)
+	}
+	if got.Contacts[0].JobID != cc.ID {
+		t.Errorf("Expected job ID %d, got %d", cc.ID, got.Contacts[0].JobID)
 	}
 }

@@ -16,12 +16,13 @@ import (
 var _ dto.VaultFileResponse
 
 type PostPhotoHandler struct {
-	vaultFileService  *services.VaultFileService
+	vaultFileService   *services.VaultFileService
 	storageInfoService *services.StorageInfoService
+	settingsService    *services.SystemSettingService
 }
 
-func NewPostPhotoHandler(vaultFileService *services.VaultFileService, storageInfoService *services.StorageInfoService) *PostPhotoHandler {
-	return &PostPhotoHandler{vaultFileService: vaultFileService, storageInfoService: storageInfoService}
+func NewPostPhotoHandler(vaultFileService *services.VaultFileService, storageInfoService *services.StorageInfoService, settingsService *services.SystemSettingService) *PostPhotoHandler {
+	return &PostPhotoHandler{vaultFileService: vaultFileService, storageInfoService: storageInfoService, settingsService: settingsService}
 }
 
 // List godoc
@@ -77,6 +78,14 @@ func (h *PostPhotoHandler) Upload(c echo.Context) error {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		return response.BadRequest(c, "err.file_required", nil)
+	}
+
+	var maxUploadSize int64 = 10 * 1024 * 1024
+	if h.settingsService != nil {
+		maxSizeSetting := h.settingsService.GetInt64("storage.max_size", 0)
+		if maxSizeSetting > 0 {
+			maxUploadSize = maxSizeSetting
+		}
 	}
 
 	if fileHeader.Size > maxUploadSize {

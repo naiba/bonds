@@ -37,6 +37,7 @@ func AllModels() []interface{} {
 		&Address{},
 		&ContactAddress{},
 		&Company{},
+		&ContactCompany{},
 
 		&Currency{},
 		&AccountCurrency{},

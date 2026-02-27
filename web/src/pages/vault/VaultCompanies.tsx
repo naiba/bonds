@@ -11,13 +11,15 @@ import {
   Modal,
   Form,
   Input,
-  message,
+  Select,
+  App,
   theme,
   Tag,
   Drawer,
   Descriptions,
   List,
   Empty,
+  Popconfirm,
 } from "antd";
 import {
   BankOutlined,
@@ -28,7 +30,7 @@ import {
 } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
 import { api } from "@/api";
-import type { Company } from "@/api";
+import type { Company, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -39,11 +41,14 @@ export default function VaultCompanies() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { token } = theme.useToken();
+  const { message } = App.useApp();
   const nameOrder = useNameOrder();
   const [form] = Form.useForm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
+  const [employeeForm] = Form.useForm();
 
   const { data: companies = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "companies"],
@@ -66,6 +71,16 @@ export default function VaultCompanies() {
       }
     },
     enabled: !!selectedCompany?.id,
+  });
+
+  // Contacts list for the add-employee select dropdown
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", "list-for-employee"],
+    queryFn: async () => {
+      const res = await api.contacts.contactsList(String(vaultId));
+      return res.data ?? [];
+    },
+    enabled: isAddEmployeeModalOpen,
   });
 
   const employees = companyDetails?.contacts ?? selectedCompany?.contacts ?? [];
@@ -101,6 +116,39 @@ export default function VaultCompanies() {
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "companies"] });
     },
   });
+
+  const addEmployeeMutation = useMutation({
+    mutationFn: (values: { contact_id: string; job_position?: string }) =>
+      api.companies.companiesEmployeesCreate(String(vaultId), selectedCompany!.id!, values),
+    onSuccess: () => {
+      message.success(t("vault.companies.employee_added"));
+      setIsAddEmployeeModalOpen(false);
+      employeeForm.resetFields();
+      invalidateCompanyQueries();
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const removeEmployeeMutation = useMutation({
+    mutationFn: (contactId: string) =>
+      api.companies.companiesEmployeesDelete(String(vaultId), selectedCompany!.id!, contactId),
+    onSuccess: () => {
+      message.success(t("vault.companies.employee_removed"));
+      invalidateCompanyQueries();
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const invalidateCompanyQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "companies"] });
+    queryClient.invalidateQueries({
+      queryKey: ["vaults", vaultId, "companies", selectedCompany?.id],
+    });
+  };
 
   const handleEdit = (company: Company) => {
     setEditingCompany(company);
@@ -286,9 +334,22 @@ export default function VaultCompanies() {
                 </Descriptions.Item>
             </Descriptions>
 
-            <Title level={5} style={{ marginTop: 24, marginBottom: 16 }}>
-                {t("vault.companies.employees")}
-            </Title>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 24, marginBottom: 16 }}>
+              <Title level={5} style={{ margin: 0 }}>
+                  {t("vault.companies.employees")}
+              </Title>
+              <Button
+                type="primary"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  employeeForm.resetFields();
+                  setIsAddEmployeeModalOpen(true);
+                }}
+              >
+                {t("vault.companies.add_employee")}
+              </Button>
+            </div>
             
             <List
                 itemLayout="horizontal"
@@ -299,12 +360,25 @@ export default function VaultCompanies() {
                 <List.Item
                     actions={[
                     <Button 
+                        key="view"
                         type="link" 
                         size="small"
                         onClick={() => navigate(`/vaults/${vaultId}/contacts/${item.id}`)}
                     >
                         {t("common.view")}
-                    </Button>
+                    </Button>,
+                    <Popconfirm
+                      key="remove"
+                      title={t("vault.companies.remove_employee")}
+                      onConfirm={() => removeEmployeeMutation.mutate(item.id)}
+                    >
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                      />
+                    </Popconfirm>,
                     ]}
                 >
                     <List.Item.Meta
@@ -319,7 +393,7 @@ export default function VaultCompanies() {
                       />
                     }
                     title={formatContactName(nameOrder, item)}
-                    description={item.job_title}
+                    description={item.job_position || "—"}
                     />
                 </List.Item>
                 )}
@@ -327,6 +401,63 @@ export default function VaultCompanies() {
             </>
         )}
       </Drawer>
+
+      <Modal
+        title={t("vault.companies.add_employee")}
+        open={isAddEmployeeModalOpen}
+        onCancel={() => {
+          setIsAddEmployeeModalOpen(false);
+          employeeForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose={true}
+      >
+        <Form
+          form={employeeForm}
+          layout="vertical"
+          onFinish={(values) => addEmployeeMutation.mutate(values)}
+        >
+          <Form.Item
+            name="contact_id"
+            label={t("vault.companies.select_contact")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              showSearch
+              filterOption={(input, option) =>
+                String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              options={contacts.map((c: any) => ({
+                label: formatContactName(nameOrder, c),
+                value: c.id,
+              }))}
+              placeholder={t("vault.companies.select_contact")}
+            />
+          </Form.Item>
+          <Form.Item
+            name="job_position"
+            label={t("contact.detail.job_position")}
+          >
+            <Input />
+          </Form.Item>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => {
+              setIsAddEmployeeModalOpen(false);
+              employeeForm.resetFields();
+            }}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={addEmployeeMutation.isPending}
+            >
+              {t("common.save")}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
     </div>
   );
 }

@@ -33,7 +33,8 @@
     "saved": "已保存",
     "updated": "已更新",
     "load_more": "加载更多",
-    "copy": "复制"
+    "copy": "复制",
+    "view": "查看"
   },
   "nav": {
     "vaults": "保险库",
@@ -314,7 +315,12 @@
       "employees": "员工",
       "detail": "公司详情",
       "no_employees": "暂无员工",
-      "delete_confirm": "确定要删除此公司吗？关联的联系人将被取消关联。"
+      "delete_confirm": "确定要删除此公司吗？关联的联系人将被取消关联。",
+      "add_employee": "添加员工",
+      "remove_employee": "移除员工",
+      "select_contact": "选择联系人",
+      "employee_added": "员工已添加",
+      "employee_removed": "员工已移除"
     },
     "lifeMetrics": {
       "title": "生活指标",
@@ -476,6 +482,10 @@
     "edit_job": "编辑工作信息",
     "job_updated": "工作信息已更新",
     "clear_job": "清除工作信息",
+    "add_job": "添加工作",
+    "no_jobs": "暂无工作信息",
+    "job_added": "工作信息已添加",
+    "job_deleted": "工作信息已删除",
     "avatar_upload": "上传头像",
     "avatar_delete": "移除头像",
     "avatar_updated": "头像已更新",

@@ -23,7 +23,14 @@ type CompanyResponse struct {
 }
 
 type CompanyContactBrief struct {
-	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	FirstName string `json:"first_name" example:"John"`
-	LastName  string `json:"last_name" example:"Doe"`
+	ID          string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstName   string `json:"first_name" example:"John"`
+	LastName    string `json:"last_name" example:"Doe"`
+	JobPosition string `json:"job_position" example:"Engineer"`
+	JobID       uint   `json:"job_id" example:"1"`
+}
+
+type AddEmployeeRequest struct {
+	ContactID   string `json:"contact_id" validate:"required" example:"550e8400-e29b-41d4-a716-446655440000"`
+	JobPosition string `json:"job_position" example:"Software Engineer"`
 }

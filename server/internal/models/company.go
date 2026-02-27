@@ -12,4 +12,5 @@ type Company struct {
 
 	Vault    Vault     `json:"vault,omitempty" gorm:"foreignKey:VaultID"`
 	Contacts []Contact `json:"contacts,omitempty" gorm:"foreignKey:CompanyID"`
+	ContactCompanies []ContactCompany `json:"contact_companies,omitempty" gorm:"foreignKey:CompanyID"`
 }

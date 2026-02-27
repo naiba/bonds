@@ -7,28 +7,23 @@ import {
   Form,
   Modal,
   Select,
-  Descriptions,
   Input,
   Popconfirm,
-  Tag,
+  List,
   Empty,
 } from "antd";
-import { EditOutlined, ShopOutlined } from "@ant-design/icons";
+import { EditOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
-import type { Contact, Company, UpdateContactReligionRequest, APIError } from "@/api";
+import type { Contact, UpdateContactReligionRequest, APIError, ContactJob } from "@/api";
 import { useState } from "react";
 
 const { Title, Text } = Typography;
 
-// The backend returns religion_id, company_id, job_position in JSON but swagger
-// annotations don't include them in ContactResponse. Use an extended interface.
 interface ContactExtra {
   religion_id?: number;
-  company_id?: number;
-  job_position?: string;
 }
 
 interface ExtraInfoModuleProps {
@@ -42,9 +37,13 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const [isReligionModalOpen, setIsReligionModalOpen] = useState(false);
   const [religionForm] = Form.useForm();
+
+  // --- Job state ---
+  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<ContactJob | null>(null);
+  const [jobForm] = Form.useForm();
 
   const { data: religions = [] } = useQuery({
     queryKey: ["vaults", vaultId, "personalize", "religions"],
@@ -68,59 +67,107 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
       message.error(err.message || t("common.error"));
     },
   });
-  
-  const [isJobModalOpen, setIsJobModalOpen] = useState(false);
-  const [jobForm] = Form.useForm();
 
+  // --- Jobs queries & mutations ---
+  // Companies list always enabled — needed to display company names in the job list
   const { data: companies = [] } = useQuery({
     queryKey: ["vaults", vaultId, "companies"],
     queryFn: async () => {
       const res = await api.companies.companiesList(String(vaultId));
       return res.data ?? [];
     },
-    enabled: isJobModalOpen,
   });
 
-  const jobMutation = useMutation({
-    mutationFn: (values: { company_id?: number; job_position?: string }) =>
-      api.contacts.contactsJobInformationUpdate(String(vaultId), String(contactId), values),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["vaults", vaultId, "contacts", contactId],
-      });
-      message.success(t("contact.detail.job_updated"));
-      setIsJobModalOpen(false);
-    },
-    onError: (err: APIError) => {
-      message.error(err.message || t("common.error"));
-    },
-  });
-
-  const clearJobMutation = useMutation({
-    mutationFn: () => api.contacts.contactsJobInformationDelete(String(vaultId), String(contactId)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["vaults", vaultId, "contacts", contactId],
-      });
-      message.success(t("contact.detail.job_updated"));
-      setIsJobModalOpen(false);
-    },
-    onError: (err: APIError) => {
-      message.error(err.message || t("common.error"));
-    },
-  });
-
-  const { data: contactCompanies = [] } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", contactId, "companies"],
+  const { data: jobs = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", contactId, "jobs"],
     queryFn: async () => {
-      const res = await api.companies.contactsCompaniesListList(String(vaultId), String(contactId));
-      return (res.data ?? []) as Company[];
+      const res = await api.contacts.contactsJobsList(String(vaultId), String(contactId));
+      return res.data ?? [];
     },
-    enabled: !!vaultId && !!contactId,
   });
+
+  const createJobMutation = useMutation({
+    mutationFn: (values: { company_id: number; job_position?: string }) =>
+      api.contacts.contactsJobsCreate(String(vaultId), String(contactId), values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId, "jobs"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId],
+      });
+      message.success(t("contact.detail.job_added"));
+      setIsJobModalOpen(false);
+      setEditingJob(null);
+      jobForm.resetFields();
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const updateJobMutation = useMutation({
+    mutationFn: ({ jobId, values }: { jobId: number; values: { company_id: number; job_position?: string } }) =>
+      api.contacts.contactsJobsUpdate(String(vaultId), String(contactId), jobId, values),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId, "jobs"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId],
+      });
+      message.success(t("contact.detail.job_updated"));
+      setIsJobModalOpen(false);
+      setEditingJob(null);
+      jobForm.resetFields();
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const deleteJobMutation = useMutation({
+    mutationFn: (jobId: number) =>
+      api.contacts.contactsJobsDelete(String(vaultId), String(contactId), jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId, "jobs"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", contactId],
+      });
+      message.success(t("contact.detail.job_deleted"));
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const openAddJob = () => {
+    setEditingJob(null);
+    jobForm.resetFields();
+    setIsJobModalOpen(true);
+  };
+
+  const openEditJob = (job: ContactJob) => {
+    setEditingJob(job);
+    jobForm.setFieldsValue({
+      company_id: job.company_id,
+      job_position: job.job_position,
+    });
+    setIsJobModalOpen(true);
+  };
+
+  const handleJobSubmit = (values: { company_id: number; job_position?: string }) => {
+    if (editingJob?.id) {
+      updateJobMutation.mutate({ jobId: editingJob.id, values });
+    } else {
+      createJobMutation.mutate(values);
+    }
+  };
 
   return (
-    <Space orientation="vertical" style={{ width: "100%" }} size={16}>
+    <Space direction="vertical" style={{ width: "100%" }} size={16}>
       <Card
         title={
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -161,66 +208,50 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
         extra={
           <Button
             type="text"
-            icon={<EditOutlined />}
-            onClick={() => {
-              jobForm.setFieldsValue({
-                company_id: extra.company_id,
-                job_position: extra.job_position,
-              });
-              setIsJobModalOpen(true);
-            }}
+            icon={<PlusOutlined />}
+            onClick={openAddJob}
           >
-            {t("common.edit")}
+            {t("contact.detail.add_job")}
           </Button>
         }
       >
-         <Descriptions column={1}>
-             <Descriptions.Item label={t("contact.detail.company")}>
-               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-               {extra.company_id && companies.length ? companies.find((c: any) => c.id === extra.company_id)?.name : extra.company_id ? `Company #${extra.company_id}` : "—"} 
-             </Descriptions.Item>
-             <Descriptions.Item label={t("contact.detail.job_position")}>
-               {extra.job_position || "—"}
-             </Descriptions.Item>
-         </Descriptions>
-      </Card>
-
-      <Card
-        title={
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ShopOutlined />
-            <Title level={5} style={{ margin: 0 }}>
-              {t("modules.extra_info.companies")}
-            </Title>
-          </div>
-        }
-        extra={
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => navigate(`/vaults/${vaultId}/companies`)}
-          >
-            {t("common.edit")}
-          </Button>
-        }
-      >
-        {contactCompanies.length > 0 ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {contactCompanies.map((company: Company) => (
-              <Tag
-                key={company.id}
-                style={{ cursor: "pointer", fontSize: 14, padding: "4px 10px" }}
-                onClick={() => navigate(`/vaults/${vaultId}/companies`)}
+        {jobs.length > 0 ? (
+          <List
+            itemLayout="horizontal"
+            dataSource={jobs}
+            renderItem={(job: ContactJob) => (
+              <List.Item
+                actions={[
+                  <Button
+                    key="edit"
+                    type="text"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => openEditJob(job)}
+                  />,
+                  <Popconfirm
+                    key="delete"
+                    title={t("common.delete_confirm")}
+                    onConfirm={() => job.id && deleteJobMutation.mutate(job.id)}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                    />
+                  </Popconfirm>,
+                ]}
               >
-                {company.name}
-              </Tag>
-            ))}
-          </div>
-        ) : (
-          <Empty
-            description={t("modules.extra_info.no_companies")}
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                <List.Item.Meta
+                  title={job.company_name || `Company #${job.company_id}`}
+                  description={job.job_position || "—"}
+                />
+              </List.Item>
+            )}
           />
+        ) : (
+          <Empty description={t("contact.detail.no_jobs")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         )}
       </Card>
 
@@ -260,18 +291,26 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
       </Modal>
 
       <Modal
-        title={t("contact.detail.edit_job")}
+        title={editingJob ? t("contact.detail.edit_job") : t("contact.detail.add_job")}
         open={isJobModalOpen}
-        onCancel={() => setIsJobModalOpen(false)}
+        onCancel={() => {
+          setIsJobModalOpen(false);
+          setEditingJob(null);
+          jobForm.resetFields();
+        }}
         footer={null}
         destroyOnClose={true}
       >
         <Form
           form={jobForm}
           layout="vertical"
-          onFinish={(values) => jobMutation.mutate(values)}
+          onFinish={handleJobSubmit}
         >
-          <Form.Item name="company_id" label={t("contact.detail.company")}>
+          <Form.Item
+            name="company_id"
+            label={t("contact.detail.company")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
             <Select
               allowClear
               showSearch
@@ -286,29 +325,21 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
           <Form.Item name="job_position" label={t("contact.detail.job_position")}>
             <Input />
           </Form.Item>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-             {(extra.company_id || extra.job_position) && (
-              <Popconfirm
-                title={t("contact.detail.delete_confirm")}
-                onConfirm={() => clearJobMutation.mutate()}
-              >
-                <Button danger type="text">
-                  {t("contact.detail.clear_job")}
-                </Button>
-              </Popconfirm>
-            )}
-            <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-              <Button onClick={() => setIsJobModalOpen(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={jobMutation.isPending}
-              >
-                {t("common.save")}
-              </Button>
-            </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => {
+              setIsJobModalOpen(false);
+              setEditingJob(null);
+              jobForm.resetFields();
+            }}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={createJobMutation.isPending || updateJobMutation.isPending}
+            >
+              {t("common.save")}
+            </Button>
           </div>
         </Form>
       </Modal>

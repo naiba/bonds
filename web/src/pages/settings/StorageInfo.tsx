@@ -32,11 +32,11 @@ export default function StorageInfo() {
   // limit_bytes=0 表示无限制，避免除零导致 NaN/Infinity
   const isUnlimited = !usage.limit_bytes;
   const percent = isUnlimited ? 0 : Math.round((usage.used_bytes / usage.limit_bytes) * 100);
-  const used = filesize(usage.used_bytes) as string;
-  const limit = isUnlimited ? t("settings.storage.unlimited") : (filesize(usage.limit_bytes) as string);
+  const used = filesize(usage.used_bytes, { standard: "jedec" }) as string;
+  const limit = isUnlimited ? t("settings.storage.unlimited") : (filesize(usage.limit_bytes, { standard: "jedec" }) as string);
   const remaining = isUnlimited
     ? t("settings.storage.unlimited")
-    : (filesize(usage.limit_bytes - usage.used_bytes) as string);
+    : (filesize(usage.limit_bytes - usage.used_bytes, { standard: "jedec" }) as string);
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>

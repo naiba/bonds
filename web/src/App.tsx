@@ -1,3 +1,9 @@
+// Orphan pages report (routes with no direct navigation entry in Layout.tsx):
+// - /vaults/:id/settings  (VaultSettings)   — accessed from vault detail page gear icon
+// - /vaults/:id/companies (VaultCompanies)  — accessed from vault detail page
+// - /admin/settings, /admin/backups, /admin/oauth-providers — accessed via admin tabs
+// All orphan routes are intentionally secondary pages reachable from their parent views.
+
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Alert, Spin } from "antd";

@@ -60,6 +60,7 @@ type Contact struct {
 	Addresses           []Address              `json:"addresses,omitempty" gorm:"many2many:contact_address"`
 	QuickFacts          []QuickFact            `json:"quick_facts,omitempty" gorm:"foreignKey:ContactID"`
 	LifeMetrics         []LifeMetric           `json:"life_metrics,omitempty" gorm:"many2many:contact_life_metric"`
+	ContactCompanies    []ContactCompany       `json:"contact_companies,omitempty" gorm:"foreignKey:ContactID"`
 }
 
 func (c *Contact) BeforeCreate(tx *gorm.DB) error {

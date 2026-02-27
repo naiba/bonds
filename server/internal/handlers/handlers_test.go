@@ -4804,3 +4804,230 @@ func TestFileServePreview(t *testing.T) {
 		t.Errorf("no preview: expected Content-Disposition to contain 'attachment', got %q", cd)
 	}
 }
+
+// ==================== Contact Job CRUD ====================
+
+func TestContactJob_CRUD_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "job-crud@example.com")
+	vault := ts.createTestVault(t, token, "Job CRUD Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "JobCRUD")
+
+	// Create a company
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies",
+		`{"name":"Job Corp","type":"tech"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create company: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var company struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Data, &company); err != nil {
+		t.Fatalf("failed to parse company: %v", err)
+	}
+
+	// List jobs — should be empty initially
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobs", vault.ID, contact.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list jobs: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var emptyJobs []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &emptyJobs); err != nil {
+		t.Fatalf("failed to parse jobs: %v", err)
+	}
+	if len(emptyJobs) != 0 {
+		t.Fatalf("expected 0 jobs initially, got %d", len(emptyJobs))
+	}
+
+	// Create a job
+	rec = ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobs", vault.ID, contact.ID),
+		fmt.Sprintf(`{"company_id":%d,"job_position":"Engineer"}`, company.ID), token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create job: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var job struct {
+		ID          uint   `json:"id"`
+		CompanyID   uint   `json:"company_id"`
+		CompanyName string `json:"company_name"`
+		JobPosition string `json:"job_position"`
+		ContactID   string `json:"contact_id"`
+	}
+	if err := json.Unmarshal(resp.Data, &job); err != nil {
+		t.Fatalf("failed to parse job: %v", err)
+	}
+	if job.CompanyID != company.ID {
+		t.Errorf("expected company ID %d, got %d", company.ID, job.CompanyID)
+	}
+	if job.JobPosition != "Engineer" {
+		t.Errorf("expected position 'Engineer', got '%s'", job.JobPosition)
+	}
+	if job.CompanyName != "Job Corp" {
+		t.Errorf("expected company name 'Job Corp', got '%s'", job.CompanyName)
+	}
+
+	// Update the job
+	rec = ts.doRequest(http.MethodPut,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobs/%d", vault.ID, contact.ID, job.ID),
+		fmt.Sprintf(`{"company_id":%d,"job_position":"Senior Engineer"}`, company.ID), token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update job: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updatedJob struct {
+		JobPosition string `json:"job_position"`
+	}
+	if err := json.Unmarshal(resp.Data, &updatedJob); err != nil {
+		t.Fatalf("failed to parse updated job: %v", err)
+	}
+	if updatedJob.JobPosition != "Senior Engineer" {
+		t.Errorf("expected position 'Senior Engineer', got '%s'", updatedJob.JobPosition)
+	}
+
+	// List jobs — should have 1
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobs", vault.ID, contact.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list jobs: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var jobs []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &jobs); err != nil {
+		t.Fatalf("failed to parse jobs: %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+
+	// Delete the job
+	rec = ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobs/%d", vault.ID, contact.ID, job.ID),
+		"", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete job: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// List jobs — should be empty again
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/contacts/%s/jobs", vault.ID, contact.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list jobs after delete: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var afterDelete []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &afterDelete); err != nil {
+		t.Fatalf("failed to parse jobs: %v", err)
+	}
+	if len(afterDelete) != 0 {
+		t.Fatalf("expected 0 jobs after delete, got %d", len(afterDelete))
+	}
+}
+
+// ==================== Company Employee Endpoints ====================
+
+func TestCompanyEmployee_AddAndRemove(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "employee-crud@example.com")
+	vault := ts.createTestVault(t, token, "Employee Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "Employee")
+
+	// Create a company
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies",
+		`{"name":"Emp Corp"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create company: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var company struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(resp.Data, &company); err != nil {
+		t.Fatalf("failed to parse company: %v", err)
+	}
+
+	// Add employee
+	rec = ts.doRequest(http.MethodPost,
+		fmt.Sprintf("/api/vaults/%s/companies/%d/employees", vault.ID, company.ID),
+		fmt.Sprintf(`{"contact_id":"%s","job_position":"CTO"}`, contact.ID), token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("add employee: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var empJob struct {
+		ID          uint   `json:"id"`
+		ContactID   string `json:"contact_id"`
+		CompanyID   uint   `json:"company_id"`
+		JobPosition string `json:"job_position"`
+	}
+	if err := json.Unmarshal(resp.Data, &empJob); err != nil {
+		t.Fatalf("failed to parse employee job: %v", err)
+	}
+	if empJob.ContactID != contact.ID {
+		t.Errorf("expected contact ID '%s', got '%s'", contact.ID, empJob.ContactID)
+	}
+	if empJob.CompanyID != company.ID {
+		t.Errorf("expected company ID %d, got %d", company.ID, empJob.CompanyID)
+	}
+	if empJob.JobPosition != "CTO" {
+		t.Errorf("expected position 'CTO', got '%s'", empJob.JobPosition)
+	}
+
+	// Get company — should include the employee
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/companies/%d", vault.ID, company.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get company: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var companyDetail struct {
+		Contacts []struct {
+			ID          string `json:"id"`
+			JobPosition string `json:"job_position"`
+			JobID       uint   `json:"job_id"`
+		} `json:"contacts"`
+	}
+	if err := json.Unmarshal(resp.Data, &companyDetail); err != nil {
+		t.Fatalf("failed to parse company detail: %v", err)
+	}
+	if len(companyDetail.Contacts) != 1 {
+		t.Fatalf("expected 1 employee, got %d", len(companyDetail.Contacts))
+	}
+	if companyDetail.Contacts[0].JobPosition != "CTO" {
+		t.Errorf("expected job position 'CTO', got '%s'", companyDetail.Contacts[0].JobPosition)
+	}
+
+	// Remove employee
+	rec = ts.doRequest(http.MethodDelete,
+		fmt.Sprintf("/api/vaults/%s/companies/%d/employees/%s", vault.ID, company.ID, contact.ID),
+		"", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("remove employee: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	// Get company — should have no employees
+	rec = ts.doRequest(http.MethodGet,
+		fmt.Sprintf("/api/vaults/%s/companies/%d", vault.ID, company.ID),
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get company after remove: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var companyAfter struct {
+		Contacts []json.RawMessage `json:"contacts"`
+	}
+	if err := json.Unmarshal(resp.Data, &companyAfter); err != nil {
+		t.Fatalf("failed to parse company: %v", err)
+	}
+	if len(companyAfter.Contacts) != 0 {
+		t.Errorf("expected 0 employees after remove, got %d", len(companyAfter.Contacts))
+	}
+}

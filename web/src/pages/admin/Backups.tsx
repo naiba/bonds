@@ -133,7 +133,7 @@ export default function AdminBackups() {
       dataIndex: "size",
       key: "size",
       width: 120,
-      render: (size: number) => filesize(size) as string,
+      render: (size: number) => filesize(size, { standard: "jedec" }) as string,
     },
     {
       title: t("backups.created_at"),

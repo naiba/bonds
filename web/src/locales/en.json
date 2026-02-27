@@ -33,7 +33,8 @@
     "saved": "Saved",
     "updated": "Updated",
     "load_more": "Load more",
-    "copy": "Copy"
+    "copy": "Copy",
+    "view": "View"
   },
   "nav": {
     "vaults": "Vaults",
@@ -314,7 +315,12 @@
       "employees": "Employees",
       "detail": "Company Details",
       "no_employees": "No employees found",
-      "delete_confirm": "Are you sure you want to delete this company? Associated contacts will be unlinked."
+      "delete_confirm": "Are you sure you want to delete this company? Associated contacts will be unlinked.",
+      "add_employee": "Add Employee",
+      "remove_employee": "Remove Employee",
+      "select_contact": "Select Contact",
+      "employee_added": "Employee added",
+      "employee_removed": "Employee removed"
     },
     "lifeMetrics": {
       "title": "Life Metrics",
@@ -476,6 +482,10 @@
     "edit_job": "Edit Job Info",
     "job_updated": "Job info updated",
     "clear_job": "Clear Job Info",
+    "add_job": "Add Job",
+    "no_jobs": "No job information",
+    "job_added": "Job added",
+    "job_deleted": "Job deleted",
     "avatar_upload": "Upload avatar",
     "avatar_delete": "Remove avatar",
     "avatar_updated": "Avatar updated",

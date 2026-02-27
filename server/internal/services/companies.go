@@ -30,7 +30,8 @@ func (s *CompanyService) List(vaultID string) ([]dto.CompanyResponse, error) {
 	return result, nil
 }
 
-
+// ListForContact queries the ContactCompany join table to find all companies for a contact.
+// Replaces the old approach of reading Contact.CompanyID directly.
 func (s *CompanyService) ListForContact(contactID, vaultID string) ([]dto.CompanyResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
@@ -39,28 +40,31 @@ func (s *CompanyService) ListForContact(contactID, vaultID string) ([]dto.Compan
 		}
 		return nil, err
 	}
-	if contact.CompanyID == nil {
-		return []dto.CompanyResponse{}, nil
-	}
-	var company models.Company
-	if err := s.db.First(&company, *contact.CompanyID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return []dto.CompanyResponse{}, nil
-		}
+
+	var jobs []models.ContactCompany
+	if err := s.db.Preload("Company").Where("contact_id = ?", contactID).Find(&jobs).Error; err != nil {
 		return nil, err
 	}
-	return []dto.CompanyResponse{toCompanyResponse(&company)}, nil
+
+	result := make([]dto.CompanyResponse, 0, len(jobs))
+	for _, j := range jobs {
+		if j.Company.ID != 0 {
+			result = append(result, toCompanyResponse(&j.Company))
+		}
+	}
+	return result, nil
 }
 
+// Get returns a single company with its employees loaded via the ContactCompany join table.
 func (s *CompanyService) Get(id uint) (*dto.CompanyResponse, error) {
 	var company models.Company
-	if err := s.db.Preload("Contacts").First(&company, id).Error; err != nil {
+	if err := s.db.Preload("ContactCompanies").Preload("ContactCompanies.Contact").First(&company, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrCompanyNotFound
 		}
 		return nil, err
 	}
-	resp := toCompanyResponseWithContacts(&company)
+	resp := toCompanyResponseWithEmployees(&company)
 	return &resp, nil
 }
 
@@ -94,6 +98,7 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 	return &resp, nil
 }
 
+// Delete removes a company and cleans up related ContactCompany rows and legacy Contact.CompanyID references.
 func (s *CompanyService) Delete(id uint, vaultID string) error {
 	var company models.Company
 	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
@@ -102,7 +107,11 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 		}
 		return err
 	}
-	// Null out CompanyID on associated contacts
+	// Delete related ContactCompany join table rows
+	if err := s.db.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
+		return err
+	}
+	// Also null out legacy CompanyID on contacts for backward compatibility
 	if err := s.db.Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
 		return err
 	}
@@ -123,14 +132,17 @@ func toCompanyResponse(c *models.Company) dto.CompanyResponse {
 	}
 }
 
-func toCompanyResponseWithContacts(c *models.Company) dto.CompanyResponse {
+// toCompanyResponseWithEmployees builds CompanyResponse with employee briefs from the ContactCompany join table.
+func toCompanyResponseWithEmployees(c *models.Company) dto.CompanyResponse {
 	resp := toCompanyResponse(c)
-	contacts := make([]dto.CompanyContactBrief, len(c.Contacts))
-	for i, ct := range c.Contacts {
+	contacts := make([]dto.CompanyContactBrief, len(c.ContactCompanies))
+	for i, cc := range c.ContactCompanies {
 		contacts[i] = dto.CompanyContactBrief{
-			ID:        ct.ID,
-			FirstName: ptrToStr(ct.FirstName),
-			LastName:  ptrToStr(ct.LastName),
+			ID:          cc.Contact.ID,
+			FirstName:   ptrToStr(cc.Contact.FirstName),
+			LastName:    ptrToStr(cc.Contact.LastName),
+			JobPosition: ptrToStr(cc.JobPosition),
+			JobID:       cc.ID,
 		}
 	}
 	resp.Contacts = contacts

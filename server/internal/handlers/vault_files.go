@@ -27,15 +27,16 @@ var allowedMimeTypes = map[string]bool{
 	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 }
 
-const maxUploadSize = 10 * 1024 * 1024
+// maxUploadSize default is 10MB, overridden by storage.max_size system setting in handleUpload()
 
 type VaultFileHandler struct {
-	vaultFileService  *services.VaultFileService
+	vaultFileService   *services.VaultFileService
 	storageInfoService *services.StorageInfoService
+	settingsService    *services.SystemSettingService
 }
 
-func NewVaultFileHandler(vaultFileService *services.VaultFileService, storageInfoService *services.StorageInfoService) *VaultFileHandler {
-	return &VaultFileHandler{vaultFileService: vaultFileService, storageInfoService: storageInfoService}
+func NewVaultFileHandler(vaultFileService *services.VaultFileService, storageInfoService *services.StorageInfoService, settingsService *services.SystemSettingService) *VaultFileHandler {
+	return &VaultFileHandler{vaultFileService: vaultFileService, storageInfoService: storageInfoService, settingsService: settingsService}
 }
 
 // List godoc
@@ -145,6 +146,14 @@ func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, file
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		return response.BadRequest(c, "err.file_required", nil)
+	}
+
+	var maxUploadSize int64 = 10 * 1024 * 1024
+	if h.settingsService != nil {
+		maxSizeSetting := h.settingsService.GetInt64("storage.max_size", 0)
+		if maxSizeSetting > 0 {
+			maxUploadSize = maxSizeSetting
+		}
 	}
 
 	if fileHeader.Size > maxUploadSize {

@@ -112,3 +112,23 @@ type ContactGroupBrief struct {
 	ID   uint   `json:"id" example:"1"`
 	Name string `json:"name" example:"Family"`
 }
+
+type CreateContactJobRequest struct {
+	CompanyID   uint   `json:"company_id" validate:"required" example:"1"`
+	JobPosition string `json:"job_position" example:"Software Engineer"`
+}
+
+type UpdateContactJobRequest struct {
+	CompanyID   uint   `json:"company_id" validate:"required" example:"1"`
+	JobPosition string `json:"job_position" example:"Software Engineer"`
+}
+
+type ContactJobResponse struct {
+	ID          uint      `json:"id" example:"1"`
+	ContactID   string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CompanyID   uint      `json:"company_id" example:"1"`
+	CompanyName string    `json:"company_name" example:"Acme Corporation"`
+	JobPosition string    `json:"job_position" example:"Software Engineer"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}

@@ -154,7 +154,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactService.SetDavPushService(davPushService)
 	noteService.SetSearchService(searchService)
 
-	postPhotoHandler := NewPostPhotoHandler(vaultFileService, storageInfoService)
+	postPhotoHandler := NewPostPhotoHandler(vaultFileService, storageInfoService, systemSettingService)
 	contactPhotoHandler := NewContactPhotoHandler(vaultFileService)
 	contactDocumentHandler := NewContactDocumentHandler(vaultFileService)
 
@@ -180,9 +180,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	journalHandler := NewJournalHandler(journalService)
 	postHandler := NewPostHandler(postService)
 	vaultTaskHandler := NewVaultTaskHandler(vaultTaskService)
-	vaultFileHandler := NewVaultFileHandler(vaultFileService, storageInfoService)
+	vaultFileHandler := NewVaultFileHandler(vaultFileService, storageInfoService, systemSettingService)
 	avatarHandler := NewAvatarHandler(db, vaultFileService)
-	companyHandler := NewCompanyHandler(companyService)
+	companyHandler := NewCompanyHandler(companyService, contactJobService)
 	calendarHandler := NewCalendarHandler(calendarService)
 	reportHandler := NewReportHandler(reportService)
 	feedHandler := NewFeedHandler(feedService)
@@ -337,8 +337,16 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactSub.PUT("/labels/:id", contactLabelHandler.Update, requireEditor)
 	contactSub.DELETE("/labels/:id", contactLabelHandler.Remove, requireEditor)
 	contactSub.PUT("/religion", contactReligionHandler.Update, requireEditor)
-	contactSub.PUT("/jobInformation", contactJobHandler.Update, requireEditor)
-	contactSub.DELETE("/jobInformation", contactJobHandler.Delete, requireEditor)
+	// Legacy endpoints for backward compatibility — work with new ContactCompany table
+	contactSub.PUT("/jobInformation", contactJobHandler.LegacyUpdate, requireEditor)
+	contactSub.DELETE("/jobInformation", contactJobHandler.LegacyDelete, requireEditor)
+
+	// New many-to-many job CRUD endpoints
+	jobRoutes := contactSub.Group("/jobs")
+	jobRoutes.GET("", contactJobHandler.List)
+	jobRoutes.POST("", contactJobHandler.Create, requireEditor)
+	jobRoutes.PUT("/:job_id", contactJobHandler.UpdateJob, requireEditor)
+	jobRoutes.DELETE("/:job_id", contactJobHandler.DeleteJob, requireEditor)
 	contactSub.GET("/feed", feedHandler.GetContactFeed)
 	contactSub.POST("/move", contactMoveHandler.Move, requireEditor)
 	contactSub.PUT("/template", contactTemplateHandler.Update, requireEditor)
@@ -517,6 +525,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.GET("/companies/:id", companyHandler.Get)
 	vaultScoped.PUT("/companies/:id", companyHandler.Update, requireEditor)
 	vaultScoped.DELETE("/companies/:id", companyHandler.Delete, requireEditor)
+	vaultScoped.POST("/companies/:id/employees", companyHandler.AddEmployee, requireEditor)
+	vaultScoped.DELETE("/companies/:id/employees/:contact_id", companyHandler.RemoveEmployee, requireEditor)
 
 	vaultScoped.GET("/files/photos", vaultFileHandler.ListPhotos)
 	vaultScoped.GET("/files/documents", vaultFileHandler.ListDocuments)

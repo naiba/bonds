@@ -139,10 +139,10 @@ export default function AdminUsers() {
       key: "storage",
       width: 160,
       render: (_: unknown, record: AdminUser) => {
-        const used = record.storage_used ? (filesize(record.storage_used) as string) : "0 B";
+        const used = record.storage_used ? (filesize(record.storage_used, { standard: "jedec" }) as string) : "0 B";
         const limitMB = record.storage_limit_in_mb ?? 0;
         // storage_limit_in_mb=0 表示使用实例默认限制
-        const limitStr = limitMB > 0 ? (filesize(limitMB * 1024 * 1024) as string) : t("admin.users.instance_default");
+        const limitStr = limitMB > 0 ? (filesize(limitMB * 1024 * 1024, { standard: "jedec" }) as string) : t("admin.users.instance_default");
         return (
           <Space direction="vertical" size={0}>
             <span>{used} / {limitStr}</span>

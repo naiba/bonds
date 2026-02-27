@@ -286,6 +286,11 @@ export type { GithubComNaibaBondsInternalDtoNotificationChannelResponse as Notif
 export type { GithubComNaibaBondsInternalDtoPersonalizeEntityResponse as PersonalizeItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCompanyResponse as Company } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoLifeMetricResponse as LifeMetric } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoContactJobResponse as ContactJob } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCreateContactJobRequest as CreateContactJobRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoUpdateContactJobRequest as UpdateContactJobRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoAddEmployeeRequest as AddEmployeeRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCompanyContactBrief as CompanyContactBrief } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoPostTagResponse as PostTag } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoPostMetricResponse as PostMetric } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoJournalMetricResponse as JournalMetric } from "./generated/data-contracts";
