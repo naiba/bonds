@@ -30,8 +30,11 @@ test.describe('Vault - Companies CRUD', () => {
     await setupVault(page, 'company-create');
 
     const vaultUrl = page.url();
-    await page.goto(vaultUrl + '/companies');
-    await expect(page.getByRole('heading', { name: /Companies/i })).toBeVisible({ timeout: 10000 });
+    await page.goto(vaultUrl + '/settings');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: /Companies/i }).click();
+    await page.waitForLoadState('networkidle');
+
 
     // Button text is "Add Company"
     await page.getByRole('button', { name: /add company/i }).first().click();
@@ -58,8 +61,11 @@ test.describe('Vault - Companies CRUD', () => {
     await setupVault(page, 'company-edit');
 
     const vaultUrl = page.url();
-    await page.goto(vaultUrl + '/companies');
-    await expect(page.getByRole('heading', { name: /Companies/i })).toBeVisible({ timeout: 10000 });
+    await page.goto(vaultUrl + '/settings');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: /Companies/i }).click();
+    await page.waitForLoadState('networkidle');
+
 
     // Create a company first
     await page.getByRole('button', { name: /add company/i }).first().click();
@@ -96,7 +102,9 @@ test.describe('Vault - Companies CRUD', () => {
     await setupVault(page, 'company-delete');
 
     const vaultUrl = page.url();
-    await page.goto(vaultUrl + '/companies');
+    await page.goto(vaultUrl + '/settings');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: /Companies/i }).click();
 
     // Create first
     await page.getByRole('button', { name: /add company/i }).first().click();

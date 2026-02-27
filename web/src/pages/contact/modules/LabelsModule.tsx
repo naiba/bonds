@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
 import type { APIError } from "@/api";
+import { Link } from "react-router-dom";
 
 const { Title, Text } = Typography;
 
@@ -129,7 +130,14 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
           <Spin />
         </div>
       ) : labels.length === 0 ? (
-        <Text type="secondary">{t("contact.detail.labels.no_labels")}</Text>
+        <div>
+          <Text type="secondary">{t("contact.detail.labels.no_labels")}</Text>
+          <div style={{ marginTop: 8 }}>
+            <Link to={`/vaults/${vaultId}/settings`} style={{ fontSize: 12 }}>
+              {t("contact.detail.manage_labels_hint")}
+            </Link>
+          </div>
+        </div>
       ) : (
         <Space size={[8, 8]} wrap>
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
@@ -190,9 +198,14 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
             />
           </Form.Item>
           {availableLabels.length === 0 && (
-            <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
-              {t("contact.detail.labels.no_labels_available")}
-            </Text>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ display: "block" }}>
+                {t("contact.detail.labels.no_labels_available")}
+              </Text>
+              <Link to={`/vaults/${vaultId}/settings`} style={{ fontSize: 12 }}>
+                {t("contact.detail.manage_labels_hint")}
+              </Link>
+            </div>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button onClick={() => setIsModalOpen(false)}>{t("common.cancel")}</Button>
@@ -238,9 +251,14 @@ export default function LabelsModule({ vaultId, contactId }: LabelsModuleProps) 
             />
           </Form.Item>
           {editAvailableLabels.length === 0 && (
-            <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
-              {t("contact.detail.labels.no_labels_available")}
-            </Text>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ display: "block" }}>
+                {t("contact.detail.labels.no_labels_available")}
+              </Text>
+              <Link to={`/vaults/${vaultId}/settings`} style={{ fontSize: 12 }}>
+                {t("contact.detail.manage_labels_hint")}
+              </Link>
+            </div>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button onClick={() => setEditingLabel(null)}>{t("common.cancel")}</Button>

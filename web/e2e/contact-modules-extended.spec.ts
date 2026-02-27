@@ -222,7 +222,9 @@ test.describe('Contact Modules - Job Information', () => {
     const vaultUrl = page.url();
 
     // Create a company first so we can assign a job
-    await page.goto(vaultUrl + '/companies');
+    await page.goto(vaultUrl + '/settings');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: /Companies/i }).click();
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: /add company/i }).first().click();
     const companyModal = page.locator('.ant-modal');
@@ -377,7 +379,9 @@ test.describe('Contact Modules - Job Information Company', () => {
     const vaultUrl = page.url();
 
     // Create a company first via the companies page
-    await page.goto(vaultUrl + '/companies');
+    await page.goto(vaultUrl + '/settings');
+    await page.waitForLoadState('networkidle');
+    await page.getByRole('tab', { name: /Companies/i }).click();
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: /add company/i }).first().click();
 

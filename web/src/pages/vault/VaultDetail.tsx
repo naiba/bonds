@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { Card, Typography, Spin, Statistic, Row, Col, Button, Descriptions, theme, Dropdown, Modal, Form, Input, Popconfirm, App, List } from "antd";
-import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, CloudServerOutlined, BankOutlined } from "@ant-design/icons";
+import { TeamOutlined, PlusOutlined, SettingOutlined, EditOutlined, DeleteOutlined, CloudServerOutlined } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
@@ -105,12 +105,6 @@ export default function VaultDetail() {
       icon: <CloudServerOutlined />,
       label: t("vault.dav_subscriptions.title"),
       onClick: () => navigate(`/vaults/${vaultId}/dav-subscriptions`),
-    },
-    {
-      key: "companies",
-      icon: <BankOutlined />,
-      label: t("vault.companies.title"),
-      onClick: () => navigate(`/vaults/${vaultId}/companies`),
     },
     {
       key: "delete",

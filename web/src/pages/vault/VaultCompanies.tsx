@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -26,7 +26,6 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
 import { api } from "@/api";
@@ -34,9 +33,7 @@ import type { Company, APIError } from "@/api";
 
 const { Title, Text } = Typography;
 
-export default function VaultCompanies() {
-  const { id } = useParams<{ id: string }>();
-  const vaultId = id!;
+export default function VaultCompanies({ vaultId }: { vaultId: string }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -168,18 +165,8 @@ export default function VaultCompanies() {
   };
 
   return (
-    <div style={{ maxWidth: 1000, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate(`/vaults/${vaultId}`)}
-            style={{ color: token.colorTextSecondary }}
-          />
-          <BankOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
-          <Title level={4} style={{ margin: 0 }}>{t("vault.companies.title")}</Title>
-        </div>
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -384,7 +371,7 @@ export default function VaultCompanies() {
                     <List.Item.Meta
                     avatar={
                       <ContactAvatar
-                        vaultId={String(id)}
+                        vaultId={vaultId}
                         contactId={item.id}
                         firstName={item.first_name}
                         lastName={item.last_name}

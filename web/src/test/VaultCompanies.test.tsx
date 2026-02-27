@@ -41,7 +41,7 @@ function renderVaultCompanies() {
     <ConfigProvider>
       <AntApp>
         <MemoryRouter>
-          <VaultCompanies />
+          <VaultCompanies vaultId="test-vault-id" />
         </MemoryRouter>
       </AntApp>
     </ConfigProvider>,

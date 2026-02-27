@@ -41,6 +41,7 @@ import type {
   LifeEventCategoryResponse,
   LifeEventCategoryTypeResponse,
 } from "@/api";
+import VaultCompanies from "./VaultCompanies";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -862,6 +863,7 @@ export default function VaultSettings() {
     { key: "tabs", label: t("vault_settings.tabs"), children: <TabsTab /> },
     { key: "users", label: t("vault_settings.users"), children: <UsersTab /> },
     { key: "labels", label: t("vault_settings.labels"), children: <LabelsTab /> },
+    { key: "companies", label: t("vault.companies.title"), children: <VaultCompanies vaultId={vaultId} /> },
     { key: "tags", label: t("vault_settings.tags"), children: <SimpleCrudTab 
         queryKeySuffix="tags" 
         apiList={(vid) => api.vaultSettings.settingsTagsList(String(vid))}

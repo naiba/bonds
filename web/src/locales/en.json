@@ -486,6 +486,7 @@
     "no_jobs": "No job information",
     "job_added": "Job added",
     "job_deleted": "Job deleted",
+    "manage_companies_hint": "Manage companies in Vault Settings",
     "avatar_upload": "Upload avatar",
     "avatar_delete": "Remove avatar",
     "avatar_updated": "Avatar updated",
@@ -510,6 +511,7 @@
         "no_labels_available": "No labels available",
         "select_placeholder": "Select a label"
       },
+      "manage_labels_hint": "Manage labels in Vault Settings",
       "groups": {
         "title": "Groups",
         "add": "Add to Group",
@@ -816,7 +818,6 @@
       "default_map_site": "Default map service",
       "distance_format": "Distance unit",
       "number_format": "Number format",
-      "help_shown": "Show help sections",
       "enable_alternative_calendar": "Enable alternative calendars (e.g. Lunar)"
     },
     "notifications": {

@@ -15,6 +15,7 @@ import {
 import { EditOutlined, PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { Link } from "react-router-dom";
 import { api } from "@/api";
 import { useTranslation } from "react-i18next";
 import type { Contact, UpdateContactReligionRequest, APIError, ContactJob } from "@/api";
@@ -251,7 +252,11 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
             )}
           />
         ) : (
-          <Empty description={t("contact.detail.no_jobs")} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <Empty description={t("contact.detail.no_jobs")} image={Empty.PRESENTED_IMAGE_SIMPLE}>
+            <Link to={`/vaults/${vaultId}/settings`} style={{ fontSize: 12 }}>
+              {t("contact.detail.manage_companies_hint")}
+            </Link>
+          </Empty>
         )}
       </Card>
 
@@ -322,6 +327,13 @@ export default function ExtraInfoModule({ vaultId, contactId, contact }: ExtraIn
               placeholder={t("contact.detail.labels.select_placeholder")}
             />
           </Form.Item>
+          {companies.length === 0 && (
+            <div style={{ marginTop: -12, marginBottom: 16, fontSize: 12 }}>
+              <Link to={`/vaults/${vaultId}/settings`}>
+                {t("contact.detail.manage_companies_hint")}
+              </Link>
+            </div>
+          )}
           <Form.Item name="job_position" label={t("contact.detail.job_position")}>
             <Input />
           </Form.Item>

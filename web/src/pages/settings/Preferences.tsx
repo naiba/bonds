@@ -282,15 +282,6 @@ export default function Preferences() {
             <Select options={numberFormats} />
           </Form.Item>
 
-          <Divider style={{ margin: "8px 0 24px" }} />
-
-          <Form.Item
-            name="help_shown"
-            label={<span style={labelStyle}>{t("settings.preferences.help_shown")}</span>}
-            valuePropName="checked"
-          >
-            <Switch />
-          </Form.Item>
           <Form.Item
             name="enable_alternative_calendar"
             label={<span style={labelStyle}>{t("settings.preferences.enable_alternative_calendar")}</span>}

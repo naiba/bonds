@@ -486,6 +486,7 @@
     "no_jobs": "暂无工作信息",
     "job_added": "工作信息已添加",
     "job_deleted": "工作信息已删除",
+    "manage_companies_hint": "在 Vault 设置中管理公司",
     "avatar_upload": "上传头像",
     "avatar_delete": "移除头像",
     "avatar_updated": "头像已更新",
@@ -510,6 +511,7 @@
         "no_labels_available": "暂无可用标签",
         "select_placeholder": "选择标签"
       },
+      "manage_labels_hint": "在 Vault 设置中管理标签",
       "groups": {
         "title": "群组",
         "add": "添加到群组",
@@ -816,7 +818,6 @@
       "default_map_site": "默认地图服务",
       "distance_format": "距离单位",
       "number_format": "数字格式",
-      "help_shown": "显示帮助信息",
       "enable_alternative_calendar": "启用多历法（如农历）"
     },
     "notifications": {

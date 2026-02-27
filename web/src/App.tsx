@@ -1,6 +1,5 @@
 // Orphan pages report (routes with no direct navigation entry in Layout.tsx):
 // - /vaults/:id/settings  (VaultSettings)   — accessed from vault detail page gear icon
-// - /vaults/:id/companies (VaultCompanies)  — accessed from vault detail page
 // - /admin/settings, /admin/backups, /admin/oauth-providers — accessed via admin tabs
 // All orphan routes are intentionally secondary pages reachable from their parent views.
 
@@ -31,7 +30,6 @@ const VaultCalendar = lazy(() => import("@/pages/vault/VaultCalendar"));
 const VaultReports = lazy(() => import("@/pages/vault/VaultReports"));
 const VaultFeed = lazy(() => import("@/pages/vault/VaultFeed"));
 const VaultSettings = lazy(() => import("@/pages/vault/VaultSettings"));
-const VaultCompanies = lazy(() => import("@/pages/vault/VaultCompanies"));
 const VaultReminders = lazy(() => import("@/pages/vault/VaultReminders"));
 const DavSubscriptions = lazy(
   () => import("@/pages/vault/DavSubscriptions")
@@ -154,10 +152,6 @@ export default function App() {
             <Route
               path="/vaults/:id/settings"
               element={<VaultSettings />}
-            />
-            <Route
-              path="/vaults/:id/companies"
-              element={<VaultCompanies />}
             />
             <Route
               path="/vaults/:id/reminders"
