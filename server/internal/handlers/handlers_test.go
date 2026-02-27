@@ -1876,7 +1876,7 @@ func setupTestServerWithStorage(t *testing.T) *testServer {
 			RefreshHrs: 168,
 		},
 		App:     config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
-		Storage: config.StorageConfig{UploadDir: t.TempDir(), MaxSize: 10 * 1024 * 1024},
+		Storage: config.StorageConfig{UploadDir: t.TempDir(), MaxSizeMB: 10},
 		Bleve:   config.BleveConfig{IndexPath: blevePath + "/test.bleve"},
 	}
 	settingSvc := services.NewSystemSettingService(db)

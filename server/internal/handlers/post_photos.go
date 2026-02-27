@@ -82,9 +82,10 @@ func (h *PostPhotoHandler) Upload(c echo.Context) error {
 
 	var maxUploadSize int64 = 10 * 1024 * 1024
 	if h.settingsService != nil {
-		maxSizeSetting := h.settingsService.GetInt64("storage.max_size", 0)
-		if maxSizeSetting > 0 {
-			maxUploadSize = maxSizeSetting
+		// storage.max_size_mb 存储的是 MB，需要转换为字节进行比较
+		maxSizeMB := h.settingsService.GetInt64("storage.max_size_mb", 0)
+		if maxSizeMB > 0 {
+			maxUploadSize = maxSizeMB * 1024 * 1024
 		}
 	}
 

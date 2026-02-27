@@ -66,7 +66,7 @@ type SMTPConfig struct {
 
 type StorageConfig struct {
 	UploadDir string
-	MaxSize   int64
+	MaxSizeMB int64
 }
 
 type WebAuthnConfig struct {
@@ -130,7 +130,7 @@ func Load() *Config {
 		},
 		Storage: StorageConfig{
 			UploadDir: getEnv("STORAGE_UPLOAD_DIR", "data/uploads"),
-			MaxSize:   getEnvInt64("STORAGE_MAX_SIZE", 10485760),
+			MaxSizeMB: getEnvInt64("STORAGE_MAX_SIZE_MB", 10),
 		},
 		Geocoding: GeocodingConfig{
 			Provider: getEnv("GEOCODING_PROVIDER", "nominatim"),

@@ -59,7 +59,7 @@ const KNOWN_SETTINGS: SettingDef[] = [
   { key: "geocoding.api_key", type: "password", section: "geocoding" },
 
   // Storage
-  { key: "storage.max_size", type: "number", section: "storage" },
+  { key: "storage.max_size_mb", type: "number", section: "storage" },
   { key: "storage.default_limit_mb", type: "number", section: "storage", placeholder: "0 = unlimited" },
 
   // Backup

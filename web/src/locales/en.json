@@ -1244,7 +1244,7 @@
         "locationiq": "LocationIQ"
       },
       "storage": {
-        "max_size": "Max Upload Size (bytes)",
+        "max_size_mb": "Max Upload Size (MB)",
         "default_limit_mb": "Default Storage Limit per Account (MB, 0 = unlimited)"
       },
       "backup": {

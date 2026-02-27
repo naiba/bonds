@@ -1244,7 +1244,7 @@
         "locationiq": "LocationIQ"
       },
       "storage": {
-        "max_size": "最大上传大小（字节）",
+        "max_size_mb": "最大上传大小（MB）",
         "default_limit_mb": "默认用户储存限额（MB，0 = 无限制）"
       },
       "backup": {
