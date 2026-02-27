@@ -225,7 +225,8 @@ test.describe('Contact Modules - Job Information', () => {
     await page.goto(vaultUrl + '/settings');
     await page.waitForLoadState('networkidle');
     await page.getByRole('tab', { name: /Companies/i }).click();
-    await page.waitForLoadState('networkidle');
+    // Wait for Companies tab content to render (Add Company button)
+    await expect(page.getByRole('button', { name: /add company/i }).first()).toBeVisible({ timeout: 15000 });
     await page.getByRole('button', { name: /add company/i }).first().click();
     const companyModal = page.locator('.ant-modal');
     await expect(companyModal).toBeVisible({ timeout: 5000 });
@@ -382,7 +383,8 @@ test.describe('Contact Modules - Job Information Company', () => {
     await page.goto(vaultUrl + '/settings');
     await page.waitForLoadState('networkidle');
     await page.getByRole('tab', { name: /Companies/i }).click();
-    await page.waitForLoadState('networkidle');
+    // Wait for Companies tab content to render (Add Company button)
+    await expect(page.getByRole('button', { name: /add company/i }).first()).toBeVisible({ timeout: 15000 });
     await page.getByRole('button', { name: /add company/i }).first().click();
 
     const companyModal = page.locator('.ant-modal');

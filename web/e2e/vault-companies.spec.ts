@@ -33,8 +33,8 @@ test.describe('Vault - Companies CRUD', () => {
     await page.goto(vaultUrl + '/settings');
     await page.waitForLoadState('networkidle');
     await page.getByRole('tab', { name: /Companies/i }).click();
-    await page.waitForLoadState('networkidle');
-
+    // Wait for Companies tab content to render (Add Company button)
+    await expect(page.getByRole('button', { name: /add company/i }).first()).toBeVisible({ timeout: 15000 });
 
     // Button text is "Add Company"
     await page.getByRole('button', { name: /add company/i }).first().click();
@@ -64,8 +64,8 @@ test.describe('Vault - Companies CRUD', () => {
     await page.goto(vaultUrl + '/settings');
     await page.waitForLoadState('networkidle');
     await page.getByRole('tab', { name: /Companies/i }).click();
-    await page.waitForLoadState('networkidle');
-
+    // Wait for Companies tab content to render (Add Company button)
+    await expect(page.getByRole('button', { name: /add company/i }).first()).toBeVisible({ timeout: 15000 });
 
     // Create a company first
     await page.getByRole('button', { name: /add company/i }).first().click();
@@ -105,6 +105,8 @@ test.describe('Vault - Companies CRUD', () => {
     await page.goto(vaultUrl + '/settings');
     await page.waitForLoadState('networkidle');
     await page.getByRole('tab', { name: /Companies/i }).click();
+    // Wait for Companies tab content to render (Add Company button)
+    await expect(page.getByRole('button', { name: /add company/i }).first()).toBeVisible({ timeout: 15000 });
 
     // Create first
     await page.getByRole('button', { name: /add company/i }).first().click();

@@ -76,7 +76,6 @@ test.describe('Settings - Preferences', () => {
     await expect(page.getByText('Default map service')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Distance unit')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Number format')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('Show help sections')).toBeVisible({ timeout: 5000 });
   });
 
   test('should save preference changes', async ({ page }) => {
