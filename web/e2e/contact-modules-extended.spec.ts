@@ -110,7 +110,9 @@ test.describe('Contact Modules - Relationships', () => {
     const resp = await responsePromise;
     expect(resp.status()).toBeLessThan(400);
 
-    await expect(relCard.getByText('RelBob Jones')).toBeVisible({ timeout: 10000 });
+    // Bidirectional list may show the contact name twice (forward + reverse),
+    // so use .first() to avoid strict mode violation.
+    await expect(relCard.getByText('RelBob Jones').first()).toBeVisible({ timeout: 10000 });
   });
 });
 
