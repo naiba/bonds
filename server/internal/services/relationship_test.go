@@ -168,12 +168,20 @@ func TestListRelationships(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
+	// List now returns bidirectional results: 2 forward (John->Jane) + 2 reverse auto-created (Jane->John),
+	// all visible from John's page because query uses contact_id=? OR related_contact_id=?.
 	relationships, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
-	if len(relationships) != 2 {
-		t.Errorf("Expected 2 relationships, got %d", len(relationships))
+	if len(relationships) != 4 {
+		t.Errorf("Expected 4 relationships (2 forward + 2 reverse), got %d", len(relationships))
+	}
+	// All results should show relatedContactID as the "other" person
+	for _, r := range relationships {
+		if r.RelatedContactID != relatedContactID {
+			t.Errorf("Expected related_contact_id to be '%s' (the other person), got '%s'", relatedContactID, r.RelatedContactID)
+		}
 	}
 }
 
@@ -357,6 +365,7 @@ func TestCreateRelationship_NoReverseType(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
+	// List(contactID) returns 1 forward record (no reverse was auto-created)
 	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List forward failed: %v", err)
@@ -365,19 +374,21 @@ func TestCreateRelationship_NoReverseType(t *testing.T) {
 		t.Errorf("Expected 1 forward relationship, got %d", len(forwardRels))
 	}
 
+	// List(relatedContactID) now returns 1 because the bidirectional query also
+	// finds the forward record (related_contact_id = relatedContactID). No reverse
+	// record was auto-created since the reverse type doesn't exist.
 	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
-	if len(reverseRels) != 0 {
-		t.Errorf("Expected 0 reverse relationships (no matching reverse type), got %d", len(reverseRels))
+	if len(reverseRels) != 1 {
+		t.Errorf("Expected 1 relationship visible from related contact (forward record seen via bidirectional query), got %d", len(reverseRels))
 	}
 }
 
 func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
 	ctx := setupRelationshipTestFull(t)
-	parentTypeID, childTypeID := createAsymmetricTypePair(t, ctx.db, ctx.accountID)
-	_ = childTypeID
+	parentTypeID, _ := createAsymmetricTypePair(t, ctx.db, ctx.accountID)
 
 	created, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateRelationshipRequest{
 		RelationshipTypeID: parentTypeID,
@@ -387,12 +398,13 @@ func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
+	// Before delete: related contact sees 2 records (1 forward via bidirectional + 1 reverse auto-created)
 	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
-	if len(reverseRels) != 1 {
-		t.Fatalf("Expected 1 reverse relationship before delete, got %d", len(reverseRels))
+	if len(reverseRels) != 2 {
+		t.Fatalf("Expected 2 relationships visible from related contact before delete, got %d", len(reverseRels))
 	}
 
 	if err := ctx.svc.Delete(created.ID, ctx.contactID, ctx.vaultID); err != nil {
@@ -428,14 +440,10 @@ func TestDeleteRelationship_ReverseAlreadyGone(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
-	if err != nil {
-		t.Fatalf("List reverse failed: %v", err)
-	}
-	for _, r := range reverseRels {
-		ctx.db.Where("id = ?", r.ID).Delete(&models.Relationship{})
-	}
+	// Manually delete the reverse record from DB directly (not via service)
+	ctx.db.Where("contact_id = ? AND related_contact_id = ?", ctx.relatedContactID, ctx.contactID).Delete(&models.Relationship{})
 
+	// Delete the forward record should succeed even though reverse is already gone (tolerant delete)
 	if err := ctx.svc.Delete(created.ID, ctx.contactID, ctx.vaultID); err != nil {
 		t.Fatalf("Delete failed (reverse already gone): %v", err)
 	}
@@ -453,14 +461,14 @@ func TestUpdateRelationship_NotBidirectional(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
+	// Related contact sees 2 records: 1 forward (via bidirectional) + 1 reverse auto-created
 	reverseRelsBefore, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
-	if len(reverseRelsBefore) != 1 {
-		t.Fatalf("Expected 1 reverse relationship, got %d", len(reverseRelsBefore))
+	if len(reverseRelsBefore) != 2 {
+		t.Fatalf("Expected 2 relationships visible from related contact, got %d", len(reverseRelsBefore))
 	}
-	reverseBeforeTypeID := reverseRelsBefore[0].RelationshipTypeID
 
 	var spouseType models.RelationshipType
 	if err := ctx.db.Where("name = name_reverse_relationship AND name IS NOT NULL").First(&spouseType).Error; err != nil {
@@ -474,17 +482,24 @@ func TestUpdateRelationship_NotBidirectional(t *testing.T) {
 		t.Fatalf("Update failed: %v", err)
 	}
 
+	// After updating forward to spouse, related contact still sees 2 records:
+	// 1 forward (now spouse, via bidirectional) + 1 reverse (still child, update is not bidirectional)
 	reverseRelsAfter, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse after update failed: %v", err)
 	}
-	if len(reverseRelsAfter) != 1 {
-		t.Fatalf("Expected 1 reverse relationship after update, got %d", len(reverseRelsAfter))
+	if len(reverseRelsAfter) != 2 {
+		t.Fatalf("Expected 2 relationships after update, got %d", len(reverseRelsAfter))
 	}
-	if reverseRelsAfter[0].RelationshipTypeID != reverseBeforeTypeID {
-		t.Errorf("Reverse should be unchanged (type %d), got type %d", reverseBeforeTypeID, reverseRelsAfter[0].RelationshipTypeID)
+	// The reverse auto-created record should still be child type (update doesn't touch reverse)
+	foundChild := false
+	for _, r := range reverseRelsAfter {
+		if r.RelationshipTypeID == childTypeID {
+			foundChild = true
+			break
+		}
 	}
-	if reverseRelsAfter[0].RelationshipTypeID != childTypeID {
-		t.Errorf("Reverse should still be child type %d, got %d", childTypeID, reverseRelsAfter[0].RelationshipTypeID)
+	if !foundChild {
+		t.Errorf("Expected reverse relationship to still be child type %d", childTypeID)
 	}
 }

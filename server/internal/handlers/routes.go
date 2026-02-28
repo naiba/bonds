@@ -617,6 +617,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	gtRoleGroup.DELETE("/:roleId", groupTypeRoleHandler.Delete)
 	gtRoleGroup.POST("/:roleId/position", groupTypeRoleHandler.UpdatePosition)
 
+	// Static route must be registered before parameterized /:id route to avoid
+	// "all" being captured as an :id parameter value.
+	personalizeGroup.GET("/relationship-types/all", relationshipTypeHandler.ListAll)
+
 	rtTypeGroup := personalizeGroup.Group("/relationship-types/:id/types")
 	rtTypeGroup.GET("", relationshipTypeHandler.List)
 	rtTypeGroup.POST("", relationshipTypeHandler.Create)

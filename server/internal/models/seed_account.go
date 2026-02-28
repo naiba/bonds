@@ -552,6 +552,9 @@ func seedDefaultModules(tx *gorm.DB, accountID, locale string) error {
 			{"seed.modules.important_dates", "important_dates", true},
 			{"seed.modules.gender_and_pronoun", "gender_pronoun", true},
 			{"seed.modules.labels", "labels", true},
+			// BUG FIX #53: quick_facts module was missing from seed data, causing it to
+			// never appear on the contact detail page's dynamic tabs.
+			{"seed.modules.quick_facts", "quick_facts", true},
 			{"seed.modules.job_information", "company", true},
 			{"seed.modules.religions", "religions", true},
 			{"seed.modules.addresses", "addresses", false},

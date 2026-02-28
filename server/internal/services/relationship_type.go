@@ -119,3 +119,31 @@ func toRelationshipTypeResponse(rt *models.RelationshipType) dto.RelationshipTyp
 		UpdatedAt:               rt.UpdatedAt,
 	}
 }
+
+// ListAll returns all relationship types across all groups for the account,
+// including the group name for frontend grouped select rendering.
+func (s *RelationshipTypeService) ListAll(accountID string) ([]dto.RelationshipTypeWithGroupResponse, error) {
+	var groups []models.RelationshipGroupType
+	if err := s.db.Where("account_id = ?", accountID).Preload("Types", func(db *gorm.DB) *gorm.DB {
+		return db.Order("id ASC")
+	}).Order("id ASC").Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	var result []dto.RelationshipTypeWithGroupResponse
+	for _, g := range groups {
+		groupName := ptrToStr(g.Name)
+		for _, rt := range g.Types {
+			result = append(result, dto.RelationshipTypeWithGroupResponse{
+				ID:                      rt.ID,
+				RelationshipGroupTypeID: rt.RelationshipGroupTypeID,
+				GroupName:               groupName,
+				Name:                    ptrToStr(rt.Name),
+				NameReverseRelationship: ptrToStr(rt.NameReverseRelationship),
+			})
+		}
+	}
+	if result == nil {
+		result = []dto.RelationshipTypeWithGroupResponse{}
+	}
+	return result, nil
+}

@@ -427,6 +427,26 @@ func NewRelationshipTypeHandler(svc *services.RelationshipTypeService) *Relation
 	return &RelationshipTypeHandler{svc: svc}
 }
 
+// ListAll godoc
+//
+//	@Summary		List all relationship types across all groups
+//	@Description	Return all relationship types with group names for the account, used for grouped select in relationship forms
+//	@Tags			relationship-types
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=[]dto.RelationshipTypeWithGroupResponse}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/settings/personalize/relationship-types/all [get]
+func (h *RelationshipTypeHandler) ListAll(c echo.Context) error {
+	accountID := middleware.GetAccountID(c)
+	types, err := h.svc.ListAll(accountID)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_list_relationship_types")
+	}
+	return response.OK(c, types)
+}
+
 // List godoc
 //
 //	@Summary		List relationship types

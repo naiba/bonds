@@ -18,7 +18,7 @@ import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { api } from "@/api";
 import NetworkGraph from "@/components/NetworkGraph";
 import type { Relationship, Contact, APIError } from "@/api";
-import type { GithubComNaibaBondsInternalDtoRelationshipTypeResponse } from "@/api";
+import type { GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse } from "@/api";
 import { useTranslation } from "react-i18next";
 
 export default function RelationshipsModule({
@@ -54,11 +54,16 @@ export default function RelationshipsModule({
     },
   });
 
+  // BUG FIX: Previously fetched relationship GROUP types (Love/Family/Friend/Work) via
+  // personalizeDetail("relationship-types"), which queries the relationship_group_types table.
+  // Users could only pick a group, not a specific type (Parent/Child/Sibling), causing
+  // wrong relationship_type_id to be stored and incorrect labels on the graph.
+  // Now fetches all actual RelationshipType records with group names for grouped select.
   const { data: relationshipTypes = [] } = useQuery({
-    queryKey: ["personalize", "relationship-types"],
+    queryKey: ["personalize", "relationship-types", "all"],
     queryFn: async () => {
-      const res = await api.personalize.personalizeDetail("relationship-types");
-      return (res.data ?? []) as GithubComNaibaBondsInternalDtoRelationshipTypeResponse[];
+      const res = await api.relationshipTypes.personalizeRelationshipTypesAllList();
+      return (res.data ?? []) as GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse[];
     },
   });
 
@@ -70,12 +75,18 @@ export default function RelationshipsModule({
     return m;
   }, [contacts]);
 
-  const typeMap = useMemo(() => {
-    const m = new Map<number, GithubComNaibaBondsInternalDtoRelationshipTypeResponse>();
-    for (const t of relationshipTypes) {
-      if (t.id) m.set(t.id, t);
+  // Build grouped options for the relationship type Select (OptGroup by group name).
+  const typeSelectOptions = useMemo(() => {
+    const groups = new Map<string, { value: number; label: string }[]>();
+    for (const rt of relationshipTypes) {
+      const groupName = rt.group_name ?? "";
+      if (!groups.has(groupName)) groups.set(groupName, []);
+      groups.get(groupName)!.push({ value: rt.id!, label: rt.name ?? "" });
     }
-    return m;
+    return Array.from(groups.entries()).map(([group, options]) => ({
+      label: group,
+      options,
+    }));
   }, [relationshipTypes]);
 
   const createMutation = useMutation({
@@ -174,7 +185,7 @@ export default function RelationshipsModule({
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
               title={<span style={{ fontWeight: 500 }}>{(() => { const c = contactMap.get(r.related_contact_id ?? ""); return c ? formatContactName(nameOrder, c) : r.related_contact_id; })()}</span>}
-              description={<Tag color="blue">{typeMap.get(r.relationship_type_id ?? 0)?.name ?? ""}</Tag>}
+              description={<Tag color="blue">{r.relationship_type_name ?? ""}</Tag>}
             />
           </List.Item>
         )}
@@ -200,7 +211,11 @@ export default function RelationshipsModule({
           </Form.Item>
           <Form.Item name="relationship_type_id" label={t("modules.relationships.relationship_type")} rules={[{ required: true }]}>
             <Select
-              options={relationshipTypes.map((rt) => ({ value: rt.id!, label: rt.name ?? "" }))}
+              showSearch
+              options={typeSelectOptions}
+              filterOption={(input, option) =>
+                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+              }
             />
           </Form.Item>
           <div style={{ marginTop: -12, marginBottom: 24 }}>

@@ -266,6 +266,7 @@ export type { GithubComNaibaBondsInternalDtoContactInformationResponse as Contac
 export type { GithubComNaibaBondsInternalDtoLoanResponse as Loan } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoPetResponse as Pet } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoRelationshipResponse as Relationship } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoGoalResponse as Goal } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoStreakResponse as Streak } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoTimelineEventResponse as TimelineEvent } from "./generated/data-contracts";

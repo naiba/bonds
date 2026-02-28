@@ -31,12 +31,28 @@ func (s *RelationshipService) List(contactID, vaultID string) ([]dto.Relationshi
 		return nil, err
 	}
 	var relationships []models.Relationship
-	if err := s.db.Where("contact_id = ?", contactID).Order("created_at DESC").Find(&relationships).Error; err != nil {
+	// BUG FIX: Query both directions so that relationships appear on both
+	// participants' pages, not just the creator's. Previously only queried
+	// contact_id = ?, which caused reverse-created records to be invisible.
+	if err := s.db.Preload("RelationshipType").
+		Where("contact_id = ? OR related_contact_id = ?", contactID, contactID).
+		Order("created_at DESC").Find(&relationships).Error; err != nil {
 		return nil, err
 	}
-	result := make([]dto.RelationshipResponse, len(relationships))
-	for i, r := range relationships {
-		result[i] = toRelationshipResponse(&r)
+	result := make([]dto.RelationshipResponse, 0, len(relationships))
+	for _, r := range relationships {
+		resp := toRelationshipResponse(&r)
+		// For reverse relationships (where this contact is the related_contact),
+		// swap IDs so the "related" contact in the response is always the OTHER person,
+		// and show the reverse type name.
+		if r.RelatedContactID == contactID {
+			resp.ContactID = contactID
+			resp.RelatedContactID = r.ContactID
+			if r.RelationshipType.NameReverseRelationship != nil {
+				resp.RelationshipTypeName = *r.RelationshipType.NameReverseRelationship
+			}
+		}
+		result = append(result, resp)
 	}
 	return result, nil
 }
@@ -160,13 +176,18 @@ func findReverseTypeID(tx *gorm.DB, typeID uint) (uint, bool) {
 }
 
 func toRelationshipResponse(r *models.Relationship) dto.RelationshipResponse {
+	typeName := ""
+	if r.RelationshipType.Name != nil {
+		typeName = *r.RelationshipType.Name
+	}
 	return dto.RelationshipResponse{
-		ID:                 r.ID,
-		ContactID:          r.ContactID,
-		RelatedContactID:   r.RelatedContactID,
-		RelationshipTypeID: r.RelationshipTypeID,
-		CreatedAt:          r.CreatedAt,
-		UpdatedAt:          r.UpdatedAt,
+		ID:                   r.ID,
+		ContactID:            r.ContactID,
+		RelatedContactID:     r.RelatedContactID,
+		RelationshipTypeID:   r.RelationshipTypeID,
+		RelationshipTypeName: typeName,
+		CreatedAt:            r.CreatedAt,
+		UpdatedAt:            r.UpdatedAt,
 	}
 }
 
