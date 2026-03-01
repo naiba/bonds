@@ -183,19 +183,32 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 				{"seed.relationship_types.spouse", "seed.relationship_types.spouse", "love", false, nil},
 				{"seed.relationship_types.date", "seed.relationship_types.date", "", true, nil},
 				{"seed.relationship_types.lover", "seed.relationship_types.lover", "", true, nil},
+				// BUG FIX: Asymmetric types must have TWO rows so that findReverseTypeID
+				// can locate the reverse by Name. Previously only one row existed (e.g.
+				// Name="in love with", NameReverse="loved by") and findReverseTypeID
+				// searched for Name="loved by" which didn't exist, breaking auto-reverse.
 				{"seed.relationship_types.in_love_with", "seed.relationship_types.loved_by", "", true, nil},
+				{"seed.relationship_types.loved_by", "seed.relationship_types.in_love_with", "", true, nil},
 				{"seed.relationship_types.ex_boyfriend", "seed.relationship_types.ex_boyfriend", "", true, nil},
 			},
 		},
 		{
 			nameKey: "seed.relationship_groups.family", canBeDeleted: false,
 			types: []relType{
+				// BUG FIX: parent/child must be TWO rows for bidirectional auto-reverse.
 				{"seed.relationship_types.parent", "seed.relationship_types.child", "child", false, intPtr(1)},
+				{"seed.relationship_types.child", "seed.relationship_types.parent", "child", false, intPtr(1)},
 				{"seed.relationship_types.brother_sister", "seed.relationship_types.brother_sister", "", true, intPtr(2)},
+				// BUG FIX: grand_parent/grand_child must be TWO rows.
 				{"seed.relationship_types.grand_parent", "seed.relationship_types.grand_child", "", true, intPtr(2)},
+				{"seed.relationship_types.grand_child", "seed.relationship_types.grand_parent", "", true, intPtr(2)},
+				// BUG FIX: uncle_aunt/nephew_niece must be TWO rows.
 				{"seed.relationship_types.uncle_aunt", "seed.relationship_types.nephew_niece", "", true, intPtr(3)},
+				{"seed.relationship_types.nephew_niece", "seed.relationship_types.uncle_aunt", "", true, intPtr(3)},
 				{"seed.relationship_types.cousin", "seed.relationship_types.cousin", "", true, intPtr(4)},
+				// BUG FIX: godparent/godchild must be TWO rows.
 				{"seed.relationship_types.godparent", "seed.relationship_types.godchild", "", true, nil},
+				{"seed.relationship_types.godchild", "seed.relationship_types.godparent", "", true, nil},
 			},
 		},
 		{
@@ -209,8 +222,12 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 			nameKey: "seed.relationship_groups.work", canBeDeleted: true,
 			types: []relType{
 				{"seed.relationship_types.colleague", "seed.relationship_types.colleague", "", true, nil},
+				// BUG FIX: subordinate/boss must be TWO rows.
 				{"seed.relationship_types.subordinate", "seed.relationship_types.boss", "", true, intPtr(1)},
+				{"seed.relationship_types.boss", "seed.relationship_types.subordinate", "", true, intPtr(1)},
+				// BUG FIX: mentor/protege must be TWO rows.
 				{"seed.relationship_types.mentor", "seed.relationship_types.protege", "", true, intPtr(1)},
+				{"seed.relationship_types.protege", "seed.relationship_types.mentor", "", true, intPtr(1)},
 			},
 		},
 	}

@@ -31,27 +31,20 @@ func (s *RelationshipService) List(contactID, vaultID string) ([]dto.Relationshi
 		return nil, err
 	}
 	var relationships []models.Relationship
-	// BUG FIX: Query both directions so that relationships appear on both
-	// participants' pages, not just the creator's. Previously only queried
-	// contact_id = ?, which caused reverse-created records to be invisible.
+	// BUG FIX: Revert to simple contact_id query. The auto-reverse mechanism in
+	// Create already produces a record owned by each participant (contact_id = each
+	// person's ID). The previous bidirectional query (contact_id=? OR related_contact_id=?)
+	// caused symmetric relationships to appear twice because both the original record
+	// and its auto-created reverse matched. With auto-reverse, each contact already
+	// "owns" their side of every relationship.
 	if err := s.db.Preload("RelationshipType").
-		Where("contact_id = ? OR related_contact_id = ?", contactID, contactID).
+		Where("contact_id = ?", contactID).
 		Order("created_at DESC").Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	result := make([]dto.RelationshipResponse, 0, len(relationships))
 	for _, r := range relationships {
 		resp := toRelationshipResponse(&r)
-		// For reverse relationships (where this contact is the related_contact),
-		// swap IDs so the "related" contact in the response is always the OTHER person,
-		// and show the reverse type name.
-		if r.RelatedContactID == contactID {
-			resp.ContactID = contactID
-			resp.RelatedContactID = r.ContactID
-			if r.RelationshipType.NameReverseRelationship != nil {
-				resp.RelationshipTypeName = *r.RelationshipType.NameReverseRelationship
-			}
-		}
 		result = append(result, resp)
 	}
 	return result, nil

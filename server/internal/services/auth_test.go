@@ -117,8 +117,10 @@ func TestRegisterSeedsDefaultData(t *testing.T) {
 	if err := db.Where("relationship_group_type_id = ?", loveGroup.ID).Find(&relTypes).Error; err != nil {
 		t.Fatalf("relationship types query failed: %v", err)
 	}
-	if len(relTypes) != 6 {
-		t.Errorf("Love group: expected 6 relationship types, got %d", len(relTypes))
+	// After Issue #35 fix: asymmetric types (e.g. in_love_with/loved_by) are now
+	// two separate rows, so Love group has 7 types instead of the original 6.
+	if len(relTypes) != 7 {
+		t.Errorf("Love group: expected 7 relationship types, got %d", len(relTypes))
 	}
 
 	var callReasons []models.CallReason

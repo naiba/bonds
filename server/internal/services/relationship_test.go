@@ -168,16 +168,17 @@ func TestListRelationships(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	// List now returns bidirectional results: 2 forward (John->Jane) + 2 reverse auto-created (Jane->John),
-	// all visible from John's page because query uses contact_id=? OR related_contact_id=?.
+	// BUG FIX: List now uses simple contact_id query (no bidirectional).
+	// Each contact only sees records they "own" (contact_id = their ID).
+	// John created 2 forward records; auto-reverse created 2 records for Jane.
+	// From John's page, we see exactly 2 (his owned records).
 	relationships, err := svc.List(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
-	if len(relationships) != 4 {
-		t.Errorf("Expected 4 relationships (2 forward + 2 reverse), got %d", len(relationships))
+	if len(relationships) != 2 {
+		t.Errorf("Expected 2 relationships (John's owned records), got %d", len(relationships))
 	}
-	// All results should show relatedContactID as the "other" person
 	for _, r := range relationships {
 		if r.RelatedContactID != relatedContactID {
 			t.Errorf("Expected related_contact_id to be '%s' (the other person), got '%s'", relatedContactID, r.RelatedContactID)
@@ -374,15 +375,15 @@ func TestCreateRelationship_NoReverseType(t *testing.T) {
 		t.Errorf("Expected 1 forward relationship, got %d", len(forwardRels))
 	}
 
-	// List(relatedContactID) now returns 1 because the bidirectional query also
-	// finds the forward record (related_contact_id = relatedContactID). No reverse
-	// record was auto-created since the reverse type doesn't exist.
+	// BUG FIX: List now uses simple contact_id query. The orphan type has no
+	// matching reverse, so no auto-reverse record was created for relatedContact.
+	// From relatedContact's page, no records have contact_id = relatedContactID.
 	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
-	if len(reverseRels) != 1 {
-		t.Errorf("Expected 1 relationship visible from related contact (forward record seen via bidirectional query), got %d", len(reverseRels))
+	if len(reverseRels) != 0 {
+		t.Errorf("Expected 0 relationships from related contact (no auto-reverse created for orphan type), got %d", len(reverseRels))
 	}
 }
 
@@ -398,13 +399,13 @@ func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	// Before delete: related contact sees 2 records (1 forward via bidirectional + 1 reverse auto-created)
+	// Before delete: related contact has 1 auto-reverse record (contact_id = relatedContact)
 	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
-	if len(reverseRels) != 2 {
-		t.Fatalf("Expected 2 relationships visible from related contact before delete, got %d", len(reverseRels))
+	if len(reverseRels) != 1 {
+		t.Fatalf("Expected 1 relationship visible from related contact before delete, got %d", len(reverseRels))
 	}
 
 	if err := ctx.svc.Delete(created.ID, ctx.contactID, ctx.vaultID); err != nil {
@@ -461,13 +462,13 @@ func TestUpdateRelationship_NotBidirectional(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	// Related contact sees 2 records: 1 forward (via bidirectional) + 1 reverse auto-created
+	// Related contact has 1 auto-reverse record (the child type)
 	reverseRelsBefore, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
-	if len(reverseRelsBefore) != 2 {
-		t.Fatalf("Expected 2 relationships visible from related contact, got %d", len(reverseRelsBefore))
+	if len(reverseRelsBefore) != 1 {
+		t.Fatalf("Expected 1 relationship visible from related contact, got %d", len(reverseRelsBefore))
 	}
 
 	var spouseType models.RelationshipType
@@ -482,14 +483,14 @@ func TestUpdateRelationship_NotBidirectional(t *testing.T) {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	// After updating forward to spouse, related contact still sees 2 records:
-	// 1 forward (now spouse, via bidirectional) + 1 reverse (still child, update is not bidirectional)
+	// After updating forward to spouse, related contact still sees 1 record:
+	// the original auto-reverse (child type, update is not bidirectional)
 	reverseRelsAfter, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("List reverse after update failed: %v", err)
 	}
-	if len(reverseRelsAfter) != 2 {
-		t.Fatalf("Expected 2 relationships after update, got %d", len(reverseRelsAfter))
+	if len(reverseRelsAfter) != 1 {
+		t.Fatalf("Expected 1 relationship after update, got %d", len(reverseRelsAfter))
 	}
 	// The reverse auto-created record should still be child type (update doesn't touch reverse)
 	foundChild := false
