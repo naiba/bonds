@@ -148,24 +148,18 @@ func (s *RelationshipService) Delete(id uint, contactID, vaultID string) error {
 	})
 }
 
+// findReverseTypeID returns the counterpart type ID for bidirectional
+// relationship auto-creation. Uses ReverseRelationshipTypeID (stable ID link)
+// instead of the old name-matching approach which broke on renames / i18n.
 func findReverseTypeID(tx *gorm.DB, typeID uint) (uint, bool) {
 	var rt models.RelationshipType
 	if err := tx.First(&rt, typeID).Error; err != nil {
 		return 0, false
 	}
-	if rt.Name == nil || rt.NameReverseRelationship == nil {
+	if rt.ReverseRelationshipTypeID == nil {
 		return 0, false
 	}
-	if *rt.Name == *rt.NameReverseRelationship {
-		return rt.ID, true
-	}
-	var reverseType models.RelationshipType
-	err := tx.Where("relationship_group_type_id = ? AND name = ?", rt.RelationshipGroupTypeID, *rt.NameReverseRelationship).
-		First(&reverseType).Error
-	if err != nil {
-		return 0, false
-	}
-	return reverseType.ID, true
+	return *rt.ReverseRelationshipTypeID, true
 }
 
 func toRelationshipResponse(r *models.Relationship) dto.RelationshipResponse {

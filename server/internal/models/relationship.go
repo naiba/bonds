@@ -25,6 +25,10 @@ type RelationshipType struct {
 	NameReverseRelationshipTranslationKey *string   `json:"name_reverse_relationship_translation_key"`
 	Type                                  *string   `json:"type"`
 	Degree                                *int      `json:"degree" gorm:"default:null"`
+	// ReverseRelationshipTypeID points to the counterpart type for bidirectional
+	// relationship auto-creation (e.g. Parent→Child). Uses ID instead of name
+	// matching to avoid breakage when users rename types or use different locales.
+	ReverseRelationshipTypeID             *uint     `json:"reverse_relationship_type_id" gorm:"default:null;index"`
 	CanBeDeleted                          bool      `json:"can_be_deleted" gorm:"default:true"`
 	CreatedAt                             time.Time `json:"created_at"`
 	UpdatedAt                             time.Time `json:"updated_at"`

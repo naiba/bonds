@@ -33,7 +33,7 @@ func setupRelationshipTypeTest(t *testing.T) (*RelationshipTypeService, *gorm.DB
 }
 
 func TestCreateRelationshipType_Success(t *testing.T) {
-	svc, _, accountID, groupTypeID := setupRelationshipTypeTest(t)
+	svc, db, accountID, groupTypeID := setupRelationshipTypeTest(t)
 
 	created, err := svc.Create(accountID, groupTypeID, dto.CreateRelationshipTypeRequest{
 		Name:                    "mentor",
@@ -53,6 +53,24 @@ func TestCreateRelationshipType_Success(t *testing.T) {
 	}
 	if !created.CanBeDeleted {
 		t.Error("Expected can_be_deleted to be true for custom type")
+	}
+	if created.ReverseRelationshipTypeID == nil {
+		t.Fatal("Expected ReverseRelationshipTypeID to be set")
+	}
+
+	// Verify the reverse type was auto-created with bidirectional link.
+	var reverseRT models.RelationshipType
+	if err := db.First(&reverseRT, *created.ReverseRelationshipTypeID).Error; err != nil {
+		t.Fatalf("Reverse type not found: %v", err)
+	}
+	if ptrToStr(reverseRT.Name) != "mentee" {
+		t.Errorf("Expected reverse type name 'mentee', got '%s'", ptrToStr(reverseRT.Name))
+	}
+	if ptrToStr(reverseRT.NameReverseRelationship) != "mentor" {
+		t.Errorf("Expected reverse type's reverse name 'mentor', got '%s'", ptrToStr(reverseRT.NameReverseRelationship))
+	}
+	if reverseRT.ReverseRelationshipTypeID == nil || *reverseRT.ReverseRelationshipTypeID != created.ID {
+		t.Errorf("Expected reverse type to point back to created type %d", created.ID)
 	}
 }
 
@@ -107,7 +125,7 @@ func TestUpdateRelationshipType_NotFound(t *testing.T) {
 }
 
 func TestDeleteRelationshipType_Success(t *testing.T) {
-	svc, _, accountID, groupTypeID := setupRelationshipTypeTest(t)
+	svc, db, accountID, groupTypeID := setupRelationshipTypeTest(t)
 
 	created, err := svc.Create(accountID, groupTypeID, dto.CreateRelationshipTypeRequest{
 		Name:                    "to-delete",
@@ -116,9 +134,19 @@ func TestDeleteRelationshipType_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
+	reverseID := *created.ReverseRelationshipTypeID
 
 	if err := svc.Delete(accountID, groupTypeID, created.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Verify the reverse type's pointer was cleared (not dangling).
+	var reverseRT models.RelationshipType
+	if err := db.First(&reverseRT, reverseID).Error; err != nil {
+		t.Fatalf("Reverse type should still exist: %v", err)
+	}
+	if reverseRT.ReverseRelationshipTypeID != nil {
+		t.Errorf("Expected reverse type's ReverseRelationshipTypeID to be nil after deleting counterpart, got %d", *reverseRT.ReverseRelationshipTypeID)
 	}
 }
 

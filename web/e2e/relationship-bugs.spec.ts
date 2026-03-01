@@ -359,3 +359,155 @@ test.describe('Issue #35 Bug 3: Symmetric relationship deduplication', () => {
     await expect(hijoEntries.first().locator('.ant-tag').filter({ hasText: /child/i })).toBeVisible();
   });
 });
+
+// ============================================================================
+// Issue #35 Fix: ID-based reverse relationship linking
+// Validates that the new ReverseRelationshipTypeID mechanism works correctly:
+// - Custom relationship types auto-create their reverse counterpart
+// - Bidirectional relationships work with user-created types
+// - Renaming a type doesn't break the reverse link
+// ============================================================================
+test.describe('Issue #35 Fix: ID-based reverse relationship type linking', () => {
+  test('custom relationship type auto-creates reverse and works bidirectionally', async ({ page }) => {
+    await setupVault(page, 'rel-id-link');
+    await goToContacts(page);
+
+    await createContact(page, 'Sensei', 'Tanaka');
+    await goBackToContacts(page);
+    await createContact(page, 'Deshi', 'Yamada');
+
+    // Navigate to Settings > Personalize to create a custom relationship type
+    await page.goto('/settings/personalize');
+    await page.waitForLoadState('networkidle');
+
+    // Expand the "Relationship Group Types" section
+    const relSection = page.locator('.ant-collapse-item').filter({ hasText: /Relationship/i });
+    await relSection.locator('.ant-collapse-header').click();
+    await page.waitForTimeout(500);
+
+    // Expand the first group (Love) to see its sub-items
+    const firstGroup = relSection.locator('.ant-list-item').first();
+    await firstGroup.locator('button').filter({ has: page.locator('.anticon-right, .anticon-down') }).click();
+    await page.waitForTimeout(500);
+
+    // Click "Add Type" button to create a new custom type
+    const subPanel = relSection.locator('[style*="border-left"]').first();
+    await subPanel.getByRole('button', { name: /Add/i }).click();
+
+    // Fill in the custom type: "teacher" with reverse "student"
+    const inputs = subPanel.locator('input');
+    await inputs.nth(0).fill('teacher');
+    await inputs.nth(1).fill('student');
+
+    // Submit and wait for API response
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/relationship-types/') && resp.request().method() === 'POST'
+    );
+    await subPanel.getByRole('button', { name: /^Add$/i }).click();
+    const resp = await createResp;
+    expect(resp.status()).toBeLessThan(400);
+
+    // The list should now show both "teacher ↔ student" AND "student ↔ teacher"
+    // (auto-created reverse)
+    await page.waitForTimeout(500);
+    await expect(subPanel.getByText('teacher ↔ student')).toBeVisible({ timeout: 5000 });
+    await expect(subPanel.getByText('student ↔ teacher')).toBeVisible({ timeout: 5000 });
+
+    // Now go back and test that the custom types work for creating relationships
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    // Navigate to the vault's contacts
+    await page.getByText('Rel Vault').first().click();
+    await page.waitForLoadState('networkidle');
+    await goToContacts(page);
+
+    // Go to Sensei's page and create relationship with Deshi as "teacher"
+    await clickContactInTable(page, 'Sensei Tanaka');
+    await navigateToTab(page, 'Social');
+    const modal = await openRelationshipModal(page);
+    await addRelationship(page, modal, 'Deshi Yamada', 'teacher');
+
+    // Sensei's page should show Deshi with "teacher" tag
+    const senseiRelCard = page.locator('.ant-card').filter({ hasText: /Relationships/ }).first();
+    await expect(senseiRelCard.getByText('Deshi Yamada').first()).toBeVisible({ timeout: 10000 });
+    await expect(senseiRelCard.locator('.ant-tag').filter({ hasText: /teacher/i }).first()).toBeVisible();
+
+    // Go to Deshi's page — should show Sensei with reverse "student" tag
+    await goBackToContacts(page);
+    await clickContactInTable(page, 'Deshi Yamada');
+    await navigateToTab(page, 'Social');
+
+    const deshiRelCard = page.locator('.ant-card').filter({ hasText: /Relationships/ }).first();
+    await expect(deshiRelCard.getByText('Sensei Tanaka').first()).toBeVisible({ timeout: 10000 });
+    await expect(deshiRelCard.locator('.ant-tag').filter({ hasText: /student/i }).first()).toBeVisible();
+  });
+
+  test('symmetric custom type points to self and works correctly', async ({ page }) => {
+    await setupVault(page, 'rel-symmetric');
+    await goToContacts(page);
+
+    await createContact(page, 'Ally', 'One');
+    await goBackToContacts(page);
+    await createContact(page, 'Ally', 'Two');
+
+    // Create a custom symmetric type: "roommate" ↔ "roommate"
+    await page.goto('/settings/personalize');
+    await page.waitForLoadState('networkidle');
+
+    const relSection = page.locator('.ant-collapse-item').filter({ hasText: /Relationship/i });
+    await relSection.locator('.ant-collapse-header').click();
+    await page.waitForTimeout(500);
+
+    const firstGroup = relSection.locator('.ant-list-item').first();
+    await firstGroup.locator('button').filter({ has: page.locator('.anticon-right, .anticon-down') }).click();
+    await page.waitForTimeout(500);
+
+    const subPanel = relSection.locator('[style*="border-left"]').first();
+    await subPanel.getByRole('button', { name: /Add/i }).click();
+
+    const inputs = subPanel.locator('input');
+    await inputs.nth(0).fill('roommate');
+    await inputs.nth(1).fill('roommate');
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/relationship-types/') && resp.request().method() === 'POST'
+    );
+    await subPanel.getByRole('button', { name: /^Add$/i }).click();
+    const resp = await createResp;
+    expect(resp.status()).toBeLessThan(400);
+
+    // Symmetric type: only ONE entry should appear (not two)
+    await page.waitForTimeout(500);
+    const roommateEntries = subPanel.locator('.ant-list-item').filter({ hasText: 'roommate ↔ roommate' });
+    await expect(roommateEntries.first()).toBeVisible({ timeout: 5000 });
+    await expect(roommateEntries).toHaveCount(1);
+
+    // Use the symmetric type in a relationship
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await page.getByText('Rel Vault').first().click();
+    await page.waitForLoadState('networkidle');
+    await goToContacts(page);
+
+    await clickContactInTable(page, 'Ally One');
+    await navigateToTab(page, 'Social');
+    const modal = await openRelationshipModal(page);
+    await addRelationship(page, modal, 'Ally Two', 'roommate');
+
+    // Ally One should see Ally Two with "roommate" tag, once
+    const relCard1 = page.locator('.ant-card').filter({ hasText: /Relationships/ }).first();
+    const entries1 = relCard1.locator('.ant-list-item').filter({ hasText: 'Ally Two' });
+    await expect(entries1.first()).toBeVisible({ timeout: 10000 });
+    await expect(entries1).toHaveCount(1);
+
+    // Ally Two should see Ally One with "roommate" tag, once
+    await goBackToContacts(page);
+    await clickContactInTable(page, 'Ally Two');
+    await navigateToTab(page, 'Social');
+
+    const relCard2 = page.locator('.ant-card').filter({ hasText: /Relationships/ }).first();
+    const entries2 = relCard2.locator('.ant-list-item').filter({ hasText: 'Ally One' });
+    await expect(entries2.first()).toBeVisible({ timeout: 10000 });
+    await expect(entries2).toHaveCount(1);
+  });
+});

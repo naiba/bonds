@@ -268,13 +268,18 @@ func createAsymmetricTypePair(t *testing.T, db *gorm.DB, accountID string) (pare
 		t.Fatalf("Create parent type failed: %v", err)
 	}
 	childType := models.RelationshipType{
-		RelationshipGroupTypeID: group.ID,
-		Name:                    &childName,
-		NameReverseRelationship: &parentName,
-		CanBeDeleted:            true,
+		RelationshipGroupTypeID:  group.ID,
+		Name:                     &childName,
+		NameReverseRelationship:  &parentName,
+		CanBeDeleted:             true,
+		ReverseRelationshipTypeID: &parentType.ID,
 	}
 	if err := db.Create(&childType).Error; err != nil {
 		t.Fatalf("Create child type failed: %v", err)
+	}
+	// Link parent → child bidirectionally
+	if err := db.Model(&parentType).Update("reverse_relationship_type_id", childType.ID).Error; err != nil {
+		t.Fatalf("Link parent to child failed: %v", err)
 	}
 	return parentType.ID, childType.ID
 }

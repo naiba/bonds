@@ -235,6 +235,10 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 	var undeletableGroupIDs []uint
 	var undeletableTypeIDs []uint
 
+	// nameKeyToID maps translation key → created RelationshipType.ID so we can
+	// link asymmetric pairs by ReverseRelationshipTypeID after creation.
+	nameKeyToID := make(map[string]uint)
+
 	for _, g := range groups {
 		group := RelationshipGroupType{
 			AccountID:          accountID,
@@ -262,8 +266,24 @@ func seedRelationshipGroupTypes(tx *gorm.DB, accountID, locale string) error {
 			if err := tx.Create(&rt).Error; err != nil {
 				return err
 			}
+			nameKeyToID[t.nameKey] = rt.ID
 			if !t.canBeDeleted {
 				undeletableTypeIDs = append(undeletableTypeIDs, rt.ID)
+			}
+		}
+
+		// Link asymmetric pairs by ReverseRelationshipTypeID. For symmetric types
+		// (nameKey == reverseKey), point to self. For asymmetric pairs, each side
+		// points to the other via stable ID, not fragile name matching.
+		for _, t := range g.types {
+			thisID := nameKeyToID[t.nameKey]
+			reverseID, ok := nameKeyToID[t.reverseKey]
+			if !ok {
+				continue
+			}
+			if err := tx.Model(&RelationshipType{}).Where("id = ?", thisID).
+				Update("reverse_relationship_type_id", reverseID).Error; err != nil {
+				return err
 			}
 		}
 	}
