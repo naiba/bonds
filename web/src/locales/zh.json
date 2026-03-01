@@ -520,6 +520,17 @@
         "removed": "已从群组移除",
         "no_groups": "未加入任何群组",
         "select_group": "选择群组"
+      },
+      "summary": {
+        "family": "家庭概况",
+        "gender": "性别",
+        "pronoun": "代词",
+        "labels": "标签",
+        "job_info": "职业信息",
+        "religion": "宗教信仰",
+        "contact_info": "联系方式",
+        "address": "主要地址",
+        "not_set": "未设置"
       }
     }
   },

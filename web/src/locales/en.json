@@ -520,6 +520,17 @@
         "removed": "Removed from group",
         "no_groups": "Not in any group",
         "select_group": "Select a group"
+      },
+      "summary": {
+        "family": "Family summary",
+        "gender": "Gender",
+        "pronoun": "Pronoun",
+        "labels": "Labels",
+        "job_info": "Job information",
+        "religion": "Religion",
+        "contact_info": "Contact information",
+        "address": "Primary address",
+        "not_set": "Not set"
       }
     }
   },

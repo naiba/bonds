@@ -58,6 +58,7 @@ import LabelsModule from "./modules/LabelsModule";
 import FeedModule from "./modules/FeedModule";
 import ExtraInfoModule from "./modules/ExtraInfoModule";
 import GroupsModule from "./modules/GroupsModule";
+import ContactSummaryCard from "./modules/ContactSummaryCard";
 
 const { Title, Text } = Typography;
 
@@ -628,6 +629,10 @@ export default function ContactDetail() {
           </Dropdown>
         </div>
       </Card>
+
+      <div style={{ marginBottom: 16 }}>
+        <ContactSummaryCard vaultId={vaultId} contactId={cId} contact={contact} />
+      </div>
 
       <Tabs
         items={tabItems}

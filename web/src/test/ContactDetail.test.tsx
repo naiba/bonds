@@ -69,6 +69,9 @@ vi.mock("@/pages/contact/modules/FeedModule", () => ({
 vi.mock("@/pages/contact/modules/ExtraInfoModule", () => ({
   default: () => <div>ExtraInfoModule</div>,
 }));
+vi.mock("@/pages/contact/modules/ContactSummaryCard", () => ({
+  default: () => <div>ContactSummaryCard</div>,
+}));
 
 vi.mock("@/api/contacts", () => ({
   contactsApi: {
