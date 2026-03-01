@@ -44,6 +44,11 @@ function renderCalendar() {
 
 describe("VaultCalendar", () => {
   it("renders contact name with label for calendar dates", () => {
+    // Use current month so the date appears in the default panel view
+    // (panelDate defaults to dayjs(), so only current month dates are rendered)
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
     mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
       const key = opts.queryKey;
       if (Array.isArray(key) && key.includes("month")) {
@@ -56,12 +61,12 @@ describe("VaultCalendar", () => {
                 contact_name: "John Doe",
                 label: "Lunar Birthday",
                 day: 15,
-                month: 2,
-                year: 2026,
+                month: currentMonth,
+                year: currentYear,
                 calendar_type: "lunar",
                 original_day: 15,
                 original_month: 1,
-                original_year: 2026,
+                original_year: currentYear,
               },
             ],
             reminders: [],
