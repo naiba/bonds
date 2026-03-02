@@ -4,7 +4,7 @@ Vaults are isolated containers that hold contacts and their associated data. The
 
 ## Why Vaults?
 
-- **Data isolation** — Contacts in different vaults are completely separate
+- **Data isolation** — Contacts in different vaults are separate, with the exception of [cross-vault relationships](/features/contacts#cross-vault-relationships)
 - **Shared access** — Invite other users to collaborate on the same vault
 - **Role-based permissions** — Control who can do what
 

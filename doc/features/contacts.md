@@ -65,4 +65,13 @@ Define relationships between contacts — parent, child, partner, friend, collea
 - **Love** — Partner, spouse, significant other
 - **Family** — Parent, child, sibling
 - **Friend** — Close friend, acquaintance
+
 - **Work** — Colleague, mentor, boss
+
+### Cross-Vault Relationships
+
+Relationships can span across vaults. When adding a relationship, the contact selector shows contacts from **all vaults** you have access to, grouped by vault name.
+
+- If you have **Editor** permission on the target vault, a **bidirectional** relationship is created automatically (both contacts see the relationship)
+- If you only have **Viewer** permission, a **one-way** relationship is created, with a hint in the UI explaining why
+- Deleting a cross-vault relationship automatically cleans up the reverse record on the other side
