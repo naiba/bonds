@@ -551,6 +551,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.PUT("/lifeMetrics/:id", lifeMetricHandler.Update, requireEditor)
 	vaultScoped.DELETE("/lifeMetrics/:id", lifeMetricHandler.Delete, requireEditor)
 	vaultScoped.POST("/lifeMetrics/:id/contacts", lifeMetricHandler.AddContact, requireEditor)
+	// BUG FIX (#56): Add missing DELETE route for removing contacts from life metrics
+	vaultScoped.DELETE("/lifeMetrics/:id/contacts/:contact_id", lifeMetricHandler.RemoveContact, requireEditor)
 
 	vaultScoped.PUT("/defaultTab", vaultHandler.UpdateDefaultTab, requireEditor)
 

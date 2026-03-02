@@ -24,7 +24,7 @@ import {
   ArrowLeftOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
-import { api, httpClient } from "@/api";
+import { api } from "@/api";
 import type { LifeMetric, SearchResult } from "@/api";
 
 const { Title, Text } = Typography;
@@ -97,8 +97,8 @@ export default function VaultLifeMetrics() {
   });
 
   const removeContactMutation = useMutation({
-    mutationFn: (values: { metricId: number; contactId: number }) =>
-      httpClient.instance.delete(`/vaults/${vaultId}/lifeMetrics/${values.metricId}/contacts/${values.contactId}`),
+    mutationFn: (values: { metricId: number; contactId: string }) =>
+      api.lifeMetrics.lifeMetricsContactsDelete(String(vaultId), values.metricId, values.contactId),
     onSuccess: () => {
       message.success(t("common.deleted"));
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "lifeMetrics"] });

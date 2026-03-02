@@ -20,12 +20,14 @@ func NewCompanyService(db *gorm.DB) *CompanyService {
 
 func (s *CompanyService) List(vaultID string) ([]dto.CompanyResponse, error) {
 	var companies []models.Company
-	if err := s.db.Where("vault_id = ?", vaultID).Order("name ASC").Find(&companies).Error; err != nil {
+	// BUG FIX (#55): Must Preload ContactCompanies+Contact so the Employees column
+	// in the frontend list is populated, not just in the single-Get detail view.
+	if err := s.db.Preload("ContactCompanies").Preload("ContactCompanies.Contact").Where("vault_id = ?", vaultID).Order("name ASC").Find(&companies).Error; err != nil {
 		return nil, err
 	}
 	result := make([]dto.CompanyResponse, len(companies))
 	for i, c := range companies {
-		result[i] = toCompanyResponse(&c)
+		result[i] = toCompanyResponseWithEmployees(&c)
 	}
 	return result, nil
 }

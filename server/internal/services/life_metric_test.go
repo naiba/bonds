@@ -96,3 +96,72 @@ func TestAddLifeMetricContact(t *testing.T) {
 		t.Fatalf("AddContact failed: %v", err)
 	}
 }
+
+func TestListLifeMetricsWithContacts(t *testing.T) {
+	svc, vaultID, contactID, _ := setupLifeMetricTest(t)
+
+	metric, _ := svc.Create(vaultID, dto.CreateLifeMetricRequest{Label: "With Contacts"})
+	if err := svc.AddContact(metric.ID, vaultID, contactID); err != nil {
+		t.Fatalf("AddContact failed: %v", err)
+	}
+
+	metrics, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(metrics) != 1 {
+		t.Fatalf("Expected 1 metric, got %d", len(metrics))
+	}
+	if len(metrics[0].Contacts) != 1 {
+		t.Errorf("Expected 1 contact in metric, got %d", len(metrics[0].Contacts))
+	}
+	if metrics[0].Contacts[0].ID != contactID {
+		t.Errorf("Expected contact ID %s, got %s", contactID, metrics[0].Contacts[0].ID)
+	}
+	if metrics[0].Contacts[0].FirstName != "John" {
+		t.Errorf("Expected first name 'John', got '%s'", metrics[0].Contacts[0].FirstName)
+	}
+}
+
+func TestRemoveLifeMetricContact(t *testing.T) {
+	svc, vaultID, contactID, _ := setupLifeMetricTest(t)
+
+	metric, _ := svc.Create(vaultID, dto.CreateLifeMetricRequest{Label: "Removable"})
+	if err := svc.AddContact(metric.ID, vaultID, contactID); err != nil {
+		t.Fatalf("AddContact failed: %v", err)
+	}
+
+	// Verify contact is present
+	metrics, _ := svc.List(vaultID)
+	if len(metrics[0].Contacts) != 1 {
+		t.Fatalf("Expected 1 contact before remove, got %d", len(metrics[0].Contacts))
+	}
+
+	// Remove contact
+	if err := svc.RemoveContact(metric.ID, vaultID, contactID); err != nil {
+		t.Fatalf("RemoveContact failed: %v", err)
+	}
+
+	// Verify contact is removed
+	metrics, _ = svc.List(vaultID)
+	if len(metrics[0].Contacts) != 0 {
+		t.Errorf("Expected 0 contacts after remove, got %d", len(metrics[0].Contacts))
+	}
+}
+
+func TestRemoveLifeMetricContact_NotFound(t *testing.T) {
+	svc, vaultID, contactID, _ := setupLifeMetricTest(t)
+
+	// Non-existent metric
+	err := svc.RemoveContact(9999, vaultID, contactID)
+	if err != ErrLifeMetricNotFound {
+		t.Errorf("Expected ErrLifeMetricNotFound, got %v", err)
+	}
+
+	// Existing metric but non-associated contact
+	metric, _ := svc.Create(vaultID, dto.CreateLifeMetricRequest{Label: "NoContact"})
+	err = svc.RemoveContact(metric.ID, vaultID, contactID)
+	if err != ErrContactNotFound {
+		t.Errorf("Expected ErrContactNotFound for unlinked contact, got %v", err)
+	}
+}

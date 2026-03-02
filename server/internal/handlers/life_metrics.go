@@ -176,3 +176,40 @@ func (h *LifeMetricHandler) AddContact(c echo.Context) error {
 	}
 	return response.NoContent(c)
 }
+
+// RemoveContact godoc
+//
+//	@Summary		Remove contact from life metric
+//	@Description	Remove association between a contact and a life metric
+//	@Tags			life-metrics
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Life Metric ID"
+//	@Param			contact_id	path	string	true	"Contact ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/lifeMetrics/{id}/contacts/{contact_id} [delete]
+func (h *LifeMetricHandler) RemoveContact(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_life_metric_id", nil)
+	}
+	contactID := c.Param("contact_id")
+	if contactID == "" {
+		return response.BadRequest(c, "err.invalid_contact_id", nil)
+	}
+	if err := h.svc.RemoveContact(uint(id), vaultID, contactID); err != nil {
+		if errors.Is(err, services.ErrLifeMetricNotFound) {
+			return response.NotFound(c, "err.life_metric_not_found")
+		}
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_remove_life_metric_contact")
+	}
+	return response.NoContent(c)
+}

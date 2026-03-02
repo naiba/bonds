@@ -437,3 +437,47 @@ func TestCompanyGet_WithEmployees(t *testing.T) {
 		t.Errorf("Expected job ID %d, got %d", cc.ID, got.Contacts[0].JobID)
 	}
 }
+
+// TestCompanyList_WithEmployees verifies List returns employees (bug fix #55).
+func TestCompanyList_WithEmployees(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("Jane"),
+		LastName:  strPtrOrNil("Smith"),
+	}
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	pos := "Manager"
+	cc := models.ContactCompany{
+		ContactID:   contact.ID,
+		CompanyID:   ctx.company.ID,
+		JobPosition: &pos,
+	}
+	if err := ctx.db.Create(&cc).Error; err != nil {
+		t.Fatalf("Create ContactCompany failed: %v", err)
+	}
+
+	companies, err := ctx.svc.List(ctx.vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(companies) != 1 {
+		t.Fatalf("Expected 1 company, got %d", len(companies))
+	}
+	if len(companies[0].Contacts) != 1 {
+		t.Fatalf("Expected 1 employee in list, got %d", len(companies[0].Contacts))
+	}
+	if companies[0].Contacts[0].ID != contact.ID {
+		t.Errorf("Expected contact ID '%s', got '%s'", contact.ID, companies[0].Contacts[0].ID)
+	}
+	if companies[0].Contacts[0].FirstName != "Jane" {
+		t.Errorf("Expected first name 'Jane', got '%s'", companies[0].Contacts[0].FirstName)
+	}
+	if companies[0].Contacts[0].JobPosition != "Manager" {
+		t.Errorf("Expected job position 'Manager', got '%s'", companies[0].Contacts[0].JobPosition)
+	}
+}
