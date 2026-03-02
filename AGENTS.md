@@ -227,7 +227,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 ### E2E（Playwright）
 
-- 测试用例在 `web/e2e/` — `auth.spec.ts`、`vault.spec.ts`、`contact.spec.ts`、`calendar.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`file-upload.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`new-features.spec.ts`、`vault-features.spec.ts`、`vault-files.spec.ts`、`bugfixes.spec.ts`、`contact-modules.spec.ts`、`contact-modules-extended.spec.ts`、`missing-features.spec.ts`、`vault-extended.spec.ts`、`vault-companies.spec.ts`。
+- 测试用例在 `web/e2e/` — `admin.spec.ts`、`auth.spec.ts`、`avatar-verify.spec.ts`、`bugfixes-55-56.spec.ts`、`calendar.spec.ts`、`contact-filter.spec.ts`、`contact-modules.spec.ts`、`contact-modules-extended.spec.ts`、`contact-summary.spec.ts`、`contact.spec.ts`、`dav-subscriptions.spec.ts`、`groups.spec.ts`、`life-events.spec.ts`、`pagination.spec.ts`、`quick-facts.spec.ts`、`relationship-bugs.spec.ts`、`search.spec.ts`、`settings.spec.ts`、`settings-enhanced.spec.ts`、`vault.spec.ts`、`vault-companies.spec.ts`、`vault-extended.spec.ts`、`vault-files.spec.ts`。
 - Playwright 自动启动 Go 服务器（端口 8080）和 Vite 开发服务器（端口 5173）。
 - Ant Design 表单：使用 `page.getByPlaceholder(...)` 而非 `getByLabel(...)`。
 - **E2E 自动清理旧 DB**：`playwright.config.ts` 的 `webServer.command` 会在启动 Go 服务器前自动删除 `server/bonds.db*`。CI 环境下始终生效；本地 `reuseExistingServer=true` 时跳过（复用已运行的服务器）。
@@ -339,6 +339,12 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 - 集成到 ContactService、NoteService、ReminderService 等，CRUD 操作后自动记录
 - 通过 `GET /api/vaults/:vault_id/feed` 查看
 
+### 跨 Vault 关系（Cross-Vault Relationships）
+
+- 关系可以跨 vault 创建：联系人选择器通过 `GET /api/relationships/contacts` 返回用户所有可访问 vault 中的联系人
+- **权限控制**：创建跨 vault 关系时，若用户对目标 vault 有 Editor 权限，自动创建双向（反向）关系；否则只创建单向关系，前端显示 “one-way only” 提示
+- 删除关系时自动清理跨 vault 的反向记录（不受权限限制，避免孤儿数据）
+- `RelationshipResponse` 包含 `related_contact_name`、`related_vault_id`、`related_vault_name` 字段用于前端展示跨 vault 标识
 ## 代码质量规则
 
 以下规则由工具链自动强制执行（ESLint、TypeScript 严格模式、CI），违反时构建/lint 会直接失败，无需人工检查：
@@ -362,27 +368,27 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 | Go Handler 文件 | 72（含 swag 注解） |
 | Go Service 文件 | 96（非测试） |
 | Go DTO 文件 | 49（含 example 标签） |
-| API 路由（Swagger 统计） | 229 paths / 342 operations |
-| React 页面组件 | 61 |
-| 前端 API 客户端 | 58 |
-| i18n 翻译键 | ~1101（en + zh 各一份） |
+| API 路由（Swagger 统计） | 232 paths / 345 operations |
+| React 页面组件 | 62 |
+| 前端 API 客户端 | 60 |
+| i18n 翻译键 | ~1112（en + zh 各一份） |
 
 ### 测试数量明细
 
 | 层级 | 文件数 | 测试函数数 |
 |------|--------|-----------|
-| Go Service 测试 | 96 | ~609 |
-| Go Handler 集成测试 | 1 | 168 |
+| Go Service 测试 | 96 | ~616 |
+| Go Handler 集成测试 | 2 | 340 |
 | Go Cron 测试 | 1 | 6 |
 | Go DAV 测试 | 2 | 26 |
 | Go Search 测试 | 1 | 5 |
 | Go Avatar 测试 | 1 | 7 |
 | Go Calendar 测试 | 1 | 13 |
 | Go Utils 测试 | 1 | 1 |
-| **Go 后端总计** | **105** | **~835** |
+| **Go 后端总计** | **106** | **~1014** |
 | React Vitest | 30 | 129 |
-| Playwright E2E | 19 | 156 |
-| **全部总计** | **154** | **1120+** |
+| Playwright E2E | 23 | 174 |
+| **全部总计** | **159** | **1317+** |
 
 ## 已知坑和注意事项
 
