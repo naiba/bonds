@@ -306,6 +306,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	protected.GET("/account", accountHandler.GetAccount)
 
+	// Cross-vault relationship contacts (no vault scope — returns contacts from all accessible vaults)
+	protected.GET("/relationships/contacts", relationshipHandler.ListContactsAcrossVaults)
+
 	vaults := protected.Group("/vaults")
 	vaults.GET("", vaultHandler.List)
 	vaults.POST("", vaultHandler.Create)

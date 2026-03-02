@@ -725,7 +725,9 @@
       "graph_empty": "暂无关系可视化",
       "kinship_degree": "亲等度数: {{degree}}",
       "kinship_no_path": "未找到亲等路径",
-      "click_to_calculate": "点击两个节点计算亲等"
+      "click_to_calculate": "点击两个节点计算亲等",
+      "one_way_only": "仅单向",
+      "one_way_hint": "你没有该联系人所在 Vault 的编辑权限，将只创建单向关系。"
     },
       "life_events": {
         "title": "人生事件",

@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -66,6 +67,7 @@ func (h *RelationshipHandler) List(c echo.Context) error {
 func (h *RelationshipHandler) Create(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 
 	var req dto.CreateRelationshipRequest
 	if err := c.Bind(&req); err != nil {
@@ -75,7 +77,7 @@ func (h *RelationshipHandler) Create(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	relationship, err := h.relationshipService.Create(contactID, vaultID, req)
+	relationship, err := h.relationshipService.Create(contactID, vaultID, userID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -216,8 +218,9 @@ func (h *RelationshipHandler) GetContactGraph(c echo.Context) error {
 func (h *RelationshipHandler) CalculateKinship(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	relatedContactID := c.Param("related_contact_id")
-	kinship, err := h.relationshipService.CalculateKinship(contactID, relatedContactID, vaultID)
+	kinship, err := h.relationshipService.CalculateKinship(contactID, relatedContactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -225,4 +228,25 @@ func (h *RelationshipHandler) CalculateKinship(c echo.Context) error {
 		return response.InternalError(c, "err.failed_to_calculate_kinship")
 	}
 	return response.OK(c, kinship)
+}
+
+// ListContactsAcrossVaults godoc
+//
+//	@Summary		List contacts across all accessible vaults
+//	@Description	Return all contacts the user can see, grouped by vault with Editor permission flags.
+//	@Description	Used by the relationship selector to support cross-vault relationship creation.
+//	@Tags			relationships
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Success		200	{object}	response.APIResponse{data=[]dto.CrossVaultContactItem}
+//	@Failure		401	{object}	response.APIResponse
+//	@Failure		500	{object}	response.APIResponse
+//	@Router			/relationships/contacts [get]
+func (h *RelationshipHandler) ListContactsAcrossVaults(c echo.Context) error {
+	userID := middleware.GetUserID(c)
+	contacts, err := h.relationshipService.ListContactsAcrossVaults(userID)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_list_contacts")
+	}
+	return response.OK(c, contacts)
 }

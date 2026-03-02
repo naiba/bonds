@@ -38,6 +38,8 @@ func (s *RelationshipService) List(contactID, vaultID string) ([]dto.Relationshi
 	// and its auto-created reverse matched. With auto-reverse, each contact already
 	// "owns" their side of every relationship.
 	if err := s.db.Preload("RelationshipType").
+		Preload("RelatedContact").
+		Preload("RelatedContact.Vault").
 		Where("contact_id = ?", contactID).
 		Order("created_at DESC").Find(&relationships).Error; err != nil {
 		return nil, err
@@ -50,9 +52,15 @@ func (s *RelationshipService) List(contactID, vaultID string) ([]dto.Relationshi
 	return result, nil
 }
 
-func (s *RelationshipService) Create(contactID, vaultID string, req dto.CreateRelationshipRequest) (*dto.RelationshipResponse, error) {
+func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.CreateRelationshipRequest) (*dto.RelationshipResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
+	}
+
+	// Verify the related contact exists (it may belong to any vault the user can access)
+	var relatedContact models.Contact
+	if err := s.db.Where("id = ?", req.RelatedContactID).First(&relatedContact).Error; err != nil {
+		return nil, ErrContactNotFound
 	}
 
 	var relationship models.Relationship
@@ -66,9 +74,12 @@ func (s *RelationshipService) Create(contactID, vaultID string, req dto.CreateRe
 			return err
 		}
 
-		// Auto-create reverse relationship
+		// Auto-create reverse relationship only if:
+		// 1. A reverse type exists
+		// 2. The user has Editor (or better) permission on the related contact's vault
+		// Cross-vault relationships without Editor permission are one-way only.
 		reverseTypeID, found := findReverseTypeID(tx, req.RelationshipTypeID)
-		if found {
+		if found && hasEditorPermission(tx, userID, relatedContact.VaultID) {
 			reverse := models.Relationship{
 				ContactID:          req.RelatedContactID,
 				RelationshipTypeID: reverseTypeID,
@@ -167,15 +178,22 @@ func toRelationshipResponse(r *models.Relationship) dto.RelationshipResponse {
 	if r.RelationshipType.Name != nil {
 		typeName = *r.RelationshipType.Name
 	}
-	return dto.RelationshipResponse{
+	resp := dto.RelationshipResponse{
 		ID:                   r.ID,
 		ContactID:            r.ContactID,
 		RelatedContactID:     r.RelatedContactID,
 		RelationshipTypeID:   r.RelationshipTypeID,
 		RelationshipTypeName: typeName,
+		RelatedContactName:   contactLabel(&r.RelatedContact),
+		RelatedVaultID:       r.RelatedContact.VaultID,
 		CreatedAt:            r.CreatedAt,
 		UpdatedAt:            r.UpdatedAt,
 	}
+	// Populate vault name if RelatedContact.Vault was preloaded
+	if r.RelatedContact.Vault.Name != "" {
+		resp.RelatedVaultName = r.RelatedContact.Vault.Name
+	}
+	return resp
 }
 
 func contactLabel(c *models.Contact) string {
@@ -289,18 +307,23 @@ func (s *RelationshipService) GetContactGraph(contactID, vaultID string) (*dto.C
 	}, nil
 }
 
-func (s *RelationshipService) CalculateKinship(contactID1, contactID2, vaultID string) (*dto.KinshipResponse, error) {
+func (s *RelationshipService) CalculateKinship(contactID1, contactID2, vaultID, userID string) (*dto.KinshipResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID1, vaultID); err != nil {
 		return nil, err
 	}
-	if err := validateContactBelongsToVault(s.db, contactID2, vaultID); err != nil {
-		return nil, err
+	// contactID2 may belong to a different vault (cross-vault relationship),
+	// so only verify it exists as a valid contact (not vault membership).
+	var c2 models.Contact
+	if err := s.db.Where("id = ?", contactID2).First(&c2).Error; err != nil {
+		return nil, ErrContactNotFound
 	}
 
+	// Load all relationships across vaults the user can access for Dijkstra traversal.
+	userVaultIDs := getUserVaultIDs(s.db, userID)
 	var relationships []models.Relationship
 	if err := s.db.
 		Preload("RelationshipType").
-		Where("contact_id IN (SELECT id FROM contacts WHERE vault_id = ?)", vaultID).
+		Where("contact_id IN (SELECT id FROM contacts WHERE vault_id IN ?)", userVaultIDs).
 		Find(&relationships).Error; err != nil {
 		return nil, err
 	}
@@ -396,4 +419,75 @@ func (pq *priorityQueue) Pop() interface{} {
 	item.index = -1
 	*pq = old[:n-1]
 	return item
+}
+
+// hasEditorPermission checks if the user has Editor (or better, i.e. Manager) permission
+// on the given vault. Used to determine whether auto-reverse relationships should be
+// created for cross-vault contacts.
+func hasEditorPermission(db *gorm.DB, userID, vaultID string) bool {
+	var uv models.UserVault
+	err := db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error
+	if err != nil {
+		return false
+	}
+	// PermissionManager(100) <= PermissionEditor(200) means Manager has better permission
+	return uv.Permission <= models.PermissionEditor
+}
+
+// getUserVaultIDs returns all vault IDs the user has access to.
+func getUserVaultIDs(db *gorm.DB, userID string) []string {
+	var userVaults []models.UserVault
+	db.Where("user_id = ?", userID).Find(&userVaults)
+	ids := make([]string, len(userVaults))
+	for i, uv := range userVaults {
+		ids[i] = uv.VaultID
+	}
+	return ids
+}
+
+// ListContactsAcrossVaults returns all contacts across vaults the user can access,
+// each annotated with vault info and whether the user has Editor permission.
+// Used by the frontend relationship selector to allow cross-vault relationship creation.
+func (s *RelationshipService) ListContactsAcrossVaults(userID string) ([]dto.CrossVaultContactItem, error) {
+	var userVaults []models.UserVault
+	if err := s.db.Where("user_id = ?", userID).Find(&userVaults).Error; err != nil {
+		return nil, err
+	}
+	if len(userVaults) == 0 {
+		return []dto.CrossVaultContactItem{}, nil
+	}
+
+	vaultIDs := make([]string, len(userVaults))
+	permMap := make(map[string]int, len(userVaults))
+	for i, uv := range userVaults {
+		vaultIDs[i] = uv.VaultID
+		permMap[uv.VaultID] = uv.Permission
+	}
+
+	var vaults []models.Vault
+	if err := s.db.Where("id IN ?", vaultIDs).Find(&vaults).Error; err != nil {
+		return nil, err
+	}
+	vaultNameMap := make(map[string]string, len(vaults))
+	for _, v := range vaults {
+		vaultNameMap[v.ID] = v.Name
+	}
+
+	var contacts []models.Contact
+	if err := s.db.Where("vault_id IN ? AND listed = ?", vaultIDs, true).Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.CrossVaultContactItem, 0, len(contacts))
+	for _, c := range contacts {
+		perm := permMap[c.VaultID]
+		result = append(result, dto.CrossVaultContactItem{
+			ContactID:   c.ID,
+			ContactName: contactLabel(&c),
+			VaultID:     c.VaultID,
+			VaultName:   vaultNameMap[c.VaultID],
+			HasEditor:   perm <= models.PermissionEditor,
+		})
+	}
+	return result, nil
 }

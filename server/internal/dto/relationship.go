@@ -18,6 +18,9 @@ type RelationshipResponse struct {
 	RelatedContactID     string    `json:"related_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	RelationshipTypeID   uint      `json:"relationship_type_id" example:"1"`
 	RelationshipTypeName string    `json:"relationship_type_name" example:"Parent"`
+	RelatedContactName   string    `json:"related_contact_name" example:"Jane Doe"`
+	RelatedVaultID       string    `json:"related_vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RelatedVaultName     string    `json:"related_vault_name" example:"Family"`
 	CreatedAt            time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt            time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
@@ -42,4 +45,14 @@ type ContactGraphResponse struct {
 type KinshipResponse struct {
 	Degree *int     `json:"degree" example:"2"`
 	Path   []string `json:"path" example:"id1,id2,id3"`
+}
+
+// CrossVaultContactItem represents a contact candidate for cross-vault relationship selection.
+// Includes vault info and whether the current user has Editor permission on that vault.
+type CrossVaultContactItem struct {
+	ContactID   string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ContactName string `json:"contact_name" example:"Jane Doe"`
+	VaultID     string `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	VaultName   string `json:"vault_name" example:"Family"`
+	HasEditor   bool   `json:"has_editor" example:"true"`
 }

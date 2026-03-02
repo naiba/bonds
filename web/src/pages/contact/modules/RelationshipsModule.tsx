@@ -14,11 +14,13 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, UserOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { api } from "@/api";
 import NetworkGraph from "@/components/NetworkGraph";
-import type { Relationship, Contact, APIError } from "@/api";
-import type { GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse } from "@/api";
+import type { Relationship, APIError } from "@/api";
+import type {
+  GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse,
+  GithubComNaibaBondsInternalDtoCrossVaultContactItem,
+} from "@/api";
 import { useTranslation } from "react-i18next";
 
 export default function RelationshipsModule({
@@ -35,7 +37,7 @@ export default function RelationshipsModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  // Cross-vault contacts query: returns contacts from ALL accessible vaults
   const qk = ["vaults", vaultId, "contacts", contactId, "relationships"];
 
   const { data: relationships = [], isLoading } = useQuery({
@@ -46,11 +48,11 @@ export default function RelationshipsModule({
     },
   });
 
-  const { data: contacts = [] } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts"],
+  const { data: crossVaultContacts = [] } = useQuery({
+    queryKey: ["relationships", "contacts"],
     queryFn: async () => {
-      const res = await api.contacts.contactsList(String(vaultId), { per_page: 9999 });
-      return res.data ?? [];
+      const res = await api.relationships.contactsList();
+      return (res.data ?? []) as GithubComNaibaBondsInternalDtoCrossVaultContactItem[];
     },
   });
 
@@ -67,13 +69,13 @@ export default function RelationshipsModule({
     },
   });
 
-  const contactMap = useMemo(() => {
-    const m = new Map<string, Contact>();
-    for (const c of contacts) {
-      if (c.id) m.set(c.id, c);
-    }
-    return m;
-  }, [contacts]);
+  // Track whether the selected contact lacks editor permission (one-way only)
+  const selectedContactId = Form.useWatch("related_contact_id", form);
+  const selectedContactOneWay = useMemo(() => {
+    if (!selectedContactId) return false;
+    const c = crossVaultContacts.find((x) => x.contact_id === selectedContactId);
+    return c ? c.has_editor === false : false;
+  }, [selectedContactId, crossVaultContacts]);
 
   // Build grouped options for the relationship type Select (OptGroup by group name).
   const typeSelectOptions = useMemo(() => {
@@ -117,12 +119,21 @@ export default function RelationshipsModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
-  const contactOptions = contacts
-    .filter((c: Contact) => c.id !== contactId)
-    .map((c: Contact) => ({
-      value: c.id,
-      label: formatContactName(nameOrder, c),
+  // Group contacts by vault for OptGroup display, append one-way suffix for non-editor contacts
+  const contactOptions = useMemo(() => {
+    const groups = new Map<string, { value: string | undefined; label: string }[]>();
+    for (const c of crossVaultContacts) {
+      if (c.contact_id === contactId) continue;
+      const vaultName = c.vault_name ?? "";
+      if (!groups.has(vaultName)) groups.set(vaultName, []);
+      const suffix = c.has_editor === false ? ` · ${t("modules.relationships.one_way_only")}` : "";
+      groups.get(vaultName)!.push({ value: c.contact_id, label: `${c.contact_name ?? ""}${suffix}` });
+    }
+    return Array.from(groups.entries()).map(([group, options]) => ({
+      label: group,
+      options,
     }));
+  }, [crossVaultContacts, contactId, t]);
 
   return (
     <>
@@ -184,8 +195,16 @@ export default function RelationshipsModule({
           >
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              title={<span style={{ fontWeight: 500 }}>{(() => { const c = contactMap.get(r.related_contact_id ?? ""); return c ? formatContactName(nameOrder, c) : r.related_contact_id; })()}</span>}
-              description={<Tag color="blue">{r.relationship_type_name ?? ""}</Tag>}
+              // Cross-vault relationship: use related_contact_name from API response directly
+              title={<span style={{ fontWeight: 500 }}>{r.related_contact_name ?? r.related_contact_id}</span>}
+              description={
+                <span>
+                  <Tag color="blue">{r.relationship_type_name ?? ""}</Tag>
+                  {r.related_vault_id !== String(vaultId) && r.related_vault_name && (
+                    <Tag color="default">{r.related_vault_name}</Tag>
+                  )}
+                </span>
+              }
             />
           </List.Item>
         )}
@@ -209,6 +228,11 @@ export default function RelationshipsModule({
               placeholder={t("modules.relationships.select_contact")}
             />
           </Form.Item>
+          {selectedContactOneWay && (
+            <div style={{ fontSize: 12, color: token.colorWarningText, marginTop: -16, marginBottom: 12 }}>
+              {t("modules.relationships.one_way_hint")}
+            </div>
+          )}
           <Form.Item name="relationship_type_id" label={t("modules.relationships.relationship_type")} rules={[{ required: true }]}>
             <Select
               showSearch
