@@ -121,7 +121,8 @@ export default function ContactDetail() {
     queryKey: ["vaults"],
     queryFn: async () => {
       const res = await api.vaults.vaultsList();
-      return res.data?.data || [];
+      // Fix #58: vaultsList() returns { data: VaultResponse[] } — don't double-unwrap with .data.data
+      return res.data ?? [];
     },
     enabled: isMoveModalOpen,
   });
