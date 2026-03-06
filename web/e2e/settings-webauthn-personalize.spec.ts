@@ -11,7 +11,7 @@ async function registerUser(page: import('@playwright/test').Page) {
   await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
 }
 
-test.describe('Enhanced Settings', () => {
+test.describe('Settings - WebAuthn and Modules', () => {
   test('should navigate to WebAuthn settings page', async ({ page }) => {
     await registerUser(page);
     await page.goto('/settings/webauthn');
@@ -196,7 +196,7 @@ test.describe('Enhanced Settings', () => {
   });
 });
 
-test.describe('Enhanced Settings - Personalize', () => {
+test.describe('Settings - Personalize', () => {
   test('personalize modules section shows module names', async ({ page }) => {
     await registerUser(page);
 

@@ -45,7 +45,7 @@ async function navigateToTab(page: import('@playwright/test').Page, tabName: str
   await page.waitForLoadState('networkidle');
 }
 
-test.describe('Contact Summary Card — Issue #54', () => {
+test.describe('Contact Summary Card', () => {
 
   test('summary card should be visible on contact detail page', async ({ page }) => {
     await setupVault(page, 'summary-visible');

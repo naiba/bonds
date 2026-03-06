@@ -444,6 +444,10 @@
       "success": "联系人已创建",
       "failed": "创建联系人失败"
     },
+    "form": {
+      "select_gender": "选择性别",
+      "select_pronoun": "选择代词"
+    },
     "detail": {
       "back": "返回联系人列表",
       "favorite": "收藏",

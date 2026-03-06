@@ -444,6 +444,10 @@
       "success": "Contact created",
       "failed": "Failed to create contact"
     },
+    "form": {
+      "select_gender": "Select gender",
+      "select_pronoun": "Select pronoun"
+    },
     "detail": {
       "back": "Back to contacts",
       "favorite": "Favorite",

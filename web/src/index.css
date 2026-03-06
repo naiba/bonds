@@ -248,6 +248,16 @@ html[data-theme="dark"] .vault-nav-divider {
   pointer-events: none;
   transition: color 0.3s;
 }
+
+/* Fix #59: prevent placeholder text from overlapping the absolutely-positioned search icon.
+   The icon is at left: 12px with 13px font-size, so text must start after ~25px.
+   Ant Design AutoComplete uses an input element; we push its text right. */
+.bonds-search-bar .ant-input {
+  padding-left: 22px !important;
+}
+.bonds-search-bar input {
+  padding-left: 22px !important;
+}
 .bonds-search-bar:focus-within .bonds-search-bar-icon {
   color: #4a7c59;
 }

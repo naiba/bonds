@@ -28,7 +28,7 @@ async function registerAndSetup(page: import('@playwright/test').Page, prefix: s
   await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
 }
 
-test.describe('Avatar Display (#11)', () => {
+test.describe('Avatar Display', () => {
   test('avatar GET request should not have double /api prefix', async ({ page }) => {
     const avatarGetUrls: string[] = [];
     page.on('request', (req) => {

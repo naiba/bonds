@@ -43,4 +43,28 @@ test.describe('Search', () => {
     await searchInput.fill('test query');
     await expect(searchInput).toHaveValue('test query');
   });
+
+  test('search input has left padding to avoid overlapping the search icon', async ({ page }) => {
+    const email = `search-icon-padding-${Date.now()}@example.com`;
+    await registerUser(page, email);
+    await setupVaultWithContacts(page);
+
+    await page.getByText('View all contacts').click();
+    await expect(page).toHaveURL(/\/contacts/, { timeout: 5000 });
+
+    // Verify the search bar and its icon are both visible
+    const searchBar = page.locator('.bonds-search-bar');
+    await expect(searchBar).toBeVisible({ timeout: 5000 });
+    const searchIcon = page.locator('.bonds-search-bar-icon');
+    await expect(searchIcon).toBeVisible({ timeout: 5000 });
+
+    // CSS rule `.bonds-search-bar input { padding-left: 22px !important }` prevents
+    // typed text from rendering underneath the magnifying glass icon.
+    const inputElement = searchBar.locator('input').first();
+    await expect(inputElement).toBeVisible({ timeout: 5000 });
+    const paddingLeft = await inputElement.evaluate((el) => {
+      return parseFloat(window.getComputedStyle(el).paddingLeft);
+    });
+    expect(paddingLeft).toBeGreaterThanOrEqual(20);
+  });
 });

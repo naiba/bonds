@@ -43,11 +43,11 @@ async function createContact(page: import('@playwright/test').Page, vaultUrl: st
 // =====================================================================================
 // Issue #55: Vault Settings > Companies > Employees should be displayed in the list
 // =====================================================================================
-test.describe('Bug #55 - Companies Employees display in list', () => {
+test.describe('Company employees display in list', () => {
   test.setTimeout(90000);
 
   test('should display employee tags in the companies list table', async ({ page }) => {
-    await registerAndCreateVault(page, 'bug55');
+    await registerAndCreateVault(page, 'co-employees');
     const vaultUrl = getVaultUrl(page);
 
     // 1. Create a contact to later assign as employee
@@ -120,11 +120,11 @@ test.describe('Bug #55 - Companies Employees display in list', () => {
 // =====================================================================================
 // Issue #56: Life Metrics > Add contact should show linked contacts
 // =====================================================================================
-test.describe('Bug #56 - Life Metrics contacts display and removal', () => {
+test.describe('Life Metrics contacts display and removal', () => {
   test.setTimeout(90000);
 
   test('should display and remove linked contacts in life metrics', async ({ page }) => {
-    await registerAndCreateVault(page, 'bug56');
+    await registerAndCreateVault(page, 'life-metrics');
     const vaultUrl = getVaultUrl(page);
 
     // 1. Create a contact

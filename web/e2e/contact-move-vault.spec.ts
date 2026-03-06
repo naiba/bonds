@@ -38,14 +38,12 @@ async function registerAndCreateTwoVaults(page: import('@playwright/test').Page,
   return firstVaultUrl;
 }
 
-// =====================================================================================
-// Issue #58: "Move contact to another vault" selector stays loading forever
-// =====================================================================================
-test.describe('Bug #58 - Move contact vault selector does not load', () => {
+// Move contact to another vault: vault selector in Move modal should load properly
+test.describe('Contact - Move to another vault', () => {
   test.setTimeout(90000);
 
   test('should load vault options in the Move Contact modal selector', async ({ page }) => {
-    const firstVaultUrl = await registerAndCreateTwoVaults(page, 'bug58');
+    const firstVaultUrl = await registerAndCreateTwoVaults(page, 'move-vault');
 
     // 1. Create a contact in the first vault
     await page.goto(firstVaultUrl + '/contacts');

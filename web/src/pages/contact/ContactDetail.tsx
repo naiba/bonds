@@ -545,6 +545,8 @@ export default function ContactDetail() {
                 suffix: contact.suffix,
                 nickname: contact.nickname,
                 maiden_name: contact.maiden_name,
+                gender_id: contact.gender_id,
+                pronoun_id: contact.pronoun_id,
               });
               setIsEditModalOpen(true);
             }}
@@ -713,6 +715,15 @@ export default function ContactDetail() {
               style={{ flex: 1 }}
             >
               <Input />
+            </Form.Item>
+          </div>
+          {/* Fix #62: gender and pronoun fields — fetched from personalize API */}
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item name="gender_id" label={t("contact.detail.summary.gender")} style={{ flex: 1 }}>
+              <GenderPronounSelect entity="genders" vaultId={vaultId} placeholder={t("contact.form.select_gender")} />
+            </Form.Item>
+            <Form.Item name="pronoun_id" label={t("contact.detail.summary.pronoun")} style={{ flex: 1 }}>
+              <GenderPronounSelect entity="pronouns" vaultId={vaultId} placeholder={t("contact.form.select_pronoun")} />
             </Form.Item>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -934,5 +945,33 @@ function AvatarImageLoader({
           </Space>
       </div>
     </div>
+  );
+}
+
+// Shared Select component for gender/pronoun fetched from personalize API
+function GenderPronounSelect({ entity, vaultId, placeholder, ...props }: {
+  entity: string;
+  vaultId: string;
+  placeholder: string;
+  value?: number;
+  onChange?: (value: number | undefined) => void;
+}) {
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["vaults", vaultId, "personalize", entity],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail(entity);
+      return res.data ?? [];
+    },
+  });
+
+  return (
+    <Select
+      {...props}
+      loading={isLoading}
+      allowClear
+      placeholder={placeholder}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      options={(items as any[]).map((item) => ({ label: item.label, value: item.id }))}
+    />
   );
 }

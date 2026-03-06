@@ -196,7 +196,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
               return (
                 <span key={rel.id} style={{ fontSize: 13 }}>
                   <Link
-                    to={`/vaults/${vaultId}/contacts/${rel.related_contact_id}`}
+                    to={`/vaults/${rel.related_vault_id || vaultId}/contacts/${rel.related_contact_id}`}
                     style={{ color: token.colorPrimary }}
                   >
                     {displayName}

@@ -66,7 +66,7 @@ async function navigateToPostDetail(page: import('@playwright/test').Page, postT
   await page.waitForLoadState('networkidle');
 }
 
-test.describe('Vault Extended Features', () => {
+test.describe('Vault - Feed, Calendar, Journal and Settings', () => {
 
   test('Vault Feed - renders feed page', async ({ page }) => {
     await registerAndCreateVault(page, 'vfeed');

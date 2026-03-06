@@ -473,3 +473,60 @@ test.describe('Contact Modules - Relationship Manage Types', () => {
     await expect(modal.getByText(/Configure relationship types/i)).toBeVisible({ timeout: 5000 });
   });
 });
+
+test.describe('Relationship Contact Name Navigation', () => {
+  test('clicking a relationship contact name navigates to that contact detail page', async ({ page }) => {
+    await setupVault(page, 'rel-navigation');
+    await goToContacts(page);
+
+    // Create two contacts to link via a relationship
+    await createContact(page, 'Parent', 'Navigator');
+
+    await page.getByRole('button', { name: /back/i }).first().click();
+    await expect(page).toHaveURL(/\/contacts$/, { timeout: 5000 });
+    await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 10000 });
+
+    await createContact(page, 'Child', 'Navigator');
+
+    // Navigate to Social tab to add a relationship
+    await navigateToTab(page, 'Social');
+    const relationshipCard = page.locator('.ant-card').filter({ hasText: /Relationships/ }).first();
+    await expect(relationshipCard).toBeVisible({ timeout: 10000 });
+
+    // Open add relationship modal
+    await relationshipCard.locator('.ant-card-extra button').click();
+    const relationshipModal = page.locator('.ant-modal').filter({ hasText: /relationship/i });
+    await expect(relationshipModal).toBeVisible({ timeout: 5000 });
+
+    // Select "Parent Navigator" as the related contact
+    const selectDropdowns = relationshipModal.locator('.ant-select');
+    await selectDropdowns.first().click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Parent Navigator' }).click();
+    await relationshipModal.locator('.ant-modal-header').click();
+    await page.waitForTimeout(300);
+
+    // Select relationship type "parent" via search
+    const relationshipTypeSelect = selectDropdowns.nth(1);
+    await relationshipTypeSelect.click();
+    await page.waitForTimeout(200);
+    await relationshipTypeSelect.locator('input').fill('parent');
+    await page.waitForTimeout(500);
+    await page.locator('.ant-select-dropdown:visible').getByTitle('parent', { exact: true }).click();
+
+    // Submit the relationship
+    const createRelationshipResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/relationships') && resp.request().method() === 'POST'
+    );
+    await relationshipModal.getByRole('button', { name: /ok/i }).click();
+    await createRelationshipResponse;
+
+    // The relationship contact name should render as a clickable <a> link
+    const relatedContactLink = relationshipCard.locator('a').filter({ hasText: 'Parent Navigator' });
+    await expect(relatedContactLink).toBeVisible({ timeout: 10000 });
+
+    // Click the link and verify navigation to Parent's contact detail page
+    await relatedContactLink.click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.getByText('Parent Navigator').first()).toBeVisible({ timeout: 10000 });
+  });
+});

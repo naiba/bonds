@@ -136,3 +136,99 @@ test.describe('Contacts - vCard', () => {
     await expect(page.getByRole('button', { name: 'Export All' })).toBeVisible({ timeout: 10000 });
   });
 });
+
+test.describe('Contacts - Gender and Pronoun', () => {
+  test('create form should display gender and pronoun select fields', async ({ page }) => {
+    await setupVault(page, 'gender-create');
+    await goToContacts(page);
+
+    await page.getByRole('button', { name: /add contact/i }).click();
+    await expect(page).toHaveURL(/\/contacts\/create/, { timeout: 5000 });
+
+    // Gender and Pronoun selects should be visible on the create form
+    const genderFormItem = page.locator('.ant-form-item').filter({ hasText: 'Gender' }).locator('.ant-select');
+    await expect(genderFormItem).toBeVisible({ timeout: 5000 });
+
+    const pronounFormItem = page.locator('.ant-form-item').filter({ hasText: 'Pronoun' }).locator('.ant-select');
+    await expect(pronounFormItem).toBeVisible({ timeout: 5000 });
+  });
+
+  test('should create a contact with gender and pronoun selected', async ({ page }) => {
+    await setupVault(page, 'gender-assign');
+    await goToContacts(page);
+
+    await page.getByRole('button', { name: /add contact/i }).click();
+    await expect(page).toHaveURL(/\/contacts\/create/, { timeout: 5000 });
+
+    await page.getByPlaceholder('First name').fill('GenderTest');
+    await page.getByPlaceholder('Last name').fill('User');
+
+    // Select a gender from the dropdown (seed data provides Male, Female, Other)
+    const genderFormItem = page.locator('.ant-form-item').filter({ hasText: 'Gender' }).locator('.ant-select');
+    await genderFormItem.click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+
+    // Ant Design Select dropdown can obscure sibling Selects.
+    // Click the page heading to dismiss the dropdown before opening the next one.
+    await page.locator('h4').first().click();
+    await page.waitForTimeout(300);
+
+    // Select a pronoun
+    const pronounFormItem = page.locator('.ant-form-item').filter({ hasText: 'Pronoun' }).locator('.ant-select');
+    await pronounFormItem.click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+
+    await page.getByRole('button', { name: /create contact/i }).click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 10000 });
+    await expect(page.getByText('GenderTest User').first()).toBeVisible({ timeout: 10000 });
+
+    // Summary card should reflect the selected gender (not "Not set")
+    const summaryCard = page.locator('[data-testid="contact-summary-card"]');
+    await expect(summaryCard).toBeVisible({ timeout: 10000 });
+    const genderSummarySection = summaryCard.locator('div').filter({ hasText: 'Gender' }).first();
+    await expect(genderSummarySection).toBeVisible();
+    await expect(genderSummarySection.getByText('Not set')).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('edit modal should display gender and pronoun select fields', async ({ page }) => {
+    await setupVault(page, 'gender-edit');
+    await goToContacts(page);
+    await createContact(page, 'EditGender', 'User');
+
+    // Open the edit modal
+    await page.getByRole('button', { name: 'Edit' }).first().click();
+    const editModal = page.locator('.ant-modal');
+    await expect(editModal).toBeVisible({ timeout: 5000 });
+    await expect(editModal.getByText('Edit Contact')).toBeVisible();
+
+    // Gender and Pronoun selects should be present in the edit modal
+    const genderFormItem = editModal.locator('.ant-form-item').filter({ hasText: 'Gender' }).locator('.ant-select');
+    await expect(genderFormItem).toBeVisible({ timeout: 5000 });
+
+    const pronounFormItem = editModal.locator('.ant-form-item').filter({ hasText: 'Pronoun' }).locator('.ant-select');
+    await expect(pronounFormItem).toBeVisible({ timeout: 5000 });
+
+    // Select a gender
+    await genderFormItem.click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+    await editModal.locator('.ant-modal-header').click();
+    await page.waitForTimeout(300);
+
+    // Select a pronoun
+    await pronounFormItem.click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+    await editModal.locator('.ant-modal-header').click();
+    await page.waitForTimeout(300);
+
+    // Save changes
+    await editModal.getByRole('button', { name: 'Save' }).click();
+    await expect(editModal).not.toBeVisible({ timeout: 15000 });
+
+    // Summary card should now show the selected gender
+    const summaryCard = page.locator('[data-testid="contact-summary-card"]');
+    await expect(summaryCard).toBeVisible({ timeout: 10000 });
+    const genderSummarySection = summaryCard.locator('div').filter({ hasText: 'Gender' }).first();
+    await expect(genderSummarySection).toBeVisible();
+    await expect(genderSummarySection.getByText('Not set')).not.toBeVisible({ timeout: 3000 });
+  });
+});

@@ -133,10 +133,8 @@ async function addRelationship(
   expect(resp.status()).toBeLessThan(400);
 }
 
-// ============================================================================
-// Issue #35 Bug 1: Relationship type dropdown should show BOTH directions
-// ============================================================================
-test.describe('Issue #35 Bug 1: Relationship type selection shows both directions', () => {
+// Relationship type dropdown should show both directions (parent ↔ child)
+test.describe('Relationship type selection shows both directions', () => {
   test('should show both parent and child in the relationship type dropdown', async ({ page }) => {
     await setupVault(page, 'rel-direction');
     await goToContacts(page);
@@ -210,10 +208,8 @@ test.describe('Issue #35 Bug 1: Relationship type selection shows both direction
   });
 });
 
-// ============================================================================
-// Issue #35 Bug 2: Reverse relationships cannot be edited/deleted
-// ============================================================================
-test.describe('Issue #35 Bug 2: Reverse relationship edit/delete', () => {
+// Reverse relationships should be editable and deletable
+test.describe('Reverse relationship edit and delete', () => {
   test('should delete a relationship from the reverse contact page', async ({ page }) => {
     await setupVault(page, 'rel-rev-del');
     await goToContacts(page);
@@ -290,10 +286,8 @@ test.describe('Issue #35 Bug 2: Reverse relationship edit/delete', () => {
   });
 });
 
-// ============================================================================
-// Issue #35 Bug 3: Symmetric relationships show duplicates
-// ============================================================================
-test.describe('Issue #35 Bug 3: Symmetric relationship deduplication', () => {
+// Symmetric relationships should not create duplicates
+test.describe('Symmetric relationship deduplication', () => {
   test('symmetric relationship should appear only once per contact', async ({ page }) => {
     await setupVault(page, 'rel-dedup');
     await goToContacts(page);
@@ -360,14 +354,11 @@ test.describe('Issue #35 Bug 3: Symmetric relationship deduplication', () => {
   });
 });
 
-// ============================================================================
-// Issue #35 Fix: ID-based reverse relationship linking
-// Validates that the new ReverseRelationshipTypeID mechanism works correctly:
+// Custom relationship types: auto-create reverse counterpart, bidirectional linking
 // - Custom relationship types auto-create their reverse counterpart
 // - Bidirectional relationships work with user-created types
 // - Renaming a type doesn't break the reverse link
-// ============================================================================
-test.describe('Issue #35 Fix: ID-based reverse relationship type linking', () => {
+test.describe('Custom relationship type reverse linking', () => {
   test('custom relationship type auto-creates reverse and works bidirectionally', async ({ page }) => {
     await setupVault(page, 'rel-id-link');
     await goToContacts(page);

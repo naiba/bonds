@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Typography, App, theme } from "antd";
+import { Card, Form, Input, Button, Typography, App, theme, Select } from "antd";
 import { ArrowLeftOutlined, UserOutlined } from "@ant-design/icons";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { CreateContactRequest, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
@@ -141,6 +141,16 @@ export default function ContactCreate() {
             </Form.Item>
           </div>
 
+          {/* Fix #62: gender and pronoun fields — fetched from personalize API */}
+          <div style={{ display: "flex", gap: 16 }}>
+            <Form.Item name="gender_id" label={t("contact.detail.summary.gender")} style={{ flex: 1 }}>
+              <GenderPronounSelect entity="genders" vaultId={vaultId} placeholder={t("contact.form.select_gender")} />
+            </Form.Item>
+            <Form.Item name="pronoun_id" label={t("contact.detail.summary.pronoun")} style={{ flex: 1 }}>
+              <GenderPronounSelect entity="pronouns" vaultId={vaultId} placeholder={t("contact.form.select_pronoun")} />
+            </Form.Item>
+          </div>
+
           <Form.Item style={{ marginBottom: 0, marginTop: 8, textAlign: "right" }}>
             <Button
               style={{ marginRight: 8 }}
@@ -155,5 +165,33 @@ export default function ContactCreate() {
         </Form>
       </Card>
     </div>
+  );
+}
+
+// Shared Select component for gender/pronoun fetched from personalize API
+function GenderPronounSelect({ entity, vaultId, placeholder, ...props }: {
+  entity: string;
+  vaultId: string;
+  placeholder: string;
+  value?: number;
+  onChange?: (value: number | undefined) => void;
+}) {
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["vaults", vaultId, "personalize", entity],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail(entity);
+      return res.data ?? [];
+    },
+  });
+
+  return (
+    <Select
+      {...props}
+      loading={isLoading}
+      allowClear
+      placeholder={placeholder}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      options={(items as any[]).map((item) => ({ label: item.label, value: item.id }))}
+    />
   );
 }

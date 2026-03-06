@@ -15,6 +15,7 @@ import {
 import { PlusOutlined, DeleteOutlined, UserOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
+import { Link } from "react-router-dom";
 import NetworkGraph from "@/components/NetworkGraph";
 import type { Relationship, APIError } from "@/api";
 import type {
@@ -195,8 +196,16 @@ export default function RelationshipsModule({
           >
             <List.Item.Meta
               avatar={<UserOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
-              // Cross-vault relationship: use related_contact_name from API response directly
-              title={<span style={{ fontWeight: 500 }}>{r.related_contact_name ?? r.related_contact_id}</span>}
+              // Fix #60: make relationship contact names clickable links to navigate to their profile.
+              // Uses related_vault_id for cross-vault relationships, falls back to current vaultId.
+              title={
+                <Link
+                  to={`/vaults/${r.related_vault_id || String(vaultId)}/contacts/${r.related_contact_id}`}
+                  style={{ fontWeight: 500, color: token.colorPrimary }}
+                >
+                  {r.related_contact_name ?? r.related_contact_id}
+                </Link>
+              }
               description={
                 <span>
                   <Tag color="blue">{r.relationship_type_name ?? ""}</Tag>
