@@ -38,7 +38,8 @@ async function setupContactPage(page: import('@playwright/test').Page) {
   await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 10000 });
   await page.waitForLoadState('networkidle');
 
-  await page.getByText('View all contacts').click();
+  // Issue #63: Dashboard 重写后 'View all contacts' 链接已移除，改用 URL 导航
+  await page.goto(page.url().replace(/\/$/, '') + '/contacts');
   await expect(page).toHaveURL(/\/contacts/, { timeout: 5000 });
 
   await page.getByRole('button', { name: /add contact/i }).click();

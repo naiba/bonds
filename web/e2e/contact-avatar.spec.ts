@@ -18,7 +18,8 @@ async function registerAndSetup(page: import('@playwright/test').Page, prefix: s
   await page.getByRole('button', { name: /create vault/i }).click();
   await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 10000 });
 
-  await page.getByText('View all contacts').click();
+  // Issue #63: Dashboard 重写后 'View all contacts' 链接已移除，改用 URL 导航
+  await page.goto(page.url().replace(/\/$/, '') + '/contacts');
   await expect(page).toHaveURL(/\/contacts/, { timeout: 5000 });
 
   await page.getByRole('button', { name: /add contact/i }).click();

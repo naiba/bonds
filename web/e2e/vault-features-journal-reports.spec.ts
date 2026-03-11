@@ -590,6 +590,7 @@ test.describe('Journal Metrics', () => {
 
 test.describe('Vault Reports - Overview Counts', () => {
   test('reports page shows correct non-zero overview counts', async ({ page }) => {
+    test.setTimeout(60000);
     await registerAndCreateVault(page, 'rpt-counts');
     const vaultUrl = getVaultUrl(page);
 
@@ -662,9 +663,18 @@ test.describe('Vault Reports - Overview Counts', () => {
     const datePicker = dateModal.locator('.ant-picker');
     await datePicker.click();
 
-    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(10);
+    // Must exclude .ant-picker-cell-today: CalendarDatePicker defaults to today
+    // when form value is undefined, so clicking today's cell won't trigger onChange
+    // (value unchanged), leaving the form field empty and failing validation.
+    // Also must use .ant-picker-cell-in-view to only match current month cells;
+    // without it, clicking a previous-month cell navigates the calendar view
+    // instead of selecting a date.
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell.ant-picker-cell-in-view:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first();
     await dateCell.click();
-    await dateModal.locator('.ant-modal-header').click();
+
+    // Wait for the DatePicker dropdown to auto-close after date selection.
+    // The dropdown may linger and intercept clicks on the modal header/footer.
+    await expect(page.locator('.ant-picker-dropdown:visible')).not.toBeVisible({ timeout: 5000 });
 
     const dateResp = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'

@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -18,16 +19,14 @@ func NewLifeMetricService(db *gorm.DB) *LifeMetricService {
 	return &LifeMetricService{db: db}
 }
 
-func (s *LifeMetricService) List(vaultID string) ([]dto.LifeMetricResponse, error) {
+func (s *LifeMetricService) List(vaultID string, userID string) ([]dto.LifeMetricResponse, error) {
 	var metrics []models.LifeMetric
-	// BUG FIX (#56): Must Preload Contacts so the linked contacts column
-	// in the frontend list is populated after adding contacts.
-	if err := s.db.Preload("Contacts").Where("vault_id = ?", vaultID).Order("created_at DESC").Find(&metrics).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Order("created_at DESC").Find(&metrics).Error; err != nil {
 		return nil, err
 	}
 	result := make([]dto.LifeMetricResponse, len(metrics))
 	for i, m := range metrics {
-		result[i] = toLifeMetricResponse(&m)
+		result[i] = s.toLifeMetricResponse(&m, userID)
 	}
 	return result, nil
 }
@@ -40,7 +39,7 @@ func (s *LifeMetricService) Create(vaultID string, req dto.CreateLifeMetricReque
 	if err := s.db.Create(&metric).Error; err != nil {
 		return nil, err
 	}
-	resp := toLifeMetricResponse(&metric)
+	resp := s.toLifeMetricResponse(&metric, "")
 	return &resp, nil
 }
 
@@ -56,7 +55,7 @@ func (s *LifeMetricService) Update(id uint, vaultID string, req dto.UpdateLifeMe
 	if err := s.db.Save(&metric).Error; err != nil {
 		return nil, err
 	}
-	resp := toLifeMetricResponse(&metric)
+	resp := s.toLifeMetricResponse(&metric, "")
 	return &resp, nil
 }
 
@@ -71,61 +70,127 @@ func (s *LifeMetricService) Delete(id uint, vaultID string) error {
 	return nil
 }
 
-func (s *LifeMetricService) AddContact(id uint, vaultID string, contactID string) error {
+func (s *LifeMetricService) Increment(metricID uint, vaultID string, userID string) (*dto.LifeMetricResponse, error) {
 	var metric models.LifeMetric
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&metric).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", metricID, vaultID).First(&metric).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrLifeMetricNotFound
+			return nil, ErrLifeMetricNotFound
 		}
-		return err
+		return nil, err
 	}
-	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
-		return err
+	event := models.ContactLifeMetric{
+		ContactID:    userID,
+		LifeMetricID: metricID,
+		UserID:       userID,
 	}
-	clm := models.ContactLifeMetric{
-		ContactID:    contactID,
-		LifeMetricID: id,
+	if err := s.db.Create(&event).Error; err != nil {
+		return nil, err
 	}
-	return s.db.Create(&clm).Error
+	resp := s.toLifeMetricResponse(&metric, userID)
+	return &resp, nil
 }
 
-// RemoveContact removes a contact association from a life metric.
-// BUG FIX (#56): This endpoint was missing — the frontend tried to call
-// DELETE /lifeMetrics/:id/contacts/:contactId but no route existed.
-func (s *LifeMetricService) RemoveContact(id uint, vaultID string, contactID string) error {
+func (s *LifeMetricService) GetDetail(metricID uint, vaultID string, userID string, year int) (*dto.LifeMetricDetailResponse, error) {
 	var metric models.LifeMetric
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&metric).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", metricID, vaultID).First(&metric).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrLifeMetricNotFound
+			return nil, ErrLifeMetricNotFound
 		}
-		return err
+		return nil, err
 	}
-	result := s.db.Where("life_metric_id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactLifeMetric{})
-	if result.Error != nil {
-		return result.Error
+
+	stats := s.calcStats(metricID, userID)
+
+	monthNames := []string{
+		"January", "February", "March", "April", "May", "June",
+		"July", "August", "September", "October", "November", "December",
 	}
-	if result.RowsAffected == 0 {
-		return ErrContactNotFound
+
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	var events []models.ContactLifeMetric
+	query := s.db.Where("life_metric_id = ? AND user_id = ? AND created_at >= ? AND created_at < ?",
+		metricID, userID, yearStart, yearEnd)
+	if err := query.Find(&events).Error; err != nil {
+		return nil, err
 	}
-	return nil
+
+	monthMap := make(map[int]int)
+	for _, e := range events {
+		m := int(e.CreatedAt.Month())
+		monthMap[m]++
+	}
+
+	months := make([]dto.LifeMetricMonthData, 12)
+	maxEvents := 0
+	for i := 0; i < 12; i++ {
+		count := monthMap[i+1]
+		months[i] = dto.LifeMetricMonthData{
+			Month:        i + 1,
+			FriendlyName: monthNames[i],
+			Events:       count,
+		}
+		if count > maxEvents {
+			maxEvents = count
+		}
+	}
+
+	return &dto.LifeMetricDetailResponse{
+		ID:        metric.ID,
+		VaultID:   metric.VaultID,
+		Label:     metric.Label,
+		Stats:     stats,
+		Months:    months,
+		MaxEvents: maxEvents,
+		CreatedAt: metric.CreatedAt,
+		UpdatedAt: metric.UpdatedAt,
+	}, nil
 }
 
-func toLifeMetricResponse(m *models.LifeMetric) dto.LifeMetricResponse {
-	resp := dto.LifeMetricResponse{
+func (s *LifeMetricService) calcStats(metricID uint, userID string) dto.LifeMetricStats {
+	if userID == "" {
+		return dto.LifeMetricStats{}
+	}
+
+	now := time.Now().UTC()
+
+	weekday := int(now.Weekday())
+	if weekday == 0 {
+		weekday = 7
+	}
+	weekStart := time.Date(now.Year(), now.Month(), now.Day()-weekday+1, 0, 0, 0, 0, time.UTC)
+
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+
+	var weekly, monthly, yearly int64
+	base := s.db.Model(&models.ContactLifeMetric{}).Where("life_metric_id = ? AND user_id = ?", metricID, userID)
+
+	base.Where("created_at >= ?", weekStart).Count(&weekly)
+
+	s.db.Model(&models.ContactLifeMetric{}).
+		Where("life_metric_id = ? AND user_id = ?", metricID, userID).
+		Where("created_at >= ?", monthStart).Count(&monthly)
+
+	s.db.Model(&models.ContactLifeMetric{}).
+		Where("life_metric_id = ? AND user_id = ?", metricID, userID).
+		Where("created_at >= ?", yearStart).Count(&yearly)
+
+	return dto.LifeMetricStats{
+		WeeklyEvents:  int(weekly),
+		MonthlyEvents: int(monthly),
+		YearlyEvents:  int(yearly),
+	}
+}
+
+func (s *LifeMetricService) toLifeMetricResponse(m *models.LifeMetric, userID string) dto.LifeMetricResponse {
+	return dto.LifeMetricResponse{
 		ID:        m.ID,
 		VaultID:   m.VaultID,
 		Label:     m.Label,
+		Stats:     s.calcStats(m.ID, userID),
 		CreatedAt: m.CreatedAt,
 		UpdatedAt: m.UpdatedAt,
 	}
-	contacts := make([]dto.LifeMetricContactBrief, len(m.Contacts))
-	for i, c := range m.Contacts {
-		contacts[i] = dto.LifeMetricContactBrief{
-			ID:        c.ID,
-			FirstName: ptrToStr(c.FirstName),
-			LastName:  ptrToStr(c.LastName),
-		}
-	}
-	resp.Contacts = contacts
-	return resp
 }

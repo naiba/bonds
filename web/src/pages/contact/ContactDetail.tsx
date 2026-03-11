@@ -50,7 +50,6 @@ import PetsModule from "./modules/PetsModule";
 import RelationshipsModule from "./modules/RelationshipsModule";
 import GoalsModule from "./modules/GoalsModule";
 import LifeEventsModule from "./modules/LifeEventsModule";
-import MoodTrackingModule from "./modules/MoodTrackingModule";
 import QuickFactsModule from "./modules/QuickFactsModule";
 import PhotosModule from "./modules/PhotosModule";
 import DocumentsModule from "./modules/DocumentsModule";
@@ -84,7 +83,6 @@ const MODULE_COMPONENT_MAP: Record<
   goals: GoalsModule,
   life_events: LifeEventsModule,
   groups: GroupsModule,
-  mood_tracking: MoodTrackingModule,
   photos: PhotosModule,
   documents: DocumentsModule,
   feed: FeedModule,
@@ -426,7 +424,6 @@ export default function ContactDetail() {
       children: (
         <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <LifeEventsModule {...moduleProps} />
-          <MoodTrackingModule {...moduleProps} />
         </Space>
       ),
     },

@@ -19,7 +19,6 @@ import {
   BarChartOutlined,
   EditOutlined,
   UsergroupAddOutlined,
-  UnorderedListOutlined,
   BellOutlined,
   ControlOutlined,
   UserSwitchOutlined,
@@ -34,7 +33,6 @@ import {
   CrownOutlined,
   CloudServerOutlined,
   LinkOutlined,
-  HeartOutlined,
   KeyOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
@@ -81,9 +79,7 @@ export default function Layout() {
         { key: `/vaults/${vaultId}/tasks`, icon: <CheckSquareOutlined />, label: t("nav.tasks") },
         { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
         { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
-        { key: `/vaults/${vaultId}/feed`, icon: <UnorderedListOutlined />, label: t("nav.feed") },
         { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
-        { key: `/vaults/${vaultId}/life-metrics`, icon: <HeartOutlined />, label: t("nav.lifeMetrics") },
         { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
       ]
     : [];
@@ -111,9 +107,7 @@ export default function Layout() {
         ],
         // Activity
         [
-          { key: `/vaults/${vaultId}/feed`, icon: <UnorderedListOutlined />, label: t("nav.feed") },
           { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
-          { key: `/vaults/${vaultId}/life-metrics`, icon: <HeartOutlined />, label: t("nav.lifeMetrics") },
           { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
         ],
       ]

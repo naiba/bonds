@@ -153,11 +153,12 @@ func toVaultResponse(v *models.Vault) dto.VaultResponse {
 		desc = *v.Description
 	}
 	return dto.VaultResponse{
-		ID:          v.ID,
-		AccountID:   v.AccountID,
-		Name:        v.Name,
-		Description: desc,
-		CreatedAt:   v.CreatedAt,
-		UpdatedAt:   v.UpdatedAt,
+		ID:                 v.ID,
+		AccountID:          v.AccountID,
+		Name:               v.Name,
+		Description:        desc,
+		DefaultActivityTab: v.DefaultActivityTab,
+		CreatedAt:          v.CreatedAt,
+		UpdatedAt:          v.UpdatedAt,
 	}
 }

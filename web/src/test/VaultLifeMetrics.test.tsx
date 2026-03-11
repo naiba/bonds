@@ -12,23 +12,6 @@ beforeAll(() => {
   };
 });
 
-vi.mock("@/api/lifeMetrics", () => ({
-  lifeMetricsApi: {
-    list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-    addContact: vi.fn(),
-    removeContact: vi.fn(),
-  },
-}));
-
-vi.mock("@/api/search", () => ({
-  searchApi: {
-    search: vi.fn(),
-  },
-}));
-
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),

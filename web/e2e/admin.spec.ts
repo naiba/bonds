@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// fullyParallel + workers>1 时，不同 describe 块可能被分配到不同 worker，
+// 导致 serial 的 "Admin Features" 中 adminEmail 闭包变量为 undefined。
+// 整个文件串行运行避免跨 worker 状态丢失。
+test.describe.configure({ mode: 'serial' });
+
 const PASSWORD = 'password123';
 
 async function registerUser(page: import('@playwright/test').Page, email: string, firstName = 'Test', lastName = 'User') {
@@ -35,15 +40,18 @@ test.describe('Login Page Improvements', () => {
 });
 
 test.describe('Admin Features', () => {
-  // Serial mode: tests share DB state, first registered user is admin
-  test.describe.configure({ mode: 'serial' });
-
   let adminEmail: string;
 
-  test('first registered user is admin and can access User Management', async ({ page }) => {
-    adminEmail = `admin-${Date.now()}@example.com`;
-    await registerUser(page, adminEmail, 'Admin', 'Boss');
+  // fullyParallel 模式下 serial describe 可能被分配到晚启动的 worker，
+  // 此 hook 确保每个测试执行前 adminEmail 已初始化
+  test.beforeEach(async ({ page }) => {
+    if (!adminEmail) {
+      adminEmail = `admin-${Date.now()}@example.com`;
+      await registerUser(page, adminEmail, 'Admin', 'Boss');
+    }
+  });
 
+  test('first registered user is admin and can access User Management', async ({ page }) => {
     await page.goto('/admin/users');
     await page.waitForLoadState('networkidle');
     await expect(page.getByText('User Management')).toBeVisible({ timeout: 10000 });
@@ -51,9 +59,8 @@ test.describe('Admin Features', () => {
   });
 
   test('admin menu is visible in user dropdown', async ({ page }) => {
-    await loginUser(page, adminEmail);
+    await loginUser(page, adminEmail!);
 
-    // Open user dropdown by clicking the avatar
     await page.locator('.ant-avatar').click();
     await expect(page.getByText('Administration')).toBeVisible({ timeout: 5000 });
   });
