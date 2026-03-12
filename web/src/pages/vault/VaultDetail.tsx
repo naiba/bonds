@@ -9,6 +9,7 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Popconfirm,
   App,
   List,
@@ -17,6 +18,9 @@ import {
   Segmented,
   theme,
   Tooltip,
+  Radio,
+  DatePicker,
+  Select,
 } from "antd";
 import {
   PlusOutlined,
@@ -39,7 +43,8 @@ import type {
   LifeMetricStats,
   LifeMetricMonthData,
   TimelineEvent,
-  MoodReportItem,
+  MoodTrackingParameterResponse,
+  LifeEventCategoryResponse,
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -325,14 +330,14 @@ export default function VaultDetail() {
             }}
           >
             {currentTab === "activity" && <ActivityTab vaultId={vaultId} />}
-            {currentTab === "life_events" && <LifeEventsTab vaultId={vaultId} />}
+            {currentTab === "life_events" && <LifeEventsTab vaultId={vaultId} userContactId={vault.user_contact_id} />}
             {currentTab === "life_metrics" && <LifeMetricsTab vaultId={vaultId} />}
           </div>
         </div>
 
         {/* ─── Right Sidebar ──────────────────────────────────── */}
         <div className="vault-dashboard-right" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <MoodSummaryWidget vaultId={vaultId} />
+          <MoodRecordingWidget vaultId={vaultId} userContactId={vault.user_contact_id} />
           <UpcomingRemindersWidget vaultId={vaultId} />
           <DueTasksWidget vaultId={vaultId} />
         </div>
@@ -526,12 +531,17 @@ function ActivityTab({ vaultId }: { vaultId: string }) {
 }
 
 // ─── Life Events Tab ─────────────────────────────────────────────
-function LifeEventsTab({ vaultId }: { vaultId: string }) {
+function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContactId?: string }) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [allTimelines, setAllTimelines] = useState<TimelineEvent[]>([]);
   const [hasMore, setHasMore] = useState(true);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addForm] = Form.useForm();
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   const { isLoading, isFetching } = useQuery({
     queryKey: ["vaults", vaultId, "dashboardLifeEvents", page],
@@ -549,6 +559,49 @@ function LifeEventsTab({ vaultId }: { vaultId: string }) {
     enabled: !!vaultId,
   });
 
+  const { data: lifeEventCategories = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "settings", "lifeEventCategories"],
+    queryFn: async () => {
+      const res = await api.vaultSettings.settingsLifeEventCategoriesList(String(vaultId));
+      return (res.data ?? []) as LifeEventCategoryResponse[];
+    },
+    enabled: !!vaultId && addModalOpen,
+  });
+
+  const filteredTypes = lifeEventCategories.find((c) => c.id === selectedCategoryId)?.types ?? [];
+
+  const addLifeEventMutation = useMutation({
+    mutationFn: async (values: { life_event_type_id: number; happened_at: dayjs.Dayjs; summary?: string; description?: string }) => {
+      const dateStr = values.happened_at.toISOString();
+      const timelineRes = await api.lifeEvents.contactsTimelineEventsCreate(
+        String(vaultId),
+        userContactId!,
+        { started_at: dateStr, label: values.summary || undefined },
+      );
+      const timelineId = timelineRes.data?.id;
+      if (!timelineId) throw new Error("Failed to create timeline event");
+      await api.lifeEvents.contactsTimelineEventsLifeEventsCreate(
+        String(vaultId),
+        userContactId!,
+        timelineId,
+        {
+          life_event_type_id: values.life_event_type_id,
+          happened_at: dateStr,
+          summary: values.summary || undefined,
+          description: values.description || undefined,
+        },
+      );
+    },
+    onSuccess: () => {
+      message.success(t("vault.dashboard.life_event_added"));
+      setAddModalOpen(false);
+      addForm.resetFields();
+      setSelectedCategoryId(null);
+      setPage(1);
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "dashboardLifeEvents"] });
+    },
+  });
+
   if (isLoading && page === 1) {
     return (
       <div style={{ textAlign: "center", padding: 48 }}>
@@ -557,76 +610,153 @@ function LifeEventsTab({ vaultId }: { vaultId: string }) {
     );
   }
 
-  if (allTimelines.length === 0) {
-    return (
-      <div style={{ padding: 32 }}>
-        <Empty description={t("vault.dashboard.no_life_events")} />
-      </div>
-    );
-  }
-
   return (
     <div style={{ padding: "16px 20px" }}>
-      {allTimelines.map((tl) => (
-        <div key={tl.id} style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <Text strong style={{ fontSize: 14 }}>
-              {tl.label}
-            </Text>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {dayjs(tl.started_at).format("MMM YYYY")}
-            </Text>
-          </div>
-          {tl.life_events && tl.life_events.length > 0 ? (
-            <div
-              style={{
-                borderLeft: `2px solid ${token.colorBorderSecondary}`,
-                marginLeft: 4,
-                paddingLeft: 16,
-              }}
-            >
-              {tl.life_events.map((le) => (
-                <div key={le.id} style={{ marginBottom: 12, position: "relative" }}>
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: -21,
-                      top: 6,
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: token.colorPrimary,
-                    }}
-                  />
-                  <Text style={{ fontWeight: 500, fontSize: 13 }}>
-                    {le.summary ?? le.description}
-                  </Text>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    {dayjs(le.happened_at).format("MMM D, YYYY")}
-                  </Text>
-                  {le.description && le.summary && (
-                    <div style={{ marginTop: 2, color: token.colorTextSecondary, fontSize: 12 }}>
-                      {le.description}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {t("modules.life_events.no_events")}
-            </Text>
-          )}
-        </div>
-      ))}
-      {hasMore && allTimelines.length > 0 && (
-        <div style={{ textAlign: "center", paddingBottom: 8 }}>
-          <Button onClick={() => setPage((p) => p + 1)} loading={isFetching}>
-            {t("common.load_more")}
+      {!userContactId ? (
+        <Text type="secondary" style={{ fontSize: 13 }}>
+          {t("vault.dashboard.life_events_not_available")}
+        </Text>
+      ) : (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              addForm.resetFields();
+              setSelectedCategoryId(null);
+              setAddModalOpen(true);
+            }}
+            size="small"
+          >
+            {t("vault.dashboard.add_life_event")}
           </Button>
         </div>
       )}
+
+      {allTimelines.length === 0 ? (
+        <Empty description={t("vault.dashboard.no_life_events")} style={{ padding: 16 }} />
+      ) : (
+        <>
+          {allTimelines.map((tl) => (
+            <div key={tl.id} style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <Text strong style={{ fontSize: 14 }}>
+                  {tl.label}
+                </Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {dayjs(tl.started_at).format("MMM YYYY")}
+                </Text>
+              </div>
+              {tl.life_events && tl.life_events.length > 0 ? (
+                <div
+                  style={{
+                    borderLeft: `2px solid ${token.colorBorderSecondary}`,
+                    marginLeft: 4,
+                    paddingLeft: 16,
+                  }}
+                >
+                  {tl.life_events.map((le) => (
+                    <div key={le.id} style={{ marginBottom: 12, position: "relative" }}>
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: -21,
+                          top: 6,
+                          width: 8,
+                          height: 8,
+                          borderRadius: "50%",
+                          background: token.colorPrimary,
+                        }}
+                      />
+                      <Text style={{ fontWeight: 500, fontSize: 13 }}>
+                        {le.summary ?? le.description}
+                      </Text>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {dayjs(le.happened_at).format("MMM D, YYYY")}
+                      </Text>
+                      {le.description && le.summary && (
+                        <div style={{ marginTop: 2, color: token.colorTextSecondary, fontSize: 12 }}>
+                          {le.description}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {t("modules.life_events.no_events")}
+                </Text>
+              )}
+            </div>
+          ))}
+          {hasMore && allTimelines.length > 0 && (
+            <div style={{ textAlign: "center", paddingBottom: 8 }}>
+              <Button onClick={() => setPage((p) => p + 1)} loading={isFetching}>
+                {t("common.load_more")}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
+      <Modal
+        title={t("vault.dashboard.add_life_event")}
+        open={addModalOpen}
+        onCancel={() => {
+          setAddModalOpen(false);
+          addForm.resetFields();
+          setSelectedCategoryId(null);
+        }}
+        onOk={() => addForm.submit()}
+        confirmLoading={addLifeEventMutation.isPending}
+      >
+        <Form
+          form={addForm}
+          layout="vertical"
+          initialValues={{ happened_at: dayjs() }}
+          onFinish={(values) => addLifeEventMutation.mutate(values)}
+        >
+          <Form.Item
+            name="category_id"
+            label={t("vault.dashboard.select_category")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              placeholder={t("vault.dashboard.select_category")}
+              onChange={(v: number) => {
+                setSelectedCategoryId(v);
+                addForm.setFieldValue("life_event_type_id", undefined);
+              }}
+              options={lifeEventCategories.map((c) => ({ label: c.label, value: c.id }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="life_event_type_id"
+            label={t("vault.dashboard.select_type")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              placeholder={t("vault.dashboard.select_type")}
+              disabled={!selectedCategoryId}
+              options={filteredTypes.map((tp) => ({ label: tp.label, value: tp.id }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="happened_at"
+            label={t("vault.dashboard.life_event_date")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <DatePicker style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item name="summary" label={t("vault.dashboard.life_event_summary")}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="description" label={t("vault.dashboard.life_event_description")}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
@@ -969,21 +1099,53 @@ function MetricBarChart({
   );
 }
 
-// ─── Mood Summary Widget ─────────────────────────────────────────
-function MoodSummaryWidget({ vaultId }: { vaultId: string }) {
+// ─── Mood Recording Widget ───────────────────────────────────────
+function MoodRecordingWidget({ vaultId, userContactId }: { vaultId: string; userContactId?: string }) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const { message } = App.useApp();
+  const [selectedMoodId, setSelectedMoodId] = useState<number | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showNote, setShowNote] = useState(false);
+  const [showSleep, setShowSleep] = useState(false);
+  const [moodDate, setMoodDate] = useState<dayjs.Dayjs | null>(null);
+  const [moodNote, setMoodNote] = useState("");
+  const [hoursSlept, setHoursSlept] = useState<number | null>(null);
 
-  const { data: moodData } = useQuery({
-    queryKey: ["vaults", vaultId, "reports", "moodTracking"],
+  const { data: moodParams = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "settings", "moodParams"],
     queryFn: async () => {
-      const res = await api.reports.reportsMoodTrackingEventsList(String(vaultId));
-      return (res.data ?? []) as MoodReportItem[];
+      const res = await api.vaultSettings.settingsMoodParamsList(String(vaultId));
+      return (res.data ?? []) as MoodTrackingParameterResponse[];
     },
     enabled: !!vaultId,
   });
 
-  const hasMoodData = moodData && moodData.length > 0;
+  const recordMutation = useMutation({
+    mutationFn: (data: { mood_tracking_parameter_id: number; rated_at: string; note?: string; number_of_hours_slept?: number }) =>
+      api.moodTracking.contactsMoodTrackingEventsCreate(String(vaultId), userContactId!, data),
+    onSuccess: () => {
+      message.success(t("vault.dashboard.mood_recorded"));
+      setSelectedMoodId(null);
+      setShowDatePicker(false);
+      setShowNote(false);
+      setShowSleep(false);
+      setMoodDate(null);
+      setMoodNote("");
+      setHoursSlept(null);
+    },
+  });
+
+  const handleRecord = () => {
+    if (!selectedMoodId || !userContactId) return;
+    const data: { mood_tracking_parameter_id: number; rated_at: string; note?: string; number_of_hours_slept?: number } = {
+      mood_tracking_parameter_id: selectedMoodId,
+      rated_at: (moodDate ?? dayjs()).toISOString(),
+    };
+    if (moodNote.trim()) data.note = moodNote.trim();
+    if (hoursSlept != null) data.number_of_hours_slept = hoursSlept;
+    recordMutation.mutate(data);
+  };
 
   return (
     <div
@@ -1001,35 +1163,98 @@ function MoodSummaryWidget({ vaultId }: { vaultId: string }) {
         </Text>
       </div>
 
-      {!hasMoodData ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "16px 0",
-            color: token.colorTextSecondary,
-            fontSize: 13,
-          }}
-        >
+      {!userContactId ? (
+        <Text type="secondary" style={{ fontSize: 13 }}>
+          {t("vault.dashboard.mood_not_available")}
+        </Text>
+      ) : moodParams.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "16px 0", color: token.colorTextSecondary, fontSize: 13 }}>
           <SmileOutlined style={{ fontSize: 28, opacity: 0.3, display: "block", marginBottom: 8 }} />
           {t("vault.dashboard.mood_how_are_you")}
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {moodData.map((item, idx) => (
-            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: "50%",
-                  background: item.hex_color ?? token.colorPrimary,
-                  flexShrink: 0,
-                }}
-              />
-              <Text style={{ fontSize: 13, flex: 1 }}>{item.parameter_label}</Text>
-              <Tag style={{ margin: 0, fontSize: 11 }}>{item.count}</Tag>
-            </div>
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Radio.Group
+            value={selectedMoodId}
+            onChange={(e) => setSelectedMoodId(e.target.value as number)}
+            style={{ display: "flex", flexDirection: "column", gap: 6 }}
+          >
+            {moodParams.map((param) => (
+              <Radio key={param.id} value={param.id} style={{ fontSize: 13 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      background: param.hex_color ?? token.colorPrimary,
+                      display: "inline-block",
+                      flexShrink: 0,
+                    }}
+                  />
+                  {param.label}
+                </span>
+              </Radio>
+            ))}
+          </Radio.Group>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {!showDatePicker && (
+              <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} onClick={() => setShowDatePicker(true)}>
+                {t("vault.dashboard.mood_change_date")}
+              </Button>
+            )}
+            {!showNote && (
+              <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} onClick={() => setShowNote(true)}>
+                {t("vault.dashboard.mood_add_note")}
+              </Button>
+            )}
+            {!showSleep && (
+              <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} onClick={() => setShowSleep(true)}>
+                {t("vault.dashboard.mood_hours_slept")}
+              </Button>
+            )}
+          </div>
+
+          {showDatePicker && (
+            <DatePicker
+              value={moodDate}
+              onChange={(d) => setMoodDate(d)}
+              style={{ width: "100%" }}
+              size="small"
+            />
+          )}
+          {showNote && (
+            <Input.TextArea
+              value={moodNote}
+              onChange={(e) => setMoodNote(e.target.value)}
+              placeholder={t("modules.mood_tracking.note_placeholder")}
+              rows={2}
+              size="small"
+            />
+          )}
+          {showSleep && (
+            <InputNumber
+              value={hoursSlept}
+              onChange={(v) => setHoursSlept(v)}
+              min={0}
+              max={24}
+              placeholder={t("vault.dashboard.mood_hours_slept")}
+              style={{ width: "100%" }}
+              size="small"
+            />
+          )}
+
+          <Button
+            type="primary"
+            size="small"
+            block
+            disabled={!selectedMoodId}
+            loading={recordMutation.isPending}
+            onClick={handleRecord}
+          >
+            {t("vault.dashboard.mood_record")}
+          </Button>
         </div>
       )}
     </div>

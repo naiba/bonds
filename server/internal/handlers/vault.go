@@ -87,7 +87,8 @@ func (h *VaultHandler) Create(c echo.Context) error {
 //	@Router			/vaults/{id} [get]
 func (h *VaultHandler) Get(c echo.Context) error {
 	vaultID := c.Param("id")
-	vault, err := h.vaultService.GetVault(vaultID)
+	userID := middleware.GetUserID(c)
+	vault, err := h.vaultService.GetVault(vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")
@@ -124,7 +125,8 @@ func (h *VaultHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	vault, err := h.vaultService.UpdateVault(vaultID, req)
+	userID := middleware.GetUserID(c)
+	vault, err := h.vaultService.UpdateVault(vaultID, userID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")

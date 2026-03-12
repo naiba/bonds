@@ -77,6 +77,46 @@ func TestCreateVault(t *testing.T) {
 	}
 }
 
+func TestCreateVault_UserContactAutoCreated(t *testing.T) {
+	svc, accountID, userID := setupVaultTest(t)
+
+	vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{
+		Name: "Contact Auto Test",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	if vault.UserContactID == "" {
+		t.Fatal("Expected UserContactID to be populated after vault creation")
+	}
+
+	var uv models.UserVault
+	if err := svc.db.Where("user_id = ? AND vault_id = ?", userID, vault.ID).First(&uv).Error; err != nil {
+		t.Fatalf("UserVault lookup failed: %v", err)
+	}
+	if uv.ContactID == "" {
+		t.Fatal("Expected UserVault.ContactID to be set")
+	}
+	if uv.ContactID != vault.UserContactID {
+		t.Errorf("UserVault.ContactID (%s) != VaultResponse.UserContactID (%s)", uv.ContactID, vault.UserContactID)
+	}
+
+	var contact models.Contact
+	if err := svc.db.First(&contact, "id = ?", uv.ContactID).Error; err != nil {
+		t.Fatalf("Self-contact lookup failed: %v", err)
+	}
+	if contact.CanBeDeleted {
+		t.Error("Self-contact should have CanBeDeleted=false")
+	}
+	if contact.Listed {
+		t.Error("Self-contact should have Listed=false")
+	}
+	if contact.VaultID != vault.ID {
+		t.Errorf("Self-contact VaultID = %s, want %s", contact.VaultID, vault.ID)
+	}
+}
+
 func TestListVaults(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
@@ -106,7 +146,7 @@ func TestUpdateVault(t *testing.T) {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
 
-	updated, err := svc.UpdateVault(created.ID, dto.UpdateVaultRequest{Name: "After", Description: "Updated"})
+	updated, err := svc.UpdateVault(created.ID, userID, dto.UpdateVaultRequest{Name: "After", Description: "Updated"})
 	if err != nil {
 		t.Fatalf("UpdateVault failed: %v", err)
 	}
@@ -130,7 +170,7 @@ func TestDeleteVault(t *testing.T) {
 		t.Fatalf("DeleteVault failed: %v", err)
 	}
 
-	_, err = svc.GetVault(created.ID)
+	_, err = svc.GetVault(created.ID, userID)
 	if err != ErrVaultNotFound {
 		t.Errorf("Expected ErrVaultNotFound, got %v", err)
 	}

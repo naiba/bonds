@@ -90,7 +90,8 @@ func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDat
 
 func (s *ReportService) Overview(vaultID string) (*dto.ReportOverviewResponse, error) {
 	var totalContacts int64
-	if err := s.db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&totalContacts).Error; err != nil {
+	// Exclude shadow contacts (Listed=false) created for UserVault self-contact
+	if err := s.db.Model(&models.Contact{}).Where("vault_id = ? AND listed = ?", vaultID, true).Count(&totalContacts).Error; err != nil {
 		return nil, err
 	}
 
@@ -100,7 +101,7 @@ func (s *ReportService) Overview(vaultID string) (*dto.ReportOverviewResponse, e
 	}
 
 	var contactIDs []string
-	if err := s.db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Pluck("id", &contactIDs).Error; err != nil {
+	if err := s.db.Model(&models.Contact{}).Where("vault_id = ? AND listed = ?", vaultID, true).Pluck("id", &contactIDs).Error; err != nil {
 		return nil, err
 	}
 

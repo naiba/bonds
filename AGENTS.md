@@ -162,7 +162,7 @@ docker-compose.yml         # 单容器部署
 - "Feed" (slug: `feed`) → feed
 - "Social" (slug: `social`) → relationships, pets, groups, addresses, contact_information
 - "Life & goals" (slug: `life-goals`) → life_events, goals
-  - 注意：`mood_tracking` 模块已从 Contact Detail 移除，Mood Tracking 仅在 Vault Dashboard 右侧栏展示（只读摘要）
+  - 注意：`mood_tracking` 模块已从 Contact Detail 移除，Mood Tracking 仅在 Vault Dashboard 右侧栏展示（交互式录入，通过 `user_contact_id` 关联到用户影子联系人）
 - "Information" (slug: `information`) → documents, photos, notes, reminders, loans, tasks, calls, posts
 
 **Vault 级种子**（`seed_vault.go`）— 创建 Vault 时在事务内调用 `SeedVaultDefaults(tx, vaultID)`：
@@ -179,7 +179,7 @@ docker-compose.yml         # 单容器部署
   - Activity（vault feed）
   - Your Life Events（`GET /api/vaults/:id/dashboard/lifeEvents`）
   - Life Metrics（+1 increment pattern）
-- **右栏**（320px）：Mood Summary（只读，来自 reports API） + Upcoming Reminders + Due Tasks
+- **右栏**（320px）：Mood Recording（交互式录入，通过 `user_contact_id` 关联） + Upcoming Reminders + Due Tasks
 - Tab 状态通过 `PUT /api/vaults/:id/defaultTab` 持久化到 `Vault.DefaultActivityTab` 字段
 - 响应式：≥1024px 三栏，768-1023px 两栏（隐藏左栏），<768px 单栏
 
@@ -193,6 +193,28 @@ docker-compose.yml         # 单容器部署
 - `LifeMetric` model 不再有 `Contacts` many2many 关联
 - 前端 Life Metrics 独立页面（`/vaults/:id/life-metrics`）保留但已从导航移除
 - Feed 独立页面（`/vaults/:id/feed`）同上
+
+### UserVault.ContactID — 用户影子联系人（Monica v5 模式）
+
+复刻 Monica v5 的 `user_vault.contact_id` 架构：每个用户在每个 vault 中拥有一个"影子联系人"（shadow contact），用于记录个人心情和生活事件。
+
+**自动创建时机：**
+- `CreateVault`：在事务内为创建者自动创建影子 Contact，设置 `UserVault.ContactID`
+- `Accept`（邀请接受）：受邀用户加入账户下所有 vault，每个 vault 自动创建影子 Contact
+
+**影子 Contact 特征：**
+- `Listed=false`：不出现在联系人列表、搜索结果
+- `CanBeDeleted=false`：不可删除
+- GORM 零值 bool 陷阱：必须先 `Create` 再 `Update("can_be_deleted", false)` 和 `Update("listed", false)`
+- 从以下查询中排除：`ListContacts`、`Overview`（报表）、`ExportVault`（vCard 导出）、`ListAddressObjects`（CardDAV）、Admin 用户统计
+
+**API 暴露：**
+- `VaultResponse.user_contact_id`：当前用户在该 vault 的影子 Contact ID
+- 前端通过此 ID 调用 mood tracking 和 life events API
+
+**辅助函数（`services/vault.go`）：**
+- `createUserSelfContact(tx, vaultID, firstName, lastName)` — 创建影子 Contact 并返回 ID
+- `getUserContactID(db, userID, vaultID)` — 查询 UserVault.ContactID
 
 ### 个性化设置（Personalize）
 

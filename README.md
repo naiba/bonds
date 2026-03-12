@@ -27,7 +27,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 ## Features
 
 - **Contacts** — Full lifecycle management with notes, tasks, reminders, gifts, debts, activities, life events, pets, and more
-- **Vault Dashboard** — 3-column layout with activity feed, life events, life metrics tracking (+1 counter), mood summary, upcoming reminders, and due tasks
+- **Vault Dashboard** — 3-column layout with activity feed, life events, life metrics tracking (+1 counter), mood recording, upcoming reminders, and due tasks
 - **Vaults** — Multi-vault data isolation with role-based access (Manager / Editor / Viewer)
 - **Reminders** — One-time and recurring (weekly/monthly/yearly), with email and Telegram notifications
 - **Full-text Search** — Bleve-powered CJK-aware search across contacts and notes

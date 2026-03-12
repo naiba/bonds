@@ -173,7 +173,16 @@
       "no_reminders": "No upcoming reminders",
       "due_tasks": "Due Tasks",
       "no_tasks": "No tasks due soon",
-      "view_all": "View all"
+      "view_all": "View all",
+      "mood_not_available": "Mood recording requires a user contact. Please recreate the vault.",
+      "add_life_event": "Add a life event",
+      "life_events_not_available": "Life events require a user contact. Please recreate the vault.",
+      "select_category": "Select category",
+      "select_type": "Select event type",
+      "life_event_summary": "Summary",
+      "life_event_description": "Description",
+      "life_event_added": "Life event added",
+      "life_event_date": "Date"
     },
     "calendar": {
       "title": "Calendar",

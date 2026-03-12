@@ -173,7 +173,16 @@
       "no_reminders": "暂无即将到来的提醒",
       "due_tasks": "待办任务",
       "no_tasks": "暂无近期待办任务",
-      "view_all": "查看全部"
+      "view_all": "查看全部",
+      "mood_not_available": "心情记录需要用户联系人，请重新创建保险库。",
+      "add_life_event": "添加生活事件",
+      "life_events_not_available": "生活事件需要用户联系人，请重新创建保险库。",
+      "select_category": "选择分类",
+      "select_type": "选择事件类型",
+      "life_event_summary": "摘要",
+      "life_event_description": "描述",
+      "life_event_added": "生活事件已添加",
+      "life_event_date": "日期"
     },
     "calendar": {
       "title": "日历",

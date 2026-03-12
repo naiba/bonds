@@ -335,9 +335,10 @@ func TestAdminDeleteUser_SharedAccount_OnlyDeletesTargetUser(t *testing.T) {
 	}
 
 	var contactCount int64
+	// 2 contacts expected: 1 manually created + 1 auto-created shadow contact for vault owner
 	adminSvc.db.Model(&models.Contact{}).Where("vault_id = ?", vault.ID).Count(&contactCount)
-	if contactCount != 1 {
-		t.Error("expected contacts to still exist")
+	if contactCount != 2 {
+		t.Errorf("expected 2 contacts to still exist, got %d", contactCount)
 	}
 
 	var uvCount int64

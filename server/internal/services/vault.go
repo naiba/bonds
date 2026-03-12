@@ -29,8 +29,10 @@ func (s *VaultService) ListVaults(userID string) ([]dto.VaultResponse, error) {
 	}
 
 	vaultIDs := make([]string, len(userVaults))
+	contactIDByVault := make(map[string]string, len(userVaults))
 	for i, uv := range userVaults {
 		vaultIDs[i] = uv.VaultID
+		contactIDByVault[uv.VaultID] = uv.ContactID
 	}
 
 	if len(vaultIDs) == 0 {
@@ -44,7 +46,7 @@ func (s *VaultService) ListVaults(userID string) ([]dto.VaultResponse, error) {
 
 	result := make([]dto.VaultResponse, len(vaults))
 	for i, v := range vaults {
-		result[i] = toVaultResponse(&v)
+		result[i] = toVaultResponse(&v, contactIDByVault[v.ID])
 	}
 	return result, nil
 }
@@ -58,6 +60,7 @@ func (s *VaultService) CreateVault(accountID, userID string, req dto.CreateVault
 		Type:        "personal",
 	}
 
+	var userContactID string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&vault).Error; err != nil {
 			return err
@@ -70,17 +73,30 @@ func (s *VaultService) CreateVault(accountID, userID string, req dto.CreateVault
 		if err := tx.Create(&userVault).Error; err != nil {
 			return err
 		}
+
+		// Monica v5 pattern: auto-create a "self" Contact for the vault creator,
+		// linked via UserVault.ContactID. This shadow contact (Listed=false, CanBeDeleted=false)
+		// is used for mood tracking, life events, etc.
+		contactID, err := createUserSelfContact(tx, userID, vault.ID)
+		if err != nil {
+			return err
+		}
+		userContactID = contactID
+		if err := tx.Model(&userVault).Update("contact_id", contactID).Error; err != nil {
+			return err
+		}
+
 		return models.SeedVaultDefaults(tx, vault.ID, locale)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	resp := toVaultResponse(&vault)
+	resp := toVaultResponse(&vault, userContactID)
 	return &resp, nil
 }
 
-func (s *VaultService) GetVault(vaultID string) (*dto.VaultResponse, error) {
+func (s *VaultService) GetVault(vaultID, userID string) (*dto.VaultResponse, error) {
 	var vault models.Vault
 	if err := s.db.First(&vault, "id = ?", vaultID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -88,11 +104,12 @@ func (s *VaultService) GetVault(vaultID string) (*dto.VaultResponse, error) {
 		}
 		return nil, err
 	}
-	resp := toVaultResponse(&vault)
+	userContactID := s.getUserContactID(userID, vaultID)
+	resp := toVaultResponse(&vault, userContactID)
 	return &resp, nil
 }
 
-func (s *VaultService) UpdateVault(vaultID string, req dto.UpdateVaultRequest) (*dto.VaultResponse, error) {
+func (s *VaultService) UpdateVault(vaultID, userID string, req dto.UpdateVaultRequest) (*dto.VaultResponse, error) {
 	var vault models.Vault
 	if err := s.db.First(&vault, "id = ?", vaultID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -109,7 +126,8 @@ func (s *VaultService) UpdateVault(vaultID string, req dto.UpdateVaultRequest) (
 		return nil, err
 	}
 
-	resp := toVaultResponse(&vault)
+	userContactID := s.getUserContactID(userID, vaultID)
+	resp := toVaultResponse(&vault, userContactID)
 	return &resp, nil
 }
 
@@ -147,7 +165,42 @@ func (s *VaultService) CheckUserVaultAccess(userID, vaultID string, requiredPerm
 	return nil
 }
 
-func toVaultResponse(v *models.Vault) dto.VaultResponse {
+// createUserSelfContact creates a shadow Contact in the vault for a user (Monica v5 pattern).
+// GORM zero-value bool trick: CanBeDeleted defaults to true, Listed defaults to true,
+// so we must Create first then Update both to false.
+func createUserSelfContact(tx *gorm.DB, userID, vaultID string) (string, error) {
+	var user models.User
+	if err := tx.First(&user, "id = ?", userID).Error; err != nil {
+		return "", err
+	}
+
+	contact := models.Contact{
+		VaultID:   vaultID,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
+	if err := tx.Create(&contact).Error; err != nil {
+		return "", err
+	}
+	// GORM skips false for bool fields with default:true — must update after create
+	if err := tx.Model(&contact).Updates(map[string]interface{}{
+		"can_be_deleted": false,
+		"listed":         false,
+	}).Error; err != nil {
+		return "", err
+	}
+	return contact.ID, nil
+}
+
+func (s *VaultService) getUserContactID(userID, vaultID string) string {
+	var uv models.UserVault
+	if err := s.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil {
+		return ""
+	}
+	return uv.ContactID
+}
+
+func toVaultResponse(v *models.Vault, userContactID string) dto.VaultResponse {
 	desc := ""
 	if v.Description != nil {
 		desc = *v.Description
@@ -158,6 +211,7 @@ func toVaultResponse(v *models.Vault) dto.VaultResponse {
 		Name:               v.Name,
 		Description:        desc,
 		DefaultActivityTab: v.DefaultActivityTab,
+		UserContactID:      userContactID,
 		CreatedAt:          v.CreatedAt,
 		UpdatedAt:          v.UpdatedAt,
 	}
