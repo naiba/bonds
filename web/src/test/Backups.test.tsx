@@ -87,26 +87,29 @@ describe("AdminBackups", () => {
   });
 
   it("renders backup config card when config is available", () => {
-    // The component calls useQuery twice: once for backups, once for config.
-    // We return different data based on call order.
-    let callCount = 0;
-    mockUseQuery.mockImplementation(() => {
-      callCount++;
-      if (callCount % 2 === 1) {
-        // First call: backup list
-        return { data: [], isLoading: false };
+    // The component calls useQuery three times: backups list, backup config,
+    // and user preferences (from useDateFormat hook). Dispatch by queryKey
+    // to avoid fragile call-order assumptions.
+    mockUseQuery.mockImplementation((opts: { queryKey: string[] }) => {
+      const key = opts.queryKey?.[0];
+      if (key === "settings") {
+        // useDateFormat() preferences query
+        return { data: { date_format: "MMM D, YYYY" }, isLoading: false };
       }
-      // Second call: backup config
-      return {
-        data: {
-          cron_enabled: true,
-          cron_spec: "0 2 * * *",
-          retention_days: 30,
-          backup_dir: "/data/backups",
-          db_driver: "sqlite",
-        },
-        isLoading: false,
-      };
+      if (key === "admin" && opts.queryKey?.[2] === "config") {
+        return {
+          data: {
+            cron_enabled: true,
+            cron_spec: "0 2 * * *",
+            retention_days: 30,
+            backup_dir: "/data/backups",
+            db_driver: "sqlite",
+          },
+          isLoading: false,
+        };
+      }
+      // Default: backup list
+      return { data: [], isLoading: false };
     });
     renderPage();
     expect(screen.getByText("Configuration")).toBeInTheDocument();
