@@ -28,6 +28,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { TimelineEvent as TEvent, PaginationMeta, APIError, LifeEventCategoryResponse } from "@/api";
 import { useTranslation } from "react-i18next";
+import { useDateFormat, formatDate, formatMonthYear } from "@/utils/dateFormat";
 import dayjs from "dayjs";
 
 const { Text } = Typography;
@@ -52,6 +53,7 @@ export default function LifeEventsModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "timelineEvents"];
 
   // Fetch life event categories to get a valid type ID (instead of hardcoded 1)
@@ -172,8 +174,8 @@ export default function LifeEventsModule({
   const collapseItems = allTimelines.map((tl: TEvent) => ({
     key: tl.id,
     label: (
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontWeight: 500, opacity: tl.collapsed ? 0.5 : 1 }}>{tl.label} — <span style={{ color: token.colorTextSecondary, fontWeight: 400 }}>{dayjs(tl.started_at).format("MMM YYYY")}</span></span>
+       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+         <span style={{ fontWeight: 500, opacity: tl.collapsed ? 0.5 : 1 }}>{tl.label} — <span style={{ color: token.colorTextSecondary, fontWeight: 400 }}>{formatMonthYear(tl.started_at, dateFormats)}</span></span>
         <Space>
           <Button
             type="text"
@@ -228,10 +230,10 @@ export default function LifeEventsModule({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ opacity: le.collapsed ? 0.5 : 1 }}>
                 <strong style={{ fontWeight: 500 }}>{le.summary ?? le.description}</strong>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {dayjs(le.happened_at).format("MMM D, YYYY")}
-                </Text>
+                 <br />
+                 <Text type="secondary" style={{ fontSize: 12 }}>
+                   {formatDate(le.happened_at, dateFormats)}
+                 </Text>
                 {le.description && (
                   <div style={{ marginTop: 4, color: token.colorTextSecondary }}>{le.description}</div>
                 )}

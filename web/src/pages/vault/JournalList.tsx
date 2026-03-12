@@ -24,7 +24,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Journal, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -39,6 +39,7 @@ export default function JournalList() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "journals"];
 
   const { data: journals = [], isLoading } = useQuery({
@@ -174,7 +175,7 @@ export default function JournalList() {
                       </Text>
                     )}
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      Created {dayjs(journal.created_at).format("MMM D, YYYY")}
+                      Created {formatDate(journal.created_at, dateFormats)}
                     </Text>
                   </>
                 }

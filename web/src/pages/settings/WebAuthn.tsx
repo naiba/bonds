@@ -13,8 +13,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { WebAuthnCredential, APIError } from "@/api";
-import dayjs from "dayjs";
 import { startRegistration } from "@simplewebauthn/browser";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import type { PublicKeyCredentialCreationOptionsJSON as SimpleWebAuthnCreationOptions } from "@simplewebauthn/browser";
 
 const { Title, Text } = Typography;
@@ -23,6 +23,7 @@ export default function WebAuthn() {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const dateFormats = useDateFormat();
 
   const { data: credentials = [], isLoading } = useQuery({
     queryKey: ["settings", "webauthn"],
@@ -79,7 +80,7 @@ export default function WebAuthn() {
       dataIndex: "created_at",
       key: "created_at",
       render: (date: string) => (
-        <Text type="secondary">{dayjs(date).format("MMM D, YYYY")}</Text>
+        <Text type="secondary">{formatDate(date, dateFormats)}</Text>
       ),
     },
     {

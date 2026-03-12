@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -98,6 +99,7 @@ export default function ContactDetail() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -305,9 +307,9 @@ export default function ContactDetail() {
           <Tag color="green" style={{ margin: 0 }}>{t("common.active")}</Tag>
         )}
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {t("common.created")} {dayjs(contact.created_at).format("MMM D, YYYY")}
+          {t("common.created")} {formatDate(contact.created_at, dateFormats)}
           {" · "}
-          {t("common.last_updated")} {dayjs(contact.updated_at).format("MMM D, YYYY")}
+          {t("common.last_updated")} {formatDate(contact.updated_at, dateFormats)}
         </Text>
       </div>
     </Card>

@@ -16,15 +16,17 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import { api } from "@/api";
 import type { ImportantDate, CreateImportantDateRequest, APIError, UserPreferences, ImportantDateTypeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
+import { useDateFormat } from "@/utils/dateFormat";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import type { CalendarType } from "@/utils/calendar";
 
-function formatDateDisplay(d: ImportantDate): string {
+function formatDateDisplay(d: ImportantDate, fullFormat: string): string {
   if (d.calendar_type && d.calendar_type !== "gregorian" && d.original_month != null && d.original_day != null) {
     const sys = getCalendarSystem(d.calendar_type as CalendarType);
     const formatted = sys.formatDate({
@@ -32,11 +34,11 @@ function formatDateDisplay(d: ImportantDate): string {
       month: d.original_month,
       year: d.original_year ?? 0,
     });
-    const gd = d.year && d.month && d.day ? `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}` : "";
+    const gd = d.year && d.month && d.day ? dayjs(new Date(d.year, d.month - 1, d.day)).format(fullFormat) : "";
     return gd ? `${formatted} (${gd})` : formatted;
   }
   if (d.year && d.month && d.day) {
-    return `${d.year}-${String(d.month).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`;
+    return dayjs(new Date(d.year, d.month - 1, d.day)).format(fullFormat);
   }
   return "";
 }
@@ -55,6 +57,7 @@ export default function ImportantDatesModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "important-dates"];
 
   const { data: prefs } = useQuery({
@@ -187,14 +190,14 @@ export default function ImportantDatesModule({
           >
             <List.Item.Meta
               title={<span style={{ fontWeight: 500 }}>{d.label}</span>}
-              description={
-                <>
-                  <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d)}</span>{" "}
-                  {altCalendar && d.calendar_type && d.calendar_type !== "gregorian" && (
-                    <Tag color="volcano">{d.calendar_type}</Tag>
-                  )}
-                </>
-              }
+               description={
+                 <>
+                   <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d, dateFormats.full)}</span>{" "}
+                   {altCalendar && d.calendar_type && d.calendar_type !== "gregorian" && (
+                     <Tag color="volcano">{d.calendar_type}</Tag>
+                   )}
+                 </>
+               }
             />
           </List.Item>
         )}

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { useDateFormat, formatDate, formatMonthYear, formatShortDate } from "@/utils/dateFormat";
 import {
   Typography,
   Spin,
@@ -536,6 +537,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const { token } = theme.useToken();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const dateFormats = useDateFormat();
   const [page, setPage] = useState(1);
   const [allTimelines, setAllTimelines] = useState<TimelineEvent[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -644,7 +646,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
                   {tl.label}
                 </Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  {dayjs(tl.started_at).format("MMM YYYY")}
+                  {formatMonthYear(tl.started_at, dateFormats)}
                 </Text>
               </div>
               {tl.life_events && tl.life_events.length > 0 ? (
@@ -673,7 +675,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
                       </Text>
                       <br />
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        {dayjs(le.happened_at).format("MMM D, YYYY")}
+                        {formatDate(le.happened_at, dateFormats)}
                       </Text>
                       {le.description && le.summary && (
                         <div style={{ marginTop: 2, color: token.colorTextSecondary, fontSize: 12 }}>
@@ -1331,6 +1333,7 @@ function DueTasksWidget({ vaultId }: { vaultId: string }) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const navigate = useNavigate();
+  const dateFormats = useDateFormat();
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["vaults", vaultId, "all-tasks"],
@@ -1381,7 +1384,7 @@ function DueTasksWidget({ vaultId }: { vaultId: string }) {
                 {task.label}
               </Text>
               <Text type="secondary" style={{ fontSize: 12, flexShrink: 0, marginLeft: 8 }}>
-                {dayjs(task.due_at).format("M/D")}
+                {formatShortDate(task.due_at, dateFormats)}
               </Text>
             </div>
           ))}

@@ -18,7 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Task } from "@/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import { useDateFormat, formatShortDate } from "@/utils/dateFormat";
 
 const { Title } = Typography;
 
@@ -28,6 +28,7 @@ export default function VaultTasks() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "all-tasks"],
@@ -93,7 +94,7 @@ export default function VaultTasks() {
                 <Checkbox checked={false}>{task.label}</Checkbox>
                 {task.due_at && (
                   <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
-                    {t("vault.tasks.due", { date: dayjs(task.due_at).format("MMM D") })}
+                    {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
                   </Tag>
                 )}
               </div>

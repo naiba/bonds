@@ -34,6 +34,7 @@ import { api } from "@/api";
 import type { Post, Photo, APIError, JournalMetricResponse, SliceOfLifeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -48,6 +49,7 @@ export default function JournalDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
 
   const [metricInput, setMetricInput] = useState("");
   const [isAddingMetric, setIsAddingMetric] = useState(false);
@@ -513,7 +515,7 @@ export default function JournalDetail() {
                     description={
                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <CalendarOutlined style={{ fontSize: 12 }} />
-                        {dayjs(post.written_at).format("MMMM D, YYYY")}
+                        {formatDate(post.written_at, dateFormats)}
                       </span>
                     }
                   />

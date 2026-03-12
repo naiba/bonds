@@ -41,7 +41,7 @@ import type {
   SliceOfLifeResponse,
 } from "@/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text, Paragraph } = Typography;
 const { Dragger } = Upload;
@@ -60,6 +60,7 @@ export default function PostDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
 
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
@@ -466,7 +467,7 @@ export default function PostDetail() {
                     {post.title}
                   </Title>
                   <Text type="secondary" style={{ fontSize: 14 }}>
-                    {dayjs(post.written_at).format("MMMM D, YYYY")}
+                    {formatDate(post.written_at, dateFormats)}
                   </Text>
                 </div>
 

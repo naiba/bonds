@@ -19,7 +19,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { InvitationType, APIError } from "@/api";
 import type { ColumnsType } from "antd/es/table";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -29,6 +29,7 @@ export default function Invitations() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const dateFormats = useDateFormat();
   const qk = ["settings", "invitations"];
 
   const { data: invitations = [], isLoading } = useQuery({
@@ -114,7 +115,7 @@ export default function Invitations() {
       dataIndex: "created_at",
       key: "created_at",
       render: (val: string) => (
-        <Text type="secondary">{dayjs(val).format("MMM D, YYYY")}</Text>
+        <Text type="secondary">{formatDate(val, dateFormats)}</Text>
       ),
     },
     {

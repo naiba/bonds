@@ -16,6 +16,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { MoodTrackingEvent, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
+import { useDateFormat, formatDateTime } from "@/utils/dateFormat";
 import dayjs from "dayjs";
 
 const ratingColors = ["#ff4d4f", "#ff7a45", "#ffc53d", "#73d13d", "#52c41a"];
@@ -39,6 +40,7 @@ export default function MoodTrackingModule({
   const [params, setParams] = useState(defaultParameters.map((p) => ({ ...p })));
   const queryClient = useQueryClient();
   const { message } = App.useApp();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "mood"];
 
   const { data: moods = [], isLoading } = useQuery({
@@ -144,7 +146,7 @@ export default function MoodTrackingModule({
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             <List.Item.Meta
-              title={<span style={{ fontWeight: 500 }}>{dayjs(mood.rated_at).format("MMM D, YYYY h:mm A")}</span>}
+               title={<span style={{ fontWeight: 500 }}>{formatDateTime(mood.rated_at, dateFormats)}</span>}
               description={
                 <>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
