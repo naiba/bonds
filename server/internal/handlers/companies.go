@@ -78,11 +78,12 @@ func (h *CompanyHandler) ListForContact(c echo.Context) error {
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/companies/{id} [get]
 func (h *CompanyHandler) Get(c echo.Context) error {
+	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_company_id", nil)
 	}
-	company, err := h.companyService.Get(uint(id))
+	company, err := h.companyService.Get(uint(id), vaultID)
 	if err != nil {
 		if errors.Is(err, services.ErrCompanyNotFound) {
 			return response.NotFound(c, "err.company_not_found")

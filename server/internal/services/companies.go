@@ -58,9 +58,12 @@ func (s *CompanyService) ListForContact(contactID, vaultID string) ([]dto.Compan
 }
 
 // Get returns a single company with its employees loaded via the ContactCompany join table.
-func (s *CompanyService) Get(id uint) (*dto.CompanyResponse, error) {
+// SECURITY: WHERE vault_id 防止跨 vault IDOR，勿删。
+func (s *CompanyService) Get(id uint, vaultID string) (*dto.CompanyResponse, error) {
 	var company models.Company
-	if err := s.db.Preload("ContactCompanies").Preload("ContactCompanies.Contact").First(&company, id).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).
+		Preload("ContactCompanies").Preload("ContactCompanies.Contact").
+		First(&company).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrCompanyNotFound
 		}
