@@ -37,16 +37,12 @@ func (s *AccountCancelService) Cancel(userID, accountID, password string) error 
 		if err := tx.Where("account_id = ?", accountID).Find(&vaults).Error; err != nil {
 			return err
 		}
+		// Reuse deleteVaultCascade (same package) to properly clean up all
+		// vault child tables — fixes the same incomplete-deletion bug as DeleteVault.
 		for _, v := range vaults {
-			if err := tx.Where("vault_id = ?", v.ID).Delete(&models.UserVault{}).Error; err != nil {
+			if err := deleteVaultCascade(tx, v.ID); err != nil {
 				return err
 			}
-			if err := tx.Where("vault_id = ?", v.ID).Delete(&models.Contact{}).Error; err != nil {
-				return err
-			}
-		}
-		if err := tx.Where("account_id = ?", accountID).Delete(&models.Vault{}).Error; err != nil {
-			return err
 		}
 		if err := tx.Where("account_id = ?", accountID).Delete(&models.User{}).Error; err != nil {
 			return err

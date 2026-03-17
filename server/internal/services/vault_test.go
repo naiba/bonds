@@ -315,3 +315,104 @@ func TestCheckUserVaultAccess(t *testing.T) {
 		}
 	})
 }
+
+func TestDeleteVault_CleanupCompleteness(t *testing.T) {
+	svc, accountID, userID := setupVaultTest(t)
+
+	vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{
+		Name:        "Cleanup Test",
+		Description: "vault to be fully cleaned",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	vaultID := vault.ID
+	db := svc.db
+
+	if err := svc.DeleteVault(vaultID); err != nil {
+		t.Fatalf("DeleteVault failed: %v", err)
+	}
+
+	type tableCheck struct {
+		name  string
+		model interface{}
+	}
+	vaultTables := []tableCheck{
+		{"ContactImportantDateType", &models.ContactImportantDateType{}},
+		{"MoodTrackingParameter", &models.MoodTrackingParameter{}},
+		{"LifeEventCategory", &models.LifeEventCategory{}},
+		{"VaultQuickFactsTemplate", &models.VaultQuickFactsTemplate{}},
+		{"Label", &models.Label{}},
+		{"Company", &models.Company{}},
+		{"Group", &models.Group{}},
+		{"Tag", &models.Tag{}},
+		{"Loan", &models.Loan{}},
+		{"File", &models.File{}},
+		{"Address", &models.Address{}},
+		{"LifeMetric", &models.LifeMetric{}},
+		{"Note", &models.Note{}},
+		{"Journal", &models.Journal{}},
+		{"TimelineEvent", &models.TimelineEvent{}},
+		{"ContactVaultUser", &models.ContactVaultUser{}},
+		{"UserVault", &models.UserVault{}},
+	}
+	for _, tc := range vaultTables {
+		var count int64
+		db.Model(tc.model).Where("vault_id = ?", vaultID).Count(&count)
+		if count != 0 {
+			t.Errorf("%s: expected 0 records for vault_id=%s, got %d", tc.name, vaultID, count)
+		}
+	}
+
+	var contactCount int64
+	db.Model(&models.Contact{}).Unscoped().Where("vault_id = ?", vaultID).Count(&contactCount)
+	if contactCount != 0 {
+		t.Errorf("Contact: expected 0 records for vault_id=%s, got %d", vaultID, contactCount)
+	}
+
+	var vaultCount int64
+	db.Model(&models.Vault{}).Where("id = ?", vaultID).Count(&vaultCount)
+	if vaultCount != 0 {
+		t.Errorf("Vault: expected 0 records for id=%s, got %d", vaultID, vaultCount)
+	}
+}
+
+func TestDeleteVault_WithForeignKeysEnabled(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	// Enable foreign key enforcement to simulate PostgreSQL behavior.
+	// With the old incomplete deletion, this would fail due to dangling references.
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("Failed to enable foreign keys: %v", err)
+	}
+
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+
+	regReq := dto.RegisterRequest{
+		FirstName: "FK",
+		LastName:  "Test",
+		Email:     "fk-test@example.com",
+		Password:  "password123",
+	}
+	resp, err := authSvc.Register(regReq, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vaultSvc := NewVaultService(db)
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{
+		Name: "FK Vault",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	if err := vaultSvc.DeleteVault(vault.ID); err != nil {
+		t.Fatalf("DeleteVault with foreign_keys=ON failed: %v", err)
+	}
+
+	_, err = vaultSvc.GetVault(vault.ID, resp.User.ID)
+	if err != ErrVaultNotFound {
+		t.Errorf("Expected ErrVaultNotFound after deletion, got %v", err)
+	}
+}
