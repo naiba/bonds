@@ -177,18 +177,141 @@ func TestDeleteVault(t *testing.T) {
 }
 
 func TestCheckUserVaultAccess(t *testing.T) {
-	svc, accountID, userID := setupVaultTest(t)
+	t.Run("creator_manager_permission", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
 
-	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
-	if err != nil {
-		t.Fatalf("CreateVault failed: %v", err)
-	}
+		created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
 
-	if err := svc.CheckUserVaultAccess(userID, created.ID, models.PermissionManager); err != nil {
-		t.Errorf("Expected access, got: %v", err)
-	}
+		if err := svc.CheckUserVaultAccess(userID, created.ID, models.PermissionManager); err != nil {
+			t.Errorf("Expected access, got: %v", err)
+		}
+	})
 
-	if err := svc.CheckUserVaultAccess("nonexistent", created.ID, models.PermissionViewer); err != ErrVaultForbidden {
-		t.Errorf("Expected ErrVaultForbidden, got %v", err)
-	}
+	t.Run("nonexistent_user", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+
+		created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess("nonexistent", created.ID, models.PermissionViewer); err != ErrVaultForbidden {
+			t.Errorf("Expected ErrVaultForbidden, got %v", err)
+		}
+	})
+
+	t.Run("editor_access_manager_only_fails", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+		db := svc.db
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		editorUser := models.User{
+			ID:        "test-editor-1",
+			AccountID: accountID,
+			Email:     "editor-user@example.com",
+			FirstName: strPtrOrNil("Editor"),
+		}
+		if err := db.Create(&editorUser).Error; err != nil {
+			t.Fatalf("Create editor user failed: %v", err)
+		}
+
+		uv := models.UserVault{
+			UserID:     editorUser.ID,
+			VaultID:    vault.ID,
+			Permission: models.PermissionEditor,
+		}
+		if err := db.Create(&uv).Error; err != nil {
+			t.Fatalf("Create UserVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(editorUser.ID, vault.ID, models.PermissionManager); err != ErrInsufficientPerm {
+			t.Errorf("Expected ErrInsufficientPerm, got %v", err)
+		}
+	})
+
+	t.Run("viewer_access_editor_only_fails", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+		db := svc.db
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		viewerUser := models.User{
+			ID:        "test-viewer-1",
+			AccountID: accountID,
+			Email:     "viewer-user@example.com",
+			FirstName: strPtrOrNil("Viewer"),
+		}
+		if err := db.Create(&viewerUser).Error; err != nil {
+			t.Fatalf("Create viewer user failed: %v", err)
+		}
+
+		uv := models.UserVault{
+			UserID:     viewerUser.ID,
+			VaultID:    vault.ID,
+			Permission: models.PermissionViewer,
+		}
+		if err := db.Create(&uv).Error; err != nil {
+			t.Fatalf("Create UserVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(viewerUser.ID, vault.ID, models.PermissionEditor); err != ErrInsufficientPerm {
+			t.Errorf("Expected ErrInsufficientPerm, got %v", err)
+		}
+	})
+
+	t.Run("editor_access_editor_required_succeeds", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+		db := svc.db
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		editorUser := models.User{
+			ID:        "test-editor-2",
+			AccountID: accountID,
+			Email:     "editor-user2@example.com",
+			FirstName: strPtrOrNil("Editor"),
+		}
+		if err := db.Create(&editorUser).Error; err != nil {
+			t.Fatalf("Create editor user failed: %v", err)
+		}
+
+		uv := models.UserVault{
+			UserID:     editorUser.ID,
+			VaultID:    vault.ID,
+			Permission: models.PermissionEditor,
+		}
+		if err := db.Create(&uv).Error; err != nil {
+			t.Fatalf("Create UserVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(editorUser.ID, vault.ID, models.PermissionEditor); err != nil {
+			t.Errorf("Expected success, got: %v", err)
+		}
+	})
+
+	t.Run("manager_access_viewer_required_succeeds", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(userID, vault.ID, models.PermissionViewer); err != nil {
+			t.Errorf("Expected success, got: %v", err)
+		}
+	})
 }
