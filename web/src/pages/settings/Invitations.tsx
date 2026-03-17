@@ -41,7 +41,7 @@ export default function Invitations() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { email: string; permission: number }) =>
+    mutationFn: (values: { email: string; permission: 100 | 200 | 300 }) =>
       api.invitations.invitationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
