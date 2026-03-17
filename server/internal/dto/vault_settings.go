@@ -47,11 +47,11 @@ type UpdateDefaultTemplateRequest struct {
 
 type AddVaultUserRequest struct {
 	Email      string `json:"email" validate:"required,email" example:"user@example.com"`
-	Permission int    `json:"permission" validate:"required" example:"100"`
+	Permission int    `json:"permission" validate:"required,oneof=100 200 300" example:"100"`
 }
 
 type UpdateVaultUserPermRequest struct {
-	Permission int `json:"permission" validate:"required" example:"100"`
+	Permission int `json:"permission" validate:"required,oneof=100 200 300" example:"100"`
 }
 
 type VaultUserResponse struct {
