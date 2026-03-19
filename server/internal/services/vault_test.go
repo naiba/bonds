@@ -77,6 +77,46 @@ func TestCreateVault(t *testing.T) {
 	}
 }
 
+func TestCreateVault_UserContactAutoCreated(t *testing.T) {
+	svc, accountID, userID := setupVaultTest(t)
+
+	vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{
+		Name: "Contact Auto Test",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	if vault.UserContactID == "" {
+		t.Fatal("Expected UserContactID to be populated after vault creation")
+	}
+
+	var uv models.UserVault
+	if err := svc.db.Where("user_id = ? AND vault_id = ?", userID, vault.ID).First(&uv).Error; err != nil {
+		t.Fatalf("UserVault lookup failed: %v", err)
+	}
+	if uv.ContactID == "" {
+		t.Fatal("Expected UserVault.ContactID to be set")
+	}
+	if uv.ContactID != vault.UserContactID {
+		t.Errorf("UserVault.ContactID (%s) != VaultResponse.UserContactID (%s)", uv.ContactID, vault.UserContactID)
+	}
+
+	var contact models.Contact
+	if err := svc.db.First(&contact, "id = ?", uv.ContactID).Error; err != nil {
+		t.Fatalf("Self-contact lookup failed: %v", err)
+	}
+	if contact.CanBeDeleted {
+		t.Error("Self-contact should have CanBeDeleted=false")
+	}
+	if contact.Listed {
+		t.Error("Self-contact should have Listed=false")
+	}
+	if contact.VaultID != vault.ID {
+		t.Errorf("Self-contact VaultID = %s, want %s", contact.VaultID, vault.ID)
+	}
+}
+
 func TestListVaults(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
@@ -106,7 +146,7 @@ func TestUpdateVault(t *testing.T) {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
 
-	updated, err := svc.UpdateVault(created.ID, dto.UpdateVaultRequest{Name: "After", Description: "Updated"})
+	updated, err := svc.UpdateVault(created.ID, userID, dto.UpdateVaultRequest{Name: "After", Description: "Updated"})
 	if err != nil {
 		t.Fatalf("UpdateVault failed: %v", err)
 	}
@@ -130,25 +170,249 @@ func TestDeleteVault(t *testing.T) {
 		t.Fatalf("DeleteVault failed: %v", err)
 	}
 
-	_, err = svc.GetVault(created.ID)
+	_, err = svc.GetVault(created.ID, userID)
 	if err != ErrVaultNotFound {
 		t.Errorf("Expected ErrVaultNotFound, got %v", err)
 	}
 }
 
 func TestCheckUserVaultAccess(t *testing.T) {
+	t.Run("creator_manager_permission", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+
+		created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(userID, created.ID, models.PermissionManager); err != nil {
+			t.Errorf("Expected access, got: %v", err)
+		}
+	})
+
+	t.Run("nonexistent_user", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+
+		created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess("nonexistent", created.ID, models.PermissionViewer); err != ErrVaultForbidden {
+			t.Errorf("Expected ErrVaultForbidden, got %v", err)
+		}
+	})
+
+	t.Run("editor_access_manager_only_fails", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+		db := svc.db
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		editorUser := models.User{
+			ID:        "test-editor-1",
+			AccountID: accountID,
+			Email:     "editor-user@example.com",
+			FirstName: strPtrOrNil("Editor"),
+		}
+		if err := db.Create(&editorUser).Error; err != nil {
+			t.Fatalf("Create editor user failed: %v", err)
+		}
+
+		uv := models.UserVault{
+			UserID:     editorUser.ID,
+			VaultID:    vault.ID,
+			Permission: models.PermissionEditor,
+		}
+		if err := db.Create(&uv).Error; err != nil {
+			t.Fatalf("Create UserVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(editorUser.ID, vault.ID, models.PermissionManager); err != ErrInsufficientPerm {
+			t.Errorf("Expected ErrInsufficientPerm, got %v", err)
+		}
+	})
+
+	t.Run("viewer_access_editor_only_fails", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+		db := svc.db
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		viewerUser := models.User{
+			ID:        "test-viewer-1",
+			AccountID: accountID,
+			Email:     "viewer-user@example.com",
+			FirstName: strPtrOrNil("Viewer"),
+		}
+		if err := db.Create(&viewerUser).Error; err != nil {
+			t.Fatalf("Create viewer user failed: %v", err)
+		}
+
+		uv := models.UserVault{
+			UserID:     viewerUser.ID,
+			VaultID:    vault.ID,
+			Permission: models.PermissionViewer,
+		}
+		if err := db.Create(&uv).Error; err != nil {
+			t.Fatalf("Create UserVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(viewerUser.ID, vault.ID, models.PermissionEditor); err != ErrInsufficientPerm {
+			t.Errorf("Expected ErrInsufficientPerm, got %v", err)
+		}
+	})
+
+	t.Run("editor_access_editor_required_succeeds", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+		db := svc.db
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		editorUser := models.User{
+			ID:        "test-editor-2",
+			AccountID: accountID,
+			Email:     "editor-user2@example.com",
+			FirstName: strPtrOrNil("Editor"),
+		}
+		if err := db.Create(&editorUser).Error; err != nil {
+			t.Fatalf("Create editor user failed: %v", err)
+		}
+
+		uv := models.UserVault{
+			UserID:     editorUser.ID,
+			VaultID:    vault.ID,
+			Permission: models.PermissionEditor,
+		}
+		if err := db.Create(&uv).Error; err != nil {
+			t.Fatalf("Create UserVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(editorUser.ID, vault.ID, models.PermissionEditor); err != nil {
+			t.Errorf("Expected success, got: %v", err)
+		}
+	})
+
+	t.Run("manager_access_viewer_required_succeeds", func(t *testing.T) {
+		svc, accountID, userID := setupVaultTest(t)
+
+		vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Permission Test"}, "en")
+		if err != nil {
+			t.Fatalf("CreateVault failed: %v", err)
+		}
+
+		if err := svc.CheckUserVaultAccess(userID, vault.ID, models.PermissionViewer); err != nil {
+			t.Errorf("Expected success, got: %v", err)
+		}
+	})
+}
+
+func TestDeleteVault_CleanupCompleteness(t *testing.T) {
 	svc, accountID, userID := setupVaultTest(t)
 
-	created, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Access Test"}, "en")
+	vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{
+		Name:        "Cleanup Test",
+		Description: "vault to be fully cleaned",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	vaultID := vault.ID
+	db := svc.db
+
+	if err := svc.DeleteVault(vaultID); err != nil {
+		t.Fatalf("DeleteVault failed: %v", err)
+	}
+
+	type tableCheck struct {
+		name  string
+		model interface{}
+	}
+	vaultTables := []tableCheck{
+		{"ContactImportantDateType", &models.ContactImportantDateType{}},
+		{"MoodTrackingParameter", &models.MoodTrackingParameter{}},
+		{"LifeEventCategory", &models.LifeEventCategory{}},
+		{"VaultQuickFactsTemplate", &models.VaultQuickFactsTemplate{}},
+		{"Label", &models.Label{}},
+		{"Company", &models.Company{}},
+		{"Group", &models.Group{}},
+		{"Tag", &models.Tag{}},
+		{"Loan", &models.Loan{}},
+		{"File", &models.File{}},
+		{"Address", &models.Address{}},
+		{"LifeMetric", &models.LifeMetric{}},
+		{"Note", &models.Note{}},
+		{"Journal", &models.Journal{}},
+		{"TimelineEvent", &models.TimelineEvent{}},
+		{"ContactVaultUser", &models.ContactVaultUser{}},
+		{"UserVault", &models.UserVault{}},
+	}
+	for _, tc := range vaultTables {
+		var count int64
+		db.Model(tc.model).Where("vault_id = ?", vaultID).Count(&count)
+		if count != 0 {
+			t.Errorf("%s: expected 0 records for vault_id=%s, got %d", tc.name, vaultID, count)
+		}
+	}
+
+	var contactCount int64
+	db.Model(&models.Contact{}).Unscoped().Where("vault_id = ?", vaultID).Count(&contactCount)
+	if contactCount != 0 {
+		t.Errorf("Contact: expected 0 records for vault_id=%s, got %d", vaultID, contactCount)
+	}
+
+	var vaultCount int64
+	db.Model(&models.Vault{}).Where("id = ?", vaultID).Count(&vaultCount)
+	if vaultCount != 0 {
+		t.Errorf("Vault: expected 0 records for id=%s, got %d", vaultID, vaultCount)
+	}
+}
+
+func TestDeleteVault_WithForeignKeysEnabled(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	// Enable foreign key enforcement to simulate PostgreSQL behavior.
+	// With the old incomplete deletion, this would fail due to dangling references.
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("Failed to enable foreign keys: %v", err)
+	}
+
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+
+	regReq := dto.RegisterRequest{
+		FirstName: "FK",
+		LastName:  "Test",
+		Email:     "fk-test@example.com",
+		Password:  "password123",
+	}
+	resp, err := authSvc.Register(regReq, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vaultSvc := NewVaultService(db)
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{
+		Name: "FK Vault",
+	}, "en")
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
 
-	if err := svc.CheckUserVaultAccess(userID, created.ID, models.PermissionManager); err != nil {
-		t.Errorf("Expected access, got: %v", err)
+	if err := vaultSvc.DeleteVault(vault.ID); err != nil {
+		t.Fatalf("DeleteVault with foreign_keys=ON failed: %v", err)
 	}
 
-	if err := svc.CheckUserVaultAccess("nonexistent", created.ID, models.PermissionViewer); err != ErrVaultForbidden {
-		t.Errorf("Expected ErrVaultForbidden, got %v", err)
+	_, err = vaultSvc.GetVault(vault.ID, resp.User.ID)
+	if err != ErrVaultNotFound {
+		t.Errorf("Expected ErrVaultNotFound after deletion, got %v", err)
 	}
 }

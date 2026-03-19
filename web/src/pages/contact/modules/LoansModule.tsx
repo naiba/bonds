@@ -19,7 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Loan, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 export default function LoansModule({
   vaultId,
@@ -35,6 +35,7 @@ export default function LoansModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "loans"];
 
   const { data: loans = [], isLoading } = useQuery({
@@ -162,10 +163,10 @@ export default function LoansModule({
                   {loan.amount_lent} {loan.currency_id ? `#${loan.currency_id}` : ''}
                   {loan.description && ` — ${loan.description}`}
                   {loan.settled_at && (
-                    <span style={{ marginLeft: 8, color: token.colorTextQuaternary }}>
-                      {t("modules.loans.settled_at", { date: dayjs(loan.settled_at).format("MMM D, YYYY") })}
-                    </span>
-                  )}
+                     <span style={{ marginLeft: 8, color: token.colorTextQuaternary }}>
+                       {t("modules.loans.settled_at", { date: formatDate(loan.settled_at, dateFormats) })}
+                     </span>
+                   )}
                 </span>
               }
             />

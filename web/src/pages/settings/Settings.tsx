@@ -3,8 +3,8 @@ import { LogoutOutlined, UserOutlined, DeleteOutlined } from "@ant-design/icons"
 import { useAuth } from "@/stores/auth";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
 import { api } from "@/api";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import type { APIError } from "@/api";
 import { useState } from "react";
 
@@ -16,6 +16,7 @@ export default function Settings() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
   const [deleteForm] = Form.useForm();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -128,7 +129,7 @@ export default function Settings() {
           </Descriptions.Item>
           <Descriptions.Item label={t("settings.account.member_since")}>
             {user?.created_at
-              ? dayjs(user.created_at).format("MMMM D, YYYY")
+              ? formatDate(user.created_at, dateFormats)
               : "—"}
           </Descriptions.Item>
         </Descriptions>

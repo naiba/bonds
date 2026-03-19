@@ -41,6 +41,15 @@ func (s *VaultUsersService) Add(vaultID string, req dto.AddVaultUserRequest) (*d
 		return nil, err
 	}
 
+	// SECURITY: 防止跨 Account 拉人——目标用户必须与 vault 属于同一 Account。
+	var vault models.Vault
+	if err := s.db.Select("account_id").First(&vault, "id = ?", vaultID).Error; err != nil {
+		return nil, err
+	}
+	if user.AccountID != vault.AccountID {
+		return nil, ErrUserEmailNotFound
+	}
+
 	var existing models.UserVault
 	err := s.db.Where("user_id = ? AND vault_id = ?", user.ID, vaultID).First(&existing).Error
 	if err == nil {

@@ -19,7 +19,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **Fast & lightweight** — Single binary, starts in milliseconds, minimal memory
 - **Easy to deploy** — One binary + SQLite. No PHP, no Composer, no Node runtime
 - **Modern UI** — React 19 + TypeScript, smooth SPA experience
-- **Well tested** — 1014 backend tests, 129 frontend tests, 174 E2E tests
+- **Well tested** — 1014 backend tests, 129 frontend tests, 180 E2E tests
 - **Community first** — Built for contributions and fast iteration
 
 > **Credits**: Bonds stands on the shoulders of [@djaiss](https://github.com/djaiss), [@asbiin](https://github.com/asbiin), and the entire Monica community. The original Monica remains available under AGPL-3.0 at [monicahq/monica](https://github.com/monicahq/monica).
@@ -27,6 +27,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 ## Features
 
 - **Contacts** — Full lifecycle management with notes, tasks, reminders, gifts, debts, activities, life events, pets, and more
+- **Vault Dashboard** — 3-column layout with activity feed, life events, life metrics tracking (+1 counter), mood recording, upcoming reminders, and due tasks
 - **Vaults** — Multi-vault data isolation with role-based access (Manager / Editor / Viewer)
 - **Reminders** — One-time and recurring (weekly/monthly/yearly), with email and Telegram notifications
 - **Full-text Search** — Bleve-powered CJK-aware search across contacts and notes
@@ -189,7 +190,7 @@ make setup         # Install all dependencies
 
 ### API Documentation
 
-Bonds provides auto-generated OpenAPI/Swagger documentation covering all 345 API endpoints.
+Bonds provides auto-generated OpenAPI/Swagger documentation covering all API endpoints.
 
 To access the Swagger UI, either enable debug mode or toggle it on in Admin > Settings > Swagger:
 ```bash

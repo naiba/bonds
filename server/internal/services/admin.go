@@ -42,11 +42,13 @@ func (s *AdminService) ListUsers() ([]dto.AdminUserResponse, error) {
 
 func (s *AdminService) toAdminUserResponse(u models.User) dto.AdminUserResponse {
 	var contactCount int64
+	// Exclude shadow contacts (can_be_deleted=false AND listed=false) from admin stats
 	s.db.Raw(`
 		SELECT COUNT(DISTINCT c.id)
 		FROM contacts c
 		INNER JOIN vaults v ON c.vault_id = v.id
-		WHERE v.account_id = ?`, u.AccountID).Scan(&contactCount)
+		WHERE v.account_id = ?
+		AND NOT (c.can_be_deleted = 0 AND c.listed = 0)`, u.AccountID).Scan(&contactCount)
 
 	var vaultCount int64
 	s.db.Model(&models.Vault{}).Where("account_id = ?", u.AccountID).Count(&vaultCount)
@@ -118,7 +120,6 @@ func (s *AdminService) SetAdmin(actorID, targetID string, isAdmin bool) error {
 
 	return s.db.Model(&user).Update("is_instance_administrator", isAdmin).Error
 }
-
 
 func (s *AdminService) SetStorageLimit(targetID string, limitMB int) error {
 	var user models.User

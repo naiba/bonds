@@ -25,6 +25,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Call, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
+import { useDateFormat, formatDateTime } from "@/utils/dateFormat";
 import dayjs from "dayjs";
 
 const typeColor: Record<string, string> = {
@@ -50,6 +51,7 @@ export default function CallsModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "calls"];
 
   const resetPagination = useCallback(() => {
@@ -176,11 +178,11 @@ export default function CallsModule({
             <List.Item.Meta
               avatar={<PhoneOutlined style={{ fontSize: 18, color: token.colorPrimary }} />}
               title={
-                <>
-                    <Tag color={typeColor[c.type!] ?? "default"}>{c.type}</Tag>
-                  <span style={{ fontWeight: 400, color: token.colorTextSecondary }}>{dayjs(c.called_at).format("MMM D, YYYY h:mm A")}</span>
-                </>
-              }
+                 <>
+                     <Tag color={typeColor[c.type!] ?? "default"}>{c.type}</Tag>
+                   <span style={{ fontWeight: 400, color: token.colorTextSecondary }}>{formatDateTime(c.called_at, dateFormats)}</span>
+                 </>
+               }
               description={
                 <span style={{ color: token.colorTextTertiary }}>
                   {c.duration != null && <span>{c.duration} min · </span>}

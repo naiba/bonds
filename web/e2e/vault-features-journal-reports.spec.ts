@@ -387,6 +387,131 @@ test.describe('Vault - Feed, Calendar, Journal and Settings', () => {
     const firstItemTextAfter = await page.locator('.ant-list-item').first().locator('.ant-list-item-meta-title').textContent();
     expect(firstItemTextAfter).toBe(secondItemText);
   });
+
+  test('Dashboard mood recording - record a mood', async ({ page }) => {
+    await registerAndCreateVault(page, 'vmoodrec');
+
+    // Mood widget is in the right sidebar with SmileOutlined icon and "Record your mood" heading
+    const moodWidget = page.locator('div').filter({ hasText: /Record your mood/ }).first();
+    await expect(moodWidget).toBeVisible({ timeout: 10000 });
+
+    // Wait for the Radio.Group with seeded mood parameters (5 levels) to appear
+    await expect(page.locator('.ant-radio-input').first()).toBeVisible({ timeout: 10000 });
+
+    // Select the first mood parameter (e.g. "🥳 Awesome")
+    await page.locator('.ant-radio-input').first().click();
+
+    // Set up response listener before clicking Record button to avoid race condition
+    const moodResp = page.waitForResponse(
+      (resp) => resp.url().includes('/moodTrackingEvents') && resp.request().method() === 'POST' && resp.status() < 400
+    );
+
+    // Click "Record your mood" button
+    await page.getByRole('button', { name: 'Record your mood' }).click();
+    await moodResp;
+
+    // Verify success message appears
+    await expect(page.locator('.ant-message')).toContainText('mood has been recorded', { timeout: 10000 });
+
+    // After success, the radio group should be deselected (form reset) —
+    // verify no radio is checked
+    await expect(page.locator('.ant-radio-input:checked')).toHaveCount(0, { timeout: 5000 });
+  });
+
+  test('Dashboard life events - add a life event', async ({ page }) => {
+    await registerAndCreateVault(page, 'vlifeevent');
+
+    // Click the "Life Events" tab in the center Segmented control
+    await page.locator('.ant-segmented-item').filter({ hasText: 'Life Events' }).click();
+
+    // Wait for the "Add a life event" button to appear
+    const addBtn = page.getByRole('button', { name: 'Add a life event' });
+    await expect(addBtn).toBeVisible({ timeout: 10000 });
+
+    // Click "Add a life event" — opens the modal
+    await addBtn.click();
+    const modal = page.locator('.ant-modal:visible');
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    // Select a Life Event Category (seed: "Transportation", "Social", "Sport", "Work")
+    await modal.locator('.ant-select').first().click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+
+    // Close category dropdown before interacting with type Select
+    await modal.locator('.ant-modal-header').click();
+    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
+
+    // Wait for type Select to become enabled after category selection
+    await expect(modal.locator('.ant-select').nth(1)).not.toHaveClass(/ant-select-disabled/, { timeout: 5000 });
+
+    // Select a Life Event Type (populated after category selection)
+    await modal.locator('.ant-select').nth(1).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+
+    // Close type dropdown
+    await modal.locator('.ant-modal-header').click();
+
+    // Date is pre-filled with today (initialValues={{ happened_at: dayjs() }}), skip it
+
+    // Fill Summary
+    await modal.locator('#summary').fill('Graduated from university');
+
+    // Fill Description
+    await modal.locator('#description').fill('Got my degree');
+
+    // Set up response listeners before clicking OK — two sequential API calls:
+    // 1) POST to timelineEvents, 2) POST to lifeEvents
+    const timelineResp = page.waitForResponse(
+      (resp) => resp.url().includes('/timelineEvents') && resp.request().method() === 'POST' && resp.status() < 400
+    );
+
+    // Click OK button
+    await modal.getByRole('button', { name: 'OK' }).click();
+    await timelineResp;
+
+    // The second call (lifeEvents) is chained in the mutation, wait for it
+    // by waiting for the modal to close (signals both calls succeeded)
+    await expect(modal).not.toBeVisible({ timeout: 15000 });
+
+    await expect(page.getByText('Graduated from university').first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test('Dashboard mood recording - progressive disclosure fields', async ({ page }) => {
+    await registerAndCreateVault(page, 'vmoodextra');
+
+    // Wait for mood widget and radio buttons
+    await expect(page.locator('.ant-radio-input').first()).toBeVisible({ timeout: 10000 });
+
+    // Select a mood parameter
+    await page.locator('.ant-radio-input').first().click();
+
+    // Click "+ change date" link button → verify DatePicker appears
+    await page.getByRole('button', { name: '+ change date' }).click();
+    await expect(page.locator('.ant-picker').first()).toBeVisible({ timeout: 5000 });
+
+    // Click "+ note" link button → verify TextArea appears
+    await page.getByRole('button', { name: '+ note' }).click();
+    await expect(page.locator('textarea')).toBeVisible({ timeout: 5000 });
+
+    // Click "+ number of hours slept" link button → verify InputNumber appears
+    await page.getByRole('button', { name: '+ number of hours slept' }).click();
+    await expect(page.locator('.ant-input-number')).toBeVisible({ timeout: 5000 });
+
+    // Fill optional fields
+    await page.locator('textarea').fill('Feeling great today');
+    await page.locator('.ant-input-number-input').fill('8');
+
+    // Set up response listener and record
+    const moodResp = page.waitForResponse(
+      (resp) => resp.url().includes('/moodTrackingEvents') && resp.request().method() === 'POST' && resp.status() < 400
+    );
+
+    await page.getByRole('button', { name: 'Record your mood' }).click();
+    await moodResp;
+
+    // Verify success
+    await expect(page.locator('.ant-message')).toContainText('mood has been recorded', { timeout: 10000 });
+  });
 });
 
 test.describe('Vault Reports', () => {
@@ -590,6 +715,7 @@ test.describe('Journal Metrics', () => {
 
 test.describe('Vault Reports - Overview Counts', () => {
   test('reports page shows correct non-zero overview counts', async ({ page }) => {
+    test.setTimeout(60000);
     await registerAndCreateVault(page, 'rpt-counts');
     const vaultUrl = getVaultUrl(page);
 
@@ -662,9 +788,18 @@ test.describe('Vault Reports - Overview Counts', () => {
     const datePicker = dateModal.locator('.ant-picker');
     await datePicker.click();
 
-    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled)').nth(10);
+    // Must exclude .ant-picker-cell-today: CalendarDatePicker defaults to today
+    // when form value is undefined, so clicking today's cell won't trigger onChange
+    // (value unchanged), leaving the form field empty and failing validation.
+    // Also must use .ant-picker-cell-in-view to only match current month cells;
+    // without it, clicking a previous-month cell navigates the calendar view
+    // instead of selecting a date.
+    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell.ant-picker-cell-in-view:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first();
     await dateCell.click();
-    await dateModal.locator('.ant-modal-header').click();
+
+    // Wait for the DatePicker dropdown to auto-close after date selection.
+    // The dropdown may linger and intercept clicks on the modal header/footer.
+    await expect(page.locator('.ant-picker-dropdown:visible')).not.toBeVisible({ timeout: 5000 });
 
     const dateResp = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'

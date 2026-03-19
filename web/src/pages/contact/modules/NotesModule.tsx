@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Note, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { TextArea } = Input;
 
@@ -26,6 +26,7 @@ export default function NotesModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "notes"];
 
   const { data: notesResponse, isLoading } = useQuery({
@@ -192,9 +193,9 @@ export default function NotesModule({
               description={
                 <>
                   <div style={{ color: token.colorTextSecondary }}>{note.body}</div>
-                  <div style={{ fontSize: 12, marginTop: 4, color: token.colorTextQuaternary }}>
-                    {dayjs(note.created_at).format("MMM D, YYYY")}
-                  </div>
+                   <div style={{ fontSize: 12, marginTop: 4, color: token.colorTextQuaternary }}>
+                     {formatDate(note.created_at, dateFormats)}
+                   </div>
                 </>
               }
             />

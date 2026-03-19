@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -32,6 +33,21 @@ func setupVaultUsersTest(t *testing.T) (*VaultUsersService, *AuthService, string
 	return NewVaultUsersService(db), authSvc, vault.ID, resp.User.ID, resp.User.AccountID
 }
 
+func registerSameAccountUser(t *testing.T, authSvc *AuthService, accountID, email string) {
+	t.Helper()
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Other", LastName: "User",
+		Email: email, Password: "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register user failed: %v", err)
+	}
+	if err := authSvc.db.Model(&models.User{}).Where("id = ?", resp.User.ID).
+		Update("account_id", accountID).Error; err != nil {
+		t.Fatalf("Failed to reassign account: %v", err)
+	}
+}
+
 func TestVaultUsersListInitial(t *testing.T) {
 	svc, _, vaultID, _, _ := setupVaultUsersTest(t)
 
@@ -45,17 +61,9 @@ func TestVaultUsersListInitial(t *testing.T) {
 }
 
 func TestVaultUsersAdd(t *testing.T) {
-	svc, authSvc, vaultID, _, _ := setupVaultUsersTest(t)
+	svc, authSvc, vaultID, _, accountID := setupVaultUsersTest(t)
 
-	_, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Other",
-		LastName:  "User",
-		Email:     "other-user@example.com",
-		Password:  "password123",
-	}, "en")
-	if err != nil {
-		t.Fatalf("Register second user failed: %v", err)
-	}
+	registerSameAccountUser(t, authSvc, accountID, "other-user@example.com")
 
 	user, err := svc.Add(vaultID, dto.AddVaultUserRequest{Email: "other-user@example.com", Permission: 200})
 	if err != nil {
@@ -88,15 +96,9 @@ func TestVaultUsersAddEmailNotFound(t *testing.T) {
 }
 
 func TestVaultUsersUpdatePermission(t *testing.T) {
-	svc, authSvc, vaultID, _, _ := setupVaultUsersTest(t)
+	svc, authSvc, vaultID, _, accountID := setupVaultUsersTest(t)
 
-	_, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Other", LastName: "User",
-		Email: "other2@example.com", Password: "password123",
-	}, "en")
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
-	}
+	registerSameAccountUser(t, authSvc, accountID, "other2@example.com")
 
 	added, err := svc.Add(vaultID, dto.AddVaultUserRequest{Email: "other2@example.com", Permission: 300})
 	if err != nil {

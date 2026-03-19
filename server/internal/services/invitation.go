@@ -124,6 +124,28 @@ func (s *InvitationService) Accept(req dto.AcceptInvitationRequest) (*dto.Invita
 			return err
 		}
 
+		// Add the invited user to all vaults of the account (Monica v5 pattern:
+		// Invitation is account-level, user gets access to every vault).
+		var vaults []models.Vault
+		if err := tx.Where("account_id = ?", invitation.AccountID).Find(&vaults).Error; err != nil {
+			return err
+		}
+		for _, v := range vaults {
+			contactID, err := createUserSelfContact(tx, user.ID, v.ID)
+			if err != nil {
+				return err
+			}
+			uv := models.UserVault{
+				UserID:     user.ID,
+				VaultID:    v.ID,
+				ContactID:  contactID,
+				Permission: invitation.Permission,
+			}
+			if err := tx.Create(&uv).Error; err != nil {
+				return err
+			}
+		}
+
 		invitation.AcceptedAt = &now
 		return tx.Save(&invitation).Error
 	})

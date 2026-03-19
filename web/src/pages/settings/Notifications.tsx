@@ -37,6 +37,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { NotificationChannel, APIError } from "@/api";
 import type { GithubComNaibaBondsInternalDtoNotificationLogResponse as NotificationLog } from "@/api/generated/data-contracts";
+import { useDateFormat, formatDateTime } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -77,6 +78,7 @@ export default function Notifications() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["settings", "notifications"];
 
   const { data: channels = [], isLoading } = useQuery({
@@ -442,7 +444,7 @@ export default function Notifications() {
               <List.Item>
                 <Space direction="vertical" size={2} style={{ width: "100%" }}>
                   <span style={{ fontSize: 12, color: token.colorTextSecondary }}>
-                    {log.sent_at ? new Date(log.sent_at).toLocaleString() : log.created_at}
+                    {log.sent_at ? formatDateTime(log.sent_at, dateFormats) : formatDateTime(log.created_at, dateFormats)}
                   </span>
                   {log.subject_line && (
                     <span style={{ fontWeight: 500 }}>{log.subject_line}</span>

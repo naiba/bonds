@@ -118,75 +118,75 @@ test.describe('Company employees display in list', () => {
 });
 
 // =====================================================================================
-// Issue #56: Life Metrics > Add contact should show linked contacts
+// Issue #63: Life Metrics redesign — event log (+1 increment) pattern
+// Replaces old contact-association model (#56) with Monica v5's per-click event log.
+// Life Metrics are now on the Vault Dashboard "Life metrics" tab.
 // =====================================================================================
-test.describe('Life Metrics contacts display and removal', () => {
+test.describe('Life Metrics increment and stats on Dashboard', () => {
   test.setTimeout(90000);
 
-  test('should display and remove linked contacts in life metrics', async ({ page }) => {
+  test('should create, increment, and display stats for life metrics on dashboard', async ({ page }) => {
     await registerAndCreateVault(page, 'life-metrics');
-    const vaultUrl = getVaultUrl(page);
 
-    // 1. Create a contact
-    await createContact(page, vaultUrl, 'Bob', 'Smith');
+    // 1. We are on the vault dashboard. Switch to the "Life metrics" tab.
+    //    The dashboard uses Ant Design Segmented component for tabs.
+    const lifeMetricsTab = page.getByText(/life metrics/i);
+    await lifeMetricsTab.click();
+    await page.waitForLoadState('networkidle');
 
-    // 2. Navigate to Life Metrics page
-    await page.goto(vaultUrl + '/life-metrics');
-    await expect(page).toHaveURL(/\/life-metrics$/, { timeout: 10000 });
-    await expect(
-      page.getByRole('heading', { level: 4 }).filter({ hasText: 'Life Metrics' })
-    ).toBeVisible({ timeout: 10000 });
-
-    // 3. Create a life metric
-    await page.getByRole('button', { name: /add metric/i }).click();
-    const createModal = page.locator('.ant-modal').filter({ hasText: /add metric|life metric/i });
+    // 2. Create a new life metric via the "Track a new metric" button
+    await page.getByRole('button', { name: /track a new metric/i }).click();
+    const createModal = page.locator('.ant-modal:visible');
     await expect(createModal).toBeVisible({ timeout: 5000 });
-    await createModal.locator('input#label').fill('Bug56 Metric');
+    await createModal.locator('input#label').fill('Exercise');
 
     const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/lifeMetrics') && resp.request().method() === 'POST'
     );
     await createModal.getByRole('button', { name: /ok/i }).click();
     await createResp;
-    await expect(page.getByText('Bug56 Metric')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Exercise')).toBeVisible({ timeout: 10000 });
 
-    // 4. Click the "Add Contact" button in the metric row
-    const metricRow = page.getByRole('row').filter({ hasText: 'Bug56 Metric' });
-    await metricRow.locator('button').filter({ has: page.locator('.anticon-user-add') }).click();
-
-    // 5. In the "Add Contact" modal, search for and select the contact
-    const contactModal = page.locator('.ant-modal').filter({ hasText: /add contact/i });
-    await expect(contactModal).toBeVisible({ timeout: 10000 });
-
-    const contactSelect = contactModal.locator('.ant-select');
-    await contactSelect.click();
-    // Search for the contact using the search functionality
-    await contactSelect.locator('input').fill('Bob');
-    await page.waitForTimeout(1000); // Wait for search results
-    await page.locator('.ant-select-item-option').filter({ hasText: /Bob/ }).first().click();
-
-    const addContactResp = page.waitForResponse(
-      (resp) => resp.url().includes('/contacts') && resp.request().method() === 'POST' && resp.url().includes('/lifeMetrics/')
+    // 3. Click the "+1" button to increment the metric
+    // The metric card has a +1 button that briefly shows 🤭 emoji
+    const incrementResp = page.waitForResponse(
+      (resp) => resp.url().includes('/increment') && resp.request().method() === 'POST'
     );
-    await contactModal.getByRole('button', { name: /ok/i }).click();
-    await addContactResp;
+    await page.getByRole('button', { name: '+1' }).click();
+    await incrementResp;
 
-    // 6. Verify the contact appears as a tag in the life metric row
-    // BUG FIX (#56): Before fix, contacts were never returned by the List API,
-    // so the contacts column was always empty after adding a contact.
-    await expect(metricRow.locator('.ant-tag').filter({ hasText: /Bob/ })).toBeVisible({ timeout: 10000 });
+    // 4. After increment, stats badges should show updated counts
+    // Weekly events should now show "1"
+    await expect(page.getByText(/1\/.*week/i)).toBeVisible({ timeout: 10000 });
 
-    // 7. Remove the contact by clicking the close button on the tag
-    // BUG FIX (#56): Before fix, the DELETE endpoint didn't exist,
-    // so removing a contact would fail silently.
-    const contactTag = metricRow.locator('.ant-tag').filter({ hasText: /Bob/ });
-    const removeResp = page.waitForResponse(
-      (resp) => resp.url().includes('/contacts/') && resp.request().method() === 'DELETE' && resp.url().includes('/lifeMetrics/')
+    // 5. Increment again to verify count increases
+    // Wait for the emoji to reset back to "+1"
+    await expect(page.getByRole('button', { name: '+1' })).toBeVisible({ timeout: 5000 });
+    const incrementResp2 = page.waitForResponse(
+      (resp) => resp.url().includes('/increment') && resp.request().method() === 'POST'
     );
-    await contactTag.locator('.anticon-close').click();
-    await removeResp;
+    await page.getByRole('button', { name: '+1' }).click();
+    await incrementResp2;
 
-    // 8. Verify the contact tag is removed
-    await expect(metricRow.locator('.ant-tag').filter({ hasText: /Bob/ })).not.toBeVisible({ timeout: 10000 });
+    // 6. Weekly events should now show "2"
+    await expect(page.getByText(/2\/.*week/i)).toBeVisible({ timeout: 10000 });
+
+    // 7. Click the stats badge to expand the monthly bar chart
+    await page.locator('.ant-tag').filter({ hasText: /week/i }).click();
+    // The bar chart area should appear with month labels
+    await expect(page.getByText(/Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/i).first()).toBeVisible({ timeout: 10000 });
+
+    // 8. Delete the metric via the "···" dropdown menu
+    await page.getByRole('button', { name: '···' }).click();
+    await page.getByText(/delete/i).click();
+    // Confirm deletion in the modal
+    const deleteResp = page.waitForResponse(
+      (resp) => resp.url().includes('/lifeMetrics/') && resp.request().method() === 'DELETE'
+    );
+    await page.locator('.ant-modal-confirm').getByRole('button', { name: /delete/i }).click();
+    await deleteResp;
+
+    // 9. Verify the metric is gone
+    await expect(page.getByText('Exercise')).not.toBeVisible({ timeout: 10000 });
   });
 });

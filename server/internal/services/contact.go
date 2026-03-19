@@ -41,13 +41,13 @@ func (s *ContactService) SetDavPushService(ps *DavPushService) {
 }
 
 func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort, filter string) ([]dto.ContactResponse, response.Meta, error) {
-	query := s.db.Where("vault_id = ?", vaultID)
-	// Apply filter
+	// Exclude UserVault shadow contacts (can_be_deleted=false AND listed=false)
+	query := s.db.Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false)
 	switch filter {
 	case "archived":
 		query = query.Where("listed = ?", false)
 	case "all":
-		// no filter
+		// no additional filter
 	case "favorites":
 		query = query.Where("listed = ?", true)
 		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)

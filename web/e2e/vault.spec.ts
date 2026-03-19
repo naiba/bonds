@@ -33,7 +33,8 @@ function getVaultUrl(page: import('@playwright/test').Page): string {
 }
 
 async function goToContacts(page: import('@playwright/test').Page) {
-  await page.getByText('View all contacts').click();
+  // Issue #63: Dashboard 重写后 'View all contacts' 链接已移除，改用 URL 导航
+  await page.goto(page.url().replace(/\/$/, '') + '/contacts');
   await expect(page).toHaveURL(/\/contacts/, { timeout: 5000 });
 }
 
@@ -99,15 +100,13 @@ test.describe('Vault - Most Consulted', () => {
     await page.goto(vaultUrl);
     await page.waitForLoadState('networkidle');
 
-    // Find the "Most Consulted" card
-    const mostConsultedCard = page.locator('.ant-card').filter({ hasText: 'Most Consulted' });
-    await expect(mostConsultedCard).toBeVisible({ timeout: 10000 });
+    // Issue #63: Dashboard 重写后 Most Consulted 使用 SidebarSection + div 而非 .ant-card + .ant-list-item
+    const mostConsultedSection = page.getByText('Most Consulted').locator('..');
+    await expect(mostConsultedSection).toBeVisible({ timeout: 10000 });
 
-    // Wait for the list to load and find the contact entry
-    const contactEntry = mostConsultedCard.locator('.ant-list-item').filter({ hasText: 'MC Test' });
+    const contactEntry = page.locator('.vault-sidebar-contact').filter({ hasText: 'MC Test' }).first();
     await expect(contactEntry).toBeVisible({ timeout: 15000 });
 
-    // Click the contact entry
     await contactEntry.click();
 
     // Verify navigation goes to a valid contact URL (NOT /contacts/undefined)

@@ -14,6 +14,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Contact, PaginationMeta, LabelResponse } from "@/api";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
@@ -57,6 +58,7 @@ export default function ContactList() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
   const { data: labels = [] } = useQuery({
     queryKey: ["vault", vaultId, "labels"],
     queryFn: async () => (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
@@ -224,7 +226,7 @@ export default function ContactList() {
       key: "updated_at",
       responsive: ["md"] as Breakpoint[],
       render: (val: string) => (
-        <Text type="secondary">{dayjs(val).format("MMM D, YYYY")}</Text>
+        <Text type="secondary">{formatDate(val, dateFormats)}</Text>
       ),
       sorter: (a, b) =>
         dayjs(a.updated_at).unix() - dayjs(b.updated_at).unix(),

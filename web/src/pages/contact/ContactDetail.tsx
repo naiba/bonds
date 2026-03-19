@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -50,7 +51,6 @@ import PetsModule from "./modules/PetsModule";
 import RelationshipsModule from "./modules/RelationshipsModule";
 import GoalsModule from "./modules/GoalsModule";
 import LifeEventsModule from "./modules/LifeEventsModule";
-import MoodTrackingModule from "./modules/MoodTrackingModule";
 import QuickFactsModule from "./modules/QuickFactsModule";
 import PhotosModule from "./modules/PhotosModule";
 import DocumentsModule from "./modules/DocumentsModule";
@@ -84,7 +84,6 @@ const MODULE_COMPONENT_MAP: Record<
   goals: GoalsModule,
   life_events: LifeEventsModule,
   groups: GroupsModule,
-  mood_tracking: MoodTrackingModule,
   photos: PhotosModule,
   documents: DocumentsModule,
   feed: FeedModule,
@@ -100,6 +99,7 @@ export default function ContactDetail() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
@@ -307,9 +307,9 @@ export default function ContactDetail() {
           <Tag color="green" style={{ margin: 0 }}>{t("common.active")}</Tag>
         )}
         <Text type="secondary" style={{ fontSize: 12 }}>
-          {t("common.created")} {dayjs(contact.created_at).format("MMM D, YYYY")}
+          {t("common.created")} {formatDate(contact.created_at, dateFormats)}
           {" · "}
-          {t("common.last_updated")} {dayjs(contact.updated_at).format("MMM D, YYYY")}
+          {t("common.last_updated")} {formatDate(contact.updated_at, dateFormats)}
         </Text>
       </div>
     </Card>
@@ -426,7 +426,6 @@ export default function ContactDetail() {
       children: (
         <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <LifeEventsModule {...moduleProps} />
-          <MoodTrackingModule {...moduleProps} />
         </Space>
       ),
     },

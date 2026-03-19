@@ -32,6 +32,7 @@ import { useAuth } from "@/stores/auth";
 import { filesize } from "filesize";
 import type { ColumnsType } from "antd/es/table";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { useState } from "react";
 
 const { Title, Text } = Typography;
@@ -43,6 +44,7 @@ export default function AdminUsers() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
   const qk = ["admin", "users"];
   const [storageLimitModalUser, setStorageLimitModalUser] = useState<AdminUser | null>(null);
   const [storageLimitValue, setStorageLimitValue] = useState<number>(0);
@@ -191,7 +193,7 @@ export default function AdminUsers() {
       dataIndex: "created_at",
       key: "created_at",
       width: 160,
-      render: (v: string) => (v ? new Date(v).toLocaleDateString() : "-"),
+      render: (v: string) => (v ? formatDate(v, dateFormats) : "-"),
     },
     {
       title: t("admin.users.actions"),

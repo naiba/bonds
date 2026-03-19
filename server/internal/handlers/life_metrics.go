@@ -3,9 +3,11 @@ package handlers
 import (
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -21,7 +23,7 @@ func NewLifeMetricHandler(svc *services.LifeMetricService) *LifeMetricHandler {
 // List godoc
 //
 //	@Summary		List life metrics
-//	@Description	Return all life metrics for a vault
+//	@Description	Return all life metrics for a vault with stats for the current user
 //	@Tags			life-metrics
 //	@Produce		json
 //	@Security		BearerAuth
@@ -31,7 +33,8 @@ func NewLifeMetricHandler(svc *services.LifeMetricService) *LifeMetricHandler {
 //	@Router			/vaults/{vault_id}/lifeMetrics [get]
 func (h *LifeMetricHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	metrics, err := h.svc.List(vaultID)
+	userID := middleware.GetUserID(c)
+	metrics, err := h.svc.List(vaultID, userID)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_life_metrics")
 	}
@@ -136,80 +139,74 @@ func (h *LifeMetricHandler) Delete(c echo.Context) error {
 	return response.NoContent(c)
 }
 
-// AddContact godoc
+// Increment godoc
 //
-//	@Summary		Add contact to life metric
-//	@Description	Associate a contact with a life metric
+//	@Summary		Increment a life metric
+//	@Description	Record a "+1" event for the current user on a life metric
 //	@Tags			life-metrics
-//	@Accept			json
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			vault_id	path		string								true	"Vault ID"
-//	@Param			id			path		integer								true	"Life Metric ID"
-//	@Param			request		body		dto.AddLifeMetricContactRequest		true	"Add contact request"
-//	@Success		204			"No Content"
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			id			path		integer	true	"Life Metric ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.LifeMetricResponse}
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
-//	@Router			/vaults/{vault_id}/lifeMetrics/{id}/contacts [post]
-func (h *LifeMetricHandler) AddContact(c echo.Context) error {
+//	@Router			/vaults/{vault_id}/lifeMetrics/{id}/increment [post]
+func (h *LifeMetricHandler) Increment(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_life_metric_id", nil)
 	}
-	var req dto.AddLifeMetricContactRequest
-	if err := c.Bind(&req); err != nil {
-		return response.BadRequest(c, "err.invalid_request_body", nil)
-	}
-	if err := validateRequest(req); err != nil {
-		return response.ValidationError(c, map[string]string{"validation": err.Error()})
-	}
-	if err := h.svc.AddContact(uint(id), vaultID, req.ContactID); err != nil {
+	userID := middleware.GetUserID(c)
+	metric, err := h.svc.Increment(uint(id), vaultID, userID)
+	if err != nil {
 		if errors.Is(err, services.ErrLifeMetricNotFound) {
 			return response.NotFound(c, "err.life_metric_not_found")
 		}
-		if errors.Is(err, services.ErrContactNotFound) {
-			return response.NotFound(c, "err.contact_not_found")
-		}
-		return response.InternalError(c, "err.failed_to_add_life_metric_contact")
+		return response.InternalError(c, "err.failed_to_increment_life_metric")
 	}
-	return response.NoContent(c)
+	return response.OK(c, metric)
 }
 
-// RemoveContact godoc
+// GetDetail godoc
 //
-//	@Summary		Remove contact from life metric
-//	@Description	Remove association between a contact and a life metric
+//	@Summary		Get life metric detail with monthly breakdown
+//	@Description	Return a life metric with 12-month event breakdown for a given year
 //	@Tags			life-metrics
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Param			vault_id	path	string	true	"Vault ID"
-//	@Param			id			path	integer	true	"Life Metric ID"
-//	@Param			contact_id	path	string	true	"Contact ID"
-//	@Success		204			"No Content"
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			id			path		integer	true	"Life Metric ID"
+//	@Param			year		query		integer	false	"Year (defaults to current year)"
+//	@Success		200			{object}	response.APIResponse{data=dto.LifeMetricDetailResponse}
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
-//	@Router			/vaults/{vault_id}/lifeMetrics/{id}/contacts/{contact_id} [delete]
-func (h *LifeMetricHandler) RemoveContact(c echo.Context) error {
+//	@Router			/vaults/{vault_id}/lifeMetrics/{id}/detail [get]
+func (h *LifeMetricHandler) GetDetail(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_life_metric_id", nil)
 	}
-	contactID := c.Param("contact_id")
-	if contactID == "" {
-		return response.BadRequest(c, "err.invalid_contact_id", nil)
+	yearStr := c.QueryParam("year")
+	year := time.Now().Year()
+	if yearStr != "" {
+		parsed, err := strconv.Atoi(yearStr)
+		if err != nil {
+			return response.BadRequest(c, "err.invalid_year", nil)
+		}
+		year = parsed
 	}
-	if err := h.svc.RemoveContact(uint(id), vaultID, contactID); err != nil {
+	userID := middleware.GetUserID(c)
+	detail, err := h.svc.GetDetail(uint(id), vaultID, userID, year)
+	if err != nil {
 		if errors.Is(err, services.ErrLifeMetricNotFound) {
 			return response.NotFound(c, "err.life_metric_not_found")
 		}
-		if errors.Is(err, services.ErrContactNotFound) {
-			return response.NotFound(c, "err.contact_not_found")
-		}
-		return response.InternalError(c, "err.failed_to_remove_life_metric_contact")
+		return response.InternalError(c, "err.failed_to_get_life_metric_detail")
 	}
-	return response.NoContent(c)
+	return response.OK(c, detail)
 }

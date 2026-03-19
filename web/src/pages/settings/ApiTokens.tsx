@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { httpClient } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
+import { useDateFormat, formatDate, formatDateTime } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -38,6 +39,7 @@ export default function ApiTokens() {
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const dateFormats = useDateFormat();
   const qk = ["settings", "tokens"];
 
   const { data: tokens = [], isLoading } = useQuery({
@@ -111,7 +113,7 @@ export default function ApiTokens() {
       key: "expires_at",
       render: (val: string | null) =>
         val ? (
-          <Text type="secondary">{dayjs(val).format("MMM D, YYYY")}</Text>
+          <Text type="secondary">{formatDate(val, dateFormats)}</Text>
         ) : (
           <Text type="secondary">{t("api_tokens.no_expiry")}</Text>
         ),
@@ -122,7 +124,7 @@ export default function ApiTokens() {
       key: "last_used_at",
       render: (val: string | null) =>
         val ? (
-          <Text type="secondary">{dayjs(val).format("MMM D, YYYY HH:mm")}</Text>
+          <Text type="secondary">{formatDateTime(val, dateFormats)}</Text>
         ) : (
           <Text type="secondary">{t("api_tokens.never_used")}</Text>
         ),
@@ -132,7 +134,7 @@ export default function ApiTokens() {
       dataIndex: "created_at",
       key: "created_at",
       render: (val: string) => (
-        <Text type="secondary">{dayjs(val).format("MMM D, YYYY")}</Text>
+        <Text type="secondary">{formatDate(val, dateFormats)}</Text>
       ),
     },
     {

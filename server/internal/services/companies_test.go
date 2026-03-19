@@ -77,7 +77,7 @@ func TestCompanyList(t *testing.T) {
 func TestCompanyGet(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
-	got, err := ctx.svc.Get(ctx.company.ID)
+	got, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestCompanyGet(t *testing.T) {
 func TestCompanyGetNotFound(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
-	_, err := ctx.svc.Get(9999)
+	_, err := ctx.svc.Get(9999, ctx.vaultID)
 	if err != ErrCompanyNotFound {
 		t.Errorf("Expected ErrCompanyNotFound, got %v", err)
 	}
@@ -420,7 +420,7 @@ func TestCompanyGet_WithEmployees(t *testing.T) {
 		t.Fatalf("Create ContactCompany failed: %v", err)
 	}
 
-	got, err := ctx.svc.Get(ctx.company.ID)
+	got, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}

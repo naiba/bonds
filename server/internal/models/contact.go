@@ -59,8 +59,8 @@ type Contact struct {
 	MoodTrackingEvents  []MoodTrackingEvent    `json:"mood_tracking_events,omitempty" gorm:"foreignKey:ContactID"`
 	Addresses           []Address              `json:"addresses,omitempty" gorm:"many2many:contact_address"`
 	QuickFacts          []QuickFact            `json:"quick_facts,omitempty" gorm:"foreignKey:ContactID"`
-	LifeMetrics         []LifeMetric           `json:"life_metrics,omitempty" gorm:"many2many:contact_life_metric"`
-	ContactCompanies    []ContactCompany       `json:"contact_companies,omitempty" gorm:"foreignKey:ContactID"`
+	// LifeMetrics relation removed: pivot table now used as event log, not a static association
+	ContactCompanies []ContactCompany `json:"contact_companies,omitempty" gorm:"foreignKey:ContactID"`
 }
 
 func (c *Contact) BeforeCreate(tx *gorm.DB) error {

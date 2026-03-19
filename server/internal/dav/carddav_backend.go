@@ -153,9 +153,10 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, _ 
 	}
 
 	var contacts []models.Contact
+	// Exclude shadow contacts (can_be_deleted=false AND listed=false) — internal UserVault self-contacts
 	if err := b.db.Preload("ContactInformations.ContactInformationType").
 		Preload("Addresses").
-		Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
+		Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 

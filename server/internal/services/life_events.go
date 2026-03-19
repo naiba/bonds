@@ -69,6 +69,41 @@ func (s *LifeEventService) ListTimelineEvents(contactID, vaultID string, page, p
 	return result, meta, nil
 }
 
+func (s *LifeEventService) ListVaultTimelineEvents(vaultID string, page, perPage int) ([]dto.TimelineEventResponse, response.Meta, error) {
+	query := s.db.Where("vault_id = ?", vaultID)
+
+	var total int64
+	if err := query.Model(&models.TimelineEvent{}).Count(&total).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 15
+	}
+	offset := (page - 1) * perPage
+
+	var events []models.TimelineEvent
+	if err := s.db.Where("vault_id = ?", vaultID).Preload("LifeEvents").Offset(offset).Limit(perPage).Order("started_at DESC").Find(&events).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	result := make([]dto.TimelineEventResponse, len(events))
+	for i, e := range events {
+		result[i] = toTimelineEventResponse(&e)
+	}
+
+	meta := response.Meta{
+		Page:       page,
+		PerPage:    perPage,
+		Total:      total,
+		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
+	}
+	return result, meta, nil
+}
+
 func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dto.CreateTimelineEventRequest) (*dto.TimelineEventResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err

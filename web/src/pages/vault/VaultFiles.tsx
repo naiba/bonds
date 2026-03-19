@@ -28,7 +28,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Document, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title } = Typography;
 
@@ -46,6 +46,7 @@ export default function VaultFiles() {
   const { token } = theme.useToken();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
+  const dateFormats = useDateFormat();
   const [uploading, setUploading] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -142,7 +143,7 @@ export default function VaultFiles() {
       key: "created_at",
       render: (date: string) => (
         <span style={{ color: token.colorTextSecondary, fontSize: 13 }}>
-          {dayjs(date).format("MMM D, YYYY")}
+          {formatDate(date, dateFormats)}
         </span>
       ),
     },

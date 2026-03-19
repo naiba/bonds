@@ -288,6 +288,9 @@ export type { GithubComNaibaBondsInternalDtoNotificationChannelResponse as Notif
 export type { GithubComNaibaBondsInternalDtoPersonalizeEntityResponse as PersonalizeItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCompanyResponse as Company } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoLifeMetricResponse as LifeMetric } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoLifeMetricStats as LifeMetricStats } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoLifeMetricDetailResponse as LifeMetricDetail } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoLifeMetricMonthData as LifeMetricMonthData } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactJobResponse as ContactJob } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCreateContactJobRequest as CreateContactJobRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateContactJobRequest as UpdateContactJobRequest } from "./generated/data-contracts";

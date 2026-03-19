@@ -251,7 +251,7 @@ export default function VaultSettings() {
     });
 
     const inviteMutation = useMutation({
-      mutationFn: (values: { email: string; permission: number }) =>
+      mutationFn: (values: { email: string; permission: 100 | 200 | 300 }) =>
         api.vaultSettings.settingsUsersCreate(String(vaultId), values),
       onSuccess: () => {
         message.success(t("invitations.status.pending")); // Or specific success message
@@ -270,7 +270,7 @@ export default function VaultSettings() {
     });
 
     const updateUserPermMutation = useMutation({
-      mutationFn: ({ userId, permission }: { userId: number; permission: number }) =>
+      mutationFn: ({ userId, permission }: { userId: number; permission: 100 | 200 | 300 }) =>
         api.vaultSettings.settingsUsersUpdate(String(vaultId), userId, { permission }),
       onSuccess: () => {
         message.success(t("common.updated"));
@@ -329,9 +329,9 @@ export default function VaultSettings() {
             renderItem={(user: VaultUserResponse) => (
               <List.Item
                 actions={[
-                  <Select
+                   <Select<100 | 200 | 300>
                     key="perm"
-                    defaultValue={user.permission ?? 300}
+                    defaultValue={(user.permission ?? 300) as 100 | 200 | 300}
                     style={{ width: 120 }}
                     onChange={(val) =>
                       updateUserPermMutation.mutate({ userId: user.id!, permission: val })

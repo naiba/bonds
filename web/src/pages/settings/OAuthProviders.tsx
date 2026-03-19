@@ -20,13 +20,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { OAuthProvider, APIError } from "@/api";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
 export default function OAuthProviders() {
   const { t } = useTranslation();
   const { message } = App.useApp();
+  const dateFormats = useDateFormat();
   const queryClient = useQueryClient();
 
   const { data: providers = [], isLoading } = useQuery({
@@ -123,7 +124,7 @@ export default function OAuthProviders() {
                       {item.id && <Tag>{item.id}</Tag>}
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {t("settings.oauth.linked_at")}{" "}
-                        {dayjs(item.created_at).format("MMM D, YYYY")}
+                        {formatDate(item.created_at, dateFormats)}
                       </Text>
                     </div>
                   }

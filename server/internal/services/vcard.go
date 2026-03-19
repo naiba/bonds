@@ -83,7 +83,8 @@ func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, 
 
 func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 	var contacts []models.Contact
-	if err := s.db.Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
+	// Exclude shadow contacts (Listed=false) — they are UserVault self-contacts, not real contacts
+	if err := s.db.Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 

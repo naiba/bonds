@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import { httpClient } from "@/api";
 import { filesize } from "filesize";
 import type { ColumnsType } from "antd/es/table";
+import { useDateFormat, formatDateTime } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -49,6 +50,7 @@ export default function AdminBackups() {
   const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const dateFormats = useDateFormat();
   const qk = ["admin", "backups"];
 
   const { data: backups = [], isLoading } = useQuery({
@@ -140,7 +142,7 @@ export default function AdminBackups() {
       dataIndex: "created_at",
       key: "created_at",
       width: 200,
-      render: (v: string) => new Date(v).toLocaleString(),
+      render: (v: string) => formatDateTime(v, dateFormats),
     },
     {
       title: t("backups.actions"),

@@ -34,8 +34,8 @@ import {
   CloseCircleOutlined,
   PlayCircleOutlined,
 } from "@ant-design/icons";
-import dayjs from "dayjs";
 import { api } from "@/api";
+import { useDateFormat, formatDateTime, formatDateTimeFull } from "@/utils/dateFormat";
 import { useAuth } from "@/stores/auth";
 import type {
   DavSubscription,
@@ -78,6 +78,7 @@ export default function DavSubscriptions() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
+  const dateFormats = useDateFormat();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<DavSubscription | null>(null);
@@ -371,7 +372,7 @@ export default function DavSubscriptions() {
             dataIndex: "last_synchronized_at",
             key: "last_synced",
             render: (val: string) =>
-              val ? dayjs(val).format("YYYY-MM-DD HH:mm") : t("vault.dav_subscriptions.never_synced"),
+              val ? formatDateTime(val, dateFormats) : t("vault.dav_subscriptions.never_synced"),
           },
           {
             title: "",
@@ -573,7 +574,7 @@ export default function DavSubscriptions() {
               dataIndex: "created_at",
               key: "created_at",
               width: 160,
-              render: (val: string) => val ? dayjs(val).format("YYYY-MM-DD HH:mm:ss") : "-",
+              render: (val: string) => val ? formatDateTimeFull(val, dateFormats) : "-",
             },
             {
               title: t("vault.dav_subscriptions.log_action"),

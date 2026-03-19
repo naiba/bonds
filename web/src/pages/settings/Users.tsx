@@ -27,8 +27,8 @@ import { api } from "@/api";
 import type { User, APIError } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/stores/auth";
-import dayjs from "dayjs";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -48,6 +48,7 @@ export default function Users() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
   const { user: currentUser } = useAuth();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
@@ -169,7 +170,7 @@ export default function Users() {
       dataIndex: "created_at",
       key: "created_at",
       render: (date: string) => (
-        <Text type="secondary">{dayjs(date).format("MMM D, YYYY")}</Text>
+        <Text type="secondary">{formatDate(date, dateFormats)}</Text>
       ),
     },
     ...(isAdmin

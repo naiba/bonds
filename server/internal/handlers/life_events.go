@@ -18,6 +18,32 @@ func NewLifeEventHandler(lifeEventService *services.LifeEventService) *LifeEvent
 	return &LifeEventHandler{lifeEventService: lifeEventService}
 }
 
+// ListVaultTimelineEvents godoc
+//
+//	@Summary		List vault-level timeline events
+//	@Description	Return paginated timeline events for the entire vault (dashboard view)
+//	@Tags			life-events
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.TimelineEventResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/dashboard/lifeEvents [get]
+func (h *LifeEventHandler) ListVaultTimelineEvents(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+
+	events, meta, err := h.lifeEventService.ListVaultTimelineEvents(vaultID, page, perPage)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_list_timeline_events")
+	}
+	return response.Paginated(c, events, meta)
+}
+
 // ListTimelineEvents godoc
 //
 //	@Summary		List timeline events for a contact

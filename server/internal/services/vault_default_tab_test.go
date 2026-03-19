@@ -29,7 +29,7 @@ func TestUpdateDefaultTab(t *testing.T) {
 		t.Fatalf("UpdateDefaultTab failed: %v", err)
 	}
 
-	got, err := vaultSvc.GetVault(vault.ID)
+	got, err := vaultSvc.GetVault(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("GetVault failed: %v", err)
 	}

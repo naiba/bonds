@@ -208,6 +208,102 @@ func TestDeleteInvitation(t *testing.T) {
 	}
 }
 
+func TestAcceptInvitation_VaultAccessGranted(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Owner",
+		LastName:  "User",
+		Email:     "vault-owner@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	v1, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault A"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault A failed: %v", err)
+	}
+	v2, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Vault B"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault B failed: %v", err)
+	}
+
+	mailer := &NoopMailer{}
+	invSvc := NewInvitationService(db, mailer, "http://localhost:8080")
+
+	inv, err := invSvc.Create(resp.User.AccountID, resp.User.ID, dto.CreateInvitationRequest{
+		Email:      "invited-vault@example.com",
+		Permission: models.PermissionEditor,
+	})
+	if err != nil {
+		t.Fatalf("Create invitation failed: %v", err)
+	}
+
+	var invitation models.Invitation
+	if err := db.First(&invitation, inv.ID).Error; err != nil {
+		t.Fatalf("Load invitation failed: %v", err)
+	}
+
+	_, err = invSvc.Accept(dto.AcceptInvitationRequest{
+		Token:     invitation.Token,
+		FirstName: "Invited",
+		LastName:  "Person",
+		Password:  "password123",
+	})
+	if err != nil {
+		t.Fatalf("Accept failed: %v", err)
+	}
+
+	var newUser models.User
+	if err := db.Where("email = ?", "invited-vault@example.com").First(&newUser).Error; err != nil {
+		t.Fatalf("New user not found: %v", err)
+	}
+
+	var userVaults []models.UserVault
+	if err := db.Where("user_id = ?", newUser.ID).Find(&userVaults).Error; err != nil {
+		t.Fatalf("UserVault query failed: %v", err)
+	}
+	if len(userVaults) != 2 {
+		t.Fatalf("Expected 2 UserVault entries, got %d", len(userVaults))
+	}
+
+	vaultIDSet := map[string]bool{v1.ID: false, v2.ID: false}
+	for _, uv := range userVaults {
+		if _, ok := vaultIDSet[uv.VaultID]; !ok {
+			t.Errorf("Unexpected vault ID: %s", uv.VaultID)
+		}
+		vaultIDSet[uv.VaultID] = true
+
+		if uv.Permission != models.PermissionEditor {
+			t.Errorf("Expected PermissionEditor (%d), got %d", models.PermissionEditor, uv.Permission)
+		}
+		if uv.ContactID == "" {
+			t.Errorf("Expected ContactID to be set for vault %s", uv.VaultID)
+		}
+
+		var contact models.Contact
+		if err := db.First(&contact, "id = ?", uv.ContactID).Error; err != nil {
+			t.Fatalf("Self-contact not found for vault %s: %v", uv.VaultID, err)
+		}
+		if contact.CanBeDeleted {
+			t.Error("Self-contact should have CanBeDeleted=false")
+		}
+		if contact.Listed {
+			t.Error("Self-contact should have Listed=false")
+		}
+	}
+	for vid, found := range vaultIDSet {
+		if !found {
+			t.Errorf("User was not added to vault %s", vid)
+		}
+	}
+}
+
 func TestCreateInvitationDuplicateEmail(t *testing.T) {
 	svc, accountID, userID := setupInvitationTest(t)
 

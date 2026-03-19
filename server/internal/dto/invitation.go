@@ -4,7 +4,7 @@ import "time"
 
 type CreateInvitationRequest struct {
 	Email      string `json:"email" validate:"required" example:"user@example.com"`
-	Permission int    `json:"permission" validate:"required" example:"100"`
+	Permission int    `json:"permission" validate:"required,oneof=100 200 300" example:"100"`
 }
 
 type AcceptInvitationRequest struct {
