@@ -65,6 +65,7 @@ const AdminOAuthProviders = lazy(() => import("@/pages/admin/OAuthProviders"));
 // Public auth pages
 const AcceptInvite = lazy(() => import("@/pages/auth/AcceptInvite"));
 const OAuthCallback = lazy(() => import("@/pages/auth/OAuthCallback"));
+const OAuthLink = lazy(() => import("@/pages/auth/OAuthLink"));
 
 function PageLoader() {
   return (
@@ -109,6 +110,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />
+          <Route path="/auth/oauth-link" element={<OAuthLink />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
 
           <Route

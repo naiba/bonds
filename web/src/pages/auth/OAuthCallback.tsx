@@ -7,6 +7,14 @@ export default function OAuthCallback() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // OAuth account-binding flow: link_token means the provider is not yet
+    // associated with any account — redirect to the dedicated linking page.
+    const linkToken = searchParams.get("link_token");
+    if (linkToken) {
+      navigate(`/auth/oauth-link?link_token=${encodeURIComponent(linkToken)}`, { replace: true });
+      return;
+    }
+
     const token = searchParams.get("token");
     if (token) {
       localStorage.setItem("token", token);
