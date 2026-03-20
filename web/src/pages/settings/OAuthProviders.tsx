@@ -66,7 +66,11 @@ export default function OAuthProviders() {
   const availableProviders = instanceInfo?.oauth_providers ?? [];
 
   const handleLinkProvider = (provider: string) => {
-    window.location.assign(`/api/settings/oauth/link/${provider}`);
+    const jwt = localStorage.getItem("token") ?? "";
+    const state = crypto.randomUUID();
+    window.location.assign(
+      `/api/auth/${provider}?mode=link&token=${encodeURIComponent(jwt)}&state=${encodeURIComponent(state)}`
+    );
   };
 
   const unlinkMutation = useMutation({

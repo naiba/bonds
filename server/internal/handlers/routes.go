@@ -685,8 +685,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	oauthGroup := settingsGroup.Group("/oauth")
 	oauthGroup.GET("", oauthHandler.ListProviders)
 	oauthGroup.DELETE("/:driver", oauthHandler.UnlinkProvider)
-	oauthGroup.GET("/link/:provider", oauthHandler.BeginLinkProvider)
-	oauthGroup.GET("/link/:provider/callback", oauthHandler.LinkCallback)
 
 	settingsGroup.DELETE("/account", accountCancelHandler.Cancel, authMiddleware.RequireAdmin)
 	settingsGroup.GET("/storage", storageInfoHandler.Get)

@@ -50,7 +50,6 @@ func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 			return response.Unauthorized(c, "err.missing_authorization_header")
 		}
 
-
 		if strings.HasPrefix(tokenString, patPrefix) {
 			return m.authenticateWithPAT(c, next, tokenString)
 		}
@@ -180,6 +179,23 @@ func GetAccountID(c echo.Context) string {
 func GetClaims(c echo.Context) *JWTClaims {
 	claims, _ := c.Get("claims").(*JWTClaims)
 	return claims
+}
+
+func ParseJWTClaims(tokenString string, secret []byte) (*JWTClaims, error) {
+	claims := &JWTClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return secret, nil
+	})
+	if err != nil || !token.Valid {
+		return nil, err
+	}
+	if claims.TwoFactorPending {
+		return nil, jwt.ErrTokenInvalidClaims
+	}
+	return claims, nil
 }
 
 func RequireEmailVerification(isRequired func() bool) echo.MiddlewareFunc {

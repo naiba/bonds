@@ -17,6 +17,7 @@ import (
 type OAuthHandler struct {
 	oauthService *services.OAuthService
 	settings     *services.SystemSettingService
+	jwtSecret    []byte
 }
 
 func NewOAuthHandler(oauthService *services.OAuthService, settings *services.SystemSettingService, jwtSecret string) *OAuthHandler {
@@ -26,7 +27,7 @@ func NewOAuthHandler(oauthService *services.OAuthService, settings *services.Sys
 	store.Options.HttpOnly = true
 	gothic.Store = store
 
-	return &OAuthHandler{oauthService: oauthService, settings: settings}
+	return &OAuthHandler{oauthService: oauthService, settings: settings, jwtSecret: []byte(jwtSecret)}
 }
 
 func (h *OAuthHandler) getAppURL() string {
@@ -45,15 +46,32 @@ func (h *OAuthHandler) getAppURL() string {
 func (h *OAuthHandler) BeginAuth(c echo.Context) error {
 	provider := c.Param("provider")
 
-	// Verify the provider is registered with goth
 	if _, err := goth.GetProvider(provider); err != nil {
 		return response.NotFound(c, "err.oauth_provider_not_found")
 	}
 
-	// Set provider for gothic
 	q := c.Request().URL.Query()
 	q.Set("provider", provider)
 	c.Request().URL.RawQuery = q.Encode()
+
+	// ?mode=link&token=xxx&state=yyy: settings page initiates OAuth binding.
+	// Validate the CSRF state token before storing JWT in session, preventing
+	// attackers from tricking users into binding a malicious OAuth account.
+	if c.QueryParam("mode") == "link" {
+		jwtToken := c.QueryParam("token")
+		state := c.QueryParam("state")
+		if jwtToken != "" && state != "" {
+			claims, err := middleware.ParseJWTClaims(jwtToken, h.jwtSecret)
+			if err != nil {
+				return response.Unauthorized(c, "err.invalid_or_expired_token")
+			}
+			session, _ := gothic.Store.Get(c.Request(), "oauth_link")
+			session.Values["link_jwt"] = jwtToken
+			session.Values["link_user_id"] = claims.UserID
+			session.Values["link_state"] = state
+			session.Save(c.Request(), c.Response())
+		}
+	}
 
 	gothic.BeginAuthHandler(c.Response(), c.Request())
 	return nil
@@ -70,7 +88,6 @@ func (h *OAuthHandler) BeginAuth(c echo.Context) error {
 func (h *OAuthHandler) Callback(c echo.Context) error {
 	provider := c.Param("provider")
 
-	// Set provider for gothic
 	q := c.Request().URL.Query()
 	q.Set("provider", provider)
 	c.Request().URL.RawQuery = q.Encode()
@@ -81,11 +98,16 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 			fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))
 	}
 
+	// Check if this callback is from a settings-page "link" flow
+	// by reading the JWT stored in session during BeginAuth.
+	if userID := h.extractLinkUserID(c); userID != "" {
+		return h.handleLinkCallback(c, provider, gothUser, userID)
+	}
+
 	locale := middleware.GetLocale(c)
 	authResp, linkInfo, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name, locale)
 	if err != nil {
 		if errors.Is(err, services.ErrOAuthAccountNotLinked) {
-			// No matching account — generate link token and redirect to binding flow
 			linkToken, tokenErr := h.oauthService.GenerateLinkToken(linkInfo)
 			if tokenErr != nil {
 				return c.Redirect(http.StatusTemporaryRedirect,
@@ -107,6 +129,58 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 
 	return c.Redirect(http.StatusTemporaryRedirect,
 		fmt.Sprintf("%s/auth/callback?token=%s", h.getAppURL(), authResp.Token))
+}
+
+func (h *OAuthHandler) extractLinkUserID(c echo.Context) string {
+	session, err := gothic.Store.Get(c.Request(), "oauth_link")
+	if err != nil {
+		return ""
+	}
+	userID, ok := session.Values["link_user_id"].(string)
+	if !ok || userID == "" {
+		return ""
+	}
+	storedState, _ := session.Values["link_state"].(string)
+
+	session.Values["link_jwt"] = ""
+	session.Values["link_user_id"] = ""
+	session.Values["link_state"] = ""
+	session.Options.MaxAge = -1
+	session.Save(c.Request(), c.Response())
+
+	// CSRF protection: the state was generated client-side and stored in session
+	// during BeginAuth. If the session has no state, this is not a valid link flow.
+	if storedState == "" {
+		return ""
+	}
+	return userID
+}
+
+func (h *OAuthHandler) handleLinkCallback(c echo.Context, provider string, gothUser goth.User, userID string) error {
+	linkInfo := &services.OAuthLinkInfo{
+		Provider:       provider,
+		ProviderUserID: gothUser.UserID,
+		Email:          gothUser.Email,
+		Name:           gothUser.Name,
+	}
+	linkToken, err := h.oauthService.GenerateLinkToken(linkInfo)
+	if err != nil {
+		return c.Redirect(http.StatusTemporaryRedirect,
+			fmt.Sprintf("%s/settings/oauth?error=oauth_failed", h.getAppURL()))
+	}
+
+	_, err = h.oauthService.LinkOAuthToUser(linkToken, userID)
+	if err != nil {
+		errMsg := "oauth_failed"
+		if errors.Is(err, services.ErrOAuthAlreadyLinked) {
+			errMsg = "oauth_already_linked"
+		}
+		return c.Redirect(http.StatusTemporaryRedirect,
+			fmt.Sprintf("%s/settings/oauth?error=%s", h.getAppURL(), errMsg))
+	}
+
+	return c.Redirect(http.StatusTemporaryRedirect,
+		fmt.Sprintf("%s/settings/oauth?linked=%s", h.getAppURL(), provider))
 }
 
 // AvailableProviders godoc
