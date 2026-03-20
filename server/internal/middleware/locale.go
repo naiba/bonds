@@ -23,6 +23,8 @@ func Locale() echo.MiddlewareFunc {
 				primary = strings.ToLower(primary)
 				if primary == "zh" {
 					lang = "zh"
+				} else if primary == "es" {
+					lang = "es"
 				}
 			}
 			c.Set("locale", lang)

@@ -600,6 +600,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	notifGroup.GET("/:id/logs", notificationHandler.ListLogs)
 
 	personalizeGroup := settingsGroup.Group("/personalize", authMiddleware.RequireAdmin)
+	personalizeGroup.POST("/sync", personalizeHandler.SyncTranslations)
 	personalizeGroup.PUT("/currencies/:currencyId/toggle", currencyHandler.Toggle)
 	personalizeGroup.POST("/currencies/enable-all", currencyHandler.EnableAll)
 	personalizeGroup.DELETE("/currencies/disable-all", currencyHandler.DisableAll)

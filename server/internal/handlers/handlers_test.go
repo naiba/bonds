@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/handlers"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
@@ -933,7 +934,6 @@ func TestContactList_Pagination(t *testing.T) {
 	}
 }
 
-
 func TestContactList_FilterArchived(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "cfilter@example.com")
@@ -1721,8 +1721,10 @@ func TestSearch_VaultIsolation(t *testing.T) {
 	}
 	resp := parseResponse(t, rec)
 	var searchResp struct {
-		Contacts []struct{ ID string `json:"id"` } `json:"contacts"`
-		Total    int                                  `json:"total"`
+		Contacts []struct {
+			ID string `json:"id"`
+		} `json:"contacts"`
+		Total int `json:"total"`
 	}
 	json.Unmarshal(resp.Data, &searchResp)
 	if len(searchResp.Contacts) != 0 {
@@ -4353,7 +4355,6 @@ func TestPersonalAccessToken_AuthWithExpiredPAT(t *testing.T) {
 	}
 }
 
-
 // ==================== ListForContact ====================
 
 func TestListForContact_ReturnsOnlyAssigned(t *testing.T) {
@@ -4532,7 +4533,9 @@ func TestLifeEvent_CreateWithValidType(t *testing.T) {
 		t.Fatalf("create timeline: expected 201, got %d: %s", rec.Code, rec.Body.String())
 	}
 	resp := parseResponse(t, rec)
-	var teData struct{ ID uint `json:"id"` }
+	var teData struct {
+		ID uint `json:"id"`
+	}
 	if err := json.Unmarshal(resp.Data, &teData); err != nil {
 		t.Fatalf("failed to parse timeline: %v", err)
 	}
@@ -4643,7 +4646,9 @@ func TestLifeEvent_ListViaTimeline(t *testing.T) {
 	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents",
 		`{"started_at":"2026-01-01T00:00:00Z","label":"Timeline"}`, token)
 	resp := parseResponse(t, rec)
-	var teData struct{ ID uint `json:"id"` }
+	var teData struct {
+		ID uint `json:"id"`
+	}
 	json.Unmarshal(resp.Data, &teData)
 
 	// Get valid type ID
@@ -5029,5 +5034,70 @@ func TestCompanyEmployee_AddAndRemove(t *testing.T) {
 	}
 	if len(companyAfter.Contacts) != 0 {
 		t.Errorf("expected 0 employees after remove, got %d", len(companyAfter.Contacts))
+	}
+}
+
+func (ts *testServer) doRequestWithLocale(method, path, body, token, locale string) *httptest.ResponseRecorder {
+	var req *http.Request
+	if body != "" {
+		req = httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req = httptest.NewRequest(method, path, nil)
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if locale != "" {
+		req.Header.Set("Accept-Language", locale)
+	}
+	rec := httptest.NewRecorder()
+	ts.e.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestSyncTranslations_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.e.Use(middleware.Locale())
+	token, _ := ts.registerTestUser(t, "sync-handler@example.com")
+
+	rec := ts.doRequestWithLocale(http.MethodPost, "/api/settings/personalize/sync", "", token, "zh")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	rec = ts.doRequestWithLocale(http.MethodGet, "/api/settings/personalize/genders", "", token, "zh")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list genders: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var genders []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Data, &genders); err != nil {
+		t.Fatalf("failed to parse genders: %v", err)
+	}
+	foundChinese := false
+	for _, g := range genders {
+		if g.Name == "男" {
+			foundChinese = true
+			break
+		}
+	}
+	if !foundChinese {
+		t.Fatalf("expected Chinese '男' after sync, got: %v", genders)
+	}
+}
+
+func TestSyncTranslations_Unauthorized(t *testing.T) {
+	ts := setupTestServer(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/personalize/sync", "", "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
 	}
 }

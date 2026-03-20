@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/i18n"
 	"gorm.io/gorm"
 )
 
@@ -175,4 +176,96 @@ func (s *PersonalizeService) ListTemplates(accountID string) ([]map[string]inter
 		return nil, err
 	}
 	return results, nil
+}
+
+type syncableEntity struct {
+	table         string
+	displayCol    string
+	keyCol        string
+	ownerCol      string
+	parentTable   string
+	parentJoinCol string
+}
+
+var accountSyncEntities = []syncableEntity{
+	{table: "genders", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "pronouns", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "address_types", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "pet_categories", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "contact_information_types", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "relationship_group_types", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "relationship_types", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id", parentTable: "relationship_group_types", parentJoinCol: "relationship_group_type_id"},
+	{table: "relationship_types", displayCol: "name_reverse_relationship", keyCol: "name_reverse_relationship_translation_key", ownerCol: "account_id", parentTable: "relationship_group_types", parentJoinCol: "relationship_group_type_id"},
+	{table: "call_reason_types", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id"},
+	{table: "call_reasons", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id", parentTable: "call_reason_types", parentJoinCol: "call_reason_type_id"},
+	{table: "religions", displayCol: "name", keyCol: "translation_key", ownerCol: "account_id"},
+	{table: "group_types", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id"},
+	{table: "group_type_roles", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id", parentTable: "group_types", parentJoinCol: "group_type_id"},
+	{table: "emotions", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "gift_occasions", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id"},
+	{table: "gift_states", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id"},
+	{table: "post_templates", displayCol: "label", keyCol: "label_translation_key", ownerCol: "account_id"},
+	{table: "templates", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "template_pages", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id", parentTable: "templates", parentJoinCol: "template_id"},
+	{table: "modules", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+}
+
+var vaultSyncEntities = []syncableEntity{
+	{table: "mood_tracking_parameters", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id"},
+	{table: "life_event_categories", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id"},
+	{table: "life_event_types", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id", parentTable: "life_event_categories", parentJoinCol: "life_event_category_id"},
+	{table: "vault_quick_facts_templates", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id"},
+}
+
+func (s *PersonalizeService) SyncAllTranslations(accountID, locale string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := syncEntities(tx, accountSyncEntities, accountID, locale); err != nil {
+			return err
+		}
+
+		var vaultIDs []string
+		if err := tx.Table("vaults").Where("account_id = ?", accountID).Pluck("id", &vaultIDs).Error; err != nil {
+			return err
+		}
+		for _, vaultID := range vaultIDs {
+			if err := syncEntities(tx, vaultSyncEntities, vaultID, locale); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func syncEntities(tx *gorm.DB, entities []syncableEntity, ownerID, locale string) error {
+	for _, e := range entities {
+		var rows []struct {
+			ID  uint   `gorm:"column:id"`
+			Key string `gorm:"column:key"`
+		}
+
+		query := tx.Table(e.table).Select("id, " + e.keyCol + " AS key").
+			Where(e.keyCol + " IS NOT NULL AND " + e.keyCol + " != ''")
+
+		if e.parentTable != "" {
+			query = query.Where(
+				fmt.Sprintf("%s IN (SELECT id FROM %s WHERE %s = ?)", e.parentJoinCol, e.parentTable, e.ownerCol),
+				ownerID,
+			)
+		} else {
+			query = query.Where(e.ownerCol+" = ?", ownerID)
+		}
+
+		if err := query.Find(&rows).Error; err != nil {
+			return err
+		}
+
+		for _, row := range rows {
+			translated := i18n.T(locale, row.Key)
+			if err := tx.Table(e.table).Where("id = ?", row.ID).
+				Update(e.displayCol, translated).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
