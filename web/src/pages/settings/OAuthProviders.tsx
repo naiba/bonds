@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Card,
   Typography,
@@ -9,17 +11,19 @@ import {
   Spin,
   Avatar,
   Tag,
+  Dropdown,
 } from "antd";
 import {
   DisconnectOutlined,
   GithubOutlined,
   GoogleOutlined,
   LinkOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
-import type { OAuthProvider, APIError } from "@/api";
+import type { OAuthProvider, APIError, InstanceInfo } from "@/api";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
@@ -29,6 +33,19 @@ export default function OAuthProviders() {
   const { message } = App.useApp();
   const dateFormats = useDateFormat();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const linked = searchParams.get("linked");
+    const error = searchParams.get("error");
+    if (linked) {
+      message.success(t("settings.oauth.link_linked"));
+      setSearchParams({}, { replace: true });
+    } else if (error) {
+      message.error(error);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, message, t]);
 
   const { data: providers = [], isLoading } = useQuery({
     queryKey: ["settings", "oauth"],
@@ -37,6 +54,20 @@ export default function OAuthProviders() {
       return res.data ?? [];
     },
   });
+
+  const { data: instanceInfo } = useQuery({
+    queryKey: ["instance-info"],
+    queryFn: async () => {
+      const res = await api.instance.infoList();
+      return (res.data ?? null) as InstanceInfo | null;
+    },
+  });
+
+  const availableProviders = instanceInfo?.oauth_providers ?? [];
+
+  const handleLinkProvider = (provider: string) => {
+    window.location.assign(`/api/settings/oauth/link/${provider}`);
+  };
 
   const unlinkMutation = useMutation({
     mutationFn: (driver: string) => api.oauth.oauthDelete(driver),
@@ -69,9 +100,34 @@ export default function OAuthProviders() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <Title level={4} style={{ marginBottom: 4 }}>
-        {t("settings.oauth.title")}
-      </Title>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <Title level={4} style={{ marginBottom: 0 }}>
+          {t("settings.oauth.title")}
+        </Title>
+        {availableProviders.length === 1 ? (
+          <Button
+            icon={<PlusOutlined />}
+            onClick={() => handleLinkProvider(availableProviders[0])}
+          >
+            {t("settings.oauth.link_new")}
+          </Button>
+        ) : availableProviders.length > 1 ? (
+          <Dropdown
+            menu={{
+              items: availableProviders.map((p) => ({
+                key: p,
+                icon: getIcon(p),
+                label: getDisplayName(p),
+                onClick: () => handleLinkProvider(p),
+              })),
+            }}
+          >
+            <Button icon={<PlusOutlined />}>
+              {t("settings.oauth.link_new")}
+            </Button>
+          </Dropdown>
+        ) : null}
+      </div>
       <Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
         {t("settings.oauth.description")}
       </Text>

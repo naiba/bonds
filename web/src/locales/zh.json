@@ -1014,7 +1014,10 @@
       "linked_at": "关联时间",
       "unlink": "取消关联",
       "unlink_confirm": "确定要取消关联此账户吗？",
-      "unlinked": "已取消关联"
+      "unlinked": "已取消关联",
+      "link_new": "关联账户",
+      "link_linked": "账户关联成功",
+      "link_error": "账户关联失败"
     },
     "storage": {
       "title": "存储空间",
@@ -1098,7 +1101,18 @@
     "continueWith": "或使用以下方式登录",
     "github": "GitHub",
     "google": "Google",
-    "sso": "单点登录"
+    "sso": "单点登录",
+    "link_title": "关联账户",
+    "link_subtitle": "此 OAuth 账号尚未关联任何账户。请登录已有账户或注册新账户以完成关联。",
+    "link_provider_label": "OAuth 提供商",
+    "link_email_label": "OAuth 邮箱",
+    "link_login_tab": "登录并关联",
+    "link_register_tab": "注册并关联",
+    "link_login_submit": "登录并关联账户",
+    "link_register_submit": "注册并关联账户",
+    "link_success": "账户关联成功",
+    "link_failed": "账户关联失败",
+    "link_token_expired": "关联令牌已过期，请重试"
   },
   "calendar": {
     "gregorian": "公历",

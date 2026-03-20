@@ -1014,7 +1014,10 @@
       "linked_at": "Linked at",
       "unlink": "Unlink",
       "unlink_confirm": "Are you sure you want to unlink this account?",
-      "unlinked": "Account unlinked"
+      "unlinked": "Account unlinked",
+      "link_new": "Link Account",
+      "link_linked": "Account linked successfully",
+      "link_error": "Failed to link account"
     },
     "storage": {
       "title": "Storage",
@@ -1098,7 +1101,18 @@
     "continueWith": "Or continue with",
     "github": "GitHub",
     "google": "Google",
-    "sso": "SSO"
+    "sso": "SSO",
+    "link_title": "Link Your Account",
+    "link_subtitle": "This OAuth provider is not linked to any account. Please login to an existing account or register a new one to complete the linking.",
+    "link_provider_label": "Provider",
+    "link_email_label": "OAuth Email",
+    "link_login_tab": "Login & Link",
+    "link_register_tab": "Register & Link",
+    "link_login_submit": "Login and Link Account",
+    "link_register_submit": "Register and Link Account",
+    "link_success": "Account linked successfully",
+    "link_failed": "Failed to link account",
+    "link_token_expired": "Link token has expired, please try again"
   },
   "calendar": {
     "gregorian": "Gregorian",
