@@ -970,7 +970,11 @@
       "search_currencies": "Search currencies...",
       "currency_toggled": "Currency toggled",
       "all_enabled": "All currencies enabled",
-      "all_disabled": "All currencies disabled"
+      "all_disabled": "All currencies disabled",
+      "sync_translations": "Sync Translations",
+      "sync_translations_desc": "Update default labels to match your current language. Custom labels won't be affected.",
+      "sync_success": "Translations synchronized",
+      "sync_confirm": "This will update all default labels to match your current language. Custom labels won't be affected. Continue?"
     },
     "users": {
       "title": "Users",

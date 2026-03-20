@@ -970,7 +970,11 @@
       "search_currencies": "搜索货币...",
       "currency_toggled": "货币已切换",
       "all_enabled": "所有货币已启用",
-      "all_disabled": "所有货币已禁用"
+      "all_disabled": "所有货币已禁用",
+      "sync_translations": "同步翻译",
+      "sync_translations_desc": "将默认标签更新为当前语言。自定义标签不受影响。",
+      "sync_success": "翻译已同步",
+      "sync_confirm": "这将把所有默认标签更新为当前语言。自定义标签不受影响。确认继续？"
     },
     "users": {
       "title": "用户",
