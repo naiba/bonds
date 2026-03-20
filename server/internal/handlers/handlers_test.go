@@ -5101,3 +5101,164 @@ func TestSyncTranslations_Unauthorized(t *testing.T) {
 		t.Fatalf("expected 401, got %d", rec.Code)
 	}
 }
+
+func (ts *testServer) generateOAuthLinkToken(t *testing.T) string {
+	t.Helper()
+	oauthSvc := services.NewOAuthService(ts.db, &ts.cfg.JWT, ts.cfg.App.URL)
+	linkToken, err := oauthSvc.GenerateLinkToken(&services.OAuthLinkInfo{
+		Provider:       "github",
+		ProviderUserID: "gh-handler-test",
+		Email:          "oauth@github.com",
+		Name:           "OAuth User",
+	})
+	if err != nil {
+		t.Fatalf("failed to generate link token: %v", err)
+	}
+	return linkToken
+}
+
+func TestOAuthLink_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "oauth-link@example.com")
+
+	linkToken := ts.generateOAuthLinkToken(t)
+
+	body := fmt.Sprintf(`{"link_token":"%s"}`, linkToken)
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link", body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var data authData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse auth data: %v", err)
+	}
+	if data.User.Email != "oauth-link@example.com" {
+		t.Errorf("expected email oauth-link@example.com, got %s", data.User.Email)
+	}
+
+	var tokenCount int64
+	ts.db.Model(&models.UserToken{}).Where("driver = ? AND driver_id = ?", "github", "gh-handler-test").Count(&tokenCount)
+	if tokenCount != 1 {
+		t.Errorf("expected 1 UserToken, got %d", tokenCount)
+	}
+}
+
+func TestOAuthLink_Unauthorized(t *testing.T) {
+	ts := setupTestServer(t)
+
+	linkToken := ts.generateOAuthLinkToken(t)
+	body := fmt.Sprintf(`{"link_token":"%s"}`, linkToken)
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link", body, "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rec.Code)
+	}
+}
+
+func TestOAuthLink_InvalidToken(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "oauth-link-bad@example.com")
+
+	body := `{"link_token":"invalid-token"}`
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link", body, token)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestOAuthLink_AlreadyLinkedToOtherUser(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "oauth-link1@example.com")
+	token2, _ := ts.registerTestUser(t, "oauth-link2@example.com")
+
+	linkToken := ts.generateOAuthLinkToken(t)
+
+	body := fmt.Sprintf(`{"link_token":"%s"}`, linkToken)
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link", body, token1)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first link expected 200, got %d", rec.Code)
+	}
+
+	linkToken2 := ts.generateOAuthLinkToken(t)
+	body2 := fmt.Sprintf(`{"link_token":"%s"}`, linkToken2)
+	rec2 := ts.doRequest(http.MethodPost, "/api/auth/oauth/link", body2, token2)
+	if rec2.Code != http.StatusConflict {
+		t.Fatalf("second link expected 409, got %d: %s", rec2.Code, rec2.Body.String())
+	}
+}
+
+func TestOAuthLinkRegister_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.registerTestUser(t, "first-user@example.com")
+
+	linkToken := ts.generateOAuthLinkToken(t)
+
+	body := fmt.Sprintf(`{
+		"link_token":"%s",
+		"first_name":"New",
+		"last_name":"User",
+		"email":"new-oauth-user@example.com",
+		"password":"password123"
+	}`, linkToken)
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link-register", body, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var data authData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse auth data: %v", err)
+	}
+	if data.User.Email != "new-oauth-user@example.com" {
+		t.Errorf("expected email new-oauth-user@example.com, got %s", data.User.Email)
+	}
+
+	var tokenCount int64
+	ts.db.Model(&models.UserToken{}).Where("driver = ? AND driver_id = ?", "github", "gh-handler-test").Count(&tokenCount)
+	if tokenCount != 1 {
+		t.Errorf("expected 1 UserToken, got %d", tokenCount)
+	}
+}
+
+func TestOAuthLinkRegister_InvalidToken(t *testing.T) {
+	ts := setupTestServer(t)
+
+	body := `{
+		"link_token":"bad-token",
+		"first_name":"New",
+		"last_name":"User",
+		"email":"bad-token@example.com",
+		"password":"password123"
+	}`
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link-register", body, "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestOAuthLinkRegister_DuplicateEmail(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.registerTestUser(t, "taken-email@example.com")
+
+	linkToken := ts.generateOAuthLinkToken(t)
+
+	body := fmt.Sprintf(`{
+		"link_token":"%s",
+		"first_name":"Dup",
+		"last_name":"User",
+		"email":"taken-email@example.com",
+		"password":"password123"
+	}`, linkToken)
+	rec := ts.doRequest(http.MethodPost, "/api/auth/oauth/link-register", body, "")
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
