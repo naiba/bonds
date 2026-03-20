@@ -259,6 +259,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	auth.POST("/refresh", authHandler.Refresh, authMiddleware.Authenticate)
 	auth.GET("/me", authHandler.Me, authMiddleware.Authenticate)
 	auth.GET("/providers", oauthHandler.AvailableProviders)
+	auth.POST("/oauth/link", oauthHandler.LinkProvider, authMiddleware.Authenticate)
+	auth.POST("/oauth/link-register", oauthHandler.LinkRegister)
 	auth.GET("/:provider", oauthHandler.BeginAuth)
 	auth.GET("/:provider/callback", oauthHandler.Callback)
 
@@ -683,6 +685,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	oauthGroup := settingsGroup.Group("/oauth")
 	oauthGroup.GET("", oauthHandler.ListProviders)
 	oauthGroup.DELETE("/:driver", oauthHandler.UnlinkProvider)
+	oauthGroup.GET("/link/:provider", oauthHandler.BeginLinkProvider)
+	oauthGroup.GET("/link/:provider/callback", oauthHandler.LinkCallback)
 
 	settingsGroup.DELETE("/account", accountCancelHandler.Cancel, authMiddleware.RequireAdmin)
 	settingsGroup.GET("/storage", storageInfoHandler.Get)

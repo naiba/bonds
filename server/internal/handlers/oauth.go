@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -81,13 +82,22 @@ func (h *OAuthHandler) Callback(c echo.Context) error {
 	}
 
 	locale := middleware.GetLocale(c)
-	authResp, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name, locale)
+	authResp, linkInfo, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name, locale)
 	if err != nil {
+		if errors.Is(err, services.ErrOAuthAccountNotLinked) {
+			// No matching account — generate link token and redirect to binding flow
+			linkToken, tokenErr := h.oauthService.GenerateLinkToken(linkInfo)
+			if tokenErr != nil {
+				return c.Redirect(http.StatusTemporaryRedirect,
+					fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))
+			}
+			return c.Redirect(http.StatusTemporaryRedirect,
+				fmt.Sprintf("%s/auth/oauth-link?link_token=%s", h.getAppURL(), linkToken))
+		}
 		return c.Redirect(http.StatusTemporaryRedirect,
 			fmt.Sprintf("%s/login?error=oauth_failed", h.getAppURL()))
 	}
 
-	// Save OAuth token for future API calls
 	expiresIn := 0
 	if !gothUser.ExpiresAt.IsZero() {
 		expiresIn = int(gothUser.ExpiresAt.Unix())
