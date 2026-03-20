@@ -19,6 +19,8 @@ interface AuthContextType {
   login: (data: LoginRequest) => Promise<void>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
+  /** Store a JWT obtained externally (e.g. OAuth callback) and trigger user fetch. */
+  setExternalToken: (jwt: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -84,6 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const setExternalToken = useCallback((jwt: string) => {
+    localStorage.setItem("token", jwt);
+    setIsLoading(true);
+    setToken(jwt);
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -93,8 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      setExternalToken,
     }),
-    [user, token, isLoading, login, register, logout],
+    [user, token, isLoading, login, register, logout, setExternalToken],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -8,6 +8,7 @@ import { useTheme } from "@/stores/theme";
 import type { ThemeMode } from "@/stores/theme";
 import { httpClient } from "@/api";
 import type { APIError } from "@/api";
+import { useAuth } from "@/stores/auth";
 
 const { Title, Text } = Typography;
 
@@ -86,6 +87,7 @@ export default function OAuthLink() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<string>("login");
 
+  const { setExternalToken } = useAuth();
   const linkToken = searchParams.get("link_token") ?? "";
   const payload = useMemo(() => decodeLinkTokenPayload(linkToken), [linkToken]);
 
@@ -133,7 +135,7 @@ export default function OAuthLink() {
         headers: { Authorization: `Bearer ${jwt}` },
       });
 
-      localStorage.setItem("token", jwt);
+      setExternalToken(jwt);
       message.success(t("oauth.link_success"));
       navigate("/vaults", { replace: true });
     } catch (err) {
@@ -156,7 +158,7 @@ export default function OAuthLink() {
       });
 
       const jwt = res.data.data?.token;
-      if (jwt) localStorage.setItem("token", jwt);
+      if (jwt) setExternalToken(jwt);
       message.success(t("oauth.link_success"));
       navigate("/vaults", { replace: true });
     } catch (err) {

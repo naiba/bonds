@@ -13,19 +13,15 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
+const mockSetExternalToken = vi.fn();
+vi.mock("@/stores/auth", () => ({
+  useAuth: () => ({
+    setExternalToken: mockSetExternalToken,
+  }),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
-  Object.defineProperty(window, "localStorage", {
-    value: {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-      length: 0,
-      key: vi.fn(),
-    },
-    writable: true,
-  });
 });
 
 function renderOAuthCallback(search = "?token=fake-oauth-token") {
@@ -41,14 +37,24 @@ function renderOAuthCallback(search = "?token=fake-oauth-token") {
 }
 
 describe("OAuthCallback", () => {
-  it("stores token and navigates to vaults when token present", () => {
+  it("calls setExternalToken and navigates to vaults when token present", () => {
     renderOAuthCallback("?token=my-token");
-    expect(window.localStorage.setItem).toHaveBeenCalledWith("token", "my-token");
+    expect(mockSetExternalToken).toHaveBeenCalledWith("my-token");
     expect(mockNavigate).toHaveBeenCalledWith("/vaults", { replace: true });
   });
 
   it("navigates to login when no token provided", () => {
     renderOAuthCallback("");
+    expect(mockSetExternalToken).not.toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true });
+  });
+
+  it("redirects to oauth-link page when link_token present", () => {
+    renderOAuthCallback("?link_token=abc123");
+    expect(mockSetExternalToken).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/auth/oauth-link?link_token=abc123",
+      { replace: true },
+    );
   });
 });
