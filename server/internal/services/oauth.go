@@ -4,16 +4,29 @@ import (
 	"errors"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 var (
 	ErrOAuthProviderNotFound = errors.New("oauth provider not found")
+	ErrOAuthAccountNotLinked = errors.New("oauth account not linked to any existing account")
+	ErrOAuthLinkTokenInvalid = errors.New("oauth link token is invalid or expired")
+	ErrOAuthAlreadyLinked    = errors.New("oauth provider already linked to another account")
 )
+
+// OAuthLinkInfo holds OAuth provider info extracted from a link token.
+// Used to pass OAuth context through the account-binding flow when a user
+// authenticates via OAuth but has no matching email account.
+type OAuthLinkInfo struct {
+	Provider       string
+	ProviderUserID string
+	Email          string
+	Name           string
+}
 
 type OAuthService struct {
 	db       *gorm.DB
@@ -38,24 +51,25 @@ func (s *OAuthService) getAppURL() string {
 }
 
 // FindOrCreateUser looks up a user by OAuth provider+providerUserID.
-// If found, returns the user. If not, checks by email and either links or creates a new account.
-func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, locale string) (*dto.AuthResponse, error) {
-	// Look up existing UserToken by Driver+DriverID
+// If found, returns auth. If not, checks by email and auto-links.
+// If no matching email exists, returns ErrOAuthAccountNotLinked instead of
+// auto-creating an account — the caller must redirect the user to the
+// account-binding flow (login existing account or register new one).
+func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, locale string) (*dto.AuthResponse, *OAuthLinkInfo, error) {
 	var token models.UserToken
 	err := s.db.Where("driver = ? AND driver_id = ?", provider, providerUserID).First(&token).Error
 	if err == nil {
-		// Found existing token — load user and return
 		var user models.User
 		if err := s.db.First(&user, "id = ?", token.UserID).Error; err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return s.generateAuthResponse(&user)
+		resp, err := s.generateAuthResponse(&user)
+		return resp, nil, err
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// No existing token — check if user exists by email
 	var existingUser models.User
 	err = s.db.Where("email = ?", email).First(&existingUser).Error
 	if err == nil {
@@ -73,61 +87,24 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, l
 			Token:    "",
 		}
 		if err := s.db.Create(&newToken).Error; err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return s.generateAuthResponse(&existingUser)
+		resp, err := s.generateAuthResponse(&existingUser)
+		return resp, nil, err
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// No existing user — create new account + user + token
-	randomPassword, err := bcrypt.GenerateFromPassword([]byte(providerUserID+email), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
+	// No matching email — do NOT auto-create account.
+	// Return link info so the handler can redirect to the binding flow.
+	linkInfo := &OAuthLinkInfo{
+		Provider:       provider,
+		ProviderUserID: providerUserID,
+		Email:          email,
+		Name:           name,
 	}
-	hashedStr := string(randomPassword)
-
-	now := time.Now()
-	account := models.Account{}
-	user := models.User{
-		Email:                  email,
-		Password:               &hashedStr,
-		IsAccountAdministrator: true,
-		EmailVerifiedAt:        &now,
-	}
-
-	// Parse name into first/last
-	firstName, lastName := parseName(name)
-	user.FirstName = &firstName
-	user.LastName = &lastName
-
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&account).Error; err != nil {
-			return err
-		}
-		user.AccountID = account.ID
-		if err := tx.Create(&user).Error; err != nil {
-			return err
-		}
-		if err := models.SeedAccountDefaults(tx, account.ID, user.ID, email, locale); err != nil {
-			return err
-		}
-		newToken := models.UserToken{
-			UserID:   user.ID,
-			Driver:   provider,
-			DriverID: providerUserID,
-			Format:   "oauth2",
-			Email:    &email,
-			Token:    "",
-		}
-		return tx.Create(&newToken).Error
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return s.generateAuthResponse(&user)
+	return nil, linkInfo, ErrOAuthAccountNotLinked
 }
 
 // SaveToken upserts an OAuth token for a user.
@@ -170,6 +147,123 @@ func (s *OAuthService) SaveToken(userID, provider, providerUserID, accessToken, 
 		updates["expires_in"] = uint64(expiresIn)
 	}
 	return s.db.Model(&token).Updates(updates).Error
+}
+
+type oauthLinkClaims struct {
+	Provider       string `json:"provider"`
+	ProviderUserID string `json:"provider_user_id"`
+	Email          string `json:"email"`
+	Name           string `json:"name"`
+	jwt.RegisteredClaims
+}
+
+func (s *OAuthService) GenerateLinkToken(info *OAuthLinkInfo) (string, error) {
+	claims := &oauthLinkClaims{
+		Provider:       info.Provider,
+		ProviderUserID: info.ProviderUserID,
+		Email:          info.Email,
+		Name:           info.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.jwt.Secret))
+}
+
+func (s *OAuthService) ParseLinkToken(linkToken string) (*OAuthLinkInfo, error) {
+	claims := &oauthLinkClaims{}
+	token, err := jwt.ParseWithClaims(linkToken, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(s.jwt.Secret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, ErrOAuthLinkTokenInvalid
+	}
+	return &OAuthLinkInfo{
+		Provider:       claims.Provider,
+		ProviderUserID: claims.ProviderUserID,
+		Email:          claims.Email,
+		Name:           claims.Name,
+	}, nil
+}
+
+func (s *OAuthService) LinkOAuthToUser(linkToken, userID string) (*dto.AuthResponse, error) {
+	info, err := s.ParseLinkToken(linkToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prevent duplicate binding: if this OAuth identity is already linked to another user, reject
+	var existing models.UserToken
+	if err := s.db.Where("driver = ? AND driver_id = ?", info.Provider, info.ProviderUserID).First(&existing).Error; err == nil {
+		if existing.UserID != userID {
+			return nil, ErrOAuthAlreadyLinked
+		}
+	}
+
+	var user models.User
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	newToken := models.UserToken{
+		UserID:   userID,
+		Driver:   info.Provider,
+		DriverID: info.ProviderUserID,
+		Format:   "oauth2",
+		Email:    &info.Email,
+		Token:    "",
+	}
+	if err := s.db.Create(&newToken).Error; err != nil {
+		return nil, err
+	}
+
+	return s.generateAuthResponse(&user)
+}
+
+func (s *OAuthService) LinkOAuthAndRegister(linkToken string, req dto.OAuthLinkRegisterRequest, locale string) (*dto.AuthResponse, error) {
+	info, err := s.ParseLinkToken(linkToken)
+	if err != nil {
+		return nil, err
+	}
+
+	var existing models.UserToken
+	if err := s.db.Where("driver = ? AND driver_id = ?", info.Provider, info.ProviderUserID).First(&existing).Error; err == nil {
+		return nil, ErrOAuthAlreadyLinked
+	}
+
+	authSvc := NewAuthService(s.db, s.jwt)
+	authResp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Email:     req.Email,
+		Password:  req.Password,
+	}, locale)
+	if err != nil {
+		return nil, err
+	}
+
+	// OAuth emails are trusted — auto-verify
+	now := time.Now()
+	s.db.Model(&models.User{}).Where("id = ?", authResp.User.ID).Update("email_verified_at", now)
+
+	newToken := models.UserToken{
+		UserID:   authResp.User.ID,
+		Driver:   info.Provider,
+		DriverID: info.ProviderUserID,
+		Format:   "oauth2",
+		Email:    &info.Email,
+		Token:    "",
+	}
+	if err := s.db.Create(&newToken).Error; err != nil {
+		return nil, err
+	}
+
+	return authResp, nil
 }
 
 func (s *OAuthService) generateAuthResponse(user *models.User) (*dto.AuthResponse, error) {

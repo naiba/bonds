@@ -61,3 +61,17 @@ type VerifyEmailResponse struct {
 	Message string       `json:"message" example:"Email verified successfully"`
 	User    UserResponse `json:"user"`
 }
+
+// OAuthLinkRequest is used when a logged-in user binds an OAuth provider via link_token
+type OAuthLinkRequest struct {
+	LinkToken string `json:"link_token" validate:"required" example:"eyJhbGciOiJIUzI1NiIs..."`
+}
+
+// OAuthLinkRegisterRequest is used when an unregistered user registers a new account and binds OAuth via link_token
+type OAuthLinkRegisterRequest struct {
+	LinkToken string `json:"link_token" validate:"required" example:"eyJhbGciOiJIUzI1NiIs..."`
+	FirstName string `json:"first_name" validate:"required" example:"John"`
+	LastName  string `json:"last_name" validate:"required" example:"Doe"`
+	Email     string `json:"email" validate:"required,email" example:"user@example.com"`
+	Password  string `json:"password" validate:"required,min=8" example:"secureP@ss123"`
+}
