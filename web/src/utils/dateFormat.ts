@@ -23,7 +23,7 @@ const DEFAULT_DATE_FORMAT = "MMM D, YYYY";
  * | MMM D, YYYY     | MMM D, YYYY   | MMM YYYY  | MMM D  | MMM D, YYYY HH:mm    |
  * | MMM DD, YYYY    | MMM DD, YYYY  | MMM YYYY  | MMM DD | MMM DD, YYYY HH:mm   |
  */
-interface DateFormatVariants {
+export interface DateFormatVariants {
   /** Full date, e.g. "2026-03-12" or "Mar 12, 2026" */
   full: string;
   /** Month + year only, e.g. "2026-03" or "Mar 2026" */

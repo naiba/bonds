@@ -22,6 +22,8 @@ import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import type { CalendarType } from "@/utils/calendar";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import type { DateFormatVariants } from "@/utils/dateFormat";
 
 const freqColor: Record<string, string> = {
   one_time: "blue",
@@ -30,7 +32,12 @@ const freqColor: Record<string, string> = {
   recurring_year: "purple",
 };
 
-function formatReminderDate(r: Reminder): string {
+function formatReminderDate(r: Reminder, dateFormats: DateFormatVariants): string {
+  const buildDateStr = () =>
+    r.year && r.month && r.day
+      ? `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`
+      : "";
+
   if (r.calendar_type && r.calendar_type !== "gregorian" && r.original_month != null && r.original_day != null) {
     const sys = getCalendarSystem(r.calendar_type as CalendarType);
     const formatted = sys.formatDate({
@@ -38,13 +45,12 @@ function formatReminderDate(r: Reminder): string {
       month: r.original_month,
       year: r.original_year ?? 0,
     });
-    const gd = r.year && r.month && r.day ? `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}` : "";
-    return gd ? `${formatted} (${gd})` : formatted;
+    // 公历部分也使用用户日期格式偏好（fix #65）
+    const gd = buildDateStr();
+    return gd ? `${formatted} (${formatDate(gd, dateFormats)})` : formatted;
   }
-  if (r.year && r.month && r.day) {
-    return `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`;
-  }
-  return "";
+  const dateStr = buildDateStr();
+  return dateStr ? formatDate(dateStr, dateFormats) : "";
 }
 
 export default function RemindersModule({
@@ -61,6 +67,7 @@ export default function RemindersModule({
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const dateFormats = useDateFormat();
   const qk = ["vaults", vaultId, "contacts", contactId, "reminders"];
 
   const { data: prefs } = useQuery({
@@ -186,7 +193,7 @@ export default function RemindersModule({
               title={<span style={{ fontWeight: 500 }}>{r.label}</span>}
               description={
                 <>
-                  <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r)}</span>{" "}
+                  <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r, dateFormats)}</span>{" "}
                   <Tag color={freqColor[r.type!] ?? "default"}>{r.type}</Tag>
                   {altCalendar && r.calendar_type && r.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{r.calendar_type}</Tag>

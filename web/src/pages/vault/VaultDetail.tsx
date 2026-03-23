@@ -1268,6 +1268,7 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const navigate = useNavigate();
+  const dateFormats = useDateFormat();
 
   const { data: reminders = [] } = useQuery({
     queryKey: ["vaults", vaultId, "reminders"],
@@ -1310,7 +1311,8 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
                 {r.label}
               </Text>
               <Text type="secondary" style={{ fontSize: 12, flexShrink: 0, marginLeft: 8 }}>
-                {r.month && r.day ? `${r.month}/${r.day}` : ""}
+                {/* 使用用户日期格式偏好，而非硬编码 M/D 格式（fix #65） */}
+                {r.month && r.day ? formatShortDate(`2000-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`, dateFormats) : ""}
               </Text>
             </div>
           ))}

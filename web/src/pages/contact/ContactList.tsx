@@ -172,8 +172,9 @@ export default function ContactList() {
       responsive: ["md"] as Breakpoint[],
       render: (_, record) => {
         const bday = (record as Contact & { birthday?: string }).birthday;
+        // 使用用户日期格式偏好格式化生日（fix #65）
         return bday ? (
-          <Text type="secondary">{bday}</Text>
+          <Text type="secondary">{formatDate(bday, dateFormats)}</Text>
         ) : (
           <Text type="secondary">—</Text>
         );

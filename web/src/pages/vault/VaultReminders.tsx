@@ -14,7 +14,7 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { api } from "@/api";
-import dayjs from "dayjs";
+import { useDateFormat, formatDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -25,6 +25,7 @@ export default function VaultReminders() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
 
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "reminders"],
@@ -89,8 +90,9 @@ export default function VaultReminders() {
             key: "date",
             render: (_, record) => {
               if (!record.year || !record.month || !record.day) return "-";
-              const date = dayjs(`${record.year}-${record.month}-${record.day}`);
-              return date.format("YYYY-MM-DD");
+              // 使用用户日期格式偏好，而非硬编码格式（fix #65）
+              const dateStr = `${record.year}-${String(record.month).padStart(2, "0")}-${String(record.day).padStart(2, "0")}`;
+              return formatDate(dateStr, dateFormats);
             },
             sorter: (a, b) => {
               if (!a.year) return -1;
