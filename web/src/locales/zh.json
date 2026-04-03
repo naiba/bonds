@@ -1161,7 +1161,28 @@
     "life_event_category_updated": "人生事件分类已更新",
     "life_event_type_updated": "人生事件类型已更新",
     "move_up": "上移",
-    "move_down": "下移"
+    "move_down": "下移",
+    "monica_import": {
+      "tab_label": "Monica导入",
+      "title": "从 Monica 导入数据",
+      "description": "导入 Monica 4.x JSON 导出文件中的联系人及相关数据。在 Monica 中，进入设置 > 导出下载数据。",
+      "upload_hint": "点击或拖拽 Monica 导出 JSON 文件到此",
+      "importing": "导入中...",
+      "success": "导入完成",
+      "error": "导入失败",
+      "contacts": "联系人",
+      "notes": "笔记",
+      "calls": "通话",
+      "tasks": "任务",
+      "reminders": "提醒",
+      "relationships": "关系",
+      "addresses": "地址",
+      "life_events": "人生事件",
+      "documents": "文档",
+      "photos": "照片",
+      "skipped": "跳过",
+      "errors": "错误"
+    }
   },
   "backups": {
     "title": "备份管理",

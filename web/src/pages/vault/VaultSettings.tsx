@@ -19,6 +19,9 @@ import {
   Select,
   ColorPicker,
   Collapse,
+  Upload,
+  Spin,
+  Alert,
   theme,
 } from "antd";
 import {
@@ -29,6 +32,7 @@ import {
   ArrowLeftOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  InboxOutlined,
 } from "@ant-design/icons";
 import type { TabsProps } from "antd";
 import { api } from "@/api";
@@ -41,6 +45,7 @@ import type {
   LifeEventCategoryResponse,
   LifeEventCategoryTypeResponse,
 } from "@/api";
+import type { GithubComNaibaBondsInternalDtoMonicaImportResponse } from "@/api/generated/data-contracts";
 import VaultCompanies from "./VaultCompanies";
 
 const { Title, Text } = Typography;
@@ -858,6 +863,104 @@ export default function VaultSettings() {
   };
 
 
+  const MonicaImportTab = () => {
+    const [importing, setImporting] = useState(false);
+    const [importResult, setImportResult] = useState<GithubComNaibaBondsInternalDtoMonicaImportResponse | null>(null);
+    const [importError, setImportError] = useState<string | null>(null);
+
+    const handleBeforeUpload = async (file: File): Promise<boolean> => {
+      setImporting(true);
+      setImportResult(null);
+      setImportError(null);
+      try {
+        const res = await api.vaultSettings.settingsImportMonicaCreate(String(vaultId), { file });
+        setImportResult(res.data ?? null);
+      } catch (err: unknown) {
+        const msg = (err instanceof Error) ? err.message : t("vault_settings.monica_import.error");
+        setImportError(msg);
+      } finally {
+        setImporting(false);
+      }
+      return false;
+    };
+
+    return (
+      <Space direction="vertical" style={{ width: "100%" }} size="large">
+        <Title level={4} style={{ margin: 0 }}>
+          {t("vault_settings.monica_import.title")}
+        </Title>
+        <Text type="secondary">
+          {t("vault_settings.monica_import.description")}
+        </Text>
+
+        <Upload.Dragger
+          accept=".json"
+          showUploadList={false}
+          beforeUpload={handleBeforeUpload}
+          disabled={importing}
+          multiple={false}
+        >
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined />
+          </p>
+          <p className="ant-upload-text">
+            {t("vault_settings.monica_import.upload_hint")}
+          </p>
+          <p className="ant-upload-hint">JSON only</p>
+        </Upload.Dragger>
+
+        {importing && (
+          <div style={{ textAlign: "center" }}>
+            <Spin size="large" />
+            <Text style={{ marginLeft: 8 }}>{t("vault_settings.monica_import.importing")}</Text>
+          </div>
+        )}
+
+        {importError && (
+          <Alert type="error" message={importError} showIcon />
+        )}
+
+        {importResult && (
+          <Alert
+            type="success"
+            message={t("vault_settings.monica_import.success")}
+            description={
+              <Space direction="vertical" size="small">
+                {([
+                  ["contacts", importResult.imported_contacts],
+                  ["notes", importResult.imported_notes],
+                  ["calls", importResult.imported_calls],
+                  ["tasks", importResult.imported_tasks],
+                  ["reminders", importResult.imported_reminders],
+                  ["relationships", importResult.imported_relationships],
+                  ["addresses", importResult.imported_addresses],
+                  ["life_events", importResult.imported_life_events],
+                  ["documents", importResult.imported_documents],
+                  ["photos", importResult.imported_photos],
+                ] as [string, number | undefined][]).map(([key, val]) => (
+                  <Text key={key}>
+                    {t(`vault_settings.monica_import.${key}`)}: {val ?? 0}
+                  </Text>
+                ))}
+                {(importResult.skipped_count ?? 0) > 0 && (
+                  <Text type="warning">
+                    {t("vault_settings.monica_import.skipped")}: {importResult.skipped_count}
+                  </Text>
+                )}
+                {Array.isArray(importResult.errors) && importResult.errors.length > 0 && (
+                  <Text type="danger">
+                    {t("vault_settings.monica_import.errors")}: {importResult.errors.slice(0, 3).join("; ")}
+                  </Text>
+                )}
+              </Space>
+            }
+            showIcon
+          />
+        )}
+      </Space>
+    );
+  };
+
   const tabItems: TabsProps["items"] = [
     { key: "general", label: t("vault_settings.general"), children: <GeneralTab /> },
     { key: "tabs", label: t("vault_settings.tabs"), children: <TabsTab /> },
@@ -901,6 +1004,7 @@ export default function VaultSettings() {
         title={t("vault_settings.quick_facts")}
         positionEntityType="quickFactTemplates"
     /> },
+    { key: "import", label: t("vault_settings.monica_import.tab_label"), children: <MonicaImportTab /> },
   ];
 
   return (

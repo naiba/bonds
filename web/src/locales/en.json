@@ -1161,7 +1161,28 @@
     "life_event_category_updated": "Life event category updated",
     "life_event_type_updated": "Life event type updated",
     "move_up": "Move Up",
-    "move_down": "Move Down"
+    "move_down": "Move Down",
+    "monica_import": {
+      "tab_label": "Monica Import",
+      "title": "Import from Monica",
+      "description": "Import contacts and related data from a Monica 4.x JSON export file. In Monica, go to Settings > Export to download your data.",
+      "upload_hint": "Click or drag Monica export JSON file here",
+      "importing": "Importing data...",
+      "success": "Import completed",
+      "error": "Import failed",
+      "contacts": "Contacts",
+      "notes": "Notes",
+      "calls": "Calls",
+      "tasks": "Tasks",
+      "reminders": "Reminders",
+      "relationships": "Relationships",
+      "addresses": "Addresses",
+      "life_events": "Life Events",
+      "documents": "Documents",
+      "photos": "Photos",
+      "skipped": "Skipped",
+      "errors": "Errors"
+    }
   },
   "backups": {
     "title": "Backups",
