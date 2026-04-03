@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/search"
 	"gorm.io/gorm"
 )
 
@@ -46,12 +47,22 @@ func getCollectionByType(collections []MonicaCollection, entityType string) []js
 }
 
 type MonicaImportService struct {
-	DB        *gorm.DB
-	UploadDir string // Storage.UploadDir — 为空时跳过文件导入
+	DB           *gorm.DB
+	UploadDir    string // Storage.UploadDir — 为空时跳过文件导入
+	feedRecorder *FeedRecorder
+	searchEngine search.Engine
 }
 
 func NewMonicaImportService(db *gorm.DB, uploadDir string) *MonicaImportService {
 	return &MonicaImportService{DB: db, UploadDir: uploadDir}
+}
+
+func (s *MonicaImportService) SetFeedRecorder(fr *FeedRecorder) {
+	s.feedRecorder = fr
+}
+
+func (s *MonicaImportService) SetSearchEngine(se search.Engine) {
+	s.searchEngine = se
 }
 
 func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.MonicaImportResponse, error) {
@@ -247,6 +258,14 @@ func (s *MonicaImportService) importContact(
 	}
 	if mc.Properties.DeceasedDate != nil {
 		s.importSpecialDate(tx, contact.ID, vaultID, mc.Properties.DeceasedDate, "deceased_date", "Deceased date", resp)
+	}
+
+	if s.feedRecorder != nil {
+		s.feedRecorder.Record(contact.ID, userID, ActionContactCreated, "", nil, nil)
+	}
+
+	if s.searchEngine != nil {
+		s.searchEngine.IndexContact(contact.ID, vaultID, ptrToStr(contact.FirstName), ptrToStr(contact.LastName), ptrToStr(contact.Nickname), ptrToStr(contact.JobPosition))
 	}
 
 	return contact.ID, true, nil

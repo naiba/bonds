@@ -322,7 +322,7 @@
             "created_at": "2023-03-01T00:00:00Z",
             "updated_at": "2023-03-01T00:00:00Z",
             "properties": {
-              "type": "partner",
+              "type": "spouse",
               "contact_is": "550e8400-e29b-41d4-a716-446655440001",
               "of_contact": "550e8400-e29b-41d4-a716-446655440002"
             }
@@ -332,7 +332,7 @@
             "created_at": "2023-03-01T00:00:00Z",
             "updated_at": "2023-03-01T00:00:00Z",
             "properties": {
-              "type": "partner",
+              "type": "spouse",
               "contact_is": "550e8400-e29b-41d4-a716-446655440002",
               "of_contact": "550e8400-e29b-41d4-a716-446655440001"
             }

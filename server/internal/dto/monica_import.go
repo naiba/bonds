@@ -8,6 +8,7 @@ type MonicaImportResponse struct {
 	ImportedTasks         int      `json:"imported_tasks" example:"2"`
 	ImportedReminders     int      `json:"imported_reminders" example:"4"`
 	ImportedAddresses     int      `json:"imported_addresses" example:"8"`
+	ImportedLifeEvents    int      `json:"imported_life_events" example:"2"`
 	ImportedRelationships int      `json:"imported_relationships" example:"6"`
 	ImportedPhotos        int      `json:"imported_photos" example:"12"`
 	ImportedDocuments     int      `json:"imported_documents" example:"1"`

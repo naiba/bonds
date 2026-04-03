@@ -1,0 +1,18 @@
+=== RUN   TestMonicaImportContacts_Basic
+--- PASS: TestMonicaImportContacts_Basic (0.13s)
+=== RUN   TestMonicaImportContacts_Gender
+--- PASS: TestMonicaImportContacts_Gender (0.12s)
+=== RUN   TestMonicaImportContacts_Tags
+--- PASS: TestMonicaImportContacts_Tags (0.12s)
+=== RUN   TestMonicaImportContacts_Birthdate
+--- PASS: TestMonicaImportContacts_Birthdate (0.12s)
+=== RUN   TestMonicaImportContacts_DeceasedDate
+--- PASS: TestMonicaImportContacts_DeceasedDate (0.12s)
+=== RUN   TestMonicaImportContacts_IsPartial
+--- PASS: TestMonicaImportContacts_IsPartial (0.13s)
+=== RUN   TestMonicaImportContacts_IsFavorite
+--- PASS: TestMonicaImportContacts_IsFavorite (0.14s)
+=== RUN   TestMonicaImportContacts_Duplicate
+--- PASS: TestMonicaImportContacts_Duplicate (0.12s)
+PASS
+ok  	github.com/naiba/bonds/internal/services	1.070s

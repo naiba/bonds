@@ -1,0 +1,27 @@
+Task 2: Monica Import DTO Definition
+=====================================
+
+✅ Created: server/internal/dto/monica_import.go
+
+DTO Structure:
+- MonicaImportResponse struct with fields:
+  - ImportedContacts (int)
+  - ImportedNotes (int)
+  - ImportedCalls (int)
+  - ImportedTasks (int)
+  - ImportedReminders (int)
+  - ImportedAddresses (int)
+  - ImportedRelationships (int)
+  - ImportedPhotos (int)
+  - ImportedDocuments (int)
+  - SkippedCount (int)
+  - Errors ([]string)
+
+Build Verification:
+- cd server && go build ./... ✅ Success
+- Commit with proper trailers ✅ Success
+
+Reference Style:
+- Followed server/internal/dto/vcard.go pattern
+- Added json tags with example annotations for Swagger
+- Used omitempty for Errors slice (optional field)
