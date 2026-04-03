@@ -3,6 +3,12 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
+	"gorm.io/gorm"
 )
 
 const MonicaExportVersion = "1.0-preview.1"
@@ -27,6 +33,241 @@ func getCollectionByType(collections []MonicaCollection, entityType string) []js
 		}
 	}
 	return nil
+}
+
+type MonicaImportService struct {
+	DB *gorm.DB
+}
+
+func NewMonicaImportService(db *gorm.DB) *MonicaImportService {
+	return &MonicaImportService{DB: db}
+}
+
+func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.MonicaImportResponse, error) {
+	export, err := ParseMonicaExport(data)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &dto.MonicaImportResponse{Errors: []string{}}
+
+	var vault models.Vault
+	if err := s.DB.First(&vault, "id = ?", vaultID).Error; err != nil {
+		return nil, fmt.Errorf("vault not found: %w", err)
+	}
+	accountID := vault.AccountID
+
+	genderByUUID := buildGenderMap(export.Account.Instance.Genders)
+	fieldTypeByUUID := buildFieldTypeMap(export.Account.Instance.ContactFieldTypes)
+	lifeEventTypeByUUID := buildLifeEventTypeMap(export.Account.Instance.LifeEventTypes)
+	activityTypeByUUID := buildActivityTypeMap(export.Account.Instance.ActivityTypes)
+
+	contactUUIDMap := make(map[string]string)
+
+	contactRaws := getCollectionByType(export.Account.Data, "contacts")
+	for _, raw := range contactRaws {
+		var mc MonicaContact
+		if err := json.Unmarshal(raw, &mc); err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("failed to parse contact: %v", err))
+			resp.SkippedCount++
+			continue
+		}
+
+		contactID, imported, err := s.importContact(s.DB, &mc, vaultID, accountID, userID, genderByUUID, resp)
+		if err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("contact %s: %v", mc.UUID, err))
+			resp.SkippedCount++
+			continue
+		}
+
+		contactUUIDMap[mc.UUID] = contactID
+		if imported {
+			resp.ImportedContacts++
+		}
+	}
+
+	// 其余 Phase (sub-resources, relationships, files) 留给后续 Task 4/5/6
+	_ = fieldTypeByUUID
+	_ = lifeEventTypeByUUID
+	_ = activityTypeByUUID
+	_ = contactUUIDMap
+
+	return resp, nil
+}
+
+func (s *MonicaImportService) importContact(
+	tx *gorm.DB, mc *MonicaContact, vaultID, accountID, userID string,
+	genderByUUID map[string]string, resp *dto.MonicaImportResponse,
+) (string, bool, error) {
+	var existingContact models.Contact
+	if err := tx.Where("vault_id = ? AND distant_uuid = ?", vaultID, mc.UUID).First(&existingContact).Error; err == nil {
+		resp.SkippedCount++
+		return existingContact.ID, false, nil
+	}
+
+	var genderID *uint
+	if mc.Properties.Gender != "" {
+		if genderName, ok := genderByUUID[mc.Properties.Gender]; ok {
+			var gender models.Gender
+			if err := tx.Where("account_id = ? AND name = ?", accountID, genderName).First(&gender).Error; err == nil {
+				genderID = &gender.ID
+			}
+		}
+	}
+
+	listed := !mc.Properties.IsPartial
+	contact := models.Contact{
+		VaultID:     vaultID,
+		FirstName:   strPtrOrNil(mc.Properties.FirstName),
+		MiddleName:  strPtrOrNil(mc.Properties.MiddleName),
+		LastName:    strPtrOrNil(mc.Properties.LastName),
+		Nickname:    strPtrOrNil(mc.Properties.Nickname),
+		JobPosition: strPtrOrNil(mc.Properties.Job),
+		GenderID:    genderID,
+		DistantUUID: strPtrOrNil(mc.UUID),
+		Listed:      listed,
+	}
+	if err := tx.Create(&contact).Error; err != nil {
+		return "", false, fmt.Errorf("create contact: %w", err)
+	}
+	// GORM zero-value bool 陷阱：Listed default:true，要设为 false 必须先 Create 再 Update
+	if !listed {
+		tx.Model(&contact).Update("listed", false)
+	}
+
+	cvu := models.ContactVaultUser{
+		ContactID:  contact.ID,
+		VaultID:    vaultID,
+		UserID:     userID,
+		IsFavorite: mc.Properties.IsStarred,
+	}
+	if err := tx.Create(&cvu).Error; err != nil {
+		return "", false, fmt.Errorf("create contact_vault_user: %w", err)
+	}
+
+	for _, tagName := range mc.Properties.Tags {
+		if tagName == "" {
+			continue
+		}
+		label, err := s.findOrCreateLabel(tx, vaultID, tagName)
+		if err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("tag %q: %v", tagName, err))
+			continue
+		}
+		cl := models.ContactLabel{
+			ContactID: contact.ID,
+			LabelID:   label.ID,
+		}
+		tx.Create(&cl) // 忽略错误（已存在则跳过）
+	}
+
+	if mc.Properties.Birthdate != nil {
+		s.importSpecialDate(tx, contact.ID, vaultID, mc.Properties.Birthdate, "birthdate", "Birthdate", resp)
+	}
+	if mc.Properties.DeceasedDate != nil {
+		s.importSpecialDate(tx, contact.ID, vaultID, mc.Properties.DeceasedDate, "deceased_date", "Deceased date", resp)
+	}
+
+	return contact.ID, true, nil
+}
+
+func (s *MonicaImportService) findOrCreateLabel(tx *gorm.DB, vaultID, name string) (*models.Label, error) {
+	slug := slugify(name)
+	var label models.Label
+	err := tx.Where("vault_id = ? AND slug = ?", vaultID, slug).First(&label).Error
+	if err == nil {
+		return &label, nil
+	}
+	label = models.Label{
+		VaultID: vaultID,
+		Name:    name,
+		Slug:    slug,
+	}
+	if err := tx.Create(&label).Error; err != nil {
+		return nil, err
+	}
+	return &label, nil
+}
+
+func (s *MonicaImportService) importSpecialDate(
+	tx *gorm.DB, contactID, vaultID string,
+	sd *MonicaSpecialDate, internalType, label string,
+	resp *dto.MonicaImportResponse,
+) {
+	var dateType models.ContactImportantDateType
+	if err := tx.Where("vault_id = ? AND internal_type = ?", vaultID, internalType).First(&dateType).Error; err != nil {
+		return
+	}
+
+	var year, month, day *int
+	if sd.Date != "" && !sd.IsAgeBased {
+		// Monica 日期格式可能是 "2006-01-02" 或 "2006-01-02T15:04:05Z"(ISO 8601)
+		dateStr := sd.Date
+		var t time.Time
+		var parseErr error
+		if t, parseErr = time.Parse(time.RFC3339, dateStr); parseErr != nil {
+			t, parseErr = time.Parse("2006-01-02", dateStr)
+		}
+		if parseErr == nil {
+			if !sd.IsYearUnknown {
+				y := t.Year()
+				year = &y
+			}
+			m := int(t.Month())
+			d := t.Day()
+			month = &m
+			day = &d
+		}
+	}
+
+	dtID := dateType.ID
+	cid := models.ContactImportantDate{
+		ContactID:                  contactID,
+		ContactImportantDateTypeID: &dtID,
+		Label:                      label,
+		Year:                       year,
+		Month:                      month,
+		Day:                        day,
+	}
+	if err := tx.Create(&cid).Error; err != nil {
+		resp.Errors = append(resp.Errors, fmt.Sprintf("importantdate %s: %v", internalType, err))
+	}
+}
+
+func slugify(name string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
+}
+
+func buildGenderMap(refs []MonicaGenderRef) map[string]string {
+	m := make(map[string]string, len(refs))
+	for _, r := range refs {
+		m[r.UUID] = r.Properties.Name
+	}
+	return m
+}
+
+func buildFieldTypeMap(refs []MonicaContactFieldTypeRef) map[string]MonicaContactFieldTypeRef {
+	m := make(map[string]MonicaContactFieldTypeRef, len(refs))
+	for _, r := range refs {
+		m[r.UUID] = r
+	}
+	return m
+}
+
+func buildLifeEventTypeMap(refs []MonicaLifeEventTypeRef) map[string]string {
+	m := make(map[string]string, len(refs))
+	for _, r := range refs {
+		m[r.UUID] = r.Properties.Name
+	}
+	return m
+}
+
+func buildActivityTypeMap(refs []MonicaActivityTypeRef) map[string]string {
+	m := make(map[string]string, len(refs))
+	for _, r := range refs {
+		m[r.UUID] = r.Properties.Name
+	}
+	return m
 }
 
 // ==== Top-level structs ====
