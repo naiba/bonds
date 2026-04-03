@@ -1,0 +1,456 @@
+{
+  "version": "1.0-preview.1",
+  "app_version": "4.1.2",
+  "export_date": "2024-01-15T10:30:00Z",
+  "url": "https://app.monicahq.com",
+  "exported_by": "test@example.com",
+  "account": {
+    "uuid": "550e8400-e29b-41d4-a716-446655440000",
+    "created_at": "2023-01-01T00:00:00Z",
+    "updated_at": "2024-01-15T10:30:00Z",
+    "data": [
+      {
+        "count": 3,
+        "type": "contacts",
+        "values": [
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440001",
+            "created_at": "2023-01-10T08:00:00Z",
+            "updated_at": "2024-01-10T12:00:00Z",
+            "properties": {
+              "first_name": "John",
+              "middle_name": "Michael",
+              "last_name": "Doe",
+              "nickname": "Johnny",
+              "description": "College friend",
+              "is_starred": true,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "job": "Software Engineer",
+              "company": "Acme Corp",
+              "food_preferences": "Vegetarian",
+              "last_talked_to": "2024-01-05T00:00:00Z",
+              "gender": "550e8400-e29b-41d4-a716-446655440020",
+              "tags": ["friend", "college"],
+              "birthdate": {
+                "uuid": "550e8400-e29b-41d4-a716-446655440030",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "1990-05-15T00:00:00Z"
+              },
+              "first_met_date": {
+                "uuid": "550e8400-e29b-41d4-a716-446655440031",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2010-09-01T00:00:00Z"
+              },
+              "first_met_through": "550e8400-e29b-41d4-a716-446655440002",
+              "avatar": {
+                "avatar_source": "photo",
+                "avatar_photo": "550e8400-e29b-41d4-a716-446655440040",
+                "has_avatar": true
+              }
+            },
+            "data": [
+              {
+                "count": 1,
+                "type": "notes",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440050",
+                    "created_at": "2023-06-01T10:00:00Z",
+                    "updated_at": "2023-06-01T10:00:00Z",
+                    "properties": {
+                      "body": "Met at the reunion last week. He looks great!",
+                      "is_favorite": true
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "calls",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440051",
+                    "created_at": "2024-01-05T14:00:00Z",
+                    "updated_at": "2024-01-05T14:00:00Z",
+                    "properties": {
+                      "called_at": "2024-01-05T14:00:00Z",
+                      "content": "Discussed weekend plans",
+                      "contact_called": false,
+                      "emotions": ["happy"]
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "tasks",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440052",
+                    "created_at": "2024-01-06T09:00:00Z",
+                    "updated_at": "2024-01-06T09:00:00Z",
+                    "properties": {
+                      "title": "Buy birthday gift",
+                      "description": "Get something nice for his birthday",
+                      "completed": false,
+                      "completed_at": ""
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "reminders",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440053",
+                    "created_at": "2023-01-15T00:00:00Z",
+                    "updated_at": "2023-01-15T00:00:00Z",
+                    "properties": {
+                      "initial_date": "2024-05-15",
+                      "title": "John's birthday",
+                      "description": "Don't forget to call!",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "inactive": false
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "addresses",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440054",
+                    "created_at": "2023-02-01T00:00:00Z",
+                    "updated_at": "2023-02-01T00:00:00Z",
+                    "properties": {
+                      "name": "Home",
+                      "street": "123 Main St",
+                      "city": "Springfield",
+                      "province": "IL",
+                      "postal_code": "62701",
+                      "latitude": 39.7817,
+                      "longitude": -89.6501,
+                      "country": "US"
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "pets",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440055",
+                    "created_at": "2023-03-01T00:00:00Z",
+                    "updated_at": "2023-03-01T00:00:00Z",
+                    "properties": {
+                      "name": "Buddy",
+                      "category": "dog"
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "gifts",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440056",
+                    "created_at": "2023-12-20T00:00:00Z",
+                    "updated_at": "2023-12-20T00:00:00Z",
+                    "properties": {
+                      "name": "Book: Clean Code",
+                      "comment": "He loves programming books",
+                      "url": "https://example.com/book",
+                      "amount": 35.99,
+                      "status": "offered",
+                      "date": "2023-12-25",
+                      "recipient": "550e8400-e29b-41d4-a716-446655440001",
+                      "photos": []
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "debts",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440057",
+                    "created_at": "2024-01-02T00:00:00Z",
+                    "updated_at": "2024-01-02T00:00:00Z",
+                    "properties": {
+                      "amount": 50.00,
+                      "currency": "USD",
+                      "status": "inprogress",
+                      "in_debt": true
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "contact_fields",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440058",
+                    "created_at": "2023-01-10T08:00:00Z",
+                    "updated_at": "2023-01-10T08:00:00Z",
+                    "properties": {
+                      "data": "john.doe@example.com",
+                      "type": "550e8400-e29b-41d4-a716-446655440021"
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "life_events",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440059",
+                    "created_at": "2023-09-01T00:00:00Z",
+                    "updated_at": "2023-09-01T00:00:00Z",
+                    "properties": {
+                      "name": "Got promoted",
+                      "note": "Promoted to senior engineer",
+                      "happened_at": "2023-08-15T00:00:00Z",
+                      "type": "550e8400-e29b-41d4-a716-446655440023"
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "conversations",
+                "values": [
+                  {
+                    "uuid": "550e8400-e29b-41d4-a716-446655440060",
+                    "created_at": "2024-01-05T14:00:00Z",
+                    "updated_at": "2024-01-05T14:00:00Z",
+                    "properties": {
+                      "happened_at": "2024-01-05T14:00:00Z",
+                      "messages": [
+                        {
+                          "uuid": "550e8400-e29b-41d4-a716-446655440061",
+                          "created_at": "2024-01-05T14:00:00Z",
+                          "updated_at": "2024-01-05T14:00:00Z",
+                          "properties": {
+                            "content": "Hey, how are you?",
+                            "written_at": "2024-01-05T14:00:00Z",
+                            "written_by_me": true
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "activities",
+                "values": ["550e8400-e29b-41d4-a716-446655440010"]
+              },
+              {
+                "count": 1,
+                "type": "photos",
+                "values": ["550e8400-e29b-41d4-a716-446655440040"]
+              },
+              {
+                "count": 1,
+                "type": "documents",
+                "values": ["550e8400-e29b-41d4-a716-446655440041"]
+              }
+            ]
+          },
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440002",
+            "created_at": "2023-02-15T08:00:00Z",
+            "updated_at": "2024-01-12T09:00:00Z",
+            "properties": {
+              "first_name": "Jane",
+              "last_name": "Smith",
+              "nickname": "",
+              "description": "",
+              "is_starred": false,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": true,
+              "job": "",
+              "company": "",
+              "food_preferences": "",
+              "last_talked_to": "",
+              "gender": "550e8400-e29b-41d4-a716-446655440020",
+              "tags": [],
+              "deceased_date": {
+                "uuid": "550e8400-e29b-41d4-a716-446655440032",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-01-10T00:00:00Z"
+              }
+            },
+            "data": []
+          },
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440003",
+            "created_at": "2023-06-20T10:00:00Z",
+            "updated_at": "2023-06-20T10:00:00Z",
+            "properties": {
+              "first_name": "Bob",
+              "is_starred": false,
+              "is_partial": true,
+              "is_active": true,
+              "is_dead": false
+            },
+            "data": []
+          }
+        ]
+      },
+      {
+        "count": 2,
+        "type": "relationships",
+        "values": [
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440070",
+            "created_at": "2023-03-01T00:00:00Z",
+            "updated_at": "2023-03-01T00:00:00Z",
+            "properties": {
+              "type": "partner",
+              "contact_is": "550e8400-e29b-41d4-a716-446655440001",
+              "of_contact": "550e8400-e29b-41d4-a716-446655440002"
+            }
+          },
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440071",
+            "created_at": "2023-03-01T00:00:00Z",
+            "updated_at": "2023-03-01T00:00:00Z",
+            "properties": {
+              "type": "partner",
+              "contact_is": "550e8400-e29b-41d4-a716-446655440002",
+              "of_contact": "550e8400-e29b-41d4-a716-446655440001"
+            }
+          }
+        ]
+      },
+      {
+        "count": 1,
+        "type": "activities",
+        "values": [
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440010",
+            "created_at": "2024-01-03T18:00:00Z",
+            "updated_at": "2024-01-03T18:00:00Z",
+            "properties": {
+              "summary": "Dinner at Italian restaurant",
+              "description": "Had a great time catching up over pasta",
+              "happened_at": "2024-01-03T18:00:00Z",
+              "type": "550e8400-e29b-41d4-a716-446655440022"
+            }
+          }
+        ]
+      },
+      {
+        "count": 1,
+        "type": "photos",
+        "values": [
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440040",
+            "created_at": "2023-07-01T00:00:00Z",
+            "updated_at": "2023-07-01T00:00:00Z",
+            "properties": {
+              "original_filename": "john-profile.png",
+              "filesize": 68,
+              "mime_type": "image/png",
+              "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            }
+          }
+        ]
+      },
+      {
+        "count": 1,
+        "type": "documents",
+        "values": [
+          {
+            "uuid": "550e8400-e29b-41d4-a716-446655440041",
+            "created_at": "2023-08-01T00:00:00Z",
+            "updated_at": "2023-08-01T00:00:00Z",
+            "properties": {
+              "original_filename": "resume.pdf",
+              "filesize": 4,
+              "type": "pdf",
+              "mime_type": "application/pdf",
+              "dataUrl": "data:application/pdf;base64,AAAA"
+            }
+          }
+        ]
+      }
+    ],
+    "properties": {
+      "default_gender": "550e8400-e29b-41d4-a716-446655440020"
+    },
+    "instance": {
+      "genders": [
+        {
+          "uuid": "550e8400-e29b-41d4-a716-446655440020",
+          "properties": {
+            "name": "Male"
+          }
+        }
+      ],
+      "contact_field_types": [
+        {
+          "uuid": "550e8400-e29b-41d4-a716-446655440021",
+          "properties": {
+            "name": "Email",
+            "protocol": "mailto:",
+            "type": "email"
+          }
+        }
+      ],
+      "activity_types": [
+        {
+          "uuid": "550e8400-e29b-41d4-a716-446655440022",
+          "properties": {
+            "name": "Ate together",
+            "translation_key": "ate_together",
+            "category": "food"
+          }
+        }
+      ],
+      "activity_type_categories": [
+        {
+          "uuid": "550e8400-e29b-41d4-a716-446655440025",
+          "properties": {
+            "name": "Food",
+            "translation_key": "food"
+          }
+        }
+      ],
+      "life_event_types": [
+        {
+          "uuid": "550e8400-e29b-41d4-a716-446655440023",
+          "properties": {
+            "name": "New job",
+            "category": "550e8400-e29b-41d4-a716-446655440024"
+          }
+        }
+      ],
+      "life_event_categories": [
+        {
+          "uuid": "550e8400-e29b-41d4-a716-446655440024",
+          "properties": {
+            "name": "Career & education",
+            "translation_key": "career_education"
+          }
+        }
+      ]
+    }
+  }
+}
