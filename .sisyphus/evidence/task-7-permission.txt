@@ -1,0 +1,10 @@
+Task 7: Permission Verification
+================================
+
+Route registered under vaultSettings group which uses:
+  VaultPermissionMiddleware(vaultService, models.PermissionManager)
+
+This means:
+- Only Manager-level users can access the import endpoint
+- Non-members get 403 (verified by TestMonicaImport_PermissionDenied)
+- Editor/Viewer users would also get 403

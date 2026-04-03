@@ -1,11 +1,16 @@
 package services
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
@@ -13,14 +18,19 @@ import (
 
 const MonicaExportVersion = "1.0-preview.1"
 
+var (
+	ErrMonicaInvalidJSON    = errors.New("invalid Monica export JSON")
+	ErrMonicaInvalidVersion = errors.New("unsupported Monica export version")
+)
+
 // ParseMonicaExport 解析 Monica 4.x JSON 导出数据
 func ParseMonicaExport(data []byte) (*MonicaExport, error) {
 	var export MonicaExport
 	if err := json.Unmarshal(data, &export); err != nil {
-		return nil, fmt.Errorf("failed to parse Monica export: %w", err)
+		return nil, fmt.Errorf("%w: %v", ErrMonicaInvalidJSON, err)
 	}
 	if export.Version != MonicaExportVersion {
-		return nil, fmt.Errorf("unsupported Monica export version: %s (expected %s)", export.Version, MonicaExportVersion)
+		return nil, fmt.Errorf("%w: %s (expected %s)", ErrMonicaInvalidVersion, export.Version, MonicaExportVersion)
 	}
 	return &export, nil
 }
@@ -36,11 +46,12 @@ func getCollectionByType(collections []MonicaCollection, entityType string) []js
 }
 
 type MonicaImportService struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	UploadDir string // Storage.UploadDir — 为空时跳过文件导入
 }
 
-func NewMonicaImportService(db *gorm.DB) *MonicaImportService {
-	return &MonicaImportService{DB: db}
+func NewMonicaImportService(db *gorm.DB, uploadDir string) *MonicaImportService {
+	return &MonicaImportService{DB: db, UploadDir: uploadDir}
 }
 
 func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.MonicaImportResponse, error) {
@@ -86,11 +97,81 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 		}
 	}
 
-	// 其余 Phase (sub-resources, relationships, files) 留给后续 Task 4/5/6
-	_ = fieldTypeByUUID
-	_ = lifeEventTypeByUUID
-	_ = activityTypeByUUID
-	_ = contactUUIDMap
+	// 获取影子联系人的 ID (用于 Loan 中的 loaner/loanee)
+	userContactID := ""
+	var uv models.UserVault
+	if err := s.DB.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err == nil {
+		userContactID = uv.ContactID
+	}
+
+	activityByUUID := buildActivityContentMap(export.Account.Data, activityTypeByUUID)
+
+	// Phase 2: 导入子资源 (需要重新遍历 contactRaws)
+	for _, raw := range contactRaws {
+		var mc MonicaContact
+		if err := json.Unmarshal(raw, &mc); err != nil {
+			continue
+		}
+		contactID, ok := contactUUIDMap[mc.UUID]
+		if !ok {
+			continue
+		}
+		s.importContactSubResources(
+			s.DB, &mc, contactID, vaultID, accountID, userID, userContactID,
+			fieldTypeByUUID, lifeEventTypeByUUID, activityByUUID, resp,
+		)
+	}
+
+	// Phase 3: 导入 Relationships (account-level, 需要 contactUUIDMap 完成)
+	relRaws := getCollectionByType(export.Account.Data, "relationships")
+	for _, raw := range relRaws {
+		var mr MonicaRelationship
+		if err := json.Unmarshal(raw, &mr); err != nil {
+			continue
+		}
+
+		contactIsID, ok1 := contactUUIDMap[mr.Properties.ContactIs]
+		ofContactID, ok2 := contactUUIDMap[mr.Properties.OfContact]
+		if !ok1 || !ok2 {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("relationship: unresolved contacts %s/%s", mr.Properties.ContactIs, mr.Properties.OfContact))
+			continue
+		}
+
+		// 按名称匹配 RelationshipType（先 Name 再 NameReverseRelationship，case-insensitive）
+		var relType models.RelationshipType
+		typeName := mr.Properties.Type
+		if err := s.DB.Where("relationship_group_type_id IN (SELECT id FROM relationship_group_types WHERE account_id = ?) AND LOWER(name) = LOWER(?)", accountID, typeName).First(&relType).Error; err != nil {
+			if err := s.DB.Where("relationship_group_type_id IN (SELECT id FROM relationship_group_types WHERE account_id = ?) AND LOWER(name_reverse_relationship) = LOWER(?)", accountID, typeName).First(&relType).Error; err != nil {
+				resp.Errors = append(resp.Errors, fmt.Sprintf("relationship type not found: %s", typeName))
+				continue
+			}
+		}
+
+		// 检查重复
+		var existing models.Relationship
+		if err := s.DB.Where("contact_id = ? AND related_contact_id = ? AND relationship_type_id = ?", contactIsID, ofContactID, relType.ID).First(&existing).Error; err != nil {
+			rel := models.Relationship{
+				ContactID:          contactIsID,
+				RelatedContactID:   ofContactID,
+				RelationshipTypeID: relType.ID,
+			}
+			if err := s.DB.Create(&rel).Error; err == nil {
+				resp.ImportedRelationships++
+			}
+		}
+	}
+
+	// Phase 4: 导入文件 (photos + documents)
+	if s.UploadDir != "" {
+		s.importPhotos(export.Account.Data, contactUUIDMap, vaultID, resp)
+		s.importDocuments(export.Account.Data, contactUUIDMap, vaultID, resp)
+	} else {
+		photoCount := len(getCollectionByType(export.Account.Data, "photos"))
+		docCount := len(getCollectionByType(export.Account.Data, "documents"))
+		if photoCount+docCount > 0 {
+			resp.Errors = append(resp.Errors, "photo/document import skipped: no upload directory configured")
+		}
+	}
 
 	return resp, nil
 }
@@ -234,6 +315,476 @@ func (s *MonicaImportService) importSpecialDate(
 	}
 }
 
+func (s *MonicaImportService) importContactSubResources(
+	tx *gorm.DB,
+	mc *MonicaContact,
+	contactID, vaultID, accountID, userID, userContactID string,
+	fieldTypeByUUID map[string]MonicaContactFieldTypeRef,
+	lifeEventTypeByUUID map[string]string,
+	activityByUUID map[string]string,
+	resp *dto.MonicaImportResponse,
+) {
+	s.importNotes(tx, mc, contactID, vaultID, userID, resp)
+	s.importCalls(tx, mc, contactID, userID, resp)
+	s.importTasks(tx, mc, contactID, userID, resp)
+	s.importReminders(tx, mc, contactID, resp)
+	s.importAddresses(tx, mc, contactID, vaultID, accountID, resp)
+	s.importContactFields(tx, mc, contactID, accountID, fieldTypeByUUID, resp)
+	s.importPets(tx, mc, contactID, accountID, resp)
+	s.importGifts(tx, mc, contactID, resp)
+	s.importDebtsAsLoans(tx, mc, contactID, vaultID, userContactID, resp)
+	s.importLifeEvents(tx, mc, contactID, vaultID, lifeEventTypeByUUID, resp)
+	s.importActivitiesAsNotes(tx, mc, contactID, vaultID, userID, activityByUUID, resp)
+	s.importConversationsAsNotes(tx, mc, contactID, vaultID, userID, resp)
+}
+
+func (s *MonicaImportService) importNotes(
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, userID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "notes") {
+		var mn MonicaNote
+		if err := json.Unmarshal(raw, &mn); err != nil {
+			continue
+		}
+		note := models.Note{
+			ContactID: contactID,
+			VaultID:   vaultID,
+			Body:      mn.Properties.Body,
+			AuthorID:  &userID,
+		}
+		if err := tx.Create(&note).Error; err == nil {
+			resp.ImportedNotes++
+		}
+	}
+}
+
+func (s *MonicaImportService) importCalls(
+	tx *gorm.DB, mc *MonicaContact, contactID, userID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "calls") {
+		var mcall MonicaCall
+		if err := json.Unmarshal(raw, &mcall); err != nil {
+			continue
+		}
+		calledAt := time.Now()
+		if mcall.Properties.CalledAt != "" {
+			if t, err := time.Parse(time.RFC3339, mcall.Properties.CalledAt); err == nil {
+				calledAt = t
+			} else if t, err := time.Parse("2006-01-02", mcall.Properties.CalledAt); err == nil {
+				calledAt = t
+			}
+		}
+		whoInitiated := "user"
+		if mcall.Properties.ContactCalled {
+			whoInitiated = "contact"
+		}
+		call := models.Call{
+			ContactID:    contactID,
+			AuthorID:     &userID,
+			AuthorName:   "Monica Import",
+			CalledAt:     calledAt,
+			Type:         "phone",
+			WhoInitiated: whoInitiated,
+			Answered:     true,
+			Description:  strPtrOrNil(mcall.Properties.Content),
+		}
+		if err := tx.Create(&call).Error; err == nil {
+			resp.ImportedCalls++
+		}
+	}
+}
+
+func (s *MonicaImportService) importTasks(
+	tx *gorm.DB, mc *MonicaContact, contactID, userID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "tasks") {
+		var mt MonicaTask
+		if err := json.Unmarshal(raw, &mt); err != nil {
+			continue
+		}
+		task := models.ContactTask{
+			ContactID:  contactID,
+			Label:      mt.Properties.Title,
+			AuthorID:   &userID,
+			AuthorName: "Monica Import",
+			Completed:  mt.Properties.Completed,
+		}
+		if mt.Properties.Description != "" {
+			task.Description = strPtrOrNil(mt.Properties.Description)
+		}
+		if mt.Properties.CompletedAt != "" {
+			if t, err := time.Parse(time.RFC3339, mt.Properties.CompletedAt); err == nil {
+				task.CompletedAt = &t
+			}
+		}
+		if err := tx.Create(&task).Error; err == nil {
+			resp.ImportedTasks++
+		}
+	}
+}
+
+func (s *MonicaImportService) importReminders(
+	tx *gorm.DB, mc *MonicaContact, contactID string,
+	resp *dto.MonicaImportResponse,
+) {
+	freqMap := map[string]string{
+		"one_time": "one_time",
+		"week":     "recurring_week",
+		"month":    "recurring_month",
+		"year":     "recurring_year",
+	}
+	for _, raw := range getCollectionByType(mc.Data, "reminders") {
+		var mr MonicaReminder
+		if err := json.Unmarshal(raw, &mr); err != nil {
+			continue
+		}
+		rType := "one_time"
+		if t, ok := freqMap[mr.Properties.FrequencyType]; ok {
+			rType = t
+		}
+		reminder := models.ContactReminder{
+			ContactID:       contactID,
+			Label:           mr.Properties.Title,
+			Type:            rType,
+			FrequencyNumber: &mr.Properties.FrequencyNumber,
+		}
+		if mr.Properties.InitialDate != "" {
+			for _, layout := range []string{"2006-01-02", time.RFC3339} {
+				if t, err := time.Parse(layout, mr.Properties.InitialDate); err == nil {
+					d := t.Day()
+					m := int(t.Month())
+					y := t.Year()
+					reminder.Day = &d
+					reminder.Month = &m
+					reminder.Year = &y
+					break
+				}
+			}
+		}
+		if err := tx.Create(&reminder).Error; err == nil {
+			resp.ImportedReminders++
+		}
+	}
+}
+
+func (s *MonicaImportService) importAddresses(
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, accountID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "addresses") {
+		var ma MonicaAddress
+		if err := json.Unmarshal(raw, &ma); err != nil {
+			continue
+		}
+		var addrType models.AddressType
+		if err := tx.Where("account_id = ? AND LOWER(name) = LOWER(?)", accountID, ma.Properties.Name).First(&addrType).Error; err != nil {
+			tx.Where("account_id = ?", accountID).First(&addrType)
+		}
+		addr := models.Address{
+			VaultID:       vaultID,
+			AddressTypeID: &addrType.ID,
+			Line1:         strPtrOrNil(ma.Properties.Street),
+			City:          strPtrOrNil(ma.Properties.City),
+			Province:      strPtrOrNil(ma.Properties.Province),
+			PostalCode:    strPtrOrNil(ma.Properties.PostalCode),
+			Country:       strPtrOrNil(ma.Properties.Country),
+		}
+		if ma.Properties.Latitude != 0 {
+			addr.Latitude = &ma.Properties.Latitude
+		}
+		if ma.Properties.Longitude != 0 {
+			addr.Longitude = &ma.Properties.Longitude
+		}
+		if err := tx.Create(&addr).Error; err != nil {
+			continue
+		}
+		ca := models.ContactAddress{ContactID: contactID, AddressID: addr.ID}
+		if err := tx.Create(&ca).Error; err == nil {
+			resp.ImportedAddresses++
+		}
+	}
+}
+
+func (s *MonicaImportService) importContactFields(
+	tx *gorm.DB, mc *MonicaContact, contactID, accountID string,
+	fieldTypeByUUID map[string]MonicaContactFieldTypeRef,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "contact_fields") {
+		var mcf MonicaContactField
+		if err := json.Unmarshal(raw, &mcf); err != nil {
+			continue
+		}
+		fieldTypeRef, ok := fieldTypeByUUID[mcf.Properties.Type]
+		if !ok {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("unknown contact_field type UUID: %s", mcf.Properties.Type))
+			continue
+		}
+		var ciType models.ContactInformationType
+		found := false
+		if fieldTypeRef.Properties.Protocol != "" {
+			if err := tx.Where("account_id = ? AND protocol = ?", accountID, fieldTypeRef.Properties.Protocol).First(&ciType).Error; err == nil {
+				found = true
+			}
+		}
+		if !found && fieldTypeRef.Properties.Type != "" {
+			if err := tx.Where("account_id = ? AND type = ?", accountID, fieldTypeRef.Properties.Type).First(&ciType).Error; err == nil {
+				found = true
+			}
+		}
+		if !found {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("unmatched contact_field type: %s", fieldTypeRef.Properties.Name))
+			continue
+		}
+		ci := models.ContactInformation{
+			ContactID: contactID,
+			TypeID:    ciType.ID,
+			Data:      mcf.Properties.Data,
+		}
+		tx.Create(&ci)
+	}
+}
+
+func (s *MonicaImportService) importPets(
+	tx *gorm.DB, mc *MonicaContact, contactID, accountID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "pets") {
+		var mp MonicaPet
+		if err := json.Unmarshal(raw, &mp); err != nil {
+			continue
+		}
+		var petCat models.PetCategory
+		if err := tx.Where("account_id = ? AND LOWER(name) = LOWER(?)", accountID, mp.Properties.Category).First(&petCat).Error; err != nil {
+			tx.Where("account_id = ?", accountID).First(&petCat)
+		}
+		name := strPtrOrNil(mp.Properties.Name)
+		pet := models.Pet{
+			ContactID:     contactID,
+			Name:          name,
+			PetCategoryID: petCat.ID,
+		}
+		tx.Create(&pet)
+	}
+}
+
+func (s *MonicaImportService) importGifts(
+	tx *gorm.DB, mc *MonicaContact, contactID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "gifts") {
+		var mg MonicaGift
+		if err := json.Unmarshal(raw, &mg); err != nil {
+			continue
+		}
+		giftType := "given"
+		if mg.Properties.Status == "received" {
+			giftType = "received"
+		}
+		gift := models.Gift{
+			ContactID:   contactID,
+			Name:        mg.Properties.Name,
+			Type:        giftType,
+			Description: strPtrOrNil(mg.Properties.Comment),
+		}
+		if mg.Properties.Amount > 0 {
+			amt := int(mg.Properties.Amount * 100)
+			gift.EstimatedPrice = &amt
+		}
+		if mg.Properties.Date != "" {
+			if t, err := time.Parse("2006-01-02", mg.Properties.Date); err == nil {
+				if giftType == "received" {
+					gift.ReceivedAt = &t
+				} else {
+					gift.GivenAt = &t
+				}
+			}
+		}
+		tx.Create(&gift)
+	}
+}
+
+func (s *MonicaImportService) importDebtsAsLoans(
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, userContactID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "debts") {
+		var md MonicaDebt
+		if err := json.Unmarshal(raw, &md); err != nil {
+			continue
+		}
+		if userContactID == "" {
+			resp.Errors = append(resp.Errors, "debt: no user shadow contact")
+			continue
+		}
+		loanType := "lent_to"
+		loaner, loanee := userContactID, contactID
+		if md.Properties.InDebt {
+			loanType = "borrowed_from"
+			loaner, loanee = contactID, userContactID
+		}
+		amt := int(md.Properties.Amount * 100)
+		loan := models.Loan{
+			VaultID:    vaultID,
+			Name:       "Monica Import",
+			Type:       loanType,
+			AmountLent: &amt,
+		}
+		if md.Properties.Currency != "" {
+			var cur models.Currency
+			if err := tx.Where("code = ?", strings.ToUpper(md.Properties.Currency)).First(&cur).Error; err == nil {
+				loan.CurrencyID = &cur.ID
+			}
+		}
+		if err := tx.Create(&loan).Error; err != nil {
+			continue
+		}
+		// GORM zero-value bool u9677u9631uff1aSettled default:falseuff0cu5df2u7ecfu7b26u5408u521du59cbu503cuff0cu5b8cu6210u65f6u518d Update
+		if md.Properties.Status == "complete" {
+			tx.Model(&loan).Update("settled", true)
+		}
+		cl := models.ContactLoan{LoanID: loan.ID, LoanerID: loaner, LoaneeID: loanee}
+		tx.Create(&cl)
+	}
+}
+
+func (s *MonicaImportService) importLifeEvents(
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID string,
+	lifeEventTypeByUUID map[string]string,
+	resp *dto.MonicaImportResponse,
+) {
+	lifeRaws := getCollectionByType(mc.Data, "life_events")
+	if len(lifeRaws) == 0 {
+		return
+	}
+	now := time.Now()
+	teLabel := "Monica Import"
+	te := models.TimelineEvent{VaultID: vaultID, Label: &teLabel, StartedAt: now}
+	if err := tx.Create(&te).Error; err != nil {
+		return
+	}
+
+	for _, raw := range lifeRaws {
+		var ml MonicaLifeEvent
+		if err := json.Unmarshal(raw, &ml); err != nil {
+			continue
+		}
+		happenedAt := now
+		if ml.Properties.HappenedAt != "" {
+			if t, err := time.Parse(time.RFC3339, ml.Properties.HappenedAt); err == nil {
+				happenedAt = t
+			} else if t, err := time.Parse("2006-01-02", ml.Properties.HappenedAt); err == nil {
+				happenedAt = t
+			}
+		}
+		var let models.LifeEventType
+		if err := tx.Joins("JOIN life_event_categories ON life_event_types.life_event_category_id = life_event_categories.id").
+			Where("life_event_categories.vault_id = ?", vaultID).
+			First(&let).Error; err != nil {
+			continue
+		}
+		le := models.LifeEvent{
+			TimelineEventID: te.ID,
+			LifeEventTypeID: let.ID,
+			HappenedAt:      happenedAt,
+			Summary:         strPtrOrNil(ml.Properties.Name),
+			Description:     strPtrOrNil(ml.Properties.Note),
+		}
+		if err := tx.Create(&le).Error; err != nil {
+			continue
+		}
+		lep := models.LifeEventParticipant{ContactID: contactID, LifeEventID: le.ID}
+		tx.Create(&lep)
+		resp.ImportedLifeEvents++
+	}
+}
+
+func (s *MonicaImportService) importActivitiesAsNotes(
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, userID string,
+	activityByUUID map[string]string,
+	resp *dto.MonicaImportResponse,
+) {
+	// contact.data[type="activities"] values u662f UUID string u6570u7ec4uff0cu975e MonicaActivity u5bf9u8c61
+	for _, raw := range getCollectionByType(mc.Data, "activities") {
+		var uuidStr string
+		if err := json.Unmarshal(raw, &uuidStr); err != nil {
+			continue
+		}
+		activityContent, ok := activityByUUID[uuidStr]
+		if !ok {
+			continue
+		}
+		note := models.Note{
+			ContactID: contactID,
+			VaultID:   vaultID,
+			Body:      activityContent,
+			AuthorID:  &userID,
+		}
+		if err := tx.Create(&note).Error; err == nil {
+			resp.ImportedNotes++
+		}
+	}
+}
+
+func (s *MonicaImportService) importConversationsAsNotes(
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, userID string,
+	resp *dto.MonicaImportResponse,
+) {
+	for _, raw := range getCollectionByType(mc.Data, "conversations") {
+		var mconv MonicaConversation
+		if err := json.Unmarshal(raw, &mconv); err != nil {
+			continue
+		}
+
+		var lines []string
+		for _, msg := range mconv.Properties.Messages {
+			sender := "Contact"
+			if msg.Properties.WrittenByMe {
+				sender = "Me"
+			}
+			lines = append(lines, fmt.Sprintf("[%s] %s: %s", msg.Properties.WrittenAt, sender, msg.Properties.Content))
+		}
+		body := strings.Join(lines, "\n")
+		title := fmt.Sprintf("Conversation (%s)", mconv.Properties.HappenedAt)
+
+		note := models.Note{
+			ContactID: contactID,
+			VaultID:   vaultID,
+			Title:     strPtrOrNil(title),
+			Body:      body,
+			AuthorID:  &userID,
+		}
+		if err := tx.Create(&note).Error; err == nil {
+			resp.ImportedNotes++
+		}
+	}
+}
+
+func buildActivityContentMap(accountData []MonicaCollection, activityTypeByUUID map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, raw := range getCollectionByType(accountData, "activities") {
+		var ma MonicaActivity
+		if err := json.Unmarshal(raw, &ma); err != nil {
+			continue
+		}
+		typeName := activityTypeByUUID[ma.Properties.Type]
+		var body string
+		if typeName != "" {
+			body = fmt.Sprintf("[Activity: %s] %s", typeName, ma.Properties.Summary)
+		} else {
+			body = ma.Properties.Summary
+		}
+		if ma.Properties.Description != "" {
+			body += "\n" + ma.Properties.Description
+		}
+		result[ma.UUID] = body
+	}
+	return result
+}
+
 func slugify(name string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
 }
@@ -268,6 +819,192 @@ func buildActivityTypeMap(refs []MonicaActivityTypeRef) map[string]string {
 		m[r.UUID] = r.Properties.Name
 	}
 	return m
+}
+
+// MIME 白名单 — 仅允许安全的文件类型导入
+var monicaImportAllowedMimeTypes = map[string]string{
+	"image/jpeg":      ".jpg",
+	"image/png":       ".png",
+	"image/gif":       ".gif",
+	"image/webp":      ".webp",
+	"application/pdf": ".pdf",
+}
+
+func (s *MonicaImportService) importPhotos(
+	accountData []MonicaCollection,
+	contactUUIDMap map[string]string,
+	vaultID string,
+	resp *dto.MonicaImportResponse,
+) {
+	photoFileMap := make(map[string]uint)
+
+	for _, raw := range getCollectionByType(accountData, "photos") {
+		var mp MonicaPhoto
+		if err := json.Unmarshal(raw, &mp); err != nil {
+			continue
+		}
+
+		fileID, err := s.saveBase64File(
+			mp.Properties.DataURL, mp.Properties.OriginalFilename,
+			mp.Properties.MimeType, mp.Properties.Filesize, vaultID, "photo",
+		)
+		if err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("photo %s: %v", mp.UUID, err))
+			continue
+		}
+		photoFileMap[mp.UUID] = fileID
+		resp.ImportedPhotos++
+	}
+
+	for _, raw := range getCollectionByType(accountData, "contacts") {
+		var mc MonicaContact
+		if err := json.Unmarshal(raw, &mc); err != nil {
+			continue
+		}
+		contactID, ok := contactUUIDMap[mc.UUID]
+		if !ok {
+			continue
+		}
+
+		// contact.data[type="photos"] values 是 UUID string 数组
+		photoUUIDs := getCollectionByType(mc.Data, "photos")
+		for i, puRaw := range photoUUIDs {
+			var photoUUID string
+			if err := json.Unmarshal(puRaw, &photoUUID); err != nil {
+				continue
+			}
+
+			fileID, ok := photoFileMap[photoUUID]
+			if !ok {
+				continue
+			}
+
+			s.DB.Model(&models.File{}).Where("id = ?", fileID).Updates(map[string]interface{}{
+				"ufileable_id": contactID,
+			})
+
+			// 第一张照片（或 avatar 指定的照片）设为联系人头像
+			if i == 0 {
+				s.DB.Model(&models.Contact{}).Where("id = ?", contactID).Update("file_id", fileID)
+			}
+		}
+	}
+}
+
+func (s *MonicaImportService) importDocuments(
+	accountData []MonicaCollection,
+	contactUUIDMap map[string]string,
+	vaultID string,
+	resp *dto.MonicaImportResponse,
+) {
+	docFileMap := make(map[string]uint)
+
+	for _, raw := range getCollectionByType(accountData, "documents") {
+		var md MonicaDocument
+		if err := json.Unmarshal(raw, &md); err != nil {
+			continue
+		}
+
+		fileID, err := s.saveBase64File(
+			md.Properties.DataURL, md.Properties.OriginalFilename,
+			md.Properties.MimeType, md.Properties.Filesize, vaultID, "document",
+		)
+		if err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("document %s: %v", md.UUID, err))
+			continue
+		}
+		docFileMap[md.UUID] = fileID
+		resp.ImportedDocuments++
+	}
+
+	for _, raw := range getCollectionByType(accountData, "contacts") {
+		var mc MonicaContact
+		if err := json.Unmarshal(raw, &mc); err != nil {
+			continue
+		}
+		contactID, ok := contactUUIDMap[mc.UUID]
+		if !ok {
+			continue
+		}
+
+		for _, duRaw := range getCollectionByType(mc.Data, "documents") {
+			var docUUID string
+			if err := json.Unmarshal(duRaw, &docUUID); err != nil {
+				continue
+			}
+
+			fileID, ok := docFileMap[docUUID]
+			if !ok {
+				continue
+			}
+
+			s.DB.Model(&models.File{}).Where("id = ?", fileID).Updates(map[string]interface{}{
+				"ufileable_id": contactID,
+			})
+		}
+	}
+}
+
+func (s *MonicaImportService) saveBase64File(
+	dataURL, originalFilename, mimeType string, filesize int, vaultID, fileType string,
+) (uint, error) {
+	if dataURL == "" {
+		return 0, fmt.Errorf("empty dataUrl")
+	}
+
+	// 解析 data:{mime};base64,{payload}
+	parts := strings.SplitN(dataURL, ",", 2)
+	if len(parts) != 2 {
+		return 0, fmt.Errorf("invalid dataUrl format")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		return 0, fmt.Errorf("base64 decode failed: %w", err)
+	}
+
+	ext, ok := monicaImportAllowedMimeTypes[mimeType]
+	if !ok {
+		return 0, fmt.Errorf("unsupported mime type: %s", mimeType)
+	}
+
+	// 存储路径: {uploadDir}/{yyyy/MM/dd}/{uuid}{ext}
+	now := time.Now()
+	dir := filepath.Join(s.UploadDir, now.Format("2006/01/02"))
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return 0, fmt.Errorf("create dir: %w", err)
+	}
+
+	fileUUID := uuid.New().String()
+	fileName := fileUUID + ext
+	filePath := filepath.Join(dir, fileName)
+	if err := os.WriteFile(filePath, decoded, 0644); err != nil {
+		return 0, fmt.Errorf("write file: %w", err)
+	}
+
+	name := originalFilename
+	if name == "" {
+		name = fileName
+	}
+	size := filesize
+	if size == 0 {
+		size = len(decoded)
+	}
+
+	file := models.File{
+		VaultID:     vaultID,
+		UUID:        fileUUID,
+		Name:        name,
+		MimeType:    mimeType,
+		Size:        size,
+		Type:        fileType,
+		OriginalURL: &filePath,
+	}
+	if err := s.DB.Create(&file).Error; err != nil {
+		os.Remove(filePath)
+		return 0, fmt.Errorf("create file record: %w", err)
+	}
+	return file.ID, nil
 }
 
 // ==== Top-level structs ====

@@ -5262,3 +5262,94 @@ func TestOAuthLinkRegister_DuplicateEmail(t *testing.T) {
 		t.Fatalf("expected 409, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestMonicaImport_Success(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "monica-import@example.com")
+	vault := ts.createTestVault(t, token, "Monica Import Vault")
+
+	testData, err := os.ReadFile("../testdata/monica_export.json")
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/settings/import/monica",
+		token, "file", "monica_export.json", "application/json", testData)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+
+	var result struct {
+		ImportedContacts int      `json:"imported_contacts"`
+		SkippedCount     int      `json:"skipped_count"`
+		Errors           []string `json:"errors"`
+	}
+	if err := json.Unmarshal(resp.Data, &result); err != nil {
+		t.Fatalf("failed to parse import response: %v", err)
+	}
+	if result.ImportedContacts != 3 {
+		t.Errorf("expected imported_contacts=3, got %d", result.ImportedContacts)
+	}
+}
+
+func TestMonicaImport_InvalidJSON(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "monica-invalid@example.com")
+	vault := ts.createTestVault(t, token, "Monica Invalid Vault")
+
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/settings/import/monica",
+		token, "file", "bad.json", "application/json", []byte("not valid json"))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+}
+
+func TestMonicaImport_NoFile(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "monica-nofile@example.com")
+	vault := ts.createTestVault(t, token, "Monica NoFile Vault")
+
+	rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/settings/import/monica", "", token)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+}
+
+func TestMonicaImport_PermissionDenied(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token1, _ := ts.registerTestUser(t, "monica-owner@example.com")
+	vault := ts.createTestVault(t, token1, "Monica Permission Vault")
+
+	token2, _ := ts.registerTestUser(t, "monica-intruder@example.com")
+
+	testData, err := os.ReadFile("../testdata/monica_export.json")
+	if err != nil {
+		t.Fatalf("failed to read test fixture: %v", err)
+	}
+
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/settings/import/monica",
+		token2, "file", "monica_export.json", "application/json", testData)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}

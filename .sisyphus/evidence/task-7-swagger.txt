@@ -1,0 +1,11 @@
+Task 7: Swagger Verification
+=============================
+
+swag init completed successfully with no errors.
+New endpoint generated in swagger.json:
+  POST /vaults/{vault_id}/settings/import/monica
+  Tag: Vault Settings
+  Accept: multipart/form-data
+  Response: dto.MonicaImportResponse
+
+go build ./... passed with no errors.

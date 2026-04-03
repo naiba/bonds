@@ -1,0 +1,10 @@
+Task 7: Monica Import Handler Tests
+====================================
+
+4 handler tests all passing:
+- TestMonicaImport_Success: uploads fixture JSON → 200, imported_contacts=3
+- TestMonicaImport_InvalidJSON: uploads invalid JSON → 400
+- TestMonicaImport_NoFile: POST without file → 400
+- TestMonicaImport_PermissionDenied: non-member user → 403
+
+Result: go test ./internal/handlers -run TestMonicaImport -v -count=1 → 4 passed
