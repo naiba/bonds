@@ -1,0 +1,128 @@
+{
+  "version": "1.0-preview.1",
+  "app_version": "4.1.2",
+  "export_date": "2024-01-15T10:30:00Z",
+  "url": "https://app.monicahq.com",
+  "exported_by": "test@example.com",
+  "account": {
+    "uuid": "e2e00000-0000-0000-0000-000000000000",
+    "created_at": "2023-01-01T00:00:00Z",
+    "updated_at": "2024-01-15T10:30:00Z",
+    "data": [
+      {
+        "count": 2,
+        "type": "contacts",
+        "values": [
+          {
+            "uuid": "e2e00000-0000-0000-0000-000000000001",
+            "created_at": "2023-01-10T08:00:00Z",
+            "updated_at": "2024-01-10T12:00:00Z",
+            "properties": {
+              "first_name": "John",
+              "last_name": "Doe",
+              "nickname": "Johnny",
+              "description": "College friend",
+              "is_starred": true,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "job": "Software Engineer",
+              "company": "Acme Corp",
+              "gender": "e2e00000-0000-0000-0000-000000000020",
+              "tags": ["friend"],
+              "birthdate": {
+                "uuid": "e2e00000-0000-0000-0000-000000000030",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "1990-05-15T00:00:00Z"
+              }
+            },
+            "data": [
+              {
+                "count": 1,
+                "type": "notes",
+                "values": [
+                  {
+                    "uuid": "e2e00000-0000-0000-0000-000000000050",
+                    "created_at": "2023-06-01T10:00:00Z",
+                    "updated_at": "2023-06-01T10:00:00Z",
+                    "properties": {
+                      "body": "Met at the reunion last week.",
+                      "is_favorite": true
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "e2e00000-0000-0000-0000-000000000002",
+            "created_at": "2023-02-15T08:00:00Z",
+            "updated_at": "2024-01-12T09:00:00Z",
+            "properties": {
+              "first_name": "Jane",
+              "last_name": "Smith",
+              "is_starred": false,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "gender": "e2e00000-0000-0000-0000-000000000020",
+              "tags": []
+            },
+            "data": [
+              {
+                "count": 1,
+                "type": "notes",
+                "values": [
+                  {
+                    "uuid": "e2e00000-0000-0000-0000-000000000051",
+                    "created_at": "2023-07-01T10:00:00Z",
+                    "updated_at": "2023-07-01T10:00:00Z",
+                    "properties": {
+                      "body": "Works at the library downtown.",
+                      "is_favorite": false
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "count": 1,
+        "type": "relationships",
+        "values": [
+          {
+            "uuid": "e2e00000-0000-0000-0000-000000000070",
+            "created_at": "2023-03-01T00:00:00Z",
+            "updated_at": "2023-03-01T00:00:00Z",
+            "properties": {
+              "type": "spouse",
+              "contact_is": "e2e00000-0000-0000-0000-000000000001",
+              "of_contact": "e2e00000-0000-0000-0000-000000000002"
+            }
+          }
+        ]
+      }
+    ],
+    "properties": {
+      "default_gender": "e2e00000-0000-0000-0000-000000000020"
+    },
+    "instance": {
+      "genders": [
+        {
+          "uuid": "e2e00000-0000-0000-0000-000000000020",
+          "properties": {
+            "name": "Male"
+          }
+        }
+      ],
+      "contact_field_types": [],
+      "activity_types": [],
+      "activity_type_categories": [],
+      "life_event_types": [],
+      "life_event_categories": []
+    }
+  }
+}
