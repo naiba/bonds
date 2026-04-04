@@ -1,4 +1,0 @@
-=== RUN   TestMonicaImportContacts_Duplicate
---- PASS: TestMonicaImportContacts_Duplicate (0.14s)
-PASS
-ok  	github.com/naiba/bonds/internal/services	0.214s

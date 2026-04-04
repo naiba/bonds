@@ -1,6 +1,0 @@
-=== RUN   TestMonicaImportPhotos_InvalidBase64
---- PASS: TestMonicaImportPhotos_InvalidBase64 (0.14s)
-=== RUN   TestMonicaImportPhotos_NoUploadDir
---- PASS: TestMonicaImportPhotos_NoUploadDir (0.15s)
-PASS
-ok  	github.com/naiba/bonds/internal/services	0.374s

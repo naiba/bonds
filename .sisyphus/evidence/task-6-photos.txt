@@ -1,8 +1,0 @@
-=== RUN   TestMonicaImportPhotos
---- PASS: TestMonicaImportPhotos (0.14s)
-=== RUN   TestMonicaImportPhotos_Avatar
---- PASS: TestMonicaImportPhotos_Avatar (0.13s)
-=== RUN   TestMonicaImportDocuments
---- PASS: TestMonicaImportDocuments (0.13s)
-PASS
-ok  	github.com/naiba/bonds/internal/services	0.486s

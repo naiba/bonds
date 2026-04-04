@@ -18,4 +18,5 @@ web/src/api/generated/
 web/playwright-report/
 web/test-results/
 .opencode/
+.sisyphus/
 monica-php

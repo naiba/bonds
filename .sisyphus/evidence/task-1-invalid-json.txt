@@ -1,4 +1,0 @@
-=== RUN   TestParseMonicaExport_InvalidJSON
---- PASS: TestParseMonicaExport_InvalidJSON (0.00s)
-PASS
-ok  	github.com/naiba/bonds/internal/services	0.065s

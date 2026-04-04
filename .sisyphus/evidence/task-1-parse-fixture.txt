@@ -1,4 +1,0 @@
-=== RUN   TestParseMonicaExport_ValidFixture
---- PASS: TestParseMonicaExport_ValidFixture (0.00s)
-PASS
-ok  	github.com/naiba/bonds/internal/services	0.078s
