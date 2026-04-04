@@ -1,6 +1,52 @@
 # Import / Export
 
-Bonds supports vCard-based import and export of contacts, making it easy to migrate data from other applications or create backups.
+Bonds supports vCard-based import/export and Monica 4.x JSON import, making it easy to migrate data from other applications or create backups.
+
+## Monica 4.x Import
+
+If you're migrating from Monica CRM (version 4.x), Bonds can import your complete data including contacts, notes, calls, tasks, relationships, photos, and more.
+
+### How to Import
+
+1. In Monica, go to **Settings > Export** and download your JSON export file
+2. In Bonds, navigate to **Vault Settings > Monica Import** tab
+3. Upload the JSON file — all your data will be imported automatically
+
+### What Gets Imported
+
+| Monica Entity | Bonds Mapping |
+|--------------|---------------|
+| Contacts | Contact (name, gender, nickname, job, company, starred, is_dead) |
+| Tags | Labels |
+| Birthdate / Deceased date | Important Dates |
+| Notes | Notes |
+| Calls | Calls |
+| Tasks | Tasks |
+| Reminders | Reminders |
+| Addresses | Addresses |
+| Contact fields (email, phone, etc.) | Contact Information |
+| Pets | Pets |
+| Gifts | Gifts |
+| Debts | Loans |
+| Relationships | Relationships (matched by type name) |
+| Life events | Life Events + Timeline |
+| Photos & Documents | Files (base64 decoded and stored) |
+| Activities | Notes (degraded with type prefix) |
+| Conversations | Notes (formatted chat log) |
+
+### Duplicate Detection
+
+Re-importing the same file is safe — contacts are matched by their original Monica UUID and skipped if already imported.
+
+### Permissions
+
+Only Vault **Managers** can perform imports.
+
+### Monica v5 Users
+
+Monica v5 removed JSON export — only VCard is available. If you're on v5:
+- Use VCard import for contact basics (name, phone, email, address)
+- For full migration: export JSON from 4.x **before** upgrading to v5
 
 ## vCard Export
 
