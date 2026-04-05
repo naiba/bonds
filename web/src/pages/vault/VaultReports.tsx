@@ -289,10 +289,10 @@ export default function VaultReports() {
             title={t("vault.reports.mood_trends")}
             style={{ height: "100%", boxShadow: token.boxShadowTertiary, borderRadius: token.borderRadiusLG }}
           >
-            {moodEntries.length > 0 ? (
+            {totalMoodEntries > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "8px 0" }}>
                 {moodEntries.map((mood, idx) => {
-                  const percent = Math.round(((mood.count || 0) / totalMoodEntries) * 100);
+                  const percent = totalMoodEntries > 0 ? Math.round(((mood.count || 0) / totalMoodEntries) * 100) : 0;
                   return (
                     <div key={idx}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
