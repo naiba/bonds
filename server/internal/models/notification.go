@@ -8,7 +8,7 @@ type UserNotificationChannel struct {
 	Type              string     `json:"type" gorm:"not null"`
 	Label             *string    `json:"label"`
 	Content           string     `json:"content" gorm:"type:text;not null"`
-	PreferredTime     *string    `json:"preferred_time" gorm:"type:time"`
+	PreferredTime     *string    `json:"preferred_time" gorm:"type:varchar(5)"`
 	Active            bool       `json:"active" gorm:"default:false"`
 	Fails             int        `json:"fails" gorm:"default:0"`
 	VerifiedAt        *time.Time `json:"verified_at"`
