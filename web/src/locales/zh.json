@@ -1119,7 +1119,8 @@
     "lunar": "农历",
     "year": "年",
     "month": "月",
-    "day": "日"
+    "day": "日",
+    "no_year": "未设置"
   },
   "theme": {
     "light": "浅色",

@@ -26,7 +26,7 @@ import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import type { CalendarType } from "@/utils/calendar";
 
-function formatDateDisplay(d: ImportantDate, fullFormat: string): string {
+function formatDateDisplay(d: ImportantDate, fullFormat: string, shortFormat: string): string {
   if (d.calendar_type && d.calendar_type !== "gregorian" && d.original_month != null && d.original_day != null) {
     const sys = getCalendarSystem(d.calendar_type as CalendarType);
     const formatted = sys.formatDate({
@@ -39,6 +39,9 @@ function formatDateDisplay(d: ImportantDate, fullFormat: string): string {
   }
   if (d.year && d.month && d.day) {
     return dayjs(new Date(d.year, d.month - 1, d.day)).format(fullFormat);
+  }
+  if (!d.year && d.month && d.day) {
+    return dayjs(new Date(2000, d.month - 1, d.day)).format(shortFormat);
   }
   return "";
 }
@@ -92,23 +95,28 @@ export default function ImportantDatesModule({
   const saveMutation = useMutation({
     mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; contact_important_date_type_id?: number; remind_me?: boolean }) => {
       const { calendarDate } = values;
-      const sys = getCalendarSystem(calendarDate.calendarType);
-      const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
-
       const matchedType = dateTypes.find((dt) => dt.id === values.contact_important_date_type_id);
       const label = values.label || matchedType?.label || "";
 
       const data: CreateImportantDateRequest = {
         label,
-        day: gd.day,
-        month: gd.month,
-        year: gd.year,
+        year: calendarDate.year ?? undefined,
+        month: calendarDate.month,
+        day: calendarDate.day,
         calendar_type: calendarDate.calendarType,
         contact_important_date_type_id: values.contact_important_date_type_id,
         remind_me: values.remind_me ?? false,
       };
 
-      if (calendarDate.calendarType !== "gregorian") {
+      if (calendarDate.year !== null) {
+        const sys = getCalendarSystem(calendarDate.calendarType);
+        const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
+        data.year = gd.year;
+        data.month = gd.month;
+        data.day = gd.day;
+      }
+
+      if (calendarDate.calendarType !== "gregorian" && calendarDate.year !== null) {
         data.original_day = calendarDate.day;
         data.original_month = calendarDate.month;
         data.original_year = calendarDate.year;
@@ -141,8 +149,8 @@ export default function ImportantDatesModule({
     const ct = (d.calendar_type || "gregorian") as CalendarType;
     const pickerVal: CalendarDatePickerValue =
       ct !== "gregorian" && d.original_day != null && d.original_month != null
-        ? { calendarType: ct, day: d.original_day, month: d.original_month, year: d.original_year ?? new Date().getFullYear() }
-        : { calendarType: "gregorian", day: d.day ?? 1, month: d.month ?? 1, year: d.year ?? new Date().getFullYear() };
+        ? { calendarType: ct, day: d.original_day, month: d.original_month, year: d.original_year ?? null }
+        : { calendarType: "gregorian", day: d.day ?? 1, month: d.month ?? 1, year: d.year ?? null };
     form.setFieldsValue({ label: d.label, calendarDate: pickerVal, contact_important_date_type_id: d.contact_important_date_type_id, remind_me: (d as ImportantDate & { remind_me?: boolean }).remind_me ?? false });
     setOpen(true);
   }
@@ -192,7 +200,7 @@ export default function ImportantDatesModule({
               title={<span style={{ fontWeight: 500 }}>{d.label}</span>}
                description={
                  <>
-                   <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d, dateFormats.full)}</span>{" "}
+                    <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d, dateFormats.full, dateFormats.short)}</span>{" "}
                    {altCalendar && d.calendar_type && d.calendar_type !== "gregorian" && (
                      <Tag color="volcano">{d.calendar_type}</Tag>
                    )}
@@ -240,7 +248,7 @@ export default function ImportantDatesModule({
             <Input />
           </Form.Item>
           <Form.Item name="calendarDate" label={t("modules.important_dates.date")} rules={[{ required: true }]}>
-            <CalendarDatePicker enableAlternativeCalendar={altCalendar} />
+             <CalendarDatePicker enableAlternativeCalendar={altCalendar} enableNoYear />
           </Form.Item>
           <Form.Item name="remind_me" label={t("modules.important_dates.remind_me")} valuePropName="checked">
             <Switch />

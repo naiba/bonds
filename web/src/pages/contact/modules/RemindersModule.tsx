@@ -97,8 +97,9 @@ export default function RemindersModule({
   const saveMutation = useMutation({
     mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; frequency: string }) => {
       const { calendarDate } = values;
+      const y = calendarDate.year ?? new Date().getFullYear();
       const sys = getCalendarSystem(calendarDate.calendarType);
-      const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
+      const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: y });
 
       const data: CreateReminderRequest = {
         label: values.label,
@@ -112,7 +113,7 @@ export default function RemindersModule({
       if (calendarDate.calendarType !== "gregorian") {
         data.original_day = calendarDate.day;
         data.original_month = calendarDate.month;
-        data.original_year = calendarDate.year;
+        data.original_year = y;
       }
 
       if (editingId) {

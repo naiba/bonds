@@ -1119,7 +1119,8 @@
     "lunar": "Chinese Lunar",
     "year": "Year",
     "month": "Month",
-    "day": "Day"
+    "day": "Day",
+    "no_year": "Not set"
   },
   "theme": {
     "light": "Light",

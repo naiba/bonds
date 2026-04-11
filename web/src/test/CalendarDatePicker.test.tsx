@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp, ConfigProvider } from "antd";
+import userEvent from "@testing-library/user-event";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 
 beforeAll(() => {
@@ -60,5 +61,32 @@ describe("CalendarDatePicker", () => {
       value: { calendarType: "lunar", day: 15, month: 1, year: 2025 },
     });
     expect(screen.getByText(/Gregorian:/)).toBeInTheDocument();
+  });
+
+  it("shows 'Not set' year option when enableNoYear is true (lunar mode)", async () => {
+    const user = userEvent.setup();
+    renderPicker({
+      enableAlternativeCalendar: true,
+      enableNoYear: true,
+      value: { calendarType: "lunar", day: 15, month: 1, year: 2025 },
+    });
+    expect(screen.getByText("Chinese Lunar")).toBeInTheDocument();
+    const selects = document.querySelectorAll(".ant-select");
+    await user.click(selects[0]);
+    await waitFor(() => {
+      expect(screen.getByText("Not set")).toBeInTheDocument();
+    });
+  });
+
+  it("shows 'Not set' as year value when value.year is null", () => {
+    renderPicker({
+      enableAlternativeCalendar: true,
+      enableNoYear: true,
+      value: { calendarType: "lunar", day: 15, month: 1, year: null } as never,
+    });
+    const yearSelect = document.querySelector(".ant-select");
+    expect(yearSelect).toBeTruthy();
+    const notSetElements = screen.getAllByText("Not set");
+    expect(notSetElements.length).toBeGreaterThanOrEqual(1);
   });
 });

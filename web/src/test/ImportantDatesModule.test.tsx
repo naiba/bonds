@@ -27,10 +27,12 @@ vi.mock("@/components/CalendarDatePicker", () => ({
 
 let mockDatesReturn: unknown = { data: [], isLoading: false };
 let mockPrefsReturn: unknown = { data: undefined };
+const mockDateTypesReturn: unknown = { data: [], isLoading: false };
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] }) => {
     const key = JSON.stringify(opts.queryKey);
     if (key.includes("preferences")) return mockPrefsReturn;
+    if (key.includes("date-types")) return mockDateTypesReturn;
     return mockDatesReturn;
   },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -116,5 +118,28 @@ describe("ImportantDatesModule", () => {
     renderModule();
     expect(screen.getByText("Birthday")).toBeInTheDocument();
     expect(screen.queryByText("gregorian")).not.toBeInTheDocument();
+  });
+
+  it("displays date without year using short format (Issue #76)", () => {
+    const noYearDate = {
+      id: 3,
+      contact_id: "c1",
+      label: "Nameday",
+      day: 15,
+      month: 6,
+      year: null,
+      calendar_type: "gregorian",
+      original_day: null,
+      original_month: null,
+      original_year: null,
+      contact_important_date_type_id: null,
+      created_at: "2025-01-01",
+      updated_at: "2025-01-01",
+    };
+    mockDatesReturn = { data: [noYearDate], isLoading: false };
+    mockPrefsReturn = { data: undefined };
+    renderModule();
+    expect(screen.getByText("Nameday")).toBeInTheDocument();
+    expect(screen.getByText(/Jun 15/)).toBeInTheDocument();
   });
 });

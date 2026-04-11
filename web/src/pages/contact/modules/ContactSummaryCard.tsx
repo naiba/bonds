@@ -190,9 +190,10 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {(relationships as any[]).map((rel) => {
               const relatedContact = contactMap.get(rel.related_contact_id ?? "");
-              const displayName = relatedContact
-                ? formatContactName(nameOrder, relatedContact)
-                : rel.related_contact_id;
+              // Priority: backend-provided name > contactMap lookup > UUID fallback
+              const displayName = rel.related_contact_name
+                || (relatedContact ? formatContactName(nameOrder, relatedContact) : "")
+                || rel.related_contact_id;
               return (
                 <span key={rel.id} style={{ fontSize: 13 }}>
                   <Link

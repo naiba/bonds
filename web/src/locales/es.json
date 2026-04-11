@@ -1052,7 +1052,8 @@
         "lunar": "Lunar chino",
         "year": "Año",
         "month": "Mes",
-        "day": "Día"
+        "day": "Día",
+        "no_year": "No establecido"
     },
     "theme": {
         "light": "Claro",
