@@ -120,6 +120,15 @@ export default function TwoFactor() {
           }}
         />
 
+        {(isEnabled || setupData) && (
+          <Alert
+            message={t("twoFactor.davWarning")}
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         {!isEnabled && !setupData && (
           <Button
             type="primary"

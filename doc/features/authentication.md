@@ -32,6 +32,15 @@ When 2FA is enabled, login is a two-step process:
 
 8 random 8-character codes are generated when 2FA is enabled. Each code can only be used once. Use them if you lose access to your authenticator app.
 
+### 2FA and DAV Sync
+
+When 2FA is enabled, **password-based DAV authentication is blocked**. DAV clients (CardDAV/CalDAV) must use a [Personal Access Token](/features/more#personal-access-tokens) instead of your password. This follows the same security model as Google, Apple, and Fastmail — a stolen password alone cannot bypass 2FA to access your data via DAV endpoints.
+
+To configure your DAV client after enabling 2FA:
+
+1. Go to **Settings → API Tokens** and create a new token
+2. In your DAV client, use your **email** as the username and the **token** (starting with `bonds_`) as the password
+
 ## WebAuthn / FIDO2
 
 Bonds supports passwordless login via WebAuthn:

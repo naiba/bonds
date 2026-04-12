@@ -13,7 +13,16 @@ Bonds includes a built-in CardDAV and CalDAV server, allowing you to sync contac
 
 ## Authentication
 
-DAV clients use **HTTP Basic Auth** (not JWT), since most DAV clients don't support token-based authentication. Use the same username (email) and password as your Bonds account.
+DAV clients use **HTTP Basic Auth** (not JWT), since most DAV clients don't support token-based authentication.
+
+| Scenario | Credentials |
+|----------|-------------|
+| 2FA **disabled** | Email + password, or email + [Personal Access Token](/features/more#personal-access-tokens) |
+| 2FA **enabled** | Email + Personal Access Token **only** (password is blocked) |
+
+::: warning
+When you enable 2FA, any DAV clients using your password will stop syncing. Update them to use a Personal Access Token from **Settings → API Tokens**.
+:::
 
 ## What Gets Synced
 
@@ -42,7 +51,7 @@ DAV clients use **HTTP Basic Auth** (not JWT), since most DAV clients don't supp
 3. Enter:
    - Server: `https://your-bonds-domain.com`
    - Username: your email
-   - Password: your password
+   - Password: your password (if 2FA is enabled, use a Personal Access Token)
 
 The well-known URLs (`/.well-known/carddav`, `/.well-known/caldav`) enable automatic discovery.
 

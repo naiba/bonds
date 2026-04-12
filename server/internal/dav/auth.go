@@ -41,6 +41,11 @@ func BasicAuthMiddleware(db *gorm.DB) func(next http.Handler) http.Handler {
 					return
 				}
 			} else {
+				if user.TwoFactorConfirmedAt != nil {
+					w.Header().Set("WWW-Authenticate", `Basic realm="Bonds DAV"`)
+					http.Error(w, "2FA enabled: use a Personal Access Token instead of password", http.StatusUnauthorized)
+					return
+				}
 				if user.Password == nil {
 					w.Header().Set("WWW-Authenticate", `Basic realm="Bonds DAV"`)
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)

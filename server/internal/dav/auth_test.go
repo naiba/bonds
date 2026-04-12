@@ -188,7 +188,7 @@ func TestBasicAuth_DisabledUser(t *testing.T) {
 	}
 }
 
-func TestBasicAuth_TwoFactorEnabledUser(t *testing.T) {
+func TestBasicAuth_TwoFactorEnabledUser_PasswordBlocked(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
@@ -207,10 +207,7 @@ func TestBasicAuth_TwoFactorEnabledUser(t *testing.T) {
 	}
 
 	mw := BasicAuthMiddleware(db)
-
-	var gotUserID string
 	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotUserID = UserIDFromContext(r.Context())
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -220,11 +217,8 @@ func TestBasicAuth_TwoFactorEnabledUser(t *testing.T) {
 
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected 200 (2FA should not block DAV BasicAuth), got %d", rec.Code)
-	}
-	if gotUserID != user.ID {
-		t.Errorf("expected user ID %q, got %q", user.ID, gotUserID)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 (2FA-enabled user must use PAT for DAV), got %d", rec.Code)
 	}
 }
 
