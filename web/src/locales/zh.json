@@ -103,6 +103,18 @@
       "failed": "注册失败",
       "hero_title": "开启有意义的人际连接之旅",
       "hero_subtitle": "一个私密的个人空间，珍藏你生命中的每一个人。"
+    },
+    "two_factor_verify": {
+      "title": "两步验证",
+      "subtitle": "请输入身份验证器中的验证码",
+      "code_placeholder": "6 位验证码",
+      "code_required": "请输入验证码",
+      "submit": "验证",
+      "invalid_code": "验证码无效，请重试",
+      "failed": "验证失败",
+      "use_recovery_code": "使用恢复代码",
+      "recovery_code_placeholder": "恢复代码",
+      "back_to_login": "返回登录"
     }
   },
   "vault": {

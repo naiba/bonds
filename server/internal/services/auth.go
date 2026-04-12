@@ -20,6 +20,8 @@ var (
 	ErrInvalidCredentials            = errors.New("invalid credentials")
 	ErrUserNotFound                  = errors.New("user not found")
 	ErrEmailNotVerified              = errors.New("email not verified")
+	ErrInvalidTempToken              = errors.New("invalid or expired temp token")
+	ErrTwoFactorNotPending           = errors.New("two factor not pending for this token")
 	ErrInvalidEmailVerificationToken = errors.New("invalid email verification token")
 	ErrEmailAlreadyVerified          = errors.New("email already verified")
 	ErrRegistrationDisabled          = errors.New("registration is disabled")
@@ -214,6 +216,47 @@ func (s *AuthService) RefreshToken(claims *middleware.JWTClaims) (*dto.AuthRespo
 	if user.Disabled {
 		return nil, ErrUserDisabled
 	}
+	return s.generateAuthResponse(&user)
+}
+
+// VerifyTwoFactor validates a TOTP code against the temp_token issued during
+// the 2FA-pending login flow. On success, returns a full JWT (no TwoFactorPending claim).
+// Bug #78: this endpoint was missing — the temp_token had nowhere to be redeemed.
+func (s *AuthService) VerifyTwoFactor(req dto.TwoFactorLoginVerifyRequest) (*dto.AuthResponse, error) {
+	claims := &middleware.JWTClaims{}
+	token, err := jwt.ParseWithClaims(req.TempToken, claims, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(s.cfg.Secret), nil
+	})
+	if err != nil || !token.Valid {
+		return nil, ErrInvalidTempToken
+	}
+	if !claims.TwoFactorPending {
+		return nil, ErrTwoFactorNotPending
+	}
+
+	twoFactorSvc := NewTwoFactorService(s.db)
+	valid, err := twoFactorSvc.Validate(claims.UserID, req.Code)
+	if err != nil {
+		return nil, err
+	}
+	if !valid {
+		return nil, ErrInvalidTOTPCode
+	}
+
+	var user models.User
+	if err := s.db.First(&user, "id = ?", claims.UserID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, err
+	}
+	if user.Disabled {
+		return nil, ErrUserDisabled
+	}
+
 	return s.generateAuthResponse(&user)
 }
 

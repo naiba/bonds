@@ -103,6 +103,18 @@
       "failed": "Registration failed",
       "hero_title": "Begin your journey of meaningful connections",
       "hero_subtitle": "A private, personal space to cherish the people in your life."
+    },
+    "two_factor_verify": {
+      "title": "Two-Factor Authentication",
+      "subtitle": "Enter the code from your authenticator app",
+      "code_placeholder": "6-digit code",
+      "code_required": "Please enter the code",
+      "submit": "Verify",
+      "invalid_code": "Invalid code, please try again",
+      "failed": "Verification failed",
+      "use_recovery_code": "Use recovery code",
+      "recovery_code_placeholder": "Recovery code",
+      "back_to_login": "Back to login"
     }
   },
   "vault": {

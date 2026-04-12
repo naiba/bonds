@@ -91,8 +91,12 @@ export default function Login() {
   async function onFinish(values: LoginRequest) {
     setLoading(true);
     try {
-      await login(values);
-      navigate(from, { replace: true });
+      const requiresTwoFactor = await login(values);
+      if (requiresTwoFactor) {
+        navigate("/login/2fa", { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err) {
       const apiErr = err as APIError;
       message.error(apiErr.message || t("auth.login.failed"));

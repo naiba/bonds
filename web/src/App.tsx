@@ -14,6 +14,7 @@ import { httpClient } from "@/api";
 const Login = lazy(() => import("@/pages/auth/Login"));
 const Register = lazy(() => import("@/pages/auth/Register"));
 const VerifyEmail = lazy(() => import("@/pages/auth/VerifyEmail"));
+const TwoFactorVerify = lazy(() => import("@/pages/auth/TwoFactorVerify"));
 
 // Vault pages
 const VaultList = lazy(() => import("@/pages/vault/VaultList"));
@@ -107,6 +108,7 @@ export default function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/login/2fa" element={<TwoFactorVerify />} />
           <Route path="/register" element={<Register />} />
           <Route path="/accept-invite" element={<AcceptInvite />} />
           <Route path="/auth/callback" element={<OAuthCallback />} />

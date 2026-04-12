@@ -16,11 +16,13 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (data: LoginRequest) => Promise<void>;
+  twoFactorPending: boolean;
+  tempToken: string | null;
+  login: (data: LoginRequest) => Promise<boolean>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
-  /** Store a JWT obtained externally (e.g. OAuth callback) and trigger user fetch. */
   setExternalToken: (jwt: string) => void;
+  verifyTwoFactor: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -33,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(
     () => !!localStorage.getItem("token"),
   );
+  const [twoFactorPending, setTwoFactorPending] = useState(false);
+  const [tempToken, setTempToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -64,12 +68,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [token]);
 
-  const login = useCallback(async (data: LoginRequest) => {
+  const login = useCallback(async (data: LoginRequest): Promise<boolean> => {
     const res = await api.auth.loginCreate(data);
     const auth = res.data!;
+    if (auth.requires_two_factor) {
+      setTwoFactorPending(true);
+      setTempToken(auth.temp_token ?? null);
+      setUser(auth.user ?? null);
+      localStorage.removeItem("token");
+      setToken(null);
+      return true;
+    }
     localStorage.setItem("token", auth.token);
     setToken(auth.token);
     setUser(auth.user);
+    return false;
   }, []);
 
   const register = useCallback(async (data: RegisterRequest) => {
@@ -84,7 +97,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
+    setTwoFactorPending(false);
+    setTempToken(null);
   }, []);
+
+  const verifyTwoFactor = useCallback(async (code: string) => {
+    if (!tempToken) {
+      throw new Error("No temp token available");
+    }
+    const res = await api.auth["2FaVerifyCreate"]({
+      temp_token: tempToken,
+      code,
+    });
+    const auth = res.data!;
+    localStorage.setItem("token", auth.token);
+    setToken(auth.token);
+    setUser(auth.user);
+    setTwoFactorPending(false);
+    setTempToken(null);
+  }, [tempToken]);
 
   const setExternalToken = useCallback((jwt: string) => {
     localStorage.setItem("token", jwt);
@@ -98,12 +129,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       isAuthenticated: !!user,
       isLoading,
+      twoFactorPending,
+      tempToken,
       login,
       register,
       logout,
       setExternalToken,
+      verifyTwoFactor,
     }),
-    [user, token, isLoading, login, register, logout, setExternalToken],
+    [user, token, isLoading, twoFactorPending, tempToken, login, register, logout, setExternalToken, verifyTwoFactor],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

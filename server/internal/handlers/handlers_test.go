@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/config"
@@ -19,6 +20,7 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
+	"github.com/pquerna/otp/totp"
 	"gorm.io/gorm"
 )
 
@@ -49,9 +51,11 @@ type apiMeta struct {
 }
 
 type authData struct {
-	Token     string   `json:"token"`
-	ExpiresAt string   `json:"expires_at"`
-	User      userData `json:"user"`
+	Token             string   `json:"token"`
+	ExpiresAt         string   `json:"expires_at"`
+	User              userData `json:"user"`
+	RequiresTwoFactor bool     `json:"requires_two_factor"`
+	TempToken         string   `json:"temp_token"`
 }
 
 type userData struct {
@@ -1858,6 +1862,173 @@ func TestTwoFactor_Unauthorized(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d: %s", rec.Code, rec.Body.String())
 	}
+}
+
+// Bug #78: Login with 2FA enabled must return requires_two_factor=true + temp_token (no full JWT).
+func TestLogin_With2FAEnabled_ReturnsRequiresTwoFactor(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "2fa-login@example.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/2fa/enable", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enable 2fa failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var setupData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &setupData); err != nil {
+		t.Fatalf("parse 2fa setup: %v", err)
+	}
+	secret, ok := setupData["secret"].(string)
+	if !ok || secret == "" {
+		t.Fatal("expected non-empty secret in 2fa setup")
+	}
+
+	code := generateTOTPCode(t, secret)
+	rec = ts.doRequest(http.MethodPost, "/api/settings/2fa/confirm",
+		`{"code":"`+code+`"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("confirm 2fa failed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/login",
+		`{"email":"2fa-login@example.com","password":"password123"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var data authData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("parse auth data: %v", err)
+	}
+	if !data.RequiresTwoFactor {
+		t.Error("expected requires_two_factor=true when 2FA is enabled and no TOTP code provided")
+	}
+	if data.TempToken == "" {
+		t.Error("expected non-empty temp_token when 2FA is required")
+	}
+	if data.Token != "" {
+		t.Error("expected empty token when 2FA is required (should only get temp_token)")
+	}
+}
+
+// Bug #78: Missing POST /auth/2fa/verify endpoint — the root cause.
+func TestAuth_TwoFactorVerify(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "2fa-verify@example.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/2fa/enable", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enable 2fa failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var setupData map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &setupData); err != nil {
+		t.Fatalf("parse 2fa setup: %v", err)
+	}
+	secret, _ := setupData["secret"].(string)
+
+	code := generateTOTPCode(t, secret)
+	rec = ts.doRequest(http.MethodPost, "/api/settings/2fa/confirm",
+		`{"code":"`+code+`"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("confirm 2fa failed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/login",
+		`{"email":"2fa-verify@example.com","password":"password123"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var loginData authData
+	if err := json.Unmarshal(resp.Data, &loginData); err != nil {
+		t.Fatalf("parse login data: %v", err)
+	}
+	if loginData.TempToken == "" {
+		t.Fatal("expected temp_token from login")
+	}
+
+	code = generateTOTPCode(t, secret)
+	rec = ts.doRequest(http.MethodPost, "/api/auth/2fa/verify",
+		`{"temp_token":"`+loginData.TempToken+`","code":"`+code+`"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 from /auth/2fa/verify, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var verifyData authData
+	if err := json.Unmarshal(resp.Data, &verifyData); err != nil {
+		t.Fatalf("parse verify data: %v", err)
+	}
+	if verifyData.Token == "" {
+		t.Error("expected full JWT token after successful 2FA verification")
+	}
+	if verifyData.RequiresTwoFactor {
+		t.Error("expected requires_two_factor=false after successful 2FA verification")
+	}
+	if verifyData.User.Email != "2fa-verify@example.com" {
+		t.Errorf("expected user email, got %s", verifyData.User.Email)
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/vaults", "", verifyData.Token)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200 with full JWT on protected route, got %d", rec.Code)
+	}
+}
+
+func TestAuth_TwoFactorVerify_InvalidCode(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "2fa-verify-invalid@example.com")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/2fa/enable", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("enable 2fa failed: %d %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var setupData map[string]interface{}
+	json.Unmarshal(resp.Data, &setupData)
+	secret, _ := setupData["secret"].(string)
+	code := generateTOTPCode(t, secret)
+	ts.doRequest(http.MethodPost, "/api/settings/2fa/confirm",
+		`{"code":"`+code+`"}`, token)
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/login",
+		`{"email":"2fa-verify-invalid@example.com","password":"password123"}`, "")
+	resp = parseResponse(t, rec)
+	var loginData authData
+	json.Unmarshal(resp.Data, &loginData)
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/2fa/verify",
+		`{"temp_token":"`+loginData.TempToken+`","code":"000000"}`, "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid TOTP code, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAuth_TwoFactorVerify_InvalidTempToken(t *testing.T) {
+	ts := setupTestServer(t)
+
+	rec := ts.doRequest(http.MethodPost, "/api/auth/2fa/verify",
+		`{"temp_token":"invalid-token","code":"123456"}`, "")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for invalid temp_token, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	token, _ := ts.registerTestUser(t, "2fa-verify-notpending@example.com")
+	rec = ts.doRequest(http.MethodPost, "/api/auth/2fa/verify",
+		`{"temp_token":"`+token+`","code":"123456"}`, "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for non-2FA-pending token, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// generateTOTPCode is a test helper that generates a valid TOTP code from a secret.
+func generateTOTPCode(t *testing.T, secret string) string {
+	t.Helper()
+	code, err := totp.GenerateCode(secret, time.Now())
+	if err != nil {
+		t.Fatalf("failed to generate TOTP code: %v", err)
+	}
+	return code
 }
 
 // ==================== File Upload ====================

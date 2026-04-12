@@ -274,6 +274,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	auth.POST("/webauthn/login/begin", webauthnHandler.BeginLogin)
 	auth.POST("/webauthn/login/finish", webauthnHandler.FinishLogin)
+	auth.POST("/2fa/verify", authHandler.VerifyTwoFactor)
 
 	api.POST("/invitations/accept", invitationHandler.Accept)
 

@@ -107,6 +107,20 @@ httpClient.instance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Bug #78: When a 2FA-pending temp token hits a protected route, the backend
+    // returns 403 with "err.two_factor_required". Redirect to the 2FA verify page
+    // instead of dumping the user back to login.
+    if (error.response?.status === 403) {
+      const apiResp = error.response?.data as GithubComNaibaBondsPkgResponseAPIResponse | undefined;
+      if (apiResp?.error?.code === "FORBIDDEN" && apiResp?.error?.message === "err.two_factor_required") {
+        if (window.location.pathname !== "/login/2fa") {
+          window.location.href = "/login/2fa";
+        }
+        return Promise.reject(apiResp.error);
+      }
+    }
+
     if (
       error.response?.status === 401 &&
       localStorage.getItem("token") &&

@@ -215,3 +215,43 @@ func (h *AuthHandler) ResendVerification(c echo.Context) error {
 	}
 	return response.OK(c, map[string]string{"message": "Verification email sent"})
 }
+
+// VerifyTwoFactor godoc
+//
+//	@Summary		Verify 2FA during login
+//	@Description	Exchange a temp_token + TOTP code for a full JWT after 2FA-pending login
+//	@Tags			auth
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		dto.TwoFactorLoginVerifyRequest	true	"2FA verification"
+//	@Success		200		{object}	response.APIResponse{data=dto.AuthResponse}
+//	@Failure		400		{object}	response.APIResponse
+//	@Failure		401		{object}	response.APIResponse
+//	@Failure		422		{object}	response.APIResponse
+//	@Failure		500		{object}	response.APIResponse
+//	@Router			/auth/2fa/verify [post]
+func (h *AuthHandler) VerifyTwoFactor(c echo.Context) error {
+	var req dto.TwoFactorLoginVerifyRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+
+	result, err := h.authService.VerifyTwoFactor(req)
+	if err != nil {
+		if errors.Is(err, services.ErrInvalidTempToken) {
+			return response.Unauthorized(c, "err.invalid_or_expired_temp_token")
+		}
+		if errors.Is(err, services.ErrTwoFactorNotPending) {
+			return response.BadRequest(c, "err.two_factor_not_pending", nil)
+		}
+		if errors.Is(err, services.ErrInvalidTOTPCode) {
+			return response.BadRequest(c, "err.invalid_totp_code", nil)
+		}
+		return response.InternalError(c, "err.failed_to_verify_2fa")
+	}
+
+	return response.OK(c, result)
+}

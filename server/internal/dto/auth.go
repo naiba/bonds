@@ -37,6 +37,11 @@ type TwoFactorVerifyRequest struct {
 	Code string `json:"code" validate:"required" example:"123456"`
 }
 
+type TwoFactorLoginVerifyRequest struct {
+	TempToken string `json:"temp_token" validate:"required" example:"eyJhbGciOiJIUzI1NiIs..."`
+	Code      string `json:"code" validate:"required" example:"123456"`
+}
+
 type TwoFactorStatusResponse struct {
 	Enabled bool `json:"enabled" example:"true"`
 }
