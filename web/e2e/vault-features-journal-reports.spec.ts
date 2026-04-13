@@ -781,25 +781,15 @@ test.describe('Vault Reports - Overview Counts', () => {
     await dateTypeSelect.click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Birthdate' }).click();
 
-    // Close dropdown by clicking modal header
+    // Close date-type dropdown by clicking modal header
     await dateModal.locator('.ant-modal-header').click();
 
-    // Set date via DatePicker
-    const datePicker = dateModal.locator('.ant-picker');
-    await datePicker.click();
-
-    // Must exclude .ant-picker-cell-today: CalendarDatePicker defaults to today
-    // when form value is undefined, so clicking today's cell won't trigger onChange
-    // (value unchanged), leaving the form field empty and failing validation.
-    // Also must use .ant-picker-cell-in-view to only match current month cells;
-    // without it, clicking a previous-month cell navigates the calendar view
-    // instead of selecting a date.
-    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell.ant-picker-cell-in-view:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first();
-    await dateCell.click();
-
-    // Wait for the DatePicker dropdown to auto-close after date selection.
-    // The dropdown may linger and intercept clicks on the modal header/footer.
-    await expect(page.locator('.ant-picker-dropdown:visible')).not.toBeVisible({ timeout: 5000 });
+    const dateFormItem = dateModal.locator('.ant-form-item').filter({ hasText: 'Date' }).last();
+    const dateSelects = dateFormItem.locator('.ant-select');
+    await dateSelects.nth(1).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(5).click();
+    await dateSelects.nth(2).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(14).click();
 
     const dateResp = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'

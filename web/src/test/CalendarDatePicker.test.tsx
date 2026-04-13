@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp, ConfigProvider } from "antd";
 import userEvent from "@testing-library/user-event";
@@ -88,5 +88,47 @@ describe("CalendarDatePicker", () => {
     expect(yearSelect).toBeTruthy();
     const notSetElements = screen.getAllByText("Not set");
     expect(notSetElements.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("Bug #76: renders year/month/day selects with 'Not set' option when enableNoYear without alt calendar", () => {
+    renderPicker({
+      enableAlternativeCalendar: false,
+      enableNoYear: true,
+      value: { calendarType: "gregorian", day: 15, month: 6, year: 2025 },
+    });
+    const selects = document.querySelectorAll(".ant-select");
+    expect(selects.length).toBe(3);
+  });
+
+  it("Bug #76: renders year/month/day selects with 'Not set' option for gregorian when alt calendar enabled", () => {
+    renderPicker({
+      enableAlternativeCalendar: true,
+      enableNoYear: true,
+      value: { calendarType: "gregorian", day: 15, month: 6, year: 2025 },
+    });
+    const selects = document.querySelectorAll(".ant-select");
+    expect(selects.length).toBe(3);
+  });
+
+  it("Bug #76: calls onChange with year=null when 'Not set' selected in gregorian mode", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderPicker({
+      enableAlternativeCalendar: false,
+      enableNoYear: true,
+      value: { calendarType: "gregorian", day: 15, month: 6, year: 2025 },
+      onChange,
+    });
+    const selects = document.querySelectorAll(".ant-select");
+    await user.click(selects[0]);
+    await waitFor(() => {
+      expect(screen.getByText("Not set")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Not set"));
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ year: null }),
+      );
+    });
   });
 });

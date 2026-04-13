@@ -134,7 +134,57 @@ export default function CalendarDatePicker({
     label: t(getCalendarSystem(ct).labelKey),
   }));
 
+  const gregorianMonths = useMemo(() => {
+    const m = [];
+    for (let i = 1; i <= 12; i++) {
+      m.push({ value: i, label: dayjs().month(i - 1).format("MMMM") });
+    }
+    return m;
+  }, []);
+
+  const gregorianDaysInMonth = useMemo(() => {
+    return dayjs(`${effectiveYear}-${String(month).padStart(2, "0")}-01`).daysInMonth();
+  }, [effectiveYear, month]);
+
+  const gregorianDayOptions = useMemo(() => {
+    const opts = [];
+    for (let d = 1; d <= gregorianDaysInMonth; d++) {
+      opts.push({ value: d, label: String(d) });
+    }
+    return opts;
+  }, [gregorianDaysInMonth]);
+
+  const selectDropdowns = (
+    <Space.Compact style={{ width: "100%" }}>
+      <Select
+        showSearch
+        value={displayYear === null ? NO_YEAR_VALUE : displayYear}
+        onChange={handleYearChange}
+        options={yearOptions}
+        style={{ width: "35%" }}
+        placeholder={t("calendar.year")}
+      />
+      <Select
+        value={month}
+        onChange={handleMonthChange}
+        options={calendarType === "gregorian" ? gregorianMonths : months}
+        style={{ width: "35%" }}
+        placeholder={t("calendar.month")}
+      />
+      <Select
+        value={day}
+        onChange={handleDayChange}
+        options={calendarType === "gregorian" ? gregorianDayOptions : dayOptions}
+        style={{ width: "30%" }}
+        placeholder={t("calendar.day")}
+      />
+    </Space.Compact>
+  );
+
   if (!enableAlternativeCalendar) {
+    if (enableNoYear) {
+      return selectDropdowns;
+    }
     return (
       <DatePicker
         value={dayjs(`${effectiveYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}
@@ -154,38 +204,13 @@ export default function CalendarDatePicker({
         block
       />
 
-      {calendarType === "gregorian" ? (
+      {calendarType === "gregorian" && !enableNoYear ? (
         <DatePicker
           value={dayjs(`${effectiveYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}
           onChange={handleGregorianChange}
           style={{ width: "100%" }}
         />
-      ) : (
-        <Space.Compact style={{ width: "100%" }}>
-          <Select
-            showSearch
-            value={displayYear === null ? NO_YEAR_VALUE : displayYear}
-            onChange={handleYearChange}
-            options={yearOptions}
-            style={{ width: "35%" }}
-            placeholder={t("calendar.year")}
-          />
-          <Select
-            value={month}
-            onChange={handleMonthChange}
-            options={months}
-            style={{ width: "35%" }}
-            placeholder={t("calendar.month")}
-          />
-          <Select
-            value={day}
-            onChange={handleDayChange}
-            options={dayOptions}
-            style={{ width: "30%" }}
-            placeholder={t("calendar.day")}
-          />
-        </Space.Compact>
-      )}
+      ) : selectDropdowns}
 
       <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: "block" }}>
         {previewText}
