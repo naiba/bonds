@@ -12,13 +12,14 @@ const { Title, Text } = Typography;
 export default function TwoFactorVerify() {
   const [loading, setLoading] = useState(false);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
+  const [verified, setVerified] = useState(false);
   const { twoFactorPending, tempToken, verifyTwoFactor, logout } = useAuth();
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token: colorToken } = theme.useToken();
 
-  if (!twoFactorPending || !tempToken) {
+  if (!verified && (!twoFactorPending || !tempToken)) {
     return <Navigate to="/login" replace />;
   }
 
@@ -26,6 +27,7 @@ export default function TwoFactorVerify() {
     setLoading(true);
     try {
       await verifyTwoFactor(values.code);
+      setVerified(true);
       navigate("/vaults", { replace: true });
     } catch (err) {
       const apiErr = err as APIError;
