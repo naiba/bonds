@@ -20,6 +20,7 @@ vi.mock("@/api", () => ({
       vaultsDelete: vi.fn(),
     },
     contacts: { contactsList: vi.fn() },
+    reminders: { remindersList: vi.fn() },
   },
 }));
 
@@ -106,6 +107,49 @@ describe("VaultDetail", () => {
     expect(
       screen.getByRole("button", { name: /add contact/i }),
     ).toBeInTheDocument();
+  });
+
+  it("shows contact name alongside reminder label in upcoming reminders widget (#82)", () => {
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      if (
+        Array.isArray(opts.queryKey) &&
+        opts.queryKey.length === 2 &&
+        opts.queryKey[0] === "vaults"
+      ) {
+        return {
+          data: {
+            id: 1,
+            name: "My Vault",
+            description: null,
+            created_at: "2024-06-01T00:00:00Z",
+            updated_at: "2024-06-02T00:00:00Z",
+          },
+          isLoading: false,
+        };
+      }
+      if (
+        Array.isArray(opts.queryKey) &&
+        opts.queryKey.includes("reminders")
+      ) {
+        return {
+          data: [
+            {
+              id: 7,
+              label: "Birthday",
+              day: 31,
+              month: 12,
+              contact_first_name: "John",
+              contact_last_name: "Doe",
+            },
+          ],
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+    renderVaultDetail();
+    expect(screen.getByText(/John Doe/)).toBeInTheDocument();
+    expect(screen.getByText(/Birthday/)).toBeInTheDocument();
   });
 
   it("renders No contacts yet when empty contacts", () => {

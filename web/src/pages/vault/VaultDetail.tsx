@@ -1305,17 +1305,23 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {upcoming.map((r: any) => (
-            <div key={r.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
-              <Text style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {r.label}
-              </Text>
-              <Text type="secondary" style={{ fontSize: 12, flexShrink: 0, marginLeft: 8 }}>
-                {/* 使用用户日期格式偏好，而非硬编码 M/D 格式（fix #65） */}
-                {r.month && r.day ? formatShortDate(`2000-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`, dateFormats) : ""}
-              </Text>
-            </div>
-          ))}
+          {upcoming.map((r: any) => {
+            const contactName = [r.contact_first_name, r.contact_last_name]
+              .filter(Boolean)
+              .join(" ")
+              .trim();
+            return (
+              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                <Text style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {contactName ? `${r.label} (${contactName})` : r.label}
+                </Text>
+                <Text type="secondary" style={{ fontSize: 12, flexShrink: 0, marginLeft: 8 }}>
+                  {/* 使用用户日期格式偏好，而非硬编码 M/D 格式（fix #65） */}
+                  {r.month && r.day ? formatShortDate(`2000-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`, dateFormats) : ""}
+                </Text>
+              </div>
+            );
+          })}
           <Button
             type="link"
             size="small"
