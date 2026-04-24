@@ -55,10 +55,11 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 		query = query.Where("listed = ?", true)
 	}
 	if search != "" {
+		like := "%" + strings.ToLower(search) + "%"
 		query = query.Where(
-			s.db.Where("first_name LIKE ?", "%"+search+"%").
-				Or("last_name LIKE ?", "%"+search+"%").
-				Or("nickname LIKE ?", "%"+search+"%"),
+			s.db.Where("LOWER(first_name) LIKE ?", like).
+				Or("LOWER(last_name) LIKE ?", like).
+				Or("LOWER(nickname) LIKE ?", like),
 		)
 	}
 	var total int64
@@ -73,9 +74,7 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 	}
 	offset := (page - 1) * perPage
 	orderClause := contactSortOrder(sort)
-	// Prepend favorites-first sorting
-	favOrder := "CASE WHEN id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = '" + userID + "' AND is_favorite = 1) THEN 0 ELSE 1 END"
-	finalOrder := favOrder + ", " + orderClause
+	finalOrder := favoriteOrderClause(userID) + ", " + orderClause
 	var contacts []models.Contact
 	if err := query.Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
@@ -334,9 +333,7 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	}
 	offset := (page - 1) * perPage
 	orderClause := contactSortOrder(sort)
-	// Prepend favorites-first sorting
-	favOrder := "CASE WHEN id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = '" + userID + "' AND is_favorite = 1) THEN 0 ELSE 1 END"
-	finalOrder := favOrder + ", " + orderClause
+	finalOrder := favoriteOrderClause(userID) + ", " + orderClause
 	var contacts []models.Contact
 	if err := query.Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
@@ -375,15 +372,15 @@ func (s *ContactService) QuickSearch(vaultID, term string) ([]dto.ContactSearchI
 		return []dto.ContactSearchItem{}, nil
 	}
 
-	likeTerm := "%" + term + "%"
+	likeTerm := "%" + strings.ToLower(term) + "%"
 	var contacts []models.Contact
 	if err := s.db.Where("vault_id = ?", vaultID).
 		Where(
-			s.db.Where("first_name LIKE ?", likeTerm).
-				Or("last_name LIKE ?", likeTerm).
-				Or("nickname LIKE ?", likeTerm).
-				Or("maiden_name LIKE ?", likeTerm).
-				Or("middle_name LIKE ?", likeTerm),
+			s.db.Where("LOWER(first_name) LIKE ?", likeTerm).
+				Or("LOWER(last_name) LIKE ?", likeTerm).
+				Or("LOWER(nickname) LIKE ?", likeTerm).
+				Or("LOWER(maiden_name) LIKE ?", likeTerm).
+				Or("LOWER(middle_name) LIKE ?", likeTerm),
 		).
 		Order("first_name ASC, last_name ASC").
 		Limit(5).
@@ -436,6 +433,10 @@ func strPtrOrNil(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func favoriteOrderClause(userID string) string {
+	return "CASE WHEN id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = '" + userID + "' AND is_favorite = true) THEN 0 ELSE 1 END"
 }
 
 func contactSortOrder(sort string) string {
