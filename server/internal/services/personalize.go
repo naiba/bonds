@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/i18n"
@@ -95,9 +96,10 @@ func (s *PersonalizeService) Create(accountID, entity string, req dto.Personaliz
 		val = req.Name
 	}
 
+	now := time.Now()
 	result := s.db.Exec(
-		fmt.Sprintf("INSERT INTO %s (account_id, %s, %s, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())", cfg.table, labelCol, nameCol),
-		accountID, val, val,
+		fmt.Sprintf("INSERT INTO %s (account_id, %s, %s, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", cfg.table, labelCol, nameCol),
+		accountID, val, val, now, now,
 	)
 	if result.Error != nil {
 		return nil, result.Error
@@ -122,8 +124,8 @@ func (s *PersonalizeService) Update(accountID, entity string, id uint, req dto.P
 	}
 
 	result := s.db.Exec(
-		fmt.Sprintf("UPDATE %s SET %s = ?, %s = ?, updated_at = NOW() WHERE id = ? AND account_id = ?", cfg.table, labelCol, nameCol),
-		val, val, id, accountID,
+		fmt.Sprintf("UPDATE %s SET %s = ?, %s = ?, updated_at = ? WHERE id = ? AND account_id = ?", cfg.table, labelCol, nameCol),
+		val, val, time.Now(), id, accountID,
 	)
 	if result.Error != nil {
 		return nil, result.Error

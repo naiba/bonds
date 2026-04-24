@@ -40,15 +40,21 @@ func (s *AdminService) ListUsers() ([]dto.AdminUserResponse, error) {
 	return result, nil
 }
 
-func (s *AdminService) toAdminUserResponse(u models.User) dto.AdminUserResponse {
-	var contactCount int64
-	// Exclude shadow contacts (can_be_deleted=false AND listed=false) from admin stats
-	s.db.Raw(`
+// adminContactCountSQL counts contacts per account, excluding UserVault shadow
+// contacts (can_be_deleted=false AND listed=false). Parameters: account_id,
+// can_be_deleted, listed.
+func adminContactCountSQL() string {
+	return `
 		SELECT COUNT(DISTINCT c.id)
 		FROM contacts c
 		INNER JOIN vaults v ON c.vault_id = v.id
 		WHERE v.account_id = ?
-		AND NOT (c.can_be_deleted = 0 AND c.listed = 0)`, u.AccountID).Scan(&contactCount)
+		AND NOT (c.can_be_deleted = ? AND c.listed = ?)`
+}
+
+func (s *AdminService) toAdminUserResponse(u models.User) dto.AdminUserResponse {
+	var contactCount int64
+	s.db.Raw(adminContactCountSQL(), u.AccountID, false, false).Scan(&contactCount)
 
 	var vaultCount int64
 	s.db.Model(&models.Vault{}).Where("account_id = ?", u.AccountID).Count(&vaultCount)
