@@ -36,10 +36,19 @@ func ParseMonicaExport(data []byte) (*MonicaExport, error) {
 	return &export, nil
 }
 
-// getCollectionByType 从 []MonicaCollection 中按 type 获取 values
+// getCollectionByType 从 []MonicaCollection 中按 type 获取 values。
+// Monica 4.x 的 CountResourceCollection 通过 Str::of(class)->afterLast('\\')->kebab()
+// 生成单数形式的 type 名 (e.g. "contact", "note")，而 Bonds 代码库历史上使用
+// 复数形式 (e.g. "contacts", "notes")。为兼容真实 Monica 导出 (#83)，同时接受两种。
 func getCollectionByType(collections []MonicaCollection, entityType string) []json.RawMessage {
+	singular := strings.TrimSuffix(entityType, "s")
+	if entityType == "addresses" {
+		singular = "address"
+	} else if entityType == "activities" {
+		singular = "activity"
+	}
 	for _, c := range collections {
-		if c.Type == entityType {
+		if c.Type == entityType || c.Type == singular {
 			return c.Values
 		}
 	}

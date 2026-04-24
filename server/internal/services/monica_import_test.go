@@ -82,6 +82,82 @@ func TestParseMonicaExport_EmptyContacts(t *testing.T) {
 	}
 }
 
+// Regression for #83: real Monica 4.x JSON exports use singular collection
+// type names (e.g. "contact", "note", "reminder") derived from
+// Str::of(ClassName)->afterLast('\\')->kebab() in CountResourceCollection.
+// Bonds must accept these singular names or no contacts get imported.
+// Confirmed against the anonymized export attached to issue #83:
+// {type: "contact"} with nested {type: "activity"|"call"|"gift"|"note"|"reminder"}.
+func TestMonicaImport_SingularCollectionTypes(t *testing.T) {
+	svc, vaultID, userID, _ := setupMonicaImportTest(t)
+
+	jsonData := `{
+		"version": "1.0-preview.1",
+		"app_version": "4.1.2",
+		"account": {
+			"uuid": "acct-1",
+			"data": [
+				{
+					"count": 1,
+					"type": "contact",
+					"values": [
+						{
+							"uuid": "contact-uuid-1",
+							"properties": {
+								"first_name": "Jane",
+								"last_name": "Smith"
+							},
+							"data": []
+						}
+					]
+				}
+			],
+			"instance": {}
+		}
+	}`
+
+	resp, err := svc.Import(vaultID, userID, []byte(jsonData))
+	if err != nil {
+		t.Fatalf("Import failed: %v", err)
+	}
+	if resp.ImportedContacts != 1 {
+		t.Fatalf("expected 1 imported contact from singular-type export, got %d (errors=%v)",
+			resp.ImportedContacts, resp.Errors)
+	}
+
+	var jane models.Contact
+	if err := svc.DB.Where("vault_id = ? AND first_name = ?", vaultID, "Jane").First(&jane).Error; err != nil {
+		t.Fatalf("Jane not found: %v", err)
+	}
+}
+
+// End-to-end regression for #83 using the anonymized export attached to the
+// issue (testdata/monica_export_real.json). Contains 5 contacts/relationships
+// /activities and per-contact calls/gifts/notes/reminders — all emitted with
+// singular Monica type names.
+func TestMonicaImport_RealAnonymizedExport(t *testing.T) {
+	svc, vaultID, userID, _ := setupMonicaImportTest(t)
+
+	data, err := os.ReadFile("../testdata/monica_export_real.json")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	resp, err := svc.Import(vaultID, userID, data)
+	if err != nil {
+		t.Fatalf("Import failed: %v", err)
+	}
+	if resp.ImportedContacts != 5 {
+		t.Fatalf("expected 5 imported contacts, got %d (errors=%v)", resp.ImportedContacts, resp.Errors)
+	}
+
+	var count int64
+	svc.DB.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&count)
+	if count < 5 {
+		t.Fatalf("expected at least 5 contacts in DB, got %d", count)
+	}
+}
+
 func setupMonicaImportTest(t *testing.T) (*MonicaImportService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)

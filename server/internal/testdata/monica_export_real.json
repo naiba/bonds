@@ -1,0 +1,1134 @@
+{
+  "version": "1.0-preview.1",
+  "app_version": "4.1.2",
+  "export_date": "2024-01-02T00:37:00.000000Z",
+  "url": "https://example.com",
+  "exported_by": "user1@example.com",
+  "account": {
+    "uuid": "00000000-0000-4000-8000-000000000001",
+    "created_at": "2024-01-03T01:14:00.000000Z",
+    "updated_at": "2024-01-04T01:51:00.000000Z",
+    "data": [
+      {
+        "count": 1,
+        "type": "user",
+        "values": [
+          {
+            "uuid": "00000000-0000-4000-8000-000000000002",
+            "first_name": "Person 1",
+            "last_name": "Person 2",
+            "email": "user2@example.com",
+            "email_verified_at": null,
+            "google2fa_secret": null,
+            "created_at": "2024-01-05T02:28:00.000000Z",
+            "updated_at": "2024-01-04T01:51:00.000000Z",
+            "properties": {
+              "locale": "en",
+              "metric": "fahrenheit",
+              "fluid_container": true,
+              "contacts_sort_order": "firstnameAZ",
+              "name_order": "firstname_lastname_nickname",
+              "dashboard_active_tab": "calls",
+              "gifts_active_tab": "ideas",
+              "profile_active_tab": "notes",
+              "timezone": "UTC",
+              "profile_new_life_event_badge_seen": true,
+              "temperature_scale": "fahrenheit",
+              "currency": "USD",
+              "me_contact": "00000000-0000-4000-8000-000000000003"
+            }
+          }
+        ]
+      },
+      {
+        "count": 5,
+        "type": "contact",
+        "values": [
+          {
+            "uuid": "00000000-0000-4000-8000-000000000004",
+            "created_at": "2024-01-06T03:05:00.000000Z",
+            "updated_at": "2024-01-07T03:42:00.000000Z",
+            "properties": {
+              "first_name": "Person 3",
+              "last_name": "Person 4",
+              "is_starred": false,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "last_consulted_at": "2024-01-08T04:19:00.000000Z",
+              "number_of_views": 24,
+              "stay_in_touch_frequency": 60,
+              "stay_in_touch_trigger_date": "2024-01-09T04:56:00.000000Z",
+              "avatar": {
+                "avatar_source": "default",
+                "avatar_gravatar_url": null,
+                "avatar_adorable_uuid": "00000000-0000-4000-8000-000000000005",
+                "avatar_default_url": "anonymized-avatar.png",
+                "has_avatar": false,
+                "avatar_external_url": null,
+                "avatar_file_name": null,
+                "avatar_location": "local",
+                "gravatar_url": null,
+                "default_avatar_color": "#4A90E2"
+              },
+              "tags": [
+                "tag 1"
+              ],
+              "gender": "00000000-0000-4000-8000-000000000006",
+              "birthdate": {
+                "uuid": "00000000-0000-4000-8000-000000000007",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-01-10T05:33:00.000000Z",
+                "created_at": "2024-01-11T06:10:00.000000Z",
+                "updated_at": "2024-01-12T06:47:00.000000Z"
+              }
+            },
+            "data": [
+              {
+                "count": 1,
+                "type": "gift",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000008",
+                    "created_at": "2024-01-13T07:24:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "name": "Item 2",
+                      "status": "offered",
+                      "date": "2024-01-15T08:38:00.000000Z"
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "note",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000009",
+                    "created_at": "2024-01-16T09:15:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "body": "Anonymized text 3"
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "reminder",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000010",
+                    "created_at": "2024-01-11T06:10:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-01-10T05:33:00.000000Z",
+                      "title": "Anonymized text 4",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": false,
+                      "inactive": false
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "activity",
+                "values": [
+                  "00000000-0000-4000-8000-000000000011"
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000012",
+            "created_at": "2024-01-17T09:52:00.000000Z",
+            "updated_at": "2024-01-18T10:29:00.000000Z",
+            "properties": {
+              "first_name": "Person 5",
+              "last_name": "Person 6",
+              "is_starred": false,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "last_consulted_at": "2024-01-19T11:06:00.000000Z",
+              "number_of_views": 32,
+              "avatar": {
+                "avatar_source": "default",
+                "avatar_gravatar_url": null,
+                "avatar_adorable_uuid": "00000000-0000-4000-8000-000000000013",
+                "avatar_default_url": "anonymized-avatar.png",
+                "has_avatar": false,
+                "avatar_external_url": null,
+                "avatar_file_name": null,
+                "avatar_location": "local",
+                "gravatar_url": null,
+                "default_avatar_color": "#7ED321"
+              },
+              "gender": "00000000-0000-4000-8000-000000000014",
+              "birthdate": {
+                "uuid": "00000000-0000-4000-8000-000000000015",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-01-20T11:43:00.000000Z",
+                "created_at": "2024-01-21T12:20:00.000000Z",
+                "updated_at": "2024-01-12T06:47:00.000000Z"
+              }
+            },
+            "data": [
+              {
+                "count": 2,
+                "type": "reminder",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000016",
+                    "created_at": "2024-01-21T12:20:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-01-20T11:43:00.000000Z",
+                      "title": "Anonymized text 5",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": false,
+                      "inactive": false
+                    }
+                  },
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000017",
+                    "created_at": "2024-01-22T12:57:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-01-23T13:34:00.000000Z",
+                      "title": "Anonymized text 6",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": true,
+                      "inactive": false
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 2,
+                "type": "activity",
+                "values": [
+                  "00000000-0000-4000-8000-000000000018",
+                  "00000000-0000-4000-8000-000000000019"
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000003",
+            "created_at": "2024-01-24T14:11:00.000000Z",
+            "updated_at": "2024-01-18T10:29:00.000000Z",
+            "properties": {
+              "first_name": "Person 7",
+              "last_name": "Person 8",
+              "is_starred": true,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "last_consulted_at": "2024-01-25T14:48:00.000000Z",
+              "number_of_views": 52,
+              "avatar": {
+                "avatar_source": "default",
+                "avatar_gravatar_url": null,
+                "avatar_adorable_uuid": "00000000-0000-4000-8000-000000000020",
+                "avatar_default_url": "anonymized-avatar.png",
+                "has_avatar": false,
+                "avatar_external_url": null,
+                "avatar_file_name": null,
+                "avatar_location": "local",
+                "gravatar_url": null,
+                "default_avatar_color": "#F5A623"
+              },
+              "gender": "00000000-0000-4000-8000-000000000014",
+              "birthdate": {
+                "uuid": "00000000-0000-4000-8000-000000000021",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-01-26T15:25:00.000000Z",
+                "created_at": "2024-01-24T14:11:00.000000Z",
+                "updated_at": "2024-01-27T16:02:00.000000Z"
+              }
+            },
+            "data": [
+              {
+                "count": 2,
+                "type": "reminder",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000022",
+                    "created_at": "2024-01-28T16:39:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-01-29T17:16:00.000000Z",
+                      "title": "Anonymized text 7",
+                      "description": "Anonymized text 8",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": true,
+                      "inactive": false
+                    }
+                  },
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000023",
+                    "created_at": "2024-01-30T17:53:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-01-31T18:30:00.000000Z",
+                      "title": "Anonymized text 9",
+                      "description": "Anonymized text 10",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": true,
+                      "inactive": false
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 1,
+                "type": "activity",
+                "values": [
+                  "00000000-0000-4000-8000-000000000024"
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000025",
+            "created_at": "2024-02-01T19:07:00.000000Z",
+            "updated_at": "2024-02-02T19:44:00.000000Z",
+            "properties": {
+              "first_name": "Person 9",
+              "middle_name": "Person 10",
+              "last_name": "Person 11",
+              "nickname": "Person 12",
+              "is_starred": false,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": true,
+              "last_consulted_at": "2024-02-03T20:21:00.000000Z",
+              "number_of_views": 16,
+              "avatar": {
+                "avatar_source": "default",
+                "avatar_gravatar_url": null,
+                "avatar_adorable_uuid": "00000000-0000-4000-8000-000000000026",
+                "avatar_default_url": "anonymized-avatar.png",
+                "has_avatar": false,
+                "avatar_external_url": null,
+                "avatar_file_name": null,
+                "avatar_location": "local",
+                "gravatar_url": null,
+                "default_avatar_color": "#BD10E0"
+              },
+              "gender": "00000000-0000-4000-8000-000000000014",
+              "birthdate": {
+                "uuid": "00000000-0000-4000-8000-000000000027",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-02-04T20:58:00.000000Z",
+                "created_at": "2024-02-05T21:35:00.000000Z",
+                "updated_at": "2024-02-06T22:12:00.000000Z"
+              },
+              "deceased_date": {
+                "uuid": "00000000-0000-4000-8000-000000000028",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-02-07T22:49:00.000000Z",
+                "created_at": "2024-02-05T21:35:00.000000Z",
+                "updated_at": "2024-01-14T08:01:00.000000Z"
+              },
+              "deceased_reminder": {
+                "uuid": "00000000-0000-4000-8000-000000000029",
+                "created_at": "2024-02-05T21:35:00.000000Z",
+                "updated_at": "2024-01-14T08:01:00.000000Z",
+                "properties": {
+                  "initial_date": "2024-02-07T22:49:00.000000Z",
+                  "title": "Anonymized text 11",
+                  "frequency_type": "year",
+                  "frequency_number": 1,
+                  "delible": true,
+                  "inactive": false
+                }
+              }
+            },
+            "data": [
+              {
+                "count": 2,
+                "type": "reminder",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000030",
+                    "created_at": "2024-02-05T21:35:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-02-04T20:58:00.000000Z",
+                      "title": "Anonymized text 12",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": false,
+                      "inactive": false
+                    }
+                  },
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000029",
+                    "created_at": "2024-02-05T21:35:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "initial_date": "2024-02-07T22:49:00.000000Z",
+                      "title": "Anonymized text 13",
+                      "frequency_type": "year",
+                      "frequency_number": 1,
+                      "delible": true,
+                      "inactive": false
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000031",
+            "created_at": "2024-02-08T23:26:00.000000Z",
+            "updated_at": "2024-02-02T19:44:00.000000Z",
+            "properties": {
+              "first_name": "Person 13",
+              "middle_name": "Person 14",
+              "last_name": "Person 15",
+              "nickname": "Person 16",
+              "is_starred": false,
+              "is_partial": false,
+              "is_active": true,
+              "is_dead": false,
+              "last_talked_to": "2024-02-09T00:03:00.000000Z",
+              "last_consulted_at": "2024-02-10T00:40:00.000000Z",
+              "number_of_views": 14,
+              "avatar": {
+                "avatar_source": "default",
+                "avatar_gravatar_url": null,
+                "avatar_adorable_uuid": "00000000-0000-4000-8000-000000000032",
+                "avatar_default_url": "anonymized-avatar.png",
+                "has_avatar": false,
+                "avatar_external_url": null,
+                "avatar_file_name": null,
+                "avatar_location": "local",
+                "gravatar_url": null,
+                "default_avatar_color": "#50E3C2"
+              },
+              "gender": "00000000-0000-4000-8000-000000000014",
+              "birthdate": {
+                "uuid": "00000000-0000-4000-8000-000000000033",
+                "is_age_based": false,
+                "is_year_unknown": false,
+                "date": "2024-02-11T01:17:00.000000Z",
+                "created_at": "2024-02-12T01:54:00.000000Z",
+                "updated_at": "2024-02-13T02:31:00.000000Z"
+              },
+              "first_met_through": "00000000-0000-4000-8000-000000000034"
+            },
+            "data": [
+              {
+                "count": 1,
+                "type": "call",
+                "values": [
+                  {
+                    "uuid": "00000000-0000-4000-8000-000000000035",
+                    "created_at": "2024-02-14T03:08:00.000000Z",
+                    "updated_at": "2024-01-14T08:01:00.000000Z",
+                    "properties": {
+                      "called_at": "2024-02-09T00:03:00.000000Z",
+                      "content": "Anonymized text 14",
+                      "contact_called": false,
+                      "emotions": [
+                        "hope",
+                        "hope"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "count": 2,
+                "type": "activity",
+                "values": [
+                  "00000000-0000-4000-8000-000000000036",
+                  "00000000-0000-4000-8000-000000000036"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "count": 5,
+        "type": "relationship",
+        "values": [
+          {
+            "uuid": "00000000-0000-4000-8000-000000000037",
+            "created_at": "2024-01-24T14:11:00.000000Z",
+            "updated_at": "2024-01-07T03:42:00.000000Z",
+            "properties": {
+              "type": "sibling",
+              "contact_is": "00000000-0000-4000-8000-000000000012",
+              "of_contact": "00000000-0000-4000-8000-000000000003"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000038",
+            "created_at": "2024-01-24T14:11:00.000000Z",
+            "updated_at": "2024-01-07T03:42:00.000000Z",
+            "properties": {
+              "type": "sibling",
+              "contact_is": "00000000-0000-4000-8000-000000000003",
+              "of_contact": "00000000-0000-4000-8000-000000000012"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000039",
+            "created_at": "2024-02-15T03:45:00.000000Z",
+            "updated_at": "2024-01-07T03:42:00.000000Z",
+            "properties": {
+              "type": "child",
+              "contact_is": "00000000-0000-4000-8000-000000000025",
+              "of_contact": "00000000-0000-4000-8000-000000000012"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000040",
+            "created_at": "2024-02-15T03:45:00.000000Z",
+            "updated_at": "2024-01-07T03:42:00.000000Z",
+            "properties": {
+              "type": "parent",
+              "contact_is": "00000000-0000-4000-8000-000000000012",
+              "of_contact": "00000000-0000-4000-8000-000000000025"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000041",
+            "created_at": "2024-02-16T04:22:00.000000Z",
+            "updated_at": "2024-01-07T03:42:00.000000Z",
+            "properties": {
+              "type": "child",
+              "contact_is": "00000000-0000-4000-8000-000000000025",
+              "of_contact": "00000000-0000-4000-8000-000000000003"
+            }
+          }
+        ]
+      },
+      {
+        "count": 5,
+        "type": "activity",
+        "values": [
+          {
+            "uuid": "00000000-0000-4000-8000-000000000042",
+            "created_at": "2024-02-17T04:59:00.000000Z",
+            "updated_at": "2024-01-14T08:01:00.000000Z",
+            "properties": {
+              "summary": "Anonymized text 15",
+              "happened_at": "2024-02-18T05:36:00.000000Z"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000036",
+            "created_at": "2024-02-19T06:13:00.000000Z",
+            "updated_at": "2024-01-14T08:01:00.000000Z",
+            "properties": {
+              "summary": "Anonymized text 16",
+              "happened_at": "2024-02-20T06:50:00.000000Z"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000043",
+            "created_at": "2024-02-21T07:27:00.000000Z",
+            "updated_at": "2024-01-14T08:01:00.000000Z",
+            "properties": {
+              "summary": "Anonymized text 17",
+              "description": "Anonymized text 18",
+              "happened_at": "2024-02-22T08:04:00.000000Z"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000044",
+            "created_at": "2024-02-23T08:41:00.000000Z",
+            "updated_at": "2024-01-14T08:01:00.000000Z",
+            "properties": {
+              "summary": "Anonymized text 19",
+              "happened_at": "2024-02-24T09:18:00.000000Z"
+            }
+          },
+          {
+            "uuid": "00000000-0000-4000-8000-000000000045",
+            "created_at": "2024-02-25T09:55:00.000000Z",
+            "updated_at": "2024-01-14T08:01:00.000000Z",
+            "properties": {
+              "summary": "Anonymized text 20",
+              "description": "Anonymized text 21",
+              "happened_at": "2024-02-26T10:32:00.000000Z"
+            }
+          }
+        ]
+      }
+    ],
+    "properties": {
+      "journal_entries": [],
+      "modules": [
+        {
+          "key": "love_relationships",
+          "translation_key": "app.relationship_type_group_love",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true,
+            "delible": false
+          }
+        },
+        {
+          "key": "family_relationships",
+          "translation_key": "app.relationship_type_group_family",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true,
+            "delible": false
+          }
+        },
+        {
+          "key": "other_relationships",
+          "translation_key": "app.relationship_type_group_other",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true,
+            "delible": false
+          }
+        },
+        {
+          "key": "pets",
+          "translation_key": "people.pets_title",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true,
+            "delible": false
+          }
+        },
+        {
+          "key": "contact_information",
+          "translation_key": "people.section_contact_information",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true,
+            "delible": false
+          }
+        },
+        {
+          "key": "addresses",
+          "translation_key": "people.contact_address_title",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true,
+            "delible": false
+          }
+        }
+      ],
+      "reminder_rules": [
+        {
+          "number_of_days_before": 7,
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true
+          }
+        },
+        {
+          "number_of_days_before": 30,
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-05T02:28:00.000000Z",
+          "properties": {
+            "active": true
+          }
+        }
+      ],
+      "audit_logs": [
+        {
+          "created_at": "2024-01-06T03:05:00.000000Z",
+          "updated_at": "2024-01-06T03:05:00.000000Z",
+          "properties": {
+            "author_name": "Person 17",
+            "action": "contact_created",
+            "objects": "Anonymized text 22",
+            "audited_at": "2024-01-06T03:05:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000004"
+          }
+        },
+        {
+          "created_at": "2024-01-17T09:52:00.000000Z",
+          "updated_at": "2024-01-17T09:52:00.000000Z",
+          "properties": {
+            "author_name": "Person 18",
+            "action": "contact_created",
+            "objects": "Anonymized text 23",
+            "audited_at": "2024-01-17T09:52:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000012"
+          }
+        },
+        {
+          "created_at": "2024-02-27T11:09:00.000000Z",
+          "updated_at": "2024-02-27T11:09:00.000000Z",
+          "properties": {
+            "author_name": "Person 19",
+            "action": "contact_description_cleared",
+            "objects": "Anonymized text 24",
+            "audited_at": "2024-02-27T11:09:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000004"
+          }
+        },
+        {
+          "created_at": "2024-02-28T11:46:00.000000Z",
+          "updated_at": "2024-02-28T11:46:00.000000Z",
+          "properties": {
+            "author_name": "Person 20",
+            "action": "contact_description_cleared",
+            "objects": "Anonymized text 25",
+            "audited_at": "2024-02-28T11:46:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000012"
+          }
+        },
+        {
+          "created_at": "2024-01-24T14:11:00.000000Z",
+          "updated_at": "2024-01-24T14:11:00.000000Z",
+          "properties": {
+            "author_name": "Person 21",
+            "action": "contact_created",
+            "objects": "Anonymized text 26",
+            "audited_at": "2024-01-24T14:11:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000003"
+          }
+        },
+        {
+          "created_at": "2024-02-01T19:07:00.000000Z",
+          "updated_at": "2024-02-01T19:07:00.000000Z",
+          "properties": {
+            "author_name": "Person 22",
+            "action": "contact_created",
+            "objects": "Anonymized text 27",
+            "audited_at": "2024-02-01T19:07:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000025"
+          }
+        },
+        {
+          "created_at": "2024-02-29T12:23:00.000000Z",
+          "updated_at": "2024-02-29T12:23:00.000000Z",
+          "properties": {
+            "author_name": "Person 23",
+            "action": "contact_description_cleared",
+            "objects": "Anonymized text 28",
+            "audited_at": "2024-02-29T12:23:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000025"
+          }
+        },
+        {
+          "created_at": "2024-02-08T23:26:00.000000Z",
+          "updated_at": "2024-02-08T23:26:00.000000Z",
+          "properties": {
+            "author_name": "Person 24",
+            "action": "contact_created",
+            "objects": "Anonymized text 29",
+            "audited_at": "2024-02-08T23:26:00.000000Z",
+            "should_appear_on_dashboard": true,
+            "author": "00000000-0000-4000-8000-000000000002",
+            "contact": "00000000-0000-4000-8000-000000000031"
+          }
+        }
+      ]
+    },
+    "instance": {
+      "activity_types": [
+        {
+          "uuid": "00000000-0000-4000-8000-000000000046",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "watched_movie_at_home",
+            "name": "Item 30",
+            "category": "00000000-0000-4000-8000-000000000047"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000048",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "went_bar",
+            "name": "Item 31",
+            "category": "00000000-0000-4000-8000-000000000049"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000050",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "picnicked",
+            "name": "Item 32",
+            "category": "00000000-0000-4000-8000-000000000049"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000051",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "went_play",
+            "name": "Item 33",
+            "category": "00000000-0000-4000-8000-000000000052"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000053",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "went_concert",
+            "name": "Item 34",
+            "category": "00000000-0000-4000-8000-000000000052"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000054",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "went_museum",
+            "name": "Item 35",
+            "category": "00000000-0000-4000-8000-000000000052"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000055",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "ate_at_his_place",
+            "name": "Item 36",
+            "category": "00000000-0000-4000-8000-000000000049"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000056",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "went_theater",
+            "name": "Item 37",
+            "category": "00000000-0000-4000-8000-000000000052"
+          }
+        }
+      ],
+      "activity_type_categories": [
+        {
+          "uuid": "00000000-0000-4000-8000-000000000052",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "cultural_activities",
+            "name": "Item 38"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000049",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "food",
+            "name": "Item 39"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000047",
+          "created_at": null,
+          "updated_at": "2024-03-02T13:37:00.000000Z",
+          "properties": {
+            "translation_key": "simple_activities",
+            "name": "Item 40"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000057",
+          "created_at": null,
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "translation_key": "sport",
+            "name": "Item 41"
+          }
+        }
+      ],
+      "contact_field_types": [
+        {
+          "uuid": "00000000-0000-4000-8000-000000000058",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 42",
+            "fontawesome_icon": "fa fa-telegram",
+            "protocol": "telegram:",
+            "delible": true
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000059",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 43",
+            "fontawesome_icon": "fa fa-linkedin-square",
+            "delible": true
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000060",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 44",
+            "fontawesome_icon": "fa fa-envelope-open-o",
+            "protocol": "mailto:",
+            "delible": false,
+            "type": "email"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000061",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 45",
+            "fontawesome_icon": "fa fa-volume-control-phone",
+            "protocol": "tel:",
+            "delible": false,
+            "type": "phone"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000062",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 46",
+            "fontawesome_icon": "fa fa-facebook-official",
+            "protocol": "https://facebook.com/",
+            "delible": true
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000063",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 47",
+            "fontawesome_icon": "fa fa-twitter-square",
+            "delible": true
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000064",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-03T14:14:00.000000Z",
+          "properties": {
+            "name": "Item 48",
+            "fontawesome_icon": "fa fa-whatsapp",
+            "protocol": "https://wa.me/",
+            "delible": true
+          }
+        }
+      ],
+      "genders": [
+        {
+          "uuid": "00000000-0000-4000-8000-000000000065",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "name": "Item 49",
+            "type": "O"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000006",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-04T01:51:00.000000Z",
+          "properties": {
+            "name": "Item 50",
+            "type": "F"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000014",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-04T01:51:00.000000Z",
+          "properties": {
+            "name": "Item 51",
+            "type": "M"
+          }
+        }
+      ],
+      "life_event_types": [
+        {
+          "uuid": "00000000-0000-4000-8000-000000000066",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"employer\": {\"type\": \"string\", \"value\": \"\"}, \"job_title\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "new_job",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000068",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"profession\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "retirement",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000069",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"degree\": {\"type\": \"string\", \"value\": \"\"}, \"end_date\": {\"type\": \"date\", \"value\": \"\"}, \"end_date_reminder_id\": {\"type\": \"integer\", \"value\": \"\"}, \"school_name\": {\"type\": \"string\", \"value\": \"\"}, \"studying\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "new_school",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000070",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"degree\": {\"type\": \"string\", \"value\": \"\"}, \"end_date\": {\"type\": \"date\", \"value\": \"\"}, \"end_date_reminder_id\": {\"type\": \"integer\", \"value\": \"\"}, \"school_name\": {\"type\": \"string\", \"value\": \"\"}, \"studying\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "study_abroad",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000071",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"organization\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "volunteer_work",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000072",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"full_citation\": {\"type\": \"string\", \"value\": \"\"}, \"url\": {\"type\": \"string\", \"value\": \"\"}, \"citation\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "published_book_or_paper",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000073",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "specific_information_structure": "{\"end_date\": {\"type\": \"date\", \"value\": \"\"}, \"end_date_reminder_id\": {\"type\": \"integer\", \"value\": \"\"}, \"branch\": {\"type\": \"string\", \"value\": \"\"}, \"division\": {\"type\": \"string\", \"value\": \"\"}, \"country\": {\"type\": \"string\", \"value\": \"\"}}",
+            "translation_key": "military_service",
+            "category": "00000000-0000-4000-8000-000000000067"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000074",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-01-14T08:01:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "translation_key": "new_relationship",
+            "category": "00000000-0000-4000-8000-000000000075"
+          }
+        }
+      ],
+      "life_event_categories": [
+        {
+          "uuid": "00000000-0000-4000-8000-000000000076",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "translation_key": "travel_experiences"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000077",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "translation_key": "home_living"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000075",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "translation_key": "family_relationships"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000078",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "translation_key": "health_wellness"
+          }
+        },
+        {
+          "uuid": "00000000-0000-4000-8000-000000000067",
+          "created_at": "2024-01-05T02:28:00.000000Z",
+          "updated_at": "2024-03-01T13:00:00.000000Z",
+          "properties": {
+            "core_monica_data": true,
+            "translation_key": "work_education"
+          }
+        }
+      ]
+    }
+  }
+}
