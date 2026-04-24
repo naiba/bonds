@@ -121,14 +121,18 @@ func (s *ReminderService) Delete(id uint, contactID, vaultID string) error {
 }
 
 func (s *ReminderService) scheduleReminder(reminder *models.ContactReminder) {
+	scheduleReminderForVaultUsers(s.db, reminder)
+}
+
+func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder) {
 	var contact models.Contact
-	if err := s.db.First(&contact, "id = ?", reminder.ContactID).Error; err != nil {
+	if err := db.First(&contact, "id = ?", reminder.ContactID).Error; err != nil {
 		log.Printf("[reminder] Failed to load contact %s for scheduling: %v", reminder.ContactID, err)
 		return
 	}
 
 	var userVaults []models.UserVault
-	if err := s.db.Where("vault_id = ?", contact.VaultID).Find(&userVaults).Error; err != nil {
+	if err := db.Where("vault_id = ?", contact.VaultID).Find(&userVaults).Error; err != nil {
 		log.Printf("[reminder] Failed to load vault users for vault %s: %v", contact.VaultID, err)
 		return
 	}
@@ -139,7 +143,7 @@ func (s *ReminderService) scheduleReminder(reminder *models.ContactReminder) {
 	}
 
 	var channels []models.UserNotificationChannel
-	if err := s.db.Where("user_id IN ? AND active = ?", userIDs, true).Find(&channels).Error; err != nil {
+	if err := db.Where("user_id IN ? AND active = ?", userIDs, true).Find(&channels).Error; err != nil {
 		log.Printf("[reminder] Failed to load notification channels: %v", err)
 		return
 	}
@@ -147,7 +151,7 @@ func (s *ReminderService) scheduleReminder(reminder *models.ContactReminder) {
 	scheduledAt := calcInitialSchedule(reminder)
 
 	for _, ch := range channels {
-		s.db.Create(&models.ContactReminderScheduled{
+		db.Create(&models.ContactReminderScheduled{
 			UserNotificationChannelID: ch.ID,
 			ContactReminderID:         reminder.ID,
 			ScheduledAt:               scheduledAt,

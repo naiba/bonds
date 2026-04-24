@@ -145,7 +145,6 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 	var existing models.ContactReminder
 	err := s.db.Where("contact_id = ? AND important_date_id = ?", contactID, date.ID).First(&existing).Error
 	if err == nil {
-		// Already exists, update it
 		existing.Label = date.Label
 		existing.Day = date.Day
 		existing.Month = date.Month
@@ -156,7 +155,6 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 		existing.OriginalYear = date.OriginalYear
 		return s.db.Save(&existing).Error
 	}
-	// Create new yearly recurring reminder
 	reminder := models.ContactReminder{
 		ContactID:       contactID,
 		ImportantDateID: &date.ID,
@@ -170,7 +168,11 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 		OriginalYear:    date.OriginalYear,
 		Type:            "recurring_year",
 	}
-	return s.db.Create(&reminder).Error
+	if err := s.db.Create(&reminder).Error; err != nil {
+		return err
+	}
+	scheduleReminderForVaultUsers(s.db, &reminder)
+	return nil
 }
 
 func (s *ImportantDateService) removeReminder(contactID string, dateID uint) error {

@@ -14,6 +14,7 @@ type importantDateTestCtx struct {
 	svc       *ImportantDateService
 	contactID string
 	vaultID   string
+	userID    string
 	db        *gorm.DB
 }
 
@@ -49,6 +50,7 @@ func setupImportantDateTest(t *testing.T) importantDateTestCtx {
 		svc:       NewImportantDateService(db),
 		contactID: contact.ID,
 		vaultID:   vault.ID,
+		userID:    resp.User.ID,
 		db:        db,
 	}
 }
@@ -420,5 +422,60 @@ func TestImportantDate_DeleteRemovesReminder(t *testing.T) {
 	ctx.db.Model(&models.ContactReminder{}).Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).Count(&count)
 	if count != 0 {
 		t.Errorf("Expected 0 reminders after deleting date, got %d", count)
+	}
+}
+
+// Regression test for #81: "Remind me" on important dates must enqueue
+// ContactReminderScheduled rows so notifications actually fire.
+func TestImportantDate_RemindMe_SchedulesNotifications(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	var ch models.UserNotificationChannel
+	if err := ctx.db.Where("user_id = ? AND active = ?", ctx.userID, true).First(&ch).Error; err != nil {
+		t.Fatalf("load seeded channel: %v", err)
+	}
+
+	var birthdateType models.ContactImportantDateType
+	if err := ctx.db.Where("vault_id = ? AND label = ?", ctx.vaultID, "Birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("Failed to find Birthdate type: %v", err)
+	}
+
+	day, month, year := 15, 6, 1990
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Birthday",
+		Day:                        &day,
+		Month:                      &month,
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		RemindMe:                   &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var reminder models.ContactReminder
+	if err := ctx.db.Where("contact_id = ? AND important_date_id = ?", ctx.contactID, date.ID).First(&reminder).Error; err != nil {
+		t.Fatalf("Expected reminder to exist: %v", err)
+	}
+
+	var scheduledCount int64
+	if err := ctx.db.Model(&models.ContactReminderScheduled{}).
+		Where("contact_reminder_id = ?", reminder.ID).Count(&scheduledCount).Error; err != nil {
+		t.Fatalf("count scheduled: %v", err)
+	}
+	if scheduledCount != 1 {
+		t.Fatalf("Expected 1 scheduled entry for important-date reminder, got %d", scheduledCount)
+	}
+
+	var scheduled models.ContactReminderScheduled
+	if err := ctx.db.Where("contact_reminder_id = ?", reminder.ID).First(&scheduled).Error; err != nil {
+		t.Fatalf("load scheduled: %v", err)
+	}
+	if scheduled.UserNotificationChannelID != ch.ID {
+		t.Errorf("Expected scheduled for channel %d, got %d", ch.ID, scheduled.UserNotificationChannelID)
+	}
+	if scheduled.TriggeredAt != nil {
+		t.Error("Expected TriggeredAt to be nil on fresh schedule")
 	}
 }
