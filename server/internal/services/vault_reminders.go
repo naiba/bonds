@@ -1,6 +1,9 @@
 package services
 
 import (
+	"sort"
+	"time"
+
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
@@ -31,11 +34,12 @@ func (s *VaultReminderService) List(vaultID string) ([]dto.VaultReminderItem, er
 	}
 
 	var reminders []models.ContactReminder
-	if err := s.db.Where("contact_id IN ?", contactIDs).Order("created_at DESC").Find(&reminders).Error; err != nil {
+	if err := s.db.Where("contact_id IN ?", contactIDs).Find(&reminders).Error; err != nil {
 		return nil, err
 	}
 
 	result := make([]dto.VaultReminderItem, len(reminders))
+	now := time.Now()
 	for i, r := range reminders {
 		contact := contactMap[r.ContactID]
 		result[i] = dto.VaultReminderItem{
@@ -44,7 +48,40 @@ func (s *VaultReminderService) List(vaultID string) ([]dto.VaultReminderItem, er
 			ContactLastName:  ptrToStr(contact.LastName),
 		}
 	}
+
+	sort.SliceStable(result, func(i, j int) bool {
+		return nextReminderOccurrence(result[i], now).Before(nextReminderOccurrence(result[j], now))
+	})
 	return result, nil
+}
+
+// nextReminderOccurrence projects a reminder onto the next concrete date so
+// vault reminders can be sorted chronologically (fix #87). For one-time
+// reminders we return the stored date; for recurring ones we roll the day/
+// month forward to the next future occurrence relative to now.
+func nextReminderOccurrence(item dto.VaultReminderItem, now time.Time) time.Time {
+	month := time.January
+	day := 1
+	if item.Month != nil {
+		month = time.Month(*item.Month)
+	}
+	if item.Day != nil {
+		day = *item.Day
+	}
+
+	if item.Type == "one_time" {
+		year := now.Year()
+		if item.Year != nil {
+			year = *item.Year
+		}
+		return time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+	}
+
+	candidate := time.Date(now.Year(), month, day, 0, 0, 0, 0, now.Location())
+	if candidate.Before(now.Truncate(24 * time.Hour)) {
+		candidate = candidate.AddDate(1, 0, 0)
+	}
+	return candidate
 }
 
 // GetCalendarMonth returns calendar data for a specific year/month

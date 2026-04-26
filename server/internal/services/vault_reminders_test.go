@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/testutil"
@@ -56,5 +57,55 @@ func TestListVaultRemindersEmpty(t *testing.T) {
 	}
 	if len(reminders) != 0 {
 		t.Errorf("Expected 0 reminders, got %d", len(reminders))
+	}
+}
+
+// Regression for #87: Upcoming Reminders widget previews the next reminders
+// chronologically. Service must order by next-occurrence date (ascending),
+// not by created_at, so the dashboard glance shows the soonest events first.
+func TestListVaultReminders_OrderedByUpcomingDate(t *testing.T) {
+	vrSvc, rSvc, contactID, vaultID := setupVaultReminderTest(t)
+
+	now := time.Now()
+	// Create three recurring-yearly reminders intentionally inserted in the
+	// "wrong" chronological order so created_at != upcoming-date order.
+	in60 := now.AddDate(0, 0, 60)
+	in10 := now.AddDate(0, 0, 10)
+	in30 := now.AddDate(0, 0, 30)
+
+	specs := []struct {
+		label string
+		t     time.Time
+	}{
+		{"in60", in60},
+		{"in10", in10},
+		{"in30", in30},
+	}
+	for _, s := range specs {
+		d, m := s.t.Day(), int(s.t.Month())
+		if _, err := rSvc.Create(contactID, vaultID, dto.CreateReminderRequest{
+			Label: s.label, Day: &d, Month: &m, Type: "recurring_year",
+		}); err != nil {
+			t.Fatalf("create %s: %v", s.label, err)
+		}
+	}
+
+	reminders, err := vrSvc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(reminders) != 3 {
+		t.Fatalf("expected 3 reminders, got %d", len(reminders))
+	}
+
+	wantOrder := []string{"in10", "in30", "in60"}
+	for i, want := range wantOrder {
+		if reminders[i].Label != want {
+			gotLabels := make([]string, len(reminders))
+			for j, r := range reminders {
+				gotLabels[j] = r.Label
+			}
+			t.Fatalf("position %d: want %s, got %s (full order=%v)", i, want, reminders[i].Label, gotLabels)
+		}
 	}
 }

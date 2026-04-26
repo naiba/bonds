@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -128,6 +129,115 @@ func TestMonicaImport_SingularCollectionTypes(t *testing.T) {
 	var jane models.Contact
 	if err := svc.DB.Where("vault_id = ? AND first_name = ?", vaultID, "Jane").First(&jane).Error; err != nil {
 		t.Fatalf("Jane not found: %v", err)
+	}
+}
+
+// Regression for #83: Monica 4.x exports use the relationship type name
+// "sibling" but Bonds seeds the equivalent type as "brother/sister"
+// (translation key brother_sister). Without an alias map the importer
+// reports `relationship type not found: sibling` and drops the link.
+func TestMonicaImport_SiblingMapsToBrotherSister(t *testing.T) {
+	svc, vaultID, userID, _ := setupMonicaImportTest(t)
+
+	exportJSON := `{
+		"version": "1.0-preview.1",
+		"account": {
+			"uuid": "test-account",
+			"data": [
+				{"count": 2, "type": "contacts", "values": [
+					{"uuid": "c1", "properties": {"first_name": "Alice"}, "data": []},
+					{"uuid": "c2", "properties": {"first_name": "Bob"}, "data": []}
+				]},
+				{"count": 1, "type": "relationships", "values": [
+					{"uuid": "r1", "properties": {"type": "sibling", "contact_is": "c1", "of_contact": "c2"}}
+				]}
+			],
+			"properties": {},
+			"instance": {}
+		}
+	}`
+
+	resp, err := svc.Import(vaultID, userID, []byte(exportJSON))
+	if err != nil {
+		t.Fatalf("Import failed: %v", err)
+	}
+	if resp.ImportedRelationships != 1 {
+		t.Fatalf("expected 1 imported relationship, got %d (errors=%v)", resp.ImportedRelationships, resp.Errors)
+	}
+
+	var alice models.Contact
+	if err := svc.DB.Where("vault_id = ? AND first_name = ?", vaultID, "Alice").First(&alice).Error; err != nil {
+		t.Fatalf("Alice not found: %v", err)
+	}
+	var rels []models.Relationship
+	if err := svc.DB.Where("contact_id = ?", alice.ID).Find(&rels).Error; err != nil {
+		t.Fatalf("query relationships: %v", err)
+	}
+	if len(rels) != 1 {
+		t.Fatalf("expected 1 relationship for Alice, got %d", len(rels))
+	}
+	var rt models.RelationshipType
+	if err := svc.DB.First(&rt, rels[0].RelationshipTypeID).Error; err != nil {
+		t.Fatalf("relationship type lookup: %v", err)
+	}
+	if rt.NameTranslationKey == nil || *rt.NameTranslationKey != "seed.relationship_types.brother_sister" {
+		t.Errorf("expected translation key brother_sister, got %v", rt.NameTranslationKey)
+	}
+}
+
+// Regression for #83: imported notes/contacts must preserve the source
+// created_at timestamps from the Monica export rather than recording the
+// time of import. Otherwise users lose the chronology of their data.
+func TestMonicaImport_PreservesSourceCreatedAt(t *testing.T) {
+	svc, vaultID, userID, _ := setupMonicaImportTest(t)
+
+	exportJSON := `{
+		"version": "1.0-preview.1",
+		"account": {
+			"uuid": "test-account",
+			"data": [
+				{"count": 1, "type": "contacts", "values": [
+					{
+						"uuid": "c1",
+						"created_at": "2020-03-15T10:30:00Z",
+						"properties": {"first_name": "Alice"},
+						"data": [
+							{"count": 1, "type": "notes", "values": [
+								{
+									"uuid": "n1",
+									"created_at": "2021-07-04T09:15:00Z",
+									"properties": {"body": "Old memory"}
+								}
+							]}
+						]
+					}
+				]}
+			],
+			"properties": {},
+			"instance": {}
+		}
+	}`
+
+	if _, err := svc.Import(vaultID, userID, []byte(exportJSON)); err != nil {
+		t.Fatalf("Import failed: %v", err)
+	}
+
+	var alice models.Contact
+	if err := svc.DB.Where("vault_id = ? AND first_name = ?", vaultID, "Alice").First(&alice).Error; err != nil {
+		t.Fatalf("Alice not found: %v", err)
+	}
+	wantContact, _ := time.Parse(time.RFC3339, "2020-03-15T10:30:00Z")
+	if !alice.CreatedAt.Equal(wantContact) {
+		t.Errorf("contact created_at: want %v, got %v", wantContact, alice.CreatedAt)
+	}
+
+	var note models.Note
+	if err := svc.DB.Where("contact_id = ?", alice.ID).First(&note).Error; err != nil {
+		t.Fatalf("note not found: %v", err)
+	}
+	wantNote, _ := time.Parse(time.RFC3339, "2021-07-04T09:15:00Z")
+	if !note.CreatedAt.Equal(wantNote) {
+		t.Errorf("note created_at: want %v, got %v", wantNote, note.CreatedAt)
 	}
 }
 

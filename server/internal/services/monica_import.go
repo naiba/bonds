@@ -158,13 +158,25 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 		}
 
 		// 按名称匹配 RelationshipType（先 Name 再 NameReverseRelationship，case-insensitive）
+		// Monica 4.x 用 kebab-case 的类型名（如 "sibling", "significant-other"），需要
+		// 先映射到 Bonds seed 翻译键再回到本地化名称。
 		var relType models.RelationshipType
 		typeName := mr.Properties.Type
-		if err := s.DB.Where("relationship_group_type_id IN (SELECT id FROM relationship_group_types WHERE account_id = ?) AND LOWER(name) = LOWER(?)", accountID, typeName).First(&relType).Error; err != nil {
-			if err := s.DB.Where("relationship_group_type_id IN (SELECT id FROM relationship_group_types WHERE account_id = ?) AND LOWER(name_reverse_relationship) = LOWER(?)", accountID, typeName).First(&relType).Error; err != nil {
-				resp.Errors = append(resp.Errors, fmt.Sprintf("relationship type not found: %s", typeName))
-				continue
+		candidates := monicaRelationshipNameCandidates(typeName)
+		found := false
+		for _, candidate := range candidates {
+			if err := s.DB.Where("relationship_group_type_id IN (SELECT id FROM relationship_group_types WHERE account_id = ?) AND (LOWER(name) = LOWER(?) OR LOWER(name_translation_key) = LOWER(?))", accountID, candidate, candidate).First(&relType).Error; err == nil {
+				found = true
+				break
 			}
+			if err := s.DB.Where("relationship_group_type_id IN (SELECT id FROM relationship_group_types WHERE account_id = ?) AND (LOWER(name_reverse_relationship) = LOWER(?) OR LOWER(name_reverse_relationship_translation_key) = LOWER(?))", accountID, candidate, candidate).First(&relType).Error; err == nil {
+				found = true
+				break
+			}
+		}
+		if !found {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("relationship type not found: %s", typeName))
+			continue
 		}
 
 		// 检查重复
@@ -227,6 +239,13 @@ func (s *MonicaImportService) importContact(
 		GenderID:    genderID,
 		DistantUUID: strPtrOrNil(mc.UUID),
 		Listed:      listed,
+	}
+	if t, ok := parseMonicaTimestamp(mc.CreatedAt); ok {
+		contact.CreatedAt = t
+		contact.UpdatedAt = t
+	}
+	if t, ok := parseMonicaTimestamp(mc.UpdatedAt); ok {
+		contact.UpdatedAt = t
 	}
 	if err := tx.Create(&contact).Error; err != nil {
 		return "", false, fmt.Errorf("create contact: %w", err)
@@ -381,10 +400,29 @@ func (s *MonicaImportService) importNotes(
 			Body:      mn.Properties.Body,
 			AuthorID:  &userID,
 		}
+		if t, ok := parseMonicaTimestamp(mn.CreatedAt); ok {
+			note.CreatedAt = t
+			note.UpdatedAt = t
+		}
+		if t, ok := parseMonicaTimestamp(mn.UpdatedAt); ok {
+			note.UpdatedAt = t
+		}
 		if err := tx.Create(&note).Error; err == nil {
 			resp.ImportedNotes++
 		}
 	}
+}
+
+func parseMonicaTimestamp(s string) (time.Time, bool) {
+	if s == "" {
+		return time.Time{}, false
+	}
+	for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02T15:04:05.000000Z", "2006-01-02 15:04:05", "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 func (s *MonicaImportService) importCalls(
@@ -815,6 +853,71 @@ func buildActivityContentMap(accountData []MonicaCollection, activityTypeByUUID 
 
 func slugify(name string) string {
 	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
+}
+
+// monicaRelationshipTypeAliases maps Monica 4.x relationship type strings
+// (kebab/snake form, see Monica's RelationshipType seeder) to the Bonds
+// seed translation keys defined in seed_account.go. Anything not listed
+// here falls back to a direct localized-name match.
+var monicaRelationshipTypeAliases = map[string]string{
+	"sibling":           "seed.relationship_types.brother_sister",
+	"siblings":          "seed.relationship_types.brother_sister",
+	"brother":           "seed.relationship_types.brother_sister",
+	"sister":            "seed.relationship_types.brother_sister",
+	"partner":           "seed.relationship_types.significant_other",
+	"significant_other": "seed.relationship_types.significant_other",
+	"significant-other": "seed.relationship_types.significant_other",
+	"parent":            "seed.relationship_types.parent",
+	"child":             "seed.relationship_types.child",
+	"grandparent":       "seed.relationship_types.grand_parent",
+	"grand_parent":      "seed.relationship_types.grand_parent",
+	"grandchild":        "seed.relationship_types.grand_child",
+	"grand_child":       "seed.relationship_types.grand_child",
+	"uncle":             "seed.relationship_types.uncle_aunt",
+	"aunt":              "seed.relationship_types.uncle_aunt",
+	"uncle_aunt":        "seed.relationship_types.uncle_aunt",
+	"nephew":            "seed.relationship_types.nephew_niece",
+	"niece":             "seed.relationship_types.nephew_niece",
+	"nephew_niece":      "seed.relationship_types.nephew_niece",
+	"cousin":            "seed.relationship_types.cousin",
+	"godparent":         "seed.relationship_types.godparent",
+	"godchild":          "seed.relationship_types.godchild",
+	"friend":            "seed.relationship_types.friend",
+	"best_friend":       "seed.relationship_types.best_friend",
+	"colleague":         "seed.relationship_types.colleague",
+	"boss":              "seed.relationship_types.boss",
+	"subordinate":       "seed.relationship_types.subordinate",
+	"mentor":            "seed.relationship_types.mentor",
+	"protege":           "seed.relationship_types.protege",
+	"spouse":            "seed.relationship_types.spouse",
+	"date":              "seed.relationship_types.date",
+	"lover":             "seed.relationship_types.lover",
+	"in_love_with":      "seed.relationship_types.in_love_with",
+	"loved_by":          "seed.relationship_types.loved_by",
+	"ex":                "seed.relationship_types.ex_boyfriend",
+	"ex_boyfriend":      "seed.relationship_types.ex_boyfriend",
+	"ex_girlfriend":     "seed.relationship_types.ex_boyfriend",
+}
+
+func monicaRelationshipNameCandidates(monicaType string) []string {
+	normalized := strings.ToLower(strings.TrimSpace(monicaType))
+	candidates := []string{normalized}
+	if alias, ok := monicaRelationshipTypeAliases[normalized]; ok {
+		candidates = append(candidates, alias)
+	}
+	if dashed := strings.ReplaceAll(normalized, "_", "-"); dashed != normalized {
+		candidates = append(candidates, dashed)
+		if alias, ok := monicaRelationshipTypeAliases[dashed]; ok {
+			candidates = append(candidates, alias)
+		}
+	}
+	if underscored := strings.ReplaceAll(normalized, "-", "_"); underscored != normalized {
+		candidates = append(candidates, underscored)
+		if alias, ok := monicaRelationshipTypeAliases[underscored]; ok {
+			candidates = append(candidates, alias)
+		}
+	}
+	return candidates
 }
 
 func buildGenderMap(refs []MonicaGenderRef) map[string]string {
