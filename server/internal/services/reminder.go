@@ -124,6 +124,34 @@ func (s *ReminderService) scheduleReminder(reminder *models.ContactReminder) {
 	scheduleReminderForVaultUsers(s.db, reminder)
 }
 
+// BackfillImportantDateReminderSchedules finds ContactReminder rows linked to
+// an important date that have no ContactReminderScheduled rows (a leftover
+// from versions before #81 was fixed) and schedules them.
+//
+// Safe to run on every startup: rows that already have schedules are skipped.
+func BackfillImportantDateReminderSchedules(db *gorm.DB) {
+	var reminders []models.ContactReminder
+	err := db.
+		Where("important_date_id IS NOT NULL").
+		Where("NOT EXISTS (?)",
+			db.Model(&models.ContactReminderScheduled{}).
+				Select("1").
+				Where("contact_reminder_scheduled.contact_reminder_id = contact_reminders.id"),
+		).
+		Find(&reminders).Error
+	if err != nil {
+		log.Printf("[reminder-backfill] query failed: %v", err)
+		return
+	}
+	if len(reminders) == 0 {
+		return
+	}
+	log.Printf("[reminder-backfill] scheduling %d important-date reminders missing schedules", len(reminders))
+	for i := range reminders {
+		scheduleReminderForVaultUsers(db, &reminders[i])
+	}
+}
+
 func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder) {
 	var contact models.Contact
 	if err := db.First(&contact, "id = ?", reminder.ContactID).Error; err != nil {

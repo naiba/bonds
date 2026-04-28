@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -479,3 +480,224 @@ func TestImportantDate_RemindMe_SchedulesNotifications(t *testing.T) {
 		t.Error("Expected TriggeredAt to be nil on fresh schedule")
 	}
 }
+
+func TestImportantDate_RemindMe_Update_TogglesScheduling(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	day, month, year := 15, 6, 1990
+	remindFalse := false
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		Year:     &year,
+		RemindMe: &remindFalse,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	var n int64
+	ctx.db.Model(&models.ContactReminderScheduled{}).Count(&n)
+	if n != 0 {
+		t.Fatalf("Expected 0 scheduled before enabling, got %d", n)
+	}
+
+	remindTrue := true
+	if _, err := ctx.svc.Update(date.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		Year:     &year,
+		RemindMe: &remindTrue,
+	}); err != nil {
+		t.Fatalf("Update enable failed: %v", err)
+	}
+	ctx.db.Model(&models.ContactReminderScheduled{}).Count(&n)
+	if n != 1 {
+		t.Fatalf("Expected 1 scheduled after enabling, got %d", n)
+	}
+
+	if _, err := ctx.svc.Update(date.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		Year:     &year,
+		RemindMe: &remindFalse,
+	}); err != nil {
+		t.Fatalf("Update disable failed: %v", err)
+	}
+	ctx.db.Model(&models.ContactReminderScheduled{}).Count(&n)
+	if n != 0 {
+		t.Errorf("Expected 0 scheduled after disabling, got %d", n)
+	}
+}
+
+func TestImportantDate_RemindMe_MultipleChannels(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	tgVerified := time.Now()
+	telegram := models.UserNotificationChannel{
+		UserID:        &ctx.userID,
+		Type:          "telegram",
+		Content:       "12345",
+		PreferredTime: strPtrLocal("09:00"),
+		VerifiedAt:    &tgVerified,
+		Active:        true,
+	}
+	if err := ctx.db.Create(&telegram).Error; err != nil {
+		t.Fatalf("create telegram channel: %v", err)
+	}
+
+	var activeBefore int64
+	ctx.db.Model(&models.UserNotificationChannel{}).Where("user_id = ? AND active = ?", ctx.userID, true).Count(&activeBefore)
+	if activeBefore != 2 {
+		t.Fatalf("Expected 2 active channels, got %d", activeBefore)
+	}
+
+	day, month, year := 15, 6, 1990
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		Year:     &year,
+		RemindMe: &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var reminder models.ContactReminder
+	if err := ctx.db.Where("important_date_id = ?", date.ID).First(&reminder).Error; err != nil {
+		t.Fatalf("load reminder: %v", err)
+	}
+	var scheduled []models.ContactReminderScheduled
+	if err := ctx.db.Where("contact_reminder_id = ?", reminder.ID).Find(&scheduled).Error; err != nil {
+		t.Fatalf("load scheduled: %v", err)
+	}
+	if len(scheduled) != 2 {
+		t.Fatalf("Expected 2 scheduled (one per active channel), got %d", len(scheduled))
+	}
+	channelIDs := map[uint]bool{}
+	for _, s := range scheduled {
+		channelIDs[s.UserNotificationChannelID] = true
+	}
+	if !channelIDs[telegram.ID] {
+		t.Errorf("Expected scheduled row for telegram channel %d", telegram.ID)
+	}
+}
+
+func TestImportantDate_Delete_RemovesScheduled(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	day, month, year := 15, 6, 1990
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		Year:     &year,
+		RemindMe: &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var n int64
+	ctx.db.Model(&models.ContactReminderScheduled{}).Count(&n)
+	if n != 1 {
+		t.Fatalf("Expected 1 scheduled before delete, got %d", n)
+	}
+
+	if err := ctx.svc.Delete(date.ID, ctx.contactID, ctx.vaultID); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	ctx.db.Model(&models.ContactReminderScheduled{}).Count(&n)
+	if n != 0 {
+		t.Errorf("Expected 0 scheduled after delete, got %d", n)
+	}
+	ctx.db.Model(&models.ContactReminder{}).Where("important_date_id = ?", date.ID).Count(&n)
+	if n != 0 {
+		t.Errorf("Expected 0 reminders after delete, got %d", n)
+	}
+}
+
+func TestImportantDate_RemindMe_FirstScheduledAt_NoYear_RollsToFuture(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	now := time.Now()
+	yesterday := now.AddDate(0, 0, -1)
+	day := yesterday.Day()
+	month := int(yesterday.Month())
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		RemindMe: &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var scheduled models.ContactReminderScheduled
+	if err := ctx.db.Joins("JOIN contact_reminders ON contact_reminders.id = contact_reminder_scheduled.contact_reminder_id").
+		Where("contact_reminders.important_date_id = ?", date.ID).
+		First(&scheduled).Error; err != nil {
+		t.Fatalf("load scheduled: %v", err)
+	}
+	if !scheduled.ScheduledAt.After(now) {
+		t.Errorf("Year-less yesterday-anniversary should roll to next year, got ScheduledAt=%v (now=%v)", scheduled.ScheduledAt, now)
+	}
+}
+
+func TestBackfillImportantDateReminderSchedules(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	day, month, year := 15, 6, 1990
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label: "Birthday",
+		Day:   &day,
+		Month: &month,
+		Year:  &year,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	dateID := date.ID
+	reminder := models.ContactReminder{
+		ContactID:       ctx.contactID,
+		ImportantDateID: &dateID,
+		Label:           "Birthday",
+		Day:             &day,
+		Month:           &month,
+		Year:            &year,
+		Type:            "recurring_year",
+	}
+	if err := ctx.db.Create(&reminder).Error; err != nil {
+		t.Fatalf("create stale reminder: %v", err)
+	}
+
+	var n int64
+	ctx.db.Model(&models.ContactReminderScheduled{}).Where("contact_reminder_id = ?", reminder.ID).Count(&n)
+	if n != 0 {
+		t.Fatalf("Expected 0 scheduled before backfill, got %d", n)
+	}
+
+	BackfillImportantDateReminderSchedules(ctx.db)
+
+	ctx.db.Model(&models.ContactReminderScheduled{}).Where("contact_reminder_id = ?", reminder.ID).Count(&n)
+	if n != 1 {
+		t.Errorf("Expected 1 scheduled after backfill, got %d", n)
+	}
+
+	BackfillImportantDateReminderSchedules(ctx.db)
+	ctx.db.Model(&models.ContactReminderScheduled{}).Where("contact_reminder_id = ?", reminder.ID).Count(&n)
+	if n != 1 {
+		t.Errorf("Expected backfill to be idempotent (still 1), got %d", n)
+	}
+}
+
+func strPtrLocal(s string) *string { return &s }
