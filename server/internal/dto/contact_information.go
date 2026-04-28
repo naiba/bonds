@@ -9,6 +9,13 @@ type CreateContactInformationRequest struct {
 	Pref   *bool  `json:"pref" example:"true"`
 }
 
+type ContactInformationByIdentityMatch struct {
+	ContactID         string                     `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ContactFirstName  string                     `json:"contact_first_name" example:"John"`
+	ContactLastName   string                     `json:"contact_last_name" example:"Doe"`
+	ContactInformation ContactInformationResponse `json:"contact_information"`
+}
+
 type UpdateContactInformationRequest struct {
 	TypeID uint   `json:"type_id" validate:"required" example:"1"`
 	Data   string `json:"data" validate:"required" example:"+1-555-0123"`

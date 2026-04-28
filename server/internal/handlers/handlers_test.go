@@ -15,6 +15,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/config"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/handlers"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
@@ -5522,5 +5523,123 @@ func TestMonicaImport_PermissionDenied(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestContactInformation_FindByIdentity_Match(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "find-by-identity@example.com")
+	vault := ts.createTestVault(t, token, "FBI Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "Alice")
+
+	create := `{"type_id":1,"data":"alice@example.com"}`
+	if rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/contactInformation",
+		create, token); rec.Code != http.StatusCreated {
+		t.Fatalf("seed contact info failed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contactInformation/by-identity?data=ALICE@EXAMPLE.COM",
+		"", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var matches []map[string]any
+	if err := json.Unmarshal(resp.Data, &matches); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches[0]["contact_id"] != contact.ID {
+		t.Errorf("contact_id mismatch: %v", matches[0]["contact_id"])
+	}
+}
+
+func TestContactInformation_FindByIdentity_MissingDataParam(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "fbi-missing@example.com")
+	vault := ts.createTestVault(t, token, "v")
+
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contactInformation/by-identity",
+		"", token)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 without data param, got %d", rec.Code)
+	}
+}
+
+func TestContactInformation_FindByIdentity_InvalidTypeID(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "fbi-bad-type@example.com")
+	vault := ts.createTestVault(t, token, "v")
+
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contactInformation/by-identity?data=x&type_id=not-a-number",
+		"", token)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestContactInformation_FindByIdentity_VaultIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, _ := ts.registerTestUser(t, "fbi-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Mine")
+	contact := ts.createTestContact(t, token1, vault1.ID, "Mine")
+	create := `{"type_id":1,"data":"shared@example.com"}`
+	if rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault1.ID+"/contacts/"+contact.ID+"/contactInformation",
+		create, token1); rec.Code != http.StatusCreated {
+		t.Fatalf("seed: %d %s", rec.Code, rec.Body.String())
+	}
+
+	token2, _ := ts.registerTestUser(t, "fbi-stranger@example.com")
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault1.ID+"/contactInformation/by-identity?data=shared@example.com",
+		"", token2)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for foreign vault, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdmin_GetSettings_RedactsSecrets(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "admin-secrets@example.com")
+	if err := ts.db.Model(&models.User{}).Where("id = ?", auth.User.ID).
+		Update("is_instance_administrator", true).Error; err != nil {
+		t.Fatalf("promote admin failed: %v", err)
+	}
+
+	settingSvc := services.NewSystemSettingService(ts.db)
+	if err := settingSvc.Set("smtp.password", "topsecret"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/settings", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var payload struct {
+		Settings []dto.SystemSettingItem `json:"settings"`
+	}
+	if err := json.Unmarshal(resp.Data, &payload); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	for _, item := range payload.Settings {
+		if item.Key == "smtp.password" {
+			if item.Value == "topsecret" {
+				t.Fatal("admin GET /settings leaked plaintext smtp.password")
+			}
+			if item.Value != services.RedactedSecretValue {
+				t.Errorf("expected redaction sentinel for smtp.password, got %q", item.Value)
+			}
+		}
 	}
 }

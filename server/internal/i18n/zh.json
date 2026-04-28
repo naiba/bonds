@@ -95,6 +95,9 @@
   "err.contact_information_not_found": "联系方式未找到",
   "err.failed_to_update_contact_information": "更新联系方式失败",
   "err.failed_to_delete_contact_information": "删除联系方式失败",
+  "err.failed_to_find_contact_information": "查找联系方式失败",
+  "err.missing_data_param": "缺少必需的 'data' 查询参数",
+  "err.invalid_type_id": "无效的 type_id 查询参数",
 
   "err.failed_to_list_loans": "获取借贷列表失败",
   "err.failed_to_create_loan": "创建借贷失败",

@@ -93,6 +93,48 @@ func (s *ContactInformationService) Delete(id uint, contactID, vaultID string) e
 	return nil
 }
 
+// FindByIdentity locates contact_information rows in a vault whose data
+// matches a given identity value (case-insensitive). When typeID > 0 the
+// search is further constrained to that ContactInformationType.
+func (s *ContactInformationService) FindByIdentity(vaultID, data string, typeID uint) ([]dto.ContactInformationByIdentityMatch, error) {
+	if vaultID == "" || data == "" {
+		return []dto.ContactInformationByIdentityMatch{}, nil
+	}
+
+	type joinedRow struct {
+		models.ContactInformation
+		FirstName string
+		LastName  string
+	}
+
+	q := s.db.
+		Table("contact_information AS ci").
+		Select("ci.*, c.first_name AS first_name, c.last_name AS last_name").
+		Joins("JOIN contacts c ON c.id = ci.contact_id").
+		Where("c.vault_id = ?", vaultID).
+		Where("LOWER(ci.data) = LOWER(?)", data)
+	if typeID > 0 {
+		q = q.Where("ci.type_id = ?", typeID)
+	}
+
+	var rows []joinedRow
+	if err := q.Order("ci.created_at DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	out := make([]dto.ContactInformationByIdentityMatch, len(rows))
+	for i, r := range rows {
+		ci := r.ContactInformation
+		out[i] = dto.ContactInformationByIdentityMatch{
+			ContactID:          ci.ContactID,
+			ContactFirstName:   r.FirstName,
+			ContactLastName:    r.LastName,
+			ContactInformation: toContactInformationResponse(&ci),
+		}
+	}
+	return out, nil
+}
+
 func toContactInformationResponse(ci *models.ContactInformation) dto.ContactInformationResponse {
 	return dto.ContactInformationResponse{
 		ID:        ci.ID,

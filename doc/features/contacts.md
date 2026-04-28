@@ -58,6 +58,28 @@ Labels are tags you can assign to contacts for organization and filtering. Creat
 
 Each contact has an avatar. If no photo is uploaded, Bonds auto-generates an **initials avatar** — a colored circle with the contact's first and last initials. The color is deterministic (based on the name hash), so the same name always gets the same color.
 
+## Look Up Contacts by Identity
+
+Integrations and AI assistants frequently need to answer the question _"which contact owns this email address / phone number?"_ without paginating through every contact in a vault.
+
+Bonds exposes a vault-scoped lookup endpoint:
+
+```
+GET /api/vaults/{vault_id}/contactInformation/by-identity?data=<value>&type_id=<n>
+```
+
+- `data` (required) — the identity value to search for. Matching is **case-insensitive**.
+- `type_id` (optional) — restrict the match to a single `ContactInformationType` (e.g. only emails).
+
+The response is an array of matches; each match includes the `contact_id`, the contact's name, and the full `ContactInformationResponse` object. Searches are scoped to a single vault and require Viewer permission on it.
+
+Example:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$APP_URL/api/vaults/$VAULT_ID/contactInformation/by-identity?data=alice@example.com"
+```
+
 ## Relationships
 
 Define relationships between contacts — parent, child, partner, friend, colleague, and more. Relationship types are organized into groups:

@@ -95,6 +95,9 @@
   "err.contact_information_not_found": "Contact information not found",
   "err.failed_to_update_contact_information": "Failed to update contact information",
   "err.failed_to_delete_contact_information": "Failed to delete contact information",
+  "err.failed_to_find_contact_information": "Failed to find contact information",
+  "err.missing_data_param": "Missing required 'data' query parameter",
+  "err.invalid_type_id": "Invalid type_id query parameter",
 
   "err.failed_to_list_loans": "Failed to list loans",
   "err.failed_to_create_loan": "Failed to create loan",

@@ -133,6 +133,44 @@ func (h *ContactInformationHandler) Update(c echo.Context) error {
 	return response.OK(c, item)
 }
 
+// FindByIdentity godoc
+//
+//	@Summary		Find contact information by identity value
+//	@Description	Search a vault for contact information rows matching a given identity value (e.g. an email or phone number). The match is case-insensitive. Optionally restrict the search to a single ContactInformationType via the type_id query parameter.
+//	@Tags			contact-information
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			data		query		string	true	"Identity value to search for"
+//	@Param			type_id		query		integer	false	"Optional ContactInformationType ID to filter on"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ContactInformationByIdentityMatch}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		403			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contactInformation/by-identity [get]
+func (h *ContactInformationHandler) FindByIdentity(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	data := c.QueryParam("data")
+	if data == "" {
+		return response.BadRequest(c, "err.missing_data_param", nil)
+	}
+	var typeID uint
+	if raw := c.QueryParam("type_id"); raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			return response.BadRequest(c, "err.invalid_type_id", nil)
+		}
+		typeID = uint(parsed)
+	}
+
+	matches, err := h.contactInformationService.FindByIdentity(vaultID, data, typeID)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_find_contact_information")
+	}
+	return response.OK(c, matches)
+}
+
 // Delete godoc
 //
 //	@Summary		Delete contact information

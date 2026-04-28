@@ -58,6 +58,28 @@
 
 每个联系人都有头像。如果没有上传照片，Bonds 会自动生成**首字母头像** — 一个带有联系人首字母的彩色圆形。颜色由名字的 MD5 哈希确定性生成，同一个名字始终得到相同的颜色。
 
+## 按身份反查联系人（by-identity）
+
+集成应用和 AI 助手经常需要回答「这个邮箱/电话号属于哪个联系人？」，而不希望遍历整个 Vault 做字符串匹配。
+
+Bonds 提供 vault 范围的反查端点：
+
+```
+GET /api/vaults/{vault_id}/contactInformation/by-identity?data=<value>&type_id=<n>
+```
+
+- `data`（必填）— 要查找的身份值，匹配**大小写不敏感**。
+- `type_id`（可选）— 限定只在某种 `ContactInformationType`（例如只查邮箱）中查找。
+
+响应是一组匹配，每条包含 `contact_id`、联系人姓名以及完整的 `ContactInformationResponse`。查找仅限单个 vault，要求对该 vault 至少拥有 Viewer 权限。
+
+示例：
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "$APP_URL/api/vaults/$VAULT_ID/contactInformation/by-identity?data=alice@example.com"
+```
+
 ## 关系
 
 定义联系人之间的关系 — 父母、子女、伴侣、朋友、同事等。关系类型按组分类：

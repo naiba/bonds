@@ -158,3 +158,139 @@ func TestDeleteContactInformationNotFound(t *testing.T) {
 		t.Errorf("Expected ErrContactInformationNotFound, got %v", err)
 	}
 }
+
+func TestFindByIdentityExactMatch(t *testing.T) {
+	svc, contactID, vaultID := setupContactInformationTest(t)
+
+	if _, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
+		TypeID: 1, Data: "alice@example.com",
+	}); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	matches, err := svc.FindByIdentity(vaultID, "alice@example.com", 0)
+	if err != nil {
+		t.Fatalf("FindByIdentity: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected 1 match, got %d", len(matches))
+	}
+	if matches[0].ContactID != contactID {
+		t.Errorf("expected contactID %s, got %s", contactID, matches[0].ContactID)
+	}
+	if matches[0].ContactInformation.Data != "alice@example.com" {
+		t.Errorf("data mismatch: %q", matches[0].ContactInformation.Data)
+	}
+	if matches[0].ContactFirstName != "John" {
+		t.Errorf("expected first name John, got %q", matches[0].ContactFirstName)
+	}
+}
+
+func TestFindByIdentityCaseInsensitive(t *testing.T) {
+	svc, contactID, vaultID := setupContactInformationTest(t)
+
+	_, err := svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{
+		TypeID: 1, Data: "Alice@Example.COM",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	matches, err := svc.FindByIdentity(vaultID, "alice@example.com", 0)
+	if err != nil {
+		t.Fatalf("FindByIdentity: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected case-insensitive match, got %d", len(matches))
+	}
+}
+
+func TestFindByIdentityNoMatch(t *testing.T) {
+	svc, _, vaultID := setupContactInformationTest(t)
+
+	matches, err := svc.FindByIdentity(vaultID, "nobody@example.com", 0)
+	if err != nil {
+		t.Fatalf("FindByIdentity: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Errorf("expected 0 matches, got %d", len(matches))
+	}
+}
+
+func TestFindByIdentityFiltersByType(t *testing.T) {
+	svc, contactID, vaultID := setupContactInformationTest(t)
+
+	_, _ = svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{TypeID: 1, Data: "shared"})
+	_, _ = svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{TypeID: 2, Data: "shared"})
+
+	all, err := svc.FindByIdentity(vaultID, "shared", 0)
+	if err != nil {
+		t.Fatalf("FindByIdentity: %v", err)
+	}
+	if len(all) != 2 {
+		t.Errorf("without type filter expected 2, got %d", len(all))
+	}
+
+	onlyOne, err := svc.FindByIdentity(vaultID, "shared", 1)
+	if err != nil {
+		t.Fatalf("FindByIdentity typeID=1: %v", err)
+	}
+	if len(onlyOne) != 1 {
+		t.Fatalf("with type filter expected 1, got %d", len(onlyOne))
+	}
+	if onlyOne[0].ContactInformation.TypeID != 1 {
+		t.Errorf("type filter did not apply, got TypeID=%d", onlyOne[0].ContactInformation.TypeID)
+	}
+}
+
+func TestFindByIdentityScopedToVault(t *testing.T) {
+	svc, contactID, vaultID := setupContactInformationTest(t)
+	_, _ = svc.Create(contactID, vaultID, dto.CreateContactInformationRequest{TypeID: 1, Data: "vault-1@example.com"})
+
+	matches, err := svc.FindByIdentity("non-existent-vault", "vault-1@example.com", 0)
+	if err != nil {
+		t.Fatalf("FindByIdentity: %v", err)
+	}
+	if len(matches) != 0 {
+		t.Errorf("must not leak across vaults, got %d matches", len(matches))
+	}
+}
+
+func TestFindByIdentityEmptyParams(t *testing.T) {
+	svc, _, vaultID := setupContactInformationTest(t)
+
+	if got, _ := svc.FindByIdentity("", "x", 0); len(got) != 0 {
+		t.Error("empty vault must yield no matches")
+	}
+	if got, _ := svc.FindByIdentity(vaultID, "", 0); len(got) != 0 {
+		t.Error("empty data must yield no matches")
+	}
+}
+
+func TestFindByIdentityMultipleContacts(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+	resp, _ := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test", LastName: "User",
+		Email:    "find-by-id-multi@example.com",
+		Password: "password123",
+	}, "en")
+	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "v"}, "en")
+	contactSvc := NewContactService(db)
+	c1, _ := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Alice"})
+	c2, _ := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Bob"})
+
+	svc := NewContactInformationService(db)
+	_, _ = svc.Create(c1.ID, vault.ID, dto.CreateContactInformationRequest{TypeID: 1, Data: "shared@example.com"})
+	_, _ = svc.Create(c2.ID, vault.ID, dto.CreateContactInformationRequest{TypeID: 1, Data: "shared@example.com"})
+
+	matches, err := svc.FindByIdentity(vault.ID, "shared@example.com", 0)
+	if err != nil {
+		t.Fatalf("FindByIdentity: %v", err)
+	}
+	if len(matches) != 2 {
+		t.Fatalf("expected matches across both contacts, got %d", len(matches))
+	}
+}
