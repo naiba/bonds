@@ -31,7 +31,12 @@ type Config struct {
 	Geocoding    GeocodingConfig
 	Bleve        BleveConfig
 	Backup       BackupConfig
+	Security     SecurityConfig
 	Announcement string
+}
+
+type SecurityConfig struct {
+	SettingsEncKey string
 }
 
 type ServerConfig struct {
@@ -148,6 +153,9 @@ func Load() *Config {
 			Dir:       getEnv("BACKUP_DIR", "data/backups"),
 			Cron:      getEnv("BACKUP_CRON", ""),
 			Retention: getEnvInt("BACKUP_RETENTION", 30),
+		},
+		Security: SecurityConfig{
+			SettingsEncKey: getEnv("SETTINGS_ENC_KEY", ""),
 		},
 		Announcement: getEnv("ANNOUNCEMENT", ""),
 	}

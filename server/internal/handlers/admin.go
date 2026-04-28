@@ -215,7 +215,7 @@ func (h *AdminHandler) DeleteUser(c echo.Context) error {
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/admin/settings [get]
 func (h *AdminHandler) GetSettings(c echo.Context) error {
-	settings, err := h.settingService.GetAll()
+	settings, err := h.settingService.GetAllRedacted()
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_settings")
 	}
@@ -252,7 +252,7 @@ func (h *AdminHandler) UpdateSettings(c echo.Context) error {
 		reload()
 	}
 
-	settings, err := h.settingService.GetAll()
+	settings, err := h.settingService.GetAllRedacted()
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_settings")
 	}

@@ -114,6 +114,7 @@ cp server/.env.example server/.env
 |------|--------|------|
 | `DEBUG` | `false` | 调试模式：启用 Echo 请求日志、GORM SQL 日志、Swagger UI（默认开启） |
 | `JWT_SECRET` | — | **生产环境必填。** 认证令牌签名密钥 |
+| `SETTINGS_ENC_KEY` | _(空)_ | 可选。启用 SMTP/OAuth/地理编码等敏感设置的 AES-256-GCM 静态加密。详见[文档](https://naiba.github.io/bonds/zh/guide/configuration#加密敏感设置) |
 | `SERVER_PORT` | `8080` | 服务端口 |
 | `SERVER_HOST` | `0.0.0.0` | 服务器监听地址 |
 | `DB_DSN` | `bonds.db` | 数据库连接字符串。SQLite：文件路径；PostgreSQL：`host=... port=5432 user=... password=... dbname=... sslmode=disable` |

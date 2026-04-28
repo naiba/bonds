@@ -113,6 +113,7 @@ cp server/.env.example server/.env
 |----------|---------|-------------|
 | `DEBUG` | `false` | Enable debug mode: Echo request logging, GORM SQL logging, Swagger UI (default on) |
 | `JWT_SECRET` | — | **Required in production.** Signing key for auth tokens |
+| `SETTINGS_ENC_KEY` | _(empty)_ | Optional. Enables AES-256-GCM encryption-at-rest for SMTP/OAuth/geocoding secrets. See [docs](https://naiba.github.io/bonds/guide/configuration#encrypting-sensitive-settings) |
 | `SERVER_PORT` | `8080` | Port the server listens on |
 | `SERVER_HOST` | `0.0.0.0` | Host address the server binds to |
 | `DB_DSN` | `bonds.db` | Database connection string. SQLite: file path; PostgreSQL: `host=... port=5432 user=... password=... dbname=... sslmode=disable` |

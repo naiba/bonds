@@ -14,6 +14,7 @@ import (
 	"github.com/markbates/goth/providers/openidConnect"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/pkg/secret"
 	"gorm.io/gorm"
 )
 
@@ -25,14 +26,33 @@ var (
 type OAuthProviderService struct {
 	db       *gorm.DB
 	settings *SystemSettingService
+	cipher   *secret.Cipher
 }
 
 func NewOAuthProviderService(db *gorm.DB) *OAuthProviderService {
-	return &OAuthProviderService{db: db}
+	return &OAuthProviderService{db: db, cipher: secret.New("")}
+}
+
+// NewOAuthProviderServiceWithCipher returns a service that encrypts each
+// provider's client_secret at rest. Pass an empty key to keep legacy
+// plaintext storage.
+func NewOAuthProviderServiceWithCipher(db *gorm.DB, encKey string) *OAuthProviderService {
+	return &OAuthProviderService{db: db, cipher: secret.New(encKey)}
 }
 
 func (s *OAuthProviderService) SetSystemSettings(ss *SystemSettingService) {
 	s.settings = ss
+}
+
+func (s *OAuthProviderService) encryptSecret(v string) (string, error) {
+	if v == "" {
+		return "", nil
+	}
+	return s.cipher.Encrypt(v)
+}
+
+func (s *OAuthProviderService) decryptSecret(v string) (string, error) {
+	return s.cipher.Decrypt(v)
 }
 
 func (s *OAuthProviderService) List() ([]dto.OAuthProviderResponse, error) {
@@ -54,11 +74,16 @@ func (s *OAuthProviderService) Create(req dto.CreateOAuthProviderRequest) (*dto.
 		return nil, ErrOAuthProviderNameExists
 	}
 
+	storedSecret, err := s.encryptSecret(req.ClientSecret)
+	if err != nil {
+		return nil, err
+	}
+
 	provider := models.OAuthProvider{
 		Type:         req.Type,
 		Name:         req.Name,
 		ClientID:     req.ClientID,
-		ClientSecret: req.ClientSecret,
+		ClientSecret: storedSecret,
 		DisplayName:  req.DisplayName,
 		DiscoveryURL: req.DiscoveryURL,
 		Scopes:       req.Scopes,
@@ -96,7 +121,11 @@ func (s *OAuthProviderService) Update(id uint, req dto.UpdateOAuthProviderReques
 		updates["client_id"] = *req.ClientID
 	}
 	if req.ClientSecret != nil {
-		updates["client_secret"] = *req.ClientSecret
+		storedSecret, err := s.encryptSecret(*req.ClientSecret)
+		if err != nil {
+			return nil, err
+		}
+		updates["client_secret"] = storedSecret
 	}
 	if req.DisplayName != nil {
 		updates["display_name"] = *req.DisplayName
@@ -160,6 +189,12 @@ func (s *OAuthProviderService) ReloadProviders() {
 
 	var gothProviders []goth.Provider
 	for _, p := range providers {
+		plainSecret, err := s.decryptSecret(p.ClientSecret)
+		if err != nil {
+			log.Printf("WARNING: Failed to decrypt client_secret for provider %q: %v", p.Name, err)
+			continue
+		}
+		p.ClientSecret = plainSecret
 		gp, err := createGothProvider(p, appURL)
 		if err != nil {
 			log.Printf("WARNING: Failed to create goth provider %q (%s): %v", p.Name, p.Type, err)
@@ -201,6 +236,34 @@ func createGothProvider(p models.OAuthProvider, appURL string) (goth.Provider, e
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", p.Type)
 	}
+}
+
+// MigratePlaintextSecrets re-encrypts plaintext client_secret rows. Idempotent.
+func (s *OAuthProviderService) MigratePlaintextSecrets() (int, error) {
+	if !s.cipher.Enabled() {
+		return 0, nil
+	}
+	var providers []models.OAuthProvider
+	if err := s.db.Find(&providers).Error; err != nil {
+		return 0, err
+	}
+	migrated := 0
+	for _, p := range providers {
+		if p.ClientSecret == "" || secret.IsCiphertext(p.ClientSecret) {
+			continue
+		}
+		ct, err := s.cipher.Encrypt(p.ClientSecret)
+		if err != nil {
+			return migrated, err
+		}
+		if err := s.db.Model(&models.OAuthProvider{}).
+			Where("id = ?", p.ID).
+			Update("client_secret", ct).Error; err != nil {
+			return migrated, err
+		}
+		migrated++
+	}
+	return migrated, nil
 }
 
 func splitScopes(csv string, defaults ...string) []string {

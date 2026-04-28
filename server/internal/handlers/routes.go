@@ -21,7 +21,12 @@ import (
 func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string) {
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret, db)
 
-	systemSettingService := services.NewSystemSettingService(db)
+	systemSettingService := services.NewSystemSettingServiceWithCipher(db, cfg.Security.SettingsEncKey)
+	if migrated, err := systemSettingService.MigratePlaintextSecrets(); err != nil {
+		log.Printf("WARNING: failed to encrypt legacy plaintext secrets: %v", err)
+	} else if migrated > 0 {
+		log.Printf("Encrypted %d previously-plaintext secret system settings", migrated)
+	}
 
 	feedRecorder := services.NewFeedRecorder(db)
 
@@ -113,8 +118,13 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		addressService.SetGeocoder(geocoder)
 	}
 
-	oauthProviderService := services.NewOAuthProviderService(db)
+	oauthProviderService := services.NewOAuthProviderServiceWithCipher(db, cfg.Security.SettingsEncKey)
 	oauthProviderService.SetSystemSettings(systemSettingService)
+	if migrated, err := oauthProviderService.MigratePlaintextSecrets(); err != nil {
+		log.Printf("WARNING: failed to encrypt legacy OAuth client_secret values: %v", err)
+	} else if migrated > 0 {
+		log.Printf("Encrypted %d previously-plaintext OAuth client_secret values", migrated)
+	}
 
 	oauthService := services.NewOAuthService(db, &cfg.JWT, cfg.App.URL)
 	oauthService.SetSystemSettings(systemSettingService)
@@ -402,6 +412,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	addresses.PUT("/:id", addressHandler.Update, requireEditor)
 	addresses.DELETE("/:id", addressHandler.Delete, requireEditor)
 	addresses.GET("/:id/image/:width/:height", addressHandler.GetMapImage)
+
+	vaultContactInfo := protected.Group("/vaults/:vault_id/contactInformation", VaultPermissionMiddleware(vaultService, models.PermissionViewer))
+	vaultContactInfo.GET("/by-identity", contactInformationHandler.FindByIdentity)
 
 	contactInfo := contactSub.Group("/contactInformation")
 	contactInfo.GET("", contactInformationHandler.List)
