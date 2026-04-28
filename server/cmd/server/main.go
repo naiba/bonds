@@ -69,6 +69,7 @@ func main() {
 
 	migrateUploadDir(cfg.Storage.UploadDir)
 	migrateModulesToContactPage(db)
+	services.BackfillImportantDateReminderSchedules(db)
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
