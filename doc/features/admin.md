@@ -34,6 +34,17 @@ As of v0.2.0, most configuration has moved from environment variables to databas
 On first startup, these settings are seeded from environment variables if present. After that, changes are made exclusively through the admin panel.
 :::
 
+### Encryption at Rest
+
+When `SETTINGS_ENC_KEY` is configured (see [Configuration → Encrypting Sensitive Settings](/guide/configuration#encrypting-sensitive-settings)), the following fields are AES-256-GCM encrypted in the database:
+
+- `smtp.password`, `geocoding.api_key`, and any `secret.*` key in **system_settings**
+- `client_secret` for every entry in **oauth_providers** (GitHub, Google, GitLab, Discord, OIDC)
+
+The admin **GET /admin/settings** endpoint always redacts secret values to `***` regardless of whether encryption is enabled — admin browsers and audit logs never see plaintext credentials. Submitting `***` on update keeps the existing value untouched, so the UI can round-trip non-secret edits without wiping credentials.
+
+Existing plaintext rows are migrated transparently on the first boot after the key is set; the migration is idempotent and safe to re-run.
+
 ## Personalization {#personalization}
 
 Account owners can customize many aspects of Bonds through the personalization settings at `/api/settings/personalize/:entity`:
@@ -77,3 +88,13 @@ Bonds includes an automatic backup system:
 - **Manual backups** — Trigger a backup on demand from the admin panel
 - **Retention** — Old backups are auto-cleaned after a configurable number of days (default: 30)
 - **Storage** — Backups are stored in the directory configured by `BACKUP_DIR` (default: `data/backups`)
+
+## Cron Scheduler
+
+Reminder delivery, CardDAV/CalDAV sync, and automatic backups all run through an internal cron scheduler:
+
+- Single-process SQLite deployments work out of the box — every job runs at most once per scheduled tick.
+- **Multi-replica PostgreSQL deployments** (e.g. Kubernetes Deployments with `replicas: 2`, Docker Compose `deploy.replicas`, load-balanced pods) are also safe: each job is gated by a `pg_try_advisory_xact_lock` plus an atomic conditional `UPDATE` on the `crons` table. Two replicas firing the same job at the same instant cannot both execute it.
+- Crashed replicas cannot wedge a job — the advisory lock is released automatically when the holding transaction ends.
+
+No configuration is required; the scheduler picks the correct strategy based on the active database driver.

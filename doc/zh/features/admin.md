@@ -34,6 +34,17 @@ Bonds 包含管理面板，用于系统级配置和用户管理。
 首次启动时，这些设置会从环境变量中读取作为初始值。之后所有修改都通过管理面板进行。
 :::
 
+### 静态加密
+
+当配置了 `SETTINGS_ENC_KEY` 时（参见[配置 → 加密敏感设置](/zh/guide/configuration#加密敏感设置)），以下字段会以 AES-256-GCM 加密存储在数据库中：
+
+- **system_settings** 中的 `smtp.password`、`geocoding.api_key` 以及任何 `secret.*` 键
+- **oauth_providers** 中所有 `client_secret`（GitHub、Google、GitLab、Discord、OIDC）
+
+无论是否启用加密，Admin **GET /admin/settings** 始终把敏感值脱敏为 `***`，管理员浏览器和审计日志看不到明文凭证。提交 `***` 进行更新表示保留原值，UI 可以安全地往返编辑非敏感字段而不会清空密钥。
+
+启用密钥后首次启动会自动将已有明文行迁移为密文，迁移幂等可重复执行。
+
 ## 个性化设置 {#个性化设置}
 
 账户所有者可通过个性化设置自定义 Bonds 的多个方面，API 路径为 `/api/settings/personalize/:entity`：
@@ -77,3 +88,13 @@ Bonds 内置自动备份系统：
 - **手动备份** — 在管理面板中按需触发备份
 - **保留策略** — 旧备份在可配置天数后自动清理（默认 30 天）
 - **存储位置** — 备份存储在 `BACKUP_DIR` 配置的目录中（默认 `data/backups`）
+
+## 定时任务（Cron）
+
+提醒发送、CardDAV/CalDAV 同步以及自动备份都通过内置的 cron 调度器运行：
+
+- 单进程 SQLite 部署开箱即用 — 每个任务在每个调度时刻最多执行一次。
+- **多副本 PostgreSQL 部署**（如 Kubernetes Deployment `replicas: 2`、Docker Compose `deploy.replicas`、负载均衡的多个实例）同样安全：每个任务通过 `pg_try_advisory_xact_lock` + 对 `crons` 表的原子条件 `UPDATE` 加锁，两个副本即便在同一刻触发同一任务也不会同时执行。
+- 副本崩溃不会导致任务卡死 — advisory lock 在持有事务结束时自动释放。
+
+无需任何配置，调度器会根据数据库驱动自动选择正确的策略。

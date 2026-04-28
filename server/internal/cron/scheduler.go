@@ -2,14 +2,19 @@ package cron
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"hash/fnv"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/naiba/bonds/internal/models"
 	robfigcron "github.com/robfig/cron/v3"
 	"gorm.io/gorm"
 )
+
+const minRunInterval = 55 * time.Second
 
 type Scheduler struct {
 	cron *robfigcron.Cron
@@ -51,29 +56,107 @@ func (s *Scheduler) runJob(name string, fn func()) {
 		}
 	}()
 
-	// Check lock: skip if last run was within 55 seconds
-	var cronRecord models.Cron
-	result := s.db.Where("command = ?", name).First(&cronRecord)
-	if result.Error == nil && cronRecord.LastRunAt != nil {
-		if time.Since(*cronRecord.LastRunAt) < 55*time.Second {
-			log.Printf("[cron] Job %q skipped: last run %v ago", name, time.Since(*cronRecord.LastRunAt))
-			return
-		}
+	acquired, err := s.acquireLock(name)
+	if err != nil {
+		log.Printf("[cron] Job %q lock error: %v", name, err)
+		return
+	}
+	if !acquired {
+		log.Printf("[cron] Job %q skipped: another instance ran it recently or holds the lock", name)
+		return
 	}
 
 	log.Printf("[cron] Job %q starting", name)
 	fn()
 	log.Printf("[cron] Job %q completed", name)
+}
 
-	// Update LastRunAt
-	now := time.Now()
-	if result.Error != nil {
-		// Record doesn't exist, create it
-		s.db.Create(&models.Cron{
-			Command:   name,
-			LastRunAt: &now,
-		})
-	} else {
-		s.db.Model(&cronRecord).Update("last_run_at", now)
+// acquireLock claims exclusive permission to run a job. Postgres uses
+// pg_try_advisory_xact_lock so two replicas firing at the same instant cannot
+// both observe a stale last_run_at; SQLite relies on its writer serialisation.
+func (s *Scheduler) acquireLock(name string) (bool, error) {
+	if s.db.Dialector.Name() == "postgres" {
+		return s.acquireLockPostgres(name)
 	}
+	return s.acquireLockGeneric(name)
+}
+
+func (s *Scheduler) acquireLockGeneric(name string) (bool, error) {
+	threshold := time.Now().Add(-minRunInterval)
+
+	res := s.db.Model(&models.Cron{}).
+		Where("command = ? AND (last_run_at IS NULL OR last_run_at < ?)", name, threshold).
+		Update("last_run_at", time.Now())
+	if res.Error != nil {
+		return false, res.Error
+	}
+	if res.RowsAffected == 1 {
+		return true, nil
+	}
+
+	now := time.Now()
+	err := s.db.Create(&models.Cron{Command: name, LastRunAt: &now}).Error
+	if err == nil {
+		return true, nil
+	}
+	if isUniqueConstraintErr(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (s *Scheduler) acquireLockPostgres(name string) (bool, error) {
+	var acquired bool
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var got bool
+		if err := tx.Raw("SELECT pg_try_advisory_xact_lock(?)", jobLockKey(name)).Scan(&got).Error; err != nil {
+			return err
+		}
+		if !got {
+			return nil
+		}
+
+		threshold := time.Now().Add(-minRunInterval)
+		res := tx.Model(&models.Cron{}).
+			Where("command = ? AND (last_run_at IS NULL OR last_run_at < ?)", name, threshold).
+			Update("last_run_at", time.Now())
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 1 {
+			acquired = true
+			return nil
+		}
+
+		now := time.Now()
+		if err := tx.Create(&models.Cron{Command: name, LastRunAt: &now}).Error; err != nil {
+			if isUniqueConstraintErr(err) {
+				return nil
+			}
+			return err
+		}
+		acquired = true
+		return nil
+	})
+	return acquired, err
+}
+
+func jobLockKey(name string) int64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte("bonds:cron:"))
+	_, _ = h.Write([]byte(name))
+	return int64(h.Sum64())
+}
+
+func isUniqueConstraintErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") ||
+		strings.Contains(msg, "duplicate key value") ||
+		strings.Contains(msg, "violates unique constraint")
 }
