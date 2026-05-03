@@ -147,7 +147,11 @@
             "no_events": "No hay eventos para este día",
             "important_dates": "Fechas importantes",
             "reminders": "Recordatorios",
-            "close": "Cerrar"
+            "close": "Cerrar",
+            "prev": "Mes anterior",
+            "next": "Mes siguiente",
+            "view_month": "Mes",
+            "view_year": "Año"
         },
         "tasks": {
             "title": "Todas las tareas",

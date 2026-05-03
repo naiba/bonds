@@ -206,7 +206,11 @@
       "no_events": "No events for this day",
       "important_dates": "Important Dates",
       "reminders": "Reminders",
-      "close": "Close"
+      "close": "Close",
+      "prev": "Previous month",
+      "next": "Next month",
+      "view_month": "Month",
+      "view_year": "Year"
     },
     "tasks": {
       "title": "All Tasks",

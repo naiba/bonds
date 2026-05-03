@@ -206,7 +206,11 @@
       "no_events": "当天无事件",
       "important_dates": "重要日期",
       "reminders": "提醒",
-      "close": "关闭"
+      "close": "关闭",
+      "prev": "上一月",
+      "next": "下一月",
+      "view_month": "月",
+      "view_year": "年"
     },
     "tasks": {
       "title": "所有任务",

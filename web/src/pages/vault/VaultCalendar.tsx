@@ -9,10 +9,15 @@ import {
   theme,
   Modal,
   Empty,
+  Select,
+  Radio,
+  Space,
 } from "antd";
 import {
   ArrowLeftOutlined,
   CalendarOutlined,
+  LeftOutlined,
+  RightOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
@@ -191,6 +196,81 @@ export default function VaultCalendar() {
         }}
       >
         <Calendar
+          value={panelDate}
+          mode={calendarMode}
+          headerRender={({ value, type, onChange, onTypeChange }) => {
+            const current = value as Dayjs;
+            const year = current.year();
+            const month = current.month();
+            const yearOptions: { label: string; value: number }[] = [];
+            for (let i = year - 10; i <= year + 10; i += 1) {
+              yearOptions.push({ label: String(i), value: i });
+            }
+            const monthOptions = Array.from({ length: 12 }, (_, i) => ({
+              label: current.month(i).format("MMM"),
+              value: i,
+            }));
+            const goPrev = () => {
+              const next =
+                type === "year" ? current.year(year - 1) : current.month(month - 1);
+              onChange(next);
+            };
+            const goNext = () => {
+              const next =
+                type === "year" ? current.year(year + 1) : current.month(month + 1);
+              onChange(next);
+            };
+            return (
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                  padding: "8px 0",
+                }}
+              >
+                <Space.Compact>
+                  <Button
+                    aria-label={t("vault.calendar.prev")}
+                    icon={<LeftOutlined />}
+                    onClick={goPrev}
+                  />
+                  <Button
+                    aria-label={t("vault.calendar.next")}
+                    icon={<RightOutlined />}
+                    onClick={goNext}
+                  />
+                </Space.Compact>
+                <Select
+                  size="middle"
+                  value={year}
+                  options={yearOptions}
+                  onChange={(v) => onChange(current.year(v))}
+                  style={{ width: 96 }}
+                />
+                {type === "month" && (
+                  <Select
+                    size="middle"
+                    value={month}
+                    options={monthOptions}
+                    onChange={(v) => onChange(current.month(v))}
+                    style={{ width: 110 }}
+                  />
+                )}
+                <Radio.Group
+                  value={type}
+                  onChange={(e) => onTypeChange(e.target.value)}
+                  optionType="button"
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="month">{t("vault.calendar.view_month")}</Radio.Button>
+                  <Radio.Button value="year">{t("vault.calendar.view_year")}</Radio.Button>
+                </Radio.Group>
+              </div>
+            );
+          }}
           cellRender={(date, info) => cellRender(date as Dayjs, info as { type: "date" | "month" })}
           onSelect={(date) => {
             if (Date.now() - panelChangingRef.current < 300) {
