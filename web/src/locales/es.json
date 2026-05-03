@@ -36,6 +36,9 @@
         "copy": "Copiar",
         "view": "Ver"
     },
+    "pagination": {
+        "total": "Total {{count}}"
+    },
     "nav": {
         "vaults": "Bóvedas",
         "settings": "Configuración",

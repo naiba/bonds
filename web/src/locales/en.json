@@ -36,6 +36,9 @@
     "copy": "Copy",
     "view": "View"
   },
+  "pagination": {
+    "total": "Total {{count}}"
+  },
   "nav": {
     "vaults": "Vaults",
     "settings": "Settings",

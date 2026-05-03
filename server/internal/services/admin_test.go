@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -38,7 +39,7 @@ func TestAdminListUsers(t *testing.T) {
 	registerTestUser(t, authSvc, "admin-list1@example.com")
 	registerTestUser(t, authSvc, "admin-list2@example.com")
 
-	users, err := adminSvc.ListUsers()
+	users, meta, err := adminSvc.ListUsers(0, 0)
 	if err != nil {
 		t.Fatalf("ListUsers failed: %v", err)
 	}
@@ -50,6 +51,39 @@ func TestAdminListUsers(t *testing.T) {
 	}
 	if users[1].Email != "admin-list2@example.com" {
 		t.Errorf("expected second user email admin-list2@example.com, got %s", users[1].Email)
+	}
+	if meta.Total != 2 {
+		t.Errorf("expected meta.Total=2, got %d", meta.Total)
+	}
+}
+
+func TestAdminListUsers_Pagination(t *testing.T) {
+	adminSvc, authSvc, _ := setupAdminTest(t)
+
+	for i := 0; i < 5; i++ {
+		registerTestUser(t, authSvc, fmt.Sprintf("admin-page%d@example.com", i))
+	}
+
+	page1, meta1, err := adminSvc.ListUsers(1, 2)
+	if err != nil {
+		t.Fatalf("ListUsers page1 failed: %v", err)
+	}
+	if len(page1) != 2 {
+		t.Errorf("expected 2 users on page 1, got %d", len(page1))
+	}
+	if meta1.Total != 5 {
+		t.Errorf("expected total=5, got %d", meta1.Total)
+	}
+	if meta1.TotalPages != 3 {
+		t.Errorf("expected total_pages=3, got %d", meta1.TotalPages)
+	}
+
+	page3, _, err := adminSvc.ListUsers(3, 2)
+	if err != nil {
+		t.Fatalf("ListUsers page3 failed: %v", err)
+	}
+	if len(page3) != 1 {
+		t.Errorf("expected 1 user on page 3, got %d", len(page3))
 	}
 }
 
@@ -73,7 +107,7 @@ func TestAdminListUsers_WithStats(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	users, err := adminSvc.ListUsers()
+	users, _, err := adminSvc.ListUsers(0, 0)
 	if err != nil {
 		t.Fatalf("ListUsers failed: %v", err)
 	}
@@ -370,7 +404,7 @@ func TestAdminSetStorageLimit(t *testing.T) {
 	}
 
 	// Verify it appears in ListUsers response
-	users, err := adminSvc.ListUsers()
+	users, _, err := adminSvc.ListUsers(0, 0)
 	if err != nil {
 		t.Fatalf("ListUsers failed: %v", err)
 	}

@@ -57,22 +57,29 @@ describe("AdminUsers", () => {
     vi.clearAllMocks();
   });
 
+  function mockUsersData(users: unknown[]) {
+    return {
+      data: { users, meta: { page: 1, per_page: 20, total: users.length, total_pages: 1 } },
+      isLoading: false,
+    };
+  }
+
   it("renders loading state", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: true });
+    mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
     renderAdminUsers();
     expect(document.querySelector(".ant-spin")).toBeInTheDocument();
   });
 
   it("renders empty table when no users", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    mockUseQuery.mockReturnValue(mockUsersData([]));
     renderAdminUsers();
     expect(screen.getByText("User Management")).toBeInTheDocument();
     expect(document.querySelector(".ant-empty")).toBeInTheDocument();
   });
 
   it("renders user list with admin and regular user", () => {
-    mockUseQuery.mockReturnValue({
-      data: [
+    mockUseQuery.mockReturnValue(
+      mockUsersData([
         {
           id: "admin-1",
           first_name: "Admin",
@@ -97,9 +104,8 @@ describe("AdminUsers", () => {
           storage_used: 0,
           created_at: "2024-06-01T00:00:00Z",
         },
-      ],
-      isLoading: false,
-    });
+      ]),
+    );
     renderAdminUsers();
     expect(screen.getByText("admin@example.com")).toBeInTheDocument();
     expect(screen.getByText("regular@example.com")).toBeInTheDocument();
@@ -107,8 +113,8 @@ describe("AdminUsers", () => {
   });
 
   it("renders disabled user with correct status tag", () => {
-    mockUseQuery.mockReturnValue({
-      data: [
+    mockUseQuery.mockReturnValue(
+      mockUsersData([
         {
           id: "user-3",
           first_name: "Disabled",
@@ -121,16 +127,15 @@ describe("AdminUsers", () => {
           storage_used: 0,
           created_at: "2024-01-01T00:00:00Z",
         },
-      ],
-      isLoading: false,
-    });
+      ]),
+    );
     renderAdminUsers();
     expect(screen.getByText("Disabled")).toBeInTheDocument();
   });
 
   it("does not show action buttons for current user", () => {
-    mockUseQuery.mockReturnValue({
-      data: [
+    mockUseQuery.mockReturnValue(
+      mockUsersData([
         {
           id: "admin-1",
           first_name: "Self",
@@ -143,9 +148,8 @@ describe("AdminUsers", () => {
           storage_used: 0,
           created_at: "2024-01-01T00:00:00Z",
         },
-      ],
-      isLoading: false,
-    });
+      ]),
+    );
     renderAdminUsers();
     expect(screen.queryByText("Disable")).not.toBeInTheDocument();
     expect(screen.queryByText("Remove Admin")).not.toBeInTheDocument();

@@ -27,13 +27,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
-import type { AdminUser, APIError } from "@/api";
+import type { AdminUser, APIError, PaginationMeta } from "@/api";
 import { useAuth } from "@/stores/auth";
 import { filesize } from "filesize";
 import type { ColumnsType } from "antd/es/table";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { useState } from "react";
+import { usePagination } from "@/hooks/usePagination";
 
 const { Title, Text } = Typography;
 
@@ -45,23 +46,30 @@ export default function AdminUsers() {
   const navigate = useNavigate();
   const nameOrder = useNameOrder();
   const dateFormats = useDateFormat();
-  const qk = ["admin", "users"];
+  const pagination = usePagination();
+  const qk = ["admin", "users", pagination.page, pagination.pageSize];
+  const invalidateKey = ["admin", "users"];
   const [storageLimitModalUser, setStorageLimitModalUser] = useState<AdminUser | null>(null);
   const [storageLimitValue, setStorageLimitValue] = useState<number>(0);
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: usersResponse, isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await api.admin.usersList();
-      return (res.data ?? []) as AdminUser[];
+      const res = await api.admin.usersList(pagination.query);
+      return {
+        users: (res.data ?? []) as AdminUser[],
+        meta: res.meta as PaginationMeta | undefined,
+      };
     },
   });
+  const users = usersResponse?.users ?? [];
+  const meta = usersResponse?.meta;
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, disabled }: { id: string; disabled: boolean }) =>
       api.admin.usersToggleUpdate(id, { disabled }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(
         variables.disabled
           ? t("admin.users.disabled_success")
@@ -80,7 +88,7 @@ export default function AdminUsers() {
       is_instance_administrator: boolean;
     }) => api.admin.usersAdminUpdate(id, { is_instance_administrator }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(
         variables.is_instance_administrator
           ? t("admin.users.admin_set")
@@ -93,7 +101,7 @@ export default function AdminUsers() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.admin.usersDelete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(t("admin.users.deleted"));
     },
     onError: (e: APIError) => message.error(e.message),
@@ -103,7 +111,7 @@ export default function AdminUsers() {
     mutationFn: ({ id, storage_limit_in_mb }: { id: string; storage_limit_in_mb: number }) =>
       api.admin.usersStorageLimitUpdate(id, { storage_limit_in_mb }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(t("admin.users.storage_limit_updated"));
       setStorageLimitModalUser(null);
     },
@@ -300,7 +308,14 @@ export default function AdminUsers() {
           columns={columns}
           dataSource={users}
           rowKey="id"
-          pagination={false}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.pageSize,
+            total: meta?.total ?? users.length,
+            onChange: pagination.onChange,
+            showSizeChanger: true,
+            showTotal: (total) => t("pagination.total", { count: total }),
+          }}
           size="small"
           scroll={{ x: 900 }}
         />

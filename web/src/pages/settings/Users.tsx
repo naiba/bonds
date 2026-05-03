@@ -24,11 +24,12 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
-import type { User, APIError } from "@/api";
+import type { User, APIError, PaginationMeta } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useAuth } from "@/stores/auth";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import { usePagination } from "@/hooks/usePagination";
 
 const { Title, Text } = Typography;
 
@@ -55,15 +56,22 @@ export default function Users() {
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
-  const qk = ["settings", "users"];
+  const pagination = usePagination();
+  const qk = ["settings", "users", pagination.page, pagination.pageSize];
+  const invalidateKey = ["settings", "users"];
 
-  const { data: users = [], isLoading } = useQuery({
+  const { data: usersResponse, isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await api.users.usersList();
-      return res.data ?? [];
+      const res = await api.users.usersList(pagination.query);
+      return {
+        users: (res.data ?? []) as User[],
+        meta: res.meta as PaginationMeta | undefined,
+      };
     },
   });
+  const users = usersResponse?.users ?? [];
+  const meta = usersResponse?.meta;
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...values }: {
@@ -73,7 +81,7 @@ export default function Users() {
       is_admin?: boolean;
     }) => api.users.usersUpdate(id, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(t("settings.users.updated"));
       setOpen(false);
       setEditing(null);
@@ -85,7 +93,7 @@ export default function Users() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.users.usersDelete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(t("settings.users.deleted"));
     },
     onError: (e: APIError) => message.error(e.message),
@@ -223,14 +231,21 @@ export default function Users() {
       <Card>
         {isLoading ? (
           <Spin />
-        ) : users.length === 0 ? (
+        ) : users.length === 0 && (meta?.total ?? 0) === 0 ? (
           <Empty description={t("settings.users.no_users")} />
         ) : (
           <Table
             dataSource={users}
             columns={columns}
             rowKey="id"
-            pagination={false}
+            pagination={{
+              current: pagination.page,
+              pageSize: pagination.pageSize,
+              total: meta?.total ?? users.length,
+              onChange: pagination.onChange,
+              showSizeChanger: true,
+              showTotal: (total) => t("pagination.total", { count: total }),
+            }}
           />
         )}
       </Card>

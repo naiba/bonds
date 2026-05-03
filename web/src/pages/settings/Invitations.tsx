@@ -17,9 +17,10 @@ import { DeleteOutlined, SendOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
-import type { InvitationType, APIError } from "@/api";
+import type { InvitationType, APIError, PaginationMeta } from "@/api";
 import type { ColumnsType } from "antd/es/table";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import { usePagination } from "@/hooks/usePagination";
 
 const { Title, Text } = Typography;
 
@@ -30,21 +31,28 @@ export default function Invitations() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const dateFormats = useDateFormat();
-  const qk = ["settings", "invitations"];
+  const pagination = usePagination();
+  const qk = ["settings", "invitations", pagination.page, pagination.pageSize];
+  const invalidateKey = ["settings", "invitations"];
 
-  const { data: invitations = [], isLoading } = useQuery({
+  const { data: invitationsResponse, isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await api.invitations.invitationsList();
-      return (res.data ?? []) as InvitationType[];
+      const res = await api.invitations.invitationsList(pagination.query);
+      return {
+        invitations: (res.data ?? []) as InvitationType[],
+        meta: res.meta as PaginationMeta | undefined,
+      };
     },
   });
+  const invitations = invitationsResponse?.invitations ?? [];
+  const meta = invitationsResponse?.meta;
 
   const createMutation = useMutation({
     mutationFn: (values: { email: string; permission: 100 | 200 | 300 }) =>
       api.invitations.invitationsCreate(values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
       setOpen(false);
       form.resetFields();
     },
@@ -54,7 +62,7 @@ export default function Invitations() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.invitations.invitationsDelete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk });
+      queryClient.invalidateQueries({ queryKey: invalidateKey });
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -179,7 +187,14 @@ export default function Invitations() {
           columns={columns}
           dataSource={invitations}
           rowKey="id"
-          pagination={false}
+          pagination={{
+            current: pagination.page,
+            pageSize: pagination.pageSize,
+            total: meta?.total ?? invitations.length,
+            onChange: pagination.onChange,
+            showSizeChanger: true,
+            showTotal: (total) => t("pagination.total", { count: total }),
+          }}
         />
       </Card>
 

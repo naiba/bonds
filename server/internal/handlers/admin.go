@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
@@ -34,17 +35,21 @@ func (h *AdminHandler) RegisterReloader(fn func()) {
 //	@Tags			admin
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Success		200	{object}	response.APIResponse{data=[]dto.AdminUserResponse}
-//	@Failure		401	{object}	response.APIResponse
-//	@Failure		403	{object}	response.APIResponse
-//	@Failure		500	{object}	response.APIResponse
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.AdminUserResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		403			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
 //	@Router			/admin/users [get]
 func (h *AdminHandler) ListUsers(c echo.Context) error {
-	users, err := h.adminService.ListUsers()
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	users, meta, err := h.adminService.ListUsers(page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_users")
 	}
-	return response.OK(c, users)
+	return response.Paginated(c, users, meta)
 }
 
 // ToggleUser godoc

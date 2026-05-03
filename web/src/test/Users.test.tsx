@@ -53,21 +53,28 @@ describe("Users", () => {
     vi.clearAllMocks();
   });
 
+  function mockUsersData(users: unknown[]) {
+    return {
+      data: { users, meta: { page: 1, per_page: 20, total: users.length, total_pages: 1 } },
+      isLoading: false,
+    };
+  }
+
   it("renders loading state", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: true });
+    mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
     renderUsers();
     expect(document.querySelector(".ant-spin")).toBeInTheDocument();
   });
 
   it("renders empty state when no users", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    mockUseQuery.mockReturnValue(mockUsersData([]));
     renderUsers();
     expect(document.querySelector(".ant-empty")).toBeInTheDocument();
   });
 
   it("renders user list when data present", () => {
-    mockUseQuery.mockReturnValue({
-      data: [
+    mockUseQuery.mockReturnValue(
+      mockUsersData([
         {
           id: "u1",
           first_name: "Alice",
@@ -76,9 +83,8 @@ describe("Users", () => {
           is_admin: true,
           created_at: "2024-01-15T00:00:00Z",
         },
-      ],
-      isLoading: false,
-    });
+      ]),
+    );
     renderUsers();
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("alice@example.com")).toBeInTheDocument();

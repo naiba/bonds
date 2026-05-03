@@ -175,12 +175,43 @@ func TestListInvitations(t *testing.T) {
 		}
 	}
 
-	list, err := svc.List(accountID)
+	list, meta, err := svc.List(accountID, 0, 0)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 	if len(list) != 3 {
 		t.Errorf("Expected 3 invitations, got %d", len(list))
+	}
+	if meta.Total != 3 {
+		t.Errorf("Expected meta.Total=3, got %d", meta.Total)
+	}
+}
+
+func TestListInvitations_Pagination(t *testing.T) {
+	svc, accountID, userID := setupInvitationTest(t)
+
+	for i := 0; i < 5; i++ {
+		_, err := svc.Create(accountID, userID, dto.CreateInvitationRequest{
+			Email:      fmt.Sprintf("page%d@example.com", i),
+			Permission: 300,
+		})
+		if err != nil {
+			t.Fatalf("Create %d failed: %v", i, err)
+		}
+	}
+
+	page1, meta1, err := svc.List(accountID, 1, 2)
+	if err != nil {
+		t.Fatalf("List page1 failed: %v", err)
+	}
+	if len(page1) != 2 {
+		t.Errorf("Expected 2 invitations on page 1, got %d", len(page1))
+	}
+	if meta1.Total != 5 {
+		t.Errorf("Expected total=5, got %d", meta1.Total)
+	}
+	if meta1.TotalPages != 3 {
+		t.Errorf("Expected total_pages=3, got %d", meta1.TotalPages)
 	}
 }
 
@@ -199,7 +230,7 @@ func TestDeleteInvitation(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	list, err := svc.List(accountID)
+	list, _, err := svc.List(accountID, 0, 0)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}

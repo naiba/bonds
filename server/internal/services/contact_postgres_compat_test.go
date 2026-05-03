@@ -84,7 +84,7 @@ func TestAdminContactCountRawSQLIsPostgresCompatible(t *testing.T) {
 		t.Errorf("admin contact-count SQL compares boolean against integer literal; SQL: %s", sql)
 	}
 
-	if _, err := adminSvc.ListUsers(); err != nil {
+	if _, _, err := adminSvc.ListUsers(0, 0); err != nil {
 		t.Fatalf("ListUsers failed: %v", err)
 	}
 }

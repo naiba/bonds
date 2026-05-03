@@ -3,11 +3,13 @@ package services
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
 )
 
@@ -27,17 +29,37 @@ func NewAdminService(db *gorm.DB, uploadDir string) *AdminService {
 	return &AdminService{db: db, uploadDir: uploadDir}
 }
 
-func (s *AdminService) ListUsers() ([]dto.AdminUserResponse, error) {
+func (s *AdminService) ListUsers(page, perPage int) ([]dto.AdminUserResponse, response.Meta, error) {
+	var total int64
+	if err := s.db.Model(&models.User{}).Count(&total).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+
 	var users []models.User
-	if err := s.db.Order("created_at ASC").Find(&users).Error; err != nil {
-		return nil, err
+	if err := s.db.Order("created_at ASC").Offset(offset).Limit(perPage).Find(&users).Error; err != nil {
+		return nil, response.Meta{}, err
 	}
 
 	result := make([]dto.AdminUserResponse, len(users))
 	for i, u := range users {
 		result[i] = s.toAdminUserResponse(u)
 	}
-	return result, nil
+
+	meta := response.Meta{
+		Page:       page,
+		PerPage:    perPage,
+		Total:      total,
+		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
+	}
+	return result, meta, nil
 }
 
 // adminContactCountSQL counts contacts per account, excluding UserVault shadow

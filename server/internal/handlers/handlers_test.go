@@ -1794,6 +1794,44 @@ func TestInvitation_List(t *testing.T) {
 	if !resp.Success {
 		t.Fatal("expected success=true")
 	}
+	if resp.Meta == nil {
+		t.Fatal("expected paginated meta")
+	}
+}
+
+func TestInvitation_List_Pagination(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "invite-page@example.com")
+
+	for i := 0; i < 3; i++ {
+		body := fmt.Sprintf(`{"email":"page%d@example.com","permission":300}`, i)
+		rec := ts.doRequest(http.MethodPost, "/api/settings/invitations", body, token)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %d failed: %d %s", i, rec.Code, rec.Body.String())
+		}
+	}
+
+	rec := ts.doRequest(http.MethodGet, "/api/settings/invitations?page=1&per_page=2", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Meta == nil {
+		t.Fatal("expected meta")
+	}
+	if resp.Meta.Total != 3 {
+		t.Errorf("expected total=3, got %d", resp.Meta.Total)
+	}
+	if resp.Meta.TotalPages != 2 {
+		t.Errorf("expected total_pages=2, got %d", resp.Meta.TotalPages)
+	}
+	var items []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &items); err != nil {
+		t.Fatalf("parse data: %v", err)
+	}
+	if len(items) != 2 {
+		t.Errorf("expected 2 items on page 1, got %d", len(items))
+	}
 }
 
 func TestInvitation_Create_InvalidEmail(t *testing.T) {
@@ -3797,6 +3835,37 @@ func TestInstanceInfo(t *testing.T) {
 	}
 	if info.AppName != "Monica Test" {
 		t.Errorf("expected app_name 'Monica Test', got '%s'", info.AppName)
+	}
+}
+
+func TestAdminListUsers_Pagination(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "admin-page1@example.com")
+	for i := 0; i < 3; i++ {
+		ts.registerTestUser(t, fmt.Sprintf("admin-page-%d@example.com", i))
+	}
+
+	rec := ts.doRequest(http.MethodGet, "/api/admin/users?page=1&per_page=2", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Meta == nil {
+		t.Fatal("expected meta")
+	}
+	if resp.Meta.Total != 4 {
+		t.Errorf("expected total=4, got %d", resp.Meta.Total)
+	}
+	if resp.Meta.TotalPages != 2 {
+		t.Errorf("expected total_pages=2, got %d", resp.Meta.TotalPages)
+	}
+	var users []json.RawMessage
+	if err := json.Unmarshal(resp.Data, &users); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users on page 1, got %d", len(users))
 	}
 }
 

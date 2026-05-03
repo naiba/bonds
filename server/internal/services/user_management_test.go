@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -45,12 +46,37 @@ func createTestUser(t *testing.T, db *gorm.DB, accountID, email string) models.U
 func TestUserManagementList(t *testing.T) {
 	svc, _, accountID, _ := setupUserManagementTest(t)
 
-	users, err := svc.List(accountID)
+	users, meta, err := svc.List(accountID, 0, 0)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 	if len(users) != 1 {
 		t.Errorf("Expected 1 user, got %d", len(users))
+	}
+	if meta.Total != 1 {
+		t.Errorf("Expected meta.Total=1, got %d", meta.Total)
+	}
+}
+
+func TestUserManagementList_Pagination(t *testing.T) {
+	svc, db, accountID, _ := setupUserManagementTest(t)
+
+	for i := 0; i < 4; i++ {
+		createTestUser(t, db, accountID, fmt.Sprintf("page-user%d@example.com", i))
+	}
+
+	page1, meta1, err := svc.List(accountID, 1, 2)
+	if err != nil {
+		t.Fatalf("List page1 failed: %v", err)
+	}
+	if len(page1) != 2 {
+		t.Errorf("Expected 2 users on page 1, got %d", len(page1))
+	}
+	if meta1.Total != 5 {
+		t.Errorf("Expected total=5, got %d", meta1.Total)
+	}
+	if meta1.TotalPages != 3 {
+		t.Errorf("Expected total_pages=3, got %d", meta1.TotalPages)
 	}
 }
 
@@ -89,7 +115,7 @@ func TestUserManagementDelete(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	users, _ := svc.List(accountID)
+	users, _, _ := svc.List(accountID, 0, 0)
 	if len(users) != 1 {
 		t.Errorf("Expected 1 user after delete, got %d", len(users))
 	}

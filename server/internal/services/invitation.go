@@ -3,11 +3,13 @@ package services
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/pkg/response"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -157,16 +159,38 @@ func (s *InvitationService) Accept(req dto.AcceptInvitationRequest) (*dto.Invita
 	return &resp, nil
 }
 
-func (s *InvitationService) List(accountID string) ([]dto.InvitationResponse, error) {
+func (s *InvitationService) List(accountID string, page, perPage int) ([]dto.InvitationResponse, response.Meta, error) {
+	query := s.db.Where("account_id = ?", accountID)
+
+	var total int64
+	if err := query.Model(&models.Invitation{}).Count(&total).Error; err != nil {
+		return nil, response.Meta{}, err
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+
 	var invitations []models.Invitation
-	if err := s.db.Where("account_id = ?", accountID).Order("created_at DESC").Find(&invitations).Error; err != nil {
-		return nil, err
+	if err := query.Order("created_at DESC").Offset(offset).Limit(perPage).Find(&invitations).Error; err != nil {
+		return nil, response.Meta{}, err
 	}
 	result := make([]dto.InvitationResponse, len(invitations))
 	for i, inv := range invitations {
 		result[i] = toInvitationResponse(&inv)
 	}
-	return result, nil
+
+	meta := response.Meta{
+		Page:       page,
+		PerPage:    perPage,
+		Total:      total,
+		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
+	}
+	return result, meta, nil
 }
 
 func (s *InvitationService) Delete(id uint, accountID string) error {

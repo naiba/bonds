@@ -36,6 +36,9 @@
     "copy": "复制",
     "view": "查看"
   },
+  "pagination": {
+    "total": "共 {{count}} 条"
+  },
   "nav": {
     "vaults": "保险库",
     "settings": "设置",

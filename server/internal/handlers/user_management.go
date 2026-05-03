@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
@@ -25,17 +26,21 @@ func NewUserManagementHandler(svc *services.UserManagementService) *UserManageme
 //	@Tags			users
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Success		200	{object}	response.APIResponse{data=[]dto.UserManagementResponse}
-//	@Failure		401	{object}	response.APIResponse
-//	@Failure		500	{object}	response.APIResponse
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.UserManagementResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
 //	@Router			/settings/users [get]
 func (h *UserManagementHandler) List(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
-	users, err := h.userManagementService.List(accountID)
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	users, meta, err := h.userManagementService.List(accountID, page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_users")
 	}
-	return response.OK(c, users)
+	return response.Paginated(c, users, meta)
 }
 
 // Update godoc

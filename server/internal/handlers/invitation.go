@@ -26,17 +26,21 @@ func NewInvitationHandler(invitationService *services.InvitationService) *Invita
 //	@Tags			invitations
 //	@Produce		json
 //	@Security		BearerAuth
-//	@Success		200	{object}	response.APIResponse{data=[]dto.InvitationResponse}
-//	@Failure		401	{object}	response.APIResponse
-//	@Failure		500	{object}	response.APIResponse
+//	@Param			page		query		integer	false	"Page number"
+//	@Param			per_page	query		integer	false	"Items per page"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.InvitationResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
 //	@Router			/settings/invitations [get]
 func (h *InvitationHandler) List(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
-	invitations, err := h.invitationService.List(accountID)
+	page, _ := strconv.Atoi(c.QueryParam("page"))
+	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
+	invitations, meta, err := h.invitationService.List(accountID, page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_invitations")
 	}
-	return response.OK(c, invitations)
+	return response.Paginated(c, invitations, meta)
 }
 
 // Create godoc
