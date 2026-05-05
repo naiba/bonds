@@ -16,12 +16,14 @@ func NewVaultTaskService(db *gorm.DB) *VaultTaskService {
 
 func (s *VaultTaskService) List(vaultID string) ([]dto.VaultTaskResponse, error) {
 	var contacts []models.Contact
-	if err := s.db.Where("vault_id = ?", vaultID).Select("id").Find(&contacts).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Select("id, first_name, last_name").Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 	contactIDs := make([]string, len(contacts))
+	contactNames := make(map[string]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
+		contactNames[c.ID] = buildContactName(&contacts[i])
 	}
 	if len(contactIDs) == 0 {
 		return []dto.VaultTaskResponse{}, nil
@@ -33,12 +35,12 @@ func (s *VaultTaskService) List(vaultID string) ([]dto.VaultTaskResponse, error)
 	}
 	result := make([]dto.VaultTaskResponse, len(tasks))
 	for i, t := range tasks {
-		result[i] = toVaultTaskResponse(&t)
+		result[i] = toVaultTaskResponse(&t, contactNames[t.ContactID])
 	}
 	return result, nil
 }
 
-func toVaultTaskResponse(t *models.ContactTask) dto.VaultTaskResponse {
+func toVaultTaskResponse(t *models.ContactTask, contactName string) dto.VaultTaskResponse {
 	desc := ""
 	if t.Description != nil {
 		desc = *t.Description
@@ -46,6 +48,7 @@ func toVaultTaskResponse(t *models.ContactTask) dto.VaultTaskResponse {
 	return dto.VaultTaskResponse{
 		ID:          t.ID,
 		ContactID:   t.ContactID,
+		ContactName: contactName,
 		AuthorName:  t.AuthorName,
 		Label:       t.Label,
 		Description: desc,

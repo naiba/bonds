@@ -28,6 +28,7 @@ export default function TasksModule({
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [label, setLabel] = useState("");
+  const [description, setDescription] = useState("");
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -54,11 +55,12 @@ export default function TasksModule({
   });
 
   const createMutation = useMutation({
-    mutationFn: (taskLabel: string) => {
+    mutationFn: ({ taskLabel, taskDescription }: { taskLabel: string; taskDescription: string }) => {
+      const payload = { label: taskLabel, description: taskDescription };
       if (editingId) {
-        return api.tasks.contactsTasksUpdate(String(vaultId), String(contactId), editingId, { label: taskLabel });
+        return api.tasks.contactsTasksUpdate(String(vaultId), String(contactId), editingId, payload);
       }
-      return api.tasks.contactsTasksCreate(String(vaultId), String(contactId), { label: taskLabel });
+      return api.tasks.contactsTasksCreate(String(vaultId), String(contactId), payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -66,6 +68,7 @@ export default function TasksModule({
       setAdding(false);
       setEditingId(null);
       setLabel("");
+      setDescription("");
       message.success(editingId ? t("modules.tasks.updated") : t("modules.tasks.added"));
     },
     onError: (e: APIError) => message.error(e.message),
@@ -91,34 +94,46 @@ export default function TasksModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
+  function submitForm() {
+    const trimmedLabel = label.trim();
+    if (!trimmedLabel) return;
+    createMutation.mutate({ taskLabel: trimmedLabel, taskDescription: description.trim() });
+  }
+
   function renderItem(task: Task) {
     if (editingId === task.id) {
       return (
-        <List.Item style={{ padding: '8px 12px' }}>
-          <Space.Compact style={{ width: "100%" }}>
+        <List.Item style={{ padding: '8px 12px', display: 'block' }}>
+          <Space direction="vertical" style={{ width: "100%" }} size={8}>
             <Input
               autoFocus
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              onPressEnter={() => label.trim() && createMutation.mutate(label.trim())}
+              onPressEnter={submitForm}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   setEditingId(null);
                   setLabel("");
+                  setDescription("");
                 }
               }}
+              placeholder={t("modules.tasks.new_task_placeholder")}
             />
-            <Button
-              type="primary"
-              onClick={() => label.trim() && createMutation.mutate(label.trim())}
-              loading={createMutation.isPending}
-            >
-              {t("common.save")}
-            </Button>
-            <Button onClick={() => { setEditingId(null); setLabel(""); }}>
-              {t("common.cancel")}
-            </Button>
-          </Space.Compact>
+            <Input.TextArea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t("modules.tasks.description_placeholder")}
+              autoSize={{ minRows: 2, maxRows: 6 }}
+            />
+            <Space>
+              <Button type="primary" onClick={submitForm} loading={createMutation.isPending}>
+                {t("common.save")}
+              </Button>
+              <Button onClick={() => { setEditingId(null); setLabel(""); setDescription(""); }}>
+                {t("common.cancel")}
+              </Button>
+            </Space>
+          </Space>
         </List.Item>
       );
     }
@@ -142,6 +157,7 @@ export default function TasksModule({
             onClick={() => {
               setEditingId(task.id!);
               setLabel(task.label!);
+              setDescription(task.description ?? "");
               setAdding(false);
             }}
           />,
@@ -150,16 +166,33 @@ export default function TasksModule({
           </Popconfirm>,
         ]}
       >
-        <Checkbox
-          checked={task.completed}
-          onChange={() => toggleMutation.mutate(task)}
-          style={{
-            textDecoration: task.completed ? "line-through" : undefined,
-            color: task.completed ? token.colorTextQuaternary : token.colorText,
-          }}
-        >
-          {task.label}
-        </Checkbox>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Checkbox
+            checked={task.completed}
+            onChange={() => toggleMutation.mutate(task)}
+            style={{
+              textDecoration: task.completed ? "line-through" : undefined,
+              color: task.completed ? token.colorTextQuaternary : token.colorText,
+            }}
+          >
+            {task.label}
+          </Checkbox>
+          {task.description && (
+            <div
+              style={{
+                marginLeft: 24,
+                marginTop: 4,
+                fontSize: 13,
+                color: token.colorTextSecondary,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                textDecoration: task.completed ? "line-through" : undefined,
+              }}
+            >
+              {task.description}
+            </div>
+          )}
+        </div>
       </List.Item>
     );
   }
@@ -173,7 +206,7 @@ export default function TasksModule({
       }}
       extra={
         !adding && !editingId && (
-          <Button type="text" icon={<PlusOutlined />} onClick={() => { setAdding(true); setLabel(""); }} style={{ color: token.colorPrimary }}>
+          <Button type="text" icon={<PlusOutlined />} onClick={() => { setAdding(true); setLabel(""); setDescription(""); }} style={{ color: token.colorPrimary }}>
             {t("modules.tasks.add")}
           </Button>
         )
@@ -186,25 +219,29 @@ export default function TasksModule({
           background: token.colorFillQuaternary,
           borderRadius: token.borderRadius,
         }}>
-          <Space.Compact style={{ width: "100%" }}>
+          <Space direction="vertical" style={{ width: "100%" }} size={8}>
             <Input
               placeholder={t("modules.tasks.new_task_placeholder")}
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              onPressEnter={() => label.trim() && createMutation.mutate(label.trim())}
+              onPressEnter={submitForm}
               autoFocus
             />
-            <Button
-              type="primary"
-              onClick={() => label.trim() && createMutation.mutate(label.trim())}
-              loading={createMutation.isPending}
-            >
-              {t("common.add")}
-            </Button>
-          </Space.Compact>
-          <Button type="text" size="small" onClick={() => { setAdding(false); setLabel(""); }} style={{ marginTop: 4 }}>
-            {t("common.cancel")}
-          </Button>
+            <Input.TextArea
+              placeholder={t("modules.tasks.description_placeholder")}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              autoSize={{ minRows: 2, maxRows: 6 }}
+            />
+            <Space>
+              <Button type="primary" onClick={submitForm} loading={createMutation.isPending}>
+                {t("common.add")}
+              </Button>
+              <Button type="text" onClick={() => { setAdding(false); setLabel(""); setDescription(""); }}>
+                {t("common.cancel")}
+              </Button>
+            </Space>
+          </Space>
         </div>
       )}
 

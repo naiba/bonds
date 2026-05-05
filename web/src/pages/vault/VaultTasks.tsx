@@ -13,10 +13,11 @@ import {
 import {
   ArrowLeftOutlined,
   CheckSquareOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Task } from "@/api";
+import type { VaultTask } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatShortDate } from "@/utils/dateFormat";
 
@@ -30,11 +31,11 @@ export default function VaultTasks() {
   const { token } = theme.useToken();
   const dateFormats = useDateFormat();
 
-  const { data: tasks = [], isLoading } = useQuery({
+  const { data: tasks = [], isLoading } = useQuery<VaultTask[]>({
     queryKey: ["vaults", vaultId, "all-tasks"],
     queryFn: async () => {
       const res = await api.vaultTasks.tasksList(String(vaultId));
-      return res.data ?? [];
+      return (res.data ?? []) as VaultTask[];
     },
     enabled: !!vaultId,
   });
@@ -47,8 +48,8 @@ export default function VaultTasks() {
     );
   }
 
-  const pending = tasks.filter((t: Task) => !t.completed);
-  const completed = tasks.filter((t: Task) => t.completed);
+  const pending = tasks.filter((t) => !t.completed);
+  const completed = tasks.filter((t) => t.completed);
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto" }}>
@@ -80,7 +81,7 @@ export default function VaultTasks() {
               <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.tasks")}</div>
             </div>
           ) }}
-          renderItem={(task: Task) => (
+          renderItem={(task: VaultTask) => (
             <List.Item
               style={{
                 borderLeft: `3px solid ${token.colorSuccess}`,
@@ -88,9 +89,10 @@ export default function VaultTasks() {
                 paddingLeft: 12,
                 borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
                 background: token.colorFillQuaternary,
+                display: 'block',
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Checkbox checked={false}>{task.label}</Checkbox>
                 {task.due_at && (
                   <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
@@ -98,6 +100,33 @@ export default function VaultTasks() {
                   </Tag>
                 )}
               </div>
+              {task.contact_id && task.contact_name && (
+                <div style={{ marginLeft: 24, marginTop: 4 }}>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<UserOutlined />}
+                    style={{ padding: 0, height: 'auto', fontSize: 12, color: token.colorTextSecondary }}
+                    onClick={() => navigate(`/vaults/${vaultId}/contacts/${task.contact_id}`)}
+                  >
+                    {task.contact_name}
+                  </Button>
+                </div>
+              )}
+              {task.description && (
+                <div
+                  style={{
+                    marginLeft: 24,
+                    marginTop: 4,
+                    fontSize: 13,
+                    color: token.colorTextSecondary,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                  }}
+                >
+                  {task.description}
+                </div>
+              )}
             </List.Item>
           )}
         />
@@ -117,7 +146,7 @@ export default function VaultTasks() {
             </Divider>
             <List
               dataSource={completed}
-              renderItem={(task: Task) => (
+              renderItem={(task: VaultTask) => (
                 <List.Item
                   style={{
                     borderLeft: `3px solid ${token.colorBorder}`,
@@ -125,11 +154,27 @@ export default function VaultTasks() {
                     paddingLeft: 12,
                     borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
                     opacity: 0.6,
+                    display: 'block',
                   }}
                 >
-                  <Checkbox checked style={{ textDecoration: "line-through" }}>
-                    {task.label}
-                  </Checkbox>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Checkbox checked style={{ textDecoration: "line-through" }}>
+                      {task.label}
+                    </Checkbox>
+                  </div>
+                  {task.contact_id && task.contact_name && (
+                    <div style={{ marginLeft: 24, marginTop: 4 }}>
+                      <Button
+                        type="link"
+                        size="small"
+                        icon={<UserOutlined />}
+                        style={{ padding: 0, height: 'auto', fontSize: 12, color: token.colorTextSecondary }}
+                        onClick={() => navigate(`/vaults/${vaultId}/contacts/${task.contact_id}`)}
+                      >
+                        {task.contact_name}
+                      </Button>
+                    </div>
+                  )}
                 </List.Item>
               )}
             />

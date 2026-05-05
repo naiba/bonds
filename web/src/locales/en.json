@@ -658,6 +658,7 @@
       "title": "Tasks",
       "add": "Add",
       "new_task_placeholder": "New task…",
+      "description_placeholder": "Add details (optional)…",
       "no_pending": "No pending tasks",
       "delete_confirm": "Delete?",
       "added": "Task added",

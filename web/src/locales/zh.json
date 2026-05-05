@@ -658,6 +658,7 @@
       "title": "任务",
       "add": "添加",
       "new_task_placeholder": "新任务…",
+      "description_placeholder": "添加详情(可选)…",
       "no_pending": "暂无待办任务",
       "delete_confirm": "确定删除？",
       "added": "任务已添加",

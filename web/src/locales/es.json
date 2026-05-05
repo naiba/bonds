@@ -597,6 +597,7 @@
             "title": "Tareas",
             "add": "Añadir",
             "new_task_placeholder": "Nueva tarea…",
+            "description_placeholder": "Añadir detalles (opcional)…",
             "no_pending": "No hay tareas pendientes",
             "delete_confirm": "¿Eliminar?",
             "added": "Tarea añadida",

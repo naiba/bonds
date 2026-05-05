@@ -274,6 +274,7 @@ export type { GithubComNaibaBondsInternalDtoCreateReminderRequest as CreateRemin
 export type { GithubComNaibaBondsInternalDtoImportantDateResponse as ImportantDate } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCreateImportantDateRequest as CreateImportantDateRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoTaskResponse as Task } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoVaultTaskResponse as VaultTask } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCallResponse as Call } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoAddressResponse as Address } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactInformationResponse as ContactInfo } from "./generated/data-contracts";
