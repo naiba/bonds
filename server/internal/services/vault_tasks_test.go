@@ -225,6 +225,51 @@ func TestVaultTaskListFilterByStatus(t *testing.T) {
 	}
 }
 
+func TestVaultTaskUpdateAllFields(t *testing.T) {
+	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
+	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "old"})
+
+	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
+		Label:       "new label",
+		Description: "richer description",
+		ContactID:   contactID,
+		Status:      models.TaskStatusInProgress,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.Label != "new label" || updated.Description != "richer description" {
+		t.Errorf("fields didn't update: %+v", updated)
+	}
+	if updated.ContactID != contactID {
+		t.Errorf("ContactID didn't update: got %q", updated.ContactID)
+	}
+	if updated.Status != models.TaskStatusInProgress {
+		t.Errorf("Status didn't update: got %q", updated.Status)
+	}
+}
+
+func TestVaultTaskUpdateClearsContactWhenEmpty(t *testing.T) {
+	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
+	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
+		Label: "x", ContactID: contactID,
+	})
+	if task.ContactID != contactID {
+		t.Fatalf("setup: expected attached, got %q", task.ContactID)
+	}
+
+	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
+		Label:     "x",
+		ContactID: "",
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.ContactID != "" {
+		t.Errorf("expected ContactID cleared, got %q", updated.ContactID)
+	}
+}
+
 func TestVaultTaskListFilterStandaloneOnly(t *testing.T) {
 	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
 	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "personal"})

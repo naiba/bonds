@@ -262,6 +262,7 @@ export type { GithubComNaibaBondsInternalDtoCreateImportantDateRequest as Create
 export type { GithubComNaibaBondsInternalDtoTaskResponse as Task } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultTaskResponse as VaultTask } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCreateVaultTaskRequest as CreateVaultTaskRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoUpdateVaultTaskRequest as UpdateVaultTaskRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateTaskStatusRequest as UpdateTaskStatusRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateTaskPositionRequest as UpdateTaskPositionRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCallResponse as Call } from "./generated/data-contracts";
