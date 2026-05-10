@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { Modal, Form, Input, Select, App } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -58,21 +57,24 @@ export default function TaskEditModal({
   const isEdit = task !== null;
   const fallbackSlug = defaultStatus ?? defaultStatusSlug(statuses);
 
-  // Reseed form whenever the modal opens or the task changes
-  useEffect(() => {
-    if (!open) return;
-    if (isEdit && task) {
-      form.setFieldsValue({
+  // Build initialValues from the task (or empty defaults for create mode).
+  // Used together with a `key` prop on the Form below so that switching
+  // between tasks remounts the Form with the right initial values — more
+  // reliable than setFieldsValue in a useEffect, which races with the
+  // Form's internal field registration when destroyOnHidden destroys and
+  // re-mounts the form on every open.
+  const initialValues: FormValues = isEdit && task
+    ? {
         label: task.label ?? "",
         description: task.description ?? "",
         contact_id: task.contact_id || undefined,
         status: task.status || fallbackSlug,
-      });
-    } else {
-      form.resetFields();
-      form.setFieldsValue({ status: fallbackSlug });
-    }
-  }, [open, task, isEdit, fallbackSlug, form]);
+      }
+    : { label: "", status: fallbackSlug };
+  // Stable key per "edit session": new key whenever modal reopens with a
+  // different task (or transitions create<->edit). The form remounts
+  // cleanly each time.
+  const formKey = `${task?.id ?? "create"}-${open ? "open" : "closed"}`;
 
   // Only fetch contacts when modal is open — no point pre-fetching
   const { data: contacts = [] } = useQuery({
@@ -131,11 +133,21 @@ export default function TaskEditModal({
       destroyOnHidden
     >
       <Form
+        key={formKey}
         form={form}
         layout="vertical"
+        initialValues={initialValues}
         onFinish={(values) => {
           if (isEdit) updateMutation.mutate(values);
           else createMutation.mutate(values);
+        }}
+        onFinishFailed={({ errorFields }) => {
+          // Surface validation failures so users see *why* nothing happened
+          // instead of a silent dead Save button.
+          if (errorFields.length > 0) {
+            const first = errorFields[0]?.errors?.[0];
+            if (first) message.error(first);
+          }
         }}
       >
         <Form.Item name="label" rules={[{ required: true }]}>
