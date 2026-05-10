@@ -297,10 +297,9 @@ export default function ContactList() {
                 }
               }}
             >
-              <Button size="small" icon={<UploadOutlined />}>{t("vcard.import")}</Button>
+              <Button icon={<UploadOutlined />}>{t("vcard.import")}</Button>
             </Upload>
             <Button
-              size="small"
               icon={<DownloadOutlined />}
               onClick={async () => {
                 try {
@@ -337,10 +336,7 @@ export default function ContactList() {
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           allowClear
-          style={{
-            maxWidth: 300,
-            borderRadius: 20,
-          }}
+          style={{ maxWidth: 300 }}
         />
         <Select
             placeholder={t("contact.list.sort_by")}

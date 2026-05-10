@@ -215,7 +215,7 @@ export default function Layout() {
           </div>
 
           {/* Right side: actions — hidden on mobile when search is expanded */}
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
             <Tooltip title={themeModeLabels[themeMode]}>
               <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
             </Tooltip>
@@ -241,7 +241,6 @@ export default function Layout() {
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  marginLeft: 4,
                   padding: "2px 4px",
                   borderRadius: token.borderRadius,
                 }}
@@ -266,7 +265,7 @@ export default function Layout() {
               padding: "0 16px",
               display: "flex",
               alignItems: "center",
-              gap: 2,
+              gap: 4,
               height: 52,
               overflowX: "auto",
             }}
