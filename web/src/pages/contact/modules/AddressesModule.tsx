@@ -7,6 +7,7 @@ import {
   Form,
   Input,
   Switch,
+  DatePicker,
   Popconfirm,
   App,
   Tag,
@@ -20,9 +21,22 @@ import {
   EnvironmentOutlined,
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import dayjs, { type Dayjs } from "dayjs";
 import { api } from "@/api";
 import type { Address, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
+
+interface AddressFormValues {
+  line_1: string;
+  line_2?: string;
+  city: string;
+  province?: string;
+  postal_code?: string;
+  country: string;
+  is_past_address?: boolean;
+  date_from?: Dayjs | null;
+  date_to?: Dayjs | null;
+}
 
 export default function AddressesModule({
   vaultId,
@@ -33,7 +47,7 @@ export default function AddressesModule({
 }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<AddressFormValues>();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -49,19 +63,24 @@ export default function AddressesModule({
   });
 
   const saveMutation = useMutation({
-    mutationFn: (values: {
-      line_1: string;
-      line_2?: string;
-      city: string;
-      province?: string;
-      postal_code?: string;
-      country: string;
-      is_past_address?: boolean;
-    }) => {
+    mutationFn: (values: AddressFormValues) => {
+      // Convert Dayjs picker values into ISO strings the backend expects.
+      // null/undefined gets passed through so the backend can clear them.
+      const payload = {
+        line_1: values.line_1,
+        line_2: values.line_2,
+        city: values.city,
+        province: values.province,
+        postal_code: values.postal_code,
+        country: values.country,
+        is_past_address: values.is_past_address ?? false,
+        date_from: values.date_from ? values.date_from.toISOString() : undefined,
+        date_to: values.date_to ? values.date_to.toISOString() : undefined,
+      };
       if (editingId) {
-        return api.addresses.contactsAddressesUpdate(String(vaultId), String(contactId), editingId, values);
+        return api.addresses.contactsAddressesUpdate(String(vaultId), String(contactId), editingId, payload);
       }
-      return api.addresses.contactsAddressesCreate(String(vaultId), String(contactId), values);
+      return api.addresses.contactsAddressesCreate(String(vaultId), String(contactId), payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -82,7 +101,18 @@ export default function AddressesModule({
 
   function openEdit(a: Address) {
     setEditingId(a.id ?? null);
-    form.setFieldsValue(a);
+    // Address fields in the API are ISO strings; DatePicker expects Dayjs.
+    form.setFieldsValue({
+      line_1: a.line_1 ?? "",
+      line_2: a.line_2 ?? "",
+      city: a.city ?? "",
+      province: a.province ?? "",
+      postal_code: a.postal_code ?? "",
+      country: a.country ?? "",
+      is_past_address: a.is_past_address ?? false,
+      date_from: a.date_from ? dayjs(a.date_from) : null,
+      date_to: a.date_to ? dayjs(a.date_to) : null,
+    });
     setOpen(true);
   }
 
@@ -96,6 +126,16 @@ export default function AddressesModule({
     return [a.line_1, a.line_2, a.city, a.province, a.postal_code, a.country]
       .filter(Boolean)
       .join(", ");
+  }
+
+  function formatRange(a: Address): string | null {
+    const fmt = (d?: string) => (d ? dayjs(d).format("MMM YYYY") : null);
+    const from = fmt(a.date_from);
+    const to = fmt(a.date_to);
+    if (!from && !to) return null;
+    if (from && to) return `${from} → ${to}`;
+    if (from && !to) return `${from} → ${t("modules.addresses.present")}`;
+    return `→ ${to}`;
   }
 
   function mapsUrl(a: Address) {
@@ -124,53 +164,62 @@ export default function AddressesModule({
         dataSource={addresses}
         locale={{ emptyText: <Empty description={t("modules.addresses.no_addresses")} /> }}
         split={false}
-        renderItem={(a: Address) => (
+        renderItem={(a: Address) => {
+          const range = formatRange(a);
+          return (
             <List.Item
-            style={{
-              borderRadius: token.borderRadius,
-              padding: '10px 12px',
-              marginBottom: 4,
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            actions={[
-              <Button key="map" type="text" size="small" icon={<EnvironmentOutlined />} href={mapsUrl(a)} target="_blank" aria-label={t("modules.addresses.view_map")} />,
-              <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(a)} />,
-              <Popconfirm key="d" title={t("modules.addresses.delete_confirm")} onConfirm={() => deleteMutation.mutate(a.id!)}>
-                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-              </Popconfirm>,
-            ]}
-          >
-            <List.Item.Meta
-              avatar={
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (a as any).latitude && (a as any).longitude ? (
-                  <img 
-                    src={mapImageUrl(a)} 
-                    alt="Map" 
-                    style={{ 
-                      width: 100, 
-                      height: 75, 
-                      objectFit: 'cover', 
-                      borderRadius: token.borderRadiusSM,
-                      border: `1px solid ${token.colorBorderSecondary}`
-                    }} 
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                ) : null
-              }
-              title={
-                <span style={{ fontWeight: 500 }}>
-                  {a.address_type_id ? `#${a.address_type_id}` : ''} {a.is_past_address && <Tag color="blue">{t("common.primary")}</Tag>}
-                </span>
-              }
-              description={<span style={{ color: token.colorTextSecondary }}>{formatAddress(a)}</span>}
-            />
-          </List.Item>
-        )}
+              style={{
+                borderRadius: token.borderRadius,
+                padding: '10px 12px',
+                marginBottom: 4,
+                transition: 'background 0.2s',
+                opacity: a.is_past_address ? 0.7 : 1,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              actions={[
+                <Button key="map" type="text" size="small" icon={<EnvironmentOutlined />} href={mapsUrl(a)} target="_blank" aria-label={t("modules.addresses.view_map")} />,
+                <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => openEdit(a)} />,
+                <Popconfirm key="d" title={t("modules.addresses.delete_confirm")} onConfirm={() => deleteMutation.mutate(a.id!)}>
+                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (a as any).latitude && (a as any).longitude ? (
+                    <img
+                      src={mapImageUrl(a)}
+                      alt="Map"
+                      style={{
+                        width: 100,
+                        height: 75,
+                        objectFit: 'cover',
+                        borderRadius: token.borderRadiusSM,
+                        border: `1px solid ${token.colorBorderSecondary}`,
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : null
+                }
+                title={
+                  <span style={{ fontWeight: 500, display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                    {formatAddress(a)}
+                    {a.is_past_address && <Tag>{t("modules.addresses.past_tag")}</Tag>}
+                  </span>
+                }
+                description={
+                  range ? (
+                    <span style={{ color: token.colorTextTertiary, fontSize: 12 }}>{range}</span>
+                  ) : null
+                }
+              />
+            </List.Item>
+          );
+        }}
       />
 
       <Modal
@@ -199,7 +248,26 @@ export default function AddressesModule({
           <Form.Item name="country" label={t("modules.addresses.country")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="is_past_address" label={t("modules.addresses.is_primary")} valuePropName="checked">
+          <Form.Item
+            name="date_from"
+            label={t("modules.addresses.date_from")}
+            tooltip={t("modules.addresses.date_from_tooltip")}
+          >
+            <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" allowClear />
+          </Form.Item>
+          <Form.Item
+            name="date_to"
+            label={t("modules.addresses.date_to")}
+            tooltip={t("modules.addresses.date_to_tooltip")}
+          >
+            <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" allowClear />
+          </Form.Item>
+          <Form.Item
+            name="is_past_address"
+            label={t("modules.addresses.is_past_address")}
+            valuePropName="checked"
+            tooltip={t("modules.addresses.is_past_address_tooltip")}
+          >
             <Switch />
           </Form.Item>
         </Form>
