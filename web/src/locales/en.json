@@ -1001,6 +1001,7 @@
       "move_down": "Move Down",
       "post_templates": "Post Templates",
       "group_types": "Group Types",
+      "task_statuses": "Task Statuses",
       "name_reverse": "Reverse Relationship Name",
       "degree": "Kinship Degree",
       "degree_tooltip": "Distance weight for kinship calculation. Leave empty to exclude.",
