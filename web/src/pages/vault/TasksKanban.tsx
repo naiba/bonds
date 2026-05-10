@@ -43,8 +43,12 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
+  // Single modal serves both Create (editingTask = null) and Edit (editingTask set).
+  // modalStatus is the column the create came from; ignored in edit mode (status
+  // is taken from the form's Status select instead).
   const [modalOpen, setModalOpen] = useState(false);
   const [modalStatus, setModalStatus] = useState<ColumnStatus>("todo");
+  const [editingTask, setEditingTask] = useState<VaultTask | null>(null);
   const [form] = Form.useForm();
 
   const { data: contacts = [] } = useQuery({
@@ -82,13 +86,39 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
     },
   });
 
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingTask(null);
+    form.resetFields();
+  };
+
   const createMutation = useMutation({
     mutationFn: (values: { label: string; description?: string; contact_id?: string; status: ColumnStatus }) =>
       api.vaultTasks.tasksCreate(vaultId, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
-      setModalOpen(false);
-      form.resetFields();
+      closeModal();
+    },
+    onError: () => message.error(t("vault.tasks.save_failed")),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: number;
+      values: { label: string; description?: string; contact_id?: string; status: ColumnStatus };
+    }) =>
+      api.vaultTasks.tasksPartialUpdate(vaultId, id, {
+        label: values.label,
+        description: values.description ?? "",
+        contact_id: values.contact_id ?? "",
+        status: values.status,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
+      closeModal();
     },
     onError: () => message.error(t("vault.tasks.save_failed")),
   });
@@ -138,8 +168,25 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
   };
 
   const openCreateModal = (status: ColumnStatus) => {
+    setEditingTask(null);
     setModalStatus(status);
     form.resetFields();
+    form.setFieldsValue({ status });
+    setModalOpen(true);
+  };
+
+  const openEditModal = (task: VaultTask) => {
+    setEditingTask(task);
+    form.resetFields();
+    form.setFieldsValue({
+      label: task.label,
+      description: task.description ?? "",
+      contact_id: task.contact_id || undefined,
+      status:
+        (STATUSES as readonly string[]).includes(task.status ?? "")
+          ? (task.status as ColumnStatus)
+          : "todo",
+    });
     setModalOpen(true);
   };
 
@@ -164,6 +211,7 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
               dueLabel={t("vault.tasks.due", { date: "" }).replace(/\s*$/, "")}
               emptyLabel={t("vault.tasks.empty_column")}
               onAdd={() => openCreateModal(status)}
+              onTaskClick={openEditModal}
               addLabel={t("vault.tasks.new_task")}
             />
           ))}
@@ -171,25 +219,48 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
       </DndContext>
 
       <Modal
-        title={t("vault.tasks.new_task_modal_title")}
+        title={
+          editingTask
+            ? t("vault.tasks.edit_task_modal_title")
+            : t("vault.tasks.new_task_modal_title")
+        }
         open={modalOpen}
-        onCancel={() => setModalOpen(false)}
+        onCancel={closeModal}
         onOk={() => form.submit()}
-        confirmLoading={createMutation.isPending}
-        okText={t("vault.tasks.create")}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
+        okText={editingTask ? t("vault.tasks.save") : t("vault.tasks.create")}
         cancelText={t("vault.tasks.cancel")}
+        destroyOnHidden
       >
         <Form
           form={form}
           layout="vertical"
-          onFinish={(values: { label: string; description?: string; contact_id?: string }) =>
-            createMutation.mutate({
-              label: values.label,
-              description: values.description || undefined,
-              contact_id: values.contact_id || undefined,
-              status: modalStatus,
-            })
-          }
+          onFinish={(values: {
+            label: string;
+            description?: string;
+            contact_id?: string;
+            status?: ColumnStatus;
+          }) => {
+            const status = values.status ?? modalStatus;
+            if (editingTask) {
+              updateMutation.mutate({
+                id: editingTask.id!,
+                values: {
+                  label: values.label,
+                  description: values.description || undefined,
+                  contact_id: values.contact_id || undefined,
+                  status,
+                },
+              });
+            } else {
+              createMutation.mutate({
+                label: values.label,
+                description: values.description || undefined,
+                contact_id: values.contact_id || undefined,
+                status,
+              });
+            }
+          }}
         >
           <Form.Item name="label" rules={[{ required: true }]}>
             <Input placeholder={t("vault.tasks.new_task_label_placeholder")} autoFocus />
@@ -200,6 +271,16 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
               autoSize={{ minRows: 2, maxRows: 6 }}
             />
           </Form.Item>
+          {editingTask && (
+            <Form.Item name="status" label={t("vault.tasks.status_label")}>
+              <Select
+                options={STATUSES.map((s) => ({
+                  value: s,
+                  label: t(`vault.tasks.col_${s}`),
+                }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="contact_id" label={t("vault.tasks.new_task_contact_optional")}>
             <Select
               allowClear
@@ -246,10 +327,11 @@ interface KanbanColumnProps {
   emptyLabel: string;
   addLabel: string;
   onAdd: () => void;
+  onTaskClick: (task: VaultTask) => void;
 }
 
 function KanbanColumn(props: KanbanColumnProps) {
-  const { status, title, tasks, token, dateFormats, dueLabel, emptyLabel, addLabel, onAdd } = props;
+  const { status, title, tasks, token, dateFormats, dueLabel, emptyLabel, addLabel, onAdd, onTaskClick } = props;
   const taskIds = tasks.map((t) => String(t.id));
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
 
@@ -300,6 +382,7 @@ function KanbanColumn(props: KanbanColumnProps) {
                 token={token}
                 dateFormats={dateFormats}
                 dueLabel={dueLabel}
+                onClick={() => onTaskClick(task)}
               />
             ))
           )}
@@ -314,9 +397,10 @@ interface SortableTaskCardProps {
   token: ReturnType<typeof theme.useToken>["token"];
   dateFormats: ReturnType<typeof useDateFormat>;
   dueLabel: string;
+  onClick: () => void;
 }
 
-function SortableTaskCard({ task, token, dateFormats, dueLabel }: SortableTaskCardProps) {
+function SortableTaskCard({ task, token, dateFormats, dueLabel, onClick }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(task.id),
   });
@@ -326,8 +410,11 @@ function SortableTaskCard({ task, token, dateFormats, dueLabel }: SortableTaskCa
     opacity: isDragging ? 0.5 : 1,
     cursor: "grab",
   };
+  // PointerSensor is configured with activationConstraint.distance:6 in the
+  // parent — drags only start after moving 6px. So a stationary mousedown+up
+  // fires onClick normally without conflicting with the drag listeners.
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick}>
       <Card
         size="small"
         styles={{ body: { padding: 12 } }}

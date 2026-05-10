@@ -99,6 +99,54 @@ func (h *VaultTaskHandler) Create(c echo.Context) error {
 	return response.Created(c, task)
 }
 
+// Update godoc
+//
+//	@Summary		Update a vault task
+//	@Description	Update label, description, due_at, status, and/or contact link of a task. Used by the click-to-edit modal.
+//	@Tags			vault-tasks
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			id			path		integer						true	"Task ID"
+//	@Param			request		body		dto.UpdateVaultTaskRequest	true	"Updated fields"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultTaskResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/tasks/{id} [patch]
+func (h *VaultTaskHandler) Update(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_task_id", nil)
+	}
+	var req dto.UpdateVaultTaskRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+
+	task, err := h.vaultTaskService.Update(uint(id), vaultID, req)
+	if err != nil {
+		if errors.Is(err, services.ErrTaskNotFound) {
+			return response.NotFound(c, "err.task_not_found")
+		}
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrInvalidTaskStatus) {
+			return response.BadRequest(c, "err.invalid_task_status", nil)
+		}
+		return response.InternalError(c, "err.failed_to_update_task")
+	}
+	return response.OK(c, task)
+}
+
 // UpdateStatus godoc
 //
 //	@Summary		Update task status (kanban column)

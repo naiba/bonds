@@ -110,6 +110,69 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 	return &resp, nil
 }
 
+// Update replaces the editable fields of a vault task in one call. Used by
+// the click-to-edit modal. ContactID may be cleared (empty string) or
+// changed to a different contact in the same vault. Status is also kept in
+// sync with Completed so the list view stays consistent.
+func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
+	if req.Status != "" && !models.IsValidTaskStatus(req.Status) {
+		return nil, ErrInvalidTaskStatus
+	}
+
+	var task models.ContactTask
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrTaskNotFound
+		}
+		return nil, err
+	}
+
+	// Resolve contact pointer: empty = standalone, non-empty = must belong to vault
+	var contactPtr *string
+	if req.ContactID != "" {
+		if err := validateContactBelongsToVault(s.db, req.ContactID, vaultID); err != nil {
+			return nil, err
+		}
+		c := req.ContactID
+		contactPtr = &c
+	}
+
+	updates := map[string]interface{}{
+		"label":       req.Label,
+		"description": strPtrOrNil(req.Description),
+		"due_at":      req.DueAt,
+		"contact_id":  contactPtr,
+	}
+	if req.Status != "" {
+		updates["status"] = req.Status
+		// Mirror the Completed/Status sync logic from UpdateStatus so the
+		// modal and the kanban-drag flow agree.
+		if req.Status == models.TaskStatusDone && !task.Completed {
+			now := time.Now()
+			updates["completed"] = true
+			updates["completed_at"] = &now
+		} else if req.Status != models.TaskStatusDone && task.Completed {
+			updates["completed"] = false
+			updates["completed_at"] = nil
+		}
+	}
+
+	if err := s.db.Model(&task).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+	// Reload to pick up canonical values (timestamps, etc.)
+	if err := s.db.Where("id = ?", task.ID).First(&task).Error; err != nil {
+		return nil, err
+	}
+
+	contactNames, err := s.collectContactNames([]models.ContactTask{task})
+	if err != nil {
+		return nil, err
+	}
+	resp := toVaultTaskResponse(&task, contactNames)
+	return &resp, nil
+}
+
 // UpdateStatus moves a task to a different kanban column. Used by drag-drop
 // across columns. Validates that the target status is recognized.
 func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateTaskStatusRequest) (*dto.VaultTaskResponse, error) {

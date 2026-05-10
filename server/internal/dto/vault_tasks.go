@@ -27,3 +27,17 @@ type CreateVaultTaskRequest struct {
 	// ContactID — optional. When omitted/empty, the task is a standalone vault-level task.
 	ContactID string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
+
+// UpdateVaultTaskRequest replaces the editable fields of a vault task in one
+// call. ContactID may be set, cleared (empty string = standalone), or changed
+// to a different contact in the same vault. Status is validated against the
+// known set; an empty Status means "leave unchanged".
+type UpdateVaultTaskRequest struct {
+	Label       string     `json:"label" validate:"required" example:"Buy birthday gift"`
+	Description string     `json:"description" example:"Get a nice book from the bookstore"`
+	DueAt       *time.Time `json:"due_at" example:"2026-01-15T10:30:00Z"`
+	Status      string     `json:"status" example:"in_progress"`
+	// ContactID — empty string clears the link (standalone). Non-empty must
+	// belong to the same vault.
+	ContactID string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+}
