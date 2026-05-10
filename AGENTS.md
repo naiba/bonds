@@ -550,6 +550,15 @@ defer cleanup()
 - 新引入第三方包时**必须** `bun add <package>` 确保写入 `package.json` 和 `bun.lock`。
 - 已踩坑的包：`filesize`、`@simplewebauthn/browser` — 本地存在但未加入 `package.json`，导致 CI 构建失败。
 
+### AntD Modal + 编辑表单：useForm 实例必须在内层组件，按记录 keyed
+
+`Form.useForm()` 返回的实例在父组件 hook state 中**跨渲染保持稳定**，承载已注册字段的值。`initialValues` 仅在某个 form 实例**首次**被任意 `<Form>` 注册时生效；之后该实例已有值，再 mount 一个新的 `<Form>`（即便加了 `key` 也只是 JSX 重挂载），AntD 会复用旧值，新 `initialValues` 被忽略。结果：编辑记录 A 关闭、点击记录 B，弹窗里看到的还是 A 的标题。
+
+- **正确做法**：把含 `useForm` + `<Form>` 的部分提取到内层子组件，外层 Modal 只持壳；在子组件上加 `key={record.id}`。每次切换记录，子组件整体重挂载，`useForm` 重新执行，得到全新实例 → `initialValues` 正常生效。
+- **不是修复**：在 `useEffect` 里调 `form.setFieldsValue(...)` / `form.resetFields()`。两者都对**同一**实例操作，跟 Form 字段注册存在 race（尤其 `destroyOnHidden` 时），表现为字段时好时坏地不被填值，required 校验静默拦截 submit，最终现象是"点了保存没反应、Network 也没请求"。
+- **submit 通道**：内层组件持有 form 实例时，外层 Modal 的 `onOk` 已经访问不到。把 Save/Cancel 按钮放进 Form 内（`htmlType="submit"`），把 Modal 的 `footer` 设为 `null`。
+- 参考：`web/src/pages/vault/TaskEditModal.tsx`（`TaskEditModal` 持壳，`TaskEditModalContent` 持表单）。
+
 ### Playwright E2E 测试经验
 
 - Ant Design 组件在 Playwright strict mode 下容易因多个元素匹配而失败（如 `.ant-card` 匹配多个卡片、`getByText` 在导航栏和内容区同时匹配）。解决：使用 `.first()`、`getByRole('table').getByText(...)` 等更精确的选择器。
