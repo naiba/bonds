@@ -237,7 +237,10 @@
       "cancel": "取消",
       "empty_column": "拖放任务到此处",
       "standalone": "独立",
-      "save_failed": "保存失败"
+      "save_failed": "保存失败",
+      "delete": "删除",
+      "delete_confirm": "确定删除此任务？",
+      "due_label": "截止日期"
     },
     "feed": {
       "title": "动态",

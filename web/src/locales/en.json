@@ -237,7 +237,10 @@
       "cancel": "Cancel",
       "empty_column": "Drop tasks here",
       "standalone": "Standalone",
-      "save_failed": "Could not save"
+      "save_failed": "Could not save",
+      "delete": "Delete",
+      "delete_confirm": "Delete this task?",
+      "due_label": "Due date"
     },
     "feed": {
       "title": "Activity Feed",

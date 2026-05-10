@@ -214,6 +214,20 @@ func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateT
 	return &resp, nil
 }
 
+// Delete removes a vault task. Returns ErrTaskNotFound if the task doesn't
+// belong to the given vault. Bypasses any audit-feed entry — task removals
+// are user-initiated and explicit.
+func (s *VaultTaskService) Delete(id uint, vaultID string) error {
+	result := s.db.Where("id = ? AND vault_id = ?", id, vaultID).Delete(&models.ContactTask{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrTaskNotFound
+	}
+	return nil
+}
+
 // UpdatePosition reorders a task within (or across) columns. The Status field
 // is optional in the request — when present, the task is also moved to that
 // column (drag across columns + reorder in one call). Position is the new
