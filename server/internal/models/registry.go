@@ -25,6 +25,7 @@ func AllModels() []interface{} {
 		&ContactReminder{},
 		&ContactReminderScheduled{},
 		&ContactTask{},
+		&TaskStatus{},
 		&ContactFeedItem{},
 
 		&Emotion{},

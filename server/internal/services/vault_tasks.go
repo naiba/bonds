@@ -71,7 +71,7 @@ func (s *VaultTaskService) List(vaultID string, filters VaultTaskFilters) ([]dto
 // Create makes a vault-level task. ContactID is optional; when empty, the
 // task is standalone. When set, the contact must belong to the same vault.
 func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
-	if req.Status != "" && !models.IsValidTaskStatus(req.Status) {
+	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
 	var contactPtr *string
@@ -90,7 +90,7 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 		AuthorName:  "User",
 		Label:       req.Label,
 		Description: strPtrOrNil(req.Description),
-		Status:      models.NormalizeTaskStatus(req.Status),
+		Status:      resolveTaskStatusOrDefault(s.db, req.Status, vaultID),
 		DueAt:       req.DueAt,
 	}
 	if err := s.db.Create(&task).Error; err != nil {
@@ -115,7 +115,7 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 // changed to a different contact in the same vault. Status is also kept in
 // sync with Completed so the list view stays consistent.
 func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
-	if req.Status != "" && !models.IsValidTaskStatus(req.Status) {
+	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
 
@@ -219,7 +219,7 @@ func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateT
 // column (drag across columns + reorder in one call). Position is the new
 // 0-based index within the destination column.
 func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.UpdateTaskPositionRequest) (*dto.VaultTaskResponse, error) {
-	if req.Status != "" && !models.IsValidTaskStatus(req.Status) {
+	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
 	var task models.ContactTask
@@ -307,7 +307,7 @@ func toVaultTaskResponse(t *models.ContactTask, names map[string]string) dto.Vau
 		AuthorName:  t.AuthorName,
 		Label:       t.Label,
 		Description: desc,
-		Status:      models.NormalizeTaskStatus(t.Status),
+		Status:      t.Status,
 		Position:    t.Position,
 		Completed:   t.Completed,
 		CompletedAt: t.CompletedAt,

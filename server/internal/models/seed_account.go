@@ -28,6 +28,7 @@ func SeedAccountDefaults(tx *gorm.DB, accountID, userID, userEmail, locale strin
 		seedDefaultTemplate,
 		seedDefaultModules,
 		seedAccountCurrencies,
+		seedTaskStatuses,
 	}
 	for _, fn := range seeders {
 		if err := fn(tx, accountID, locale); err != nil {
@@ -693,4 +694,55 @@ func seedAccountCurrencies(tx *gorm.DB, accountID, _ string) error {
 		items[i] = AccountCurrency{CurrencyID: c.ID, AccountID: accountID}
 	}
 	return tx.CreateInBatches(&items, 50).Error
+}
+
+// seedTaskStatuses installs the five default kanban columns. The first three
+// (todo, in_progress, done) cannot be deleted because the cascade-on-delete
+// logic re-assigns orphan tasks to the default status, and we need a stable
+// landing spot. Blocked and Cancelled are deletable conveniences.
+func seedTaskStatuses(tx *gorm.DB, accountID, locale string) error {
+	type statusDef struct {
+		key       string
+		slug      string
+		isDefault bool
+		canDelete bool
+	}
+	defs := []statusDef{
+		{"seed.task_statuses.todo", "todo", true, false},
+		{"seed.task_statuses.in_progress", "in_progress", false, false},
+		{"seed.task_statuses.done", "done", false, false},
+		{"seed.task_statuses.blocked", "blocked", false, true},
+		{"seed.task_statuses.cancelled", "cancelled", false, true},
+	}
+	items := make([]TaskStatus, len(defs))
+	for idx, d := range defs {
+		items[idx] = TaskStatus{
+			AccountID:          accountID,
+			Name:               strPtr(i18n.T(locale, d.key)),
+			NameTranslationKey: strPtr(d.key),
+			Slug:               d.slug,
+			Position:           idx,
+			IsDefault:          d.isDefault,
+			CanBeDeleted:       d.canDelete,
+		}
+	}
+	if err := tx.Create(&items).Error; err != nil {
+		return err
+	}
+	// GORM Create skips zero-value bools (false), so the columns get the
+	// `default:` value from the column definition rather than what we set.
+	// Force-update the false-valued bools after the insert so they hold.
+	for _, item := range items {
+		if !item.IsDefault {
+			if err := tx.Model(&TaskStatus{}).Where("id = ?", item.ID).Update("is_default", false).Error; err != nil {
+				return err
+			}
+		}
+		if !item.CanBeDeleted {
+			if err := tx.Model(&TaskStatus{}).Where("id = ?", item.ID).Update("can_be_deleted", false).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

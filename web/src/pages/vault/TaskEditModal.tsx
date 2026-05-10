@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { VaultTask, Contact } from "@/api";
-import { TASK_STATUSES, type TaskStatus, normalizeTaskStatus } from "@/utils/taskStatus";
+import { useTaskStatuses, defaultStatusSlug, type TaskStatus } from "@/utils/taskStatus";
 
 const TASK_QUERY_KEY = (vaultId: string) => ["vaults", vaultId, "all-tasks"];
 
@@ -13,9 +13,12 @@ interface TaskEditModalProps {
   open: boolean;
   // null = create mode; set = edit mode
   task: VaultTask | null;
-  // Default status when creating (column the "+" came from). Ignored in edit
-  // mode (the form's Status select is the source of truth there).
-  defaultStatus?: TaskStatus;
+  // Default status slug when creating (column the "+" came from). Ignored
+  // in edit mode (the form's Status select is the source of truth there).
+  defaultStatus?: string;
+  // Optional: pass through the parent's already-fetched status list to
+  // avoid a duplicate query. The hook below falls back to its own fetch.
+  statuses?: TaskStatus[];
   onClose: () => void;
 }
 
@@ -23,7 +26,7 @@ interface FormValues {
   label: string;
   description?: string;
   contact_id?: string;
-  status?: TaskStatus;
+  status?: string;
 }
 
 /**
@@ -38,7 +41,8 @@ export default function TaskEditModal({
   vaultId,
   open,
   task,
-  defaultStatus = "todo",
+  defaultStatus,
+  statuses: statusesProp,
   onClose,
 }: TaskEditModalProps) {
   const { t } = useTranslation();
@@ -46,7 +50,13 @@ export default function TaskEditModal({
   const queryClient = useQueryClient();
   const [form] = Form.useForm<FormValues>();
 
+  // Fetch our own copy if the parent didn't pass one. Both call sites share
+  // the same queryKey so the cache is reused; this is just a fallback.
+  const { data: ownStatuses = [] } = useTaskStatuses();
+  const statuses = statusesProp && statusesProp.length > 0 ? statusesProp : ownStatuses;
+
   const isEdit = task !== null;
+  const fallbackSlug = defaultStatus ?? defaultStatusSlug(statuses);
 
   // Reseed form whenever the modal opens or the task changes
   useEffect(() => {
@@ -56,13 +66,13 @@ export default function TaskEditModal({
         label: task.label ?? "",
         description: task.description ?? "",
         contact_id: task.contact_id || undefined,
-        status: normalizeTaskStatus(task.status),
+        status: task.status || fallbackSlug,
       });
     } else {
       form.resetFields();
-      form.setFieldsValue({ status: defaultStatus });
+      form.setFieldsValue({ status: fallbackSlug });
     }
-  }, [open, task, isEdit, defaultStatus, form]);
+  }, [open, task, isEdit, fallbackSlug, form]);
 
   // Only fetch contacts when modal is open — no point pre-fetching
   const { data: contacts = [] } = useQuery({
@@ -87,7 +97,7 @@ export default function TaskEditModal({
         label: values.label,
         description: values.description ?? "",
         contact_id: values.contact_id ?? "",
-        status: values.status ?? defaultStatus,
+        status: values.status ?? fallbackSlug,
       }),
     onSuccess,
     onError,
@@ -99,7 +109,7 @@ export default function TaskEditModal({
         label: values.label,
         description: values.description ?? "",
         contact_id: values.contact_id ?? "",
-        status: values.status ?? defaultStatus,
+        status: values.status ?? fallbackSlug,
       }),
     onSuccess,
     onError,
@@ -140,9 +150,9 @@ export default function TaskEditModal({
         {isEdit && (
           <Form.Item name="status" label={t("vault.tasks.status_label")}>
             <Select
-              options={TASK_STATUSES.map((s) => ({
-                value: s,
-                label: t(`vault.tasks.col_${s}`),
+              options={statuses.map((s) => ({
+                value: s.slug,
+                label: s.label,
               }))}
             />
           </Form.Item>

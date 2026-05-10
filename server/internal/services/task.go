@@ -59,10 +59,10 @@ func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.Create
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
-	status := models.NormalizeTaskStatus(req.Status)
-	if req.Status != "" && !models.IsValidTaskStatus(req.Status) {
+	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
+	status := resolveTaskStatusOrDefault(s.db, req.Status, vaultID)
 	contactPtr := contactID
 	task := models.ContactTask{
 		VaultID:     vaultID,
@@ -91,7 +91,7 @@ func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateT
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
-	if req.Status != "" && !models.IsValidTaskStatus(req.Status) {
+	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
 	var task models.ContactTask
@@ -171,7 +171,7 @@ func toTaskResponse(t *models.ContactTask) dto.TaskResponse {
 		AuthorID:    ptrToStr(t.AuthorID),
 		Label:       t.Label,
 		Description: ptrToStr(t.Description),
-		Status:      models.NormalizeTaskStatus(t.Status),
+		Status:      t.Status,
 		Position:    t.Position,
 		Completed:   t.Completed,
 		CompletedAt: t.CompletedAt,

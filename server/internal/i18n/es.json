@@ -360,5 +360,11 @@
   "seed.life_event_types.got_fired": "Fue despedido/a",
   "seed.life_event_types.had_a_promotion": "Tuvo un ascenso",
   "seed.quick_facts.hobbies": "Aficiones",
-  "seed.quick_facts.food_preferences": "Preferencias alimenticias"
+  "seed.quick_facts.food_preferences": "Preferencias alimenticias",
+
+  "seed.task_statuses.todo": "Por hacer",
+  "seed.task_statuses.in_progress": "En progreso",
+  "seed.task_statuses.done": "Hecho",
+  "seed.task_statuses.blocked": "Bloqueado",
+  "seed.task_statuses.cancelled": "Cancelado"
 }

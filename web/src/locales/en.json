@@ -228,6 +228,7 @@
       "edit_task_modal_title": "Edit task",
       "save": "Save",
       "status_label": "Status",
+      "no_statuses_configured": "No task statuses configured. Add some in Settings → Personalize → Task statuses.",
       "new_task_label_placeholder": "What needs doing?",
       "new_task_description_placeholder": "Add details (optional)",
       "new_task_contact_optional": "Tied to a contact (optional)",

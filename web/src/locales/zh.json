@@ -228,6 +228,7 @@
       "edit_task_modal_title": "编辑任务",
       "save": "保存",
       "status_label": "状态",
+      "no_statuses_configured": "未配置任务状态。请前往「设置 → 个性化 → 任务状态」添加。",
       "new_task_label_placeholder": "需要做什么？",
       "new_task_description_placeholder": "补充说明（可选）",
       "new_task_contact_optional": "关联联系人（可选）",

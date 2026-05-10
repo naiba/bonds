@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Card, Tag, Typography, Button, Grid, theme } from "antd";
+import { Card, Tag, Typography, Button, Grid, Spin, theme } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import {
   DndContext,
@@ -21,7 +21,7 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { VaultTask } from "@/api";
 import { useDateFormat, formatShortDate } from "@/utils/dateFormat";
-import { TASK_STATUSES, type TaskStatus, normalizeTaskStatus } from "@/utils/taskStatus";
+import { useTaskStatuses, defaultStatusSlug, type TaskStatus } from "@/utils/taskStatus";
 import TaskEditModal from "./TaskEditModal";
 
 const { Text } = Typography;
@@ -32,34 +32,26 @@ const TASK_QUERY_KEY = (vaultId: string) => ["vaults", vaultId, "all-tasks"];
 interface TasksKanbanProps {
   vaultId: string;
   tasks: VaultTask[];
-  // External hook so the parent (VaultTasks) can use the same modal instance
-  // when a list-view row is clicked. When omitted, this component owns its
-  // modal state internally.
-  onTaskClick?: (task: VaultTask) => void;
 }
 
-export default function TasksKanban({ vaultId, tasks, onTaskClick }: TasksKanbanProps) {
+export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const queryClient = useQueryClient();
   const dateFormats = useDateFormat();
   const screens = useBreakpoint();
-  // Side-by-side + drag at lg breakpoint and up (≥992px). Below that we
-  // stack vertically and disable drag — drag-drop on touch fights with
-  // scroll, and 3 columns can't fit narrowly without text mangling.
   const isWide = !!screens.lg;
+
+  const { data: statuses = [], isLoading: loadingStatuses } = useTaskStatuses();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  // Internal modal state (used when no external onTaskClick provided)
-  const [internalModalOpen, setInternalModalOpen] = useState(false);
-  const [internalEditingTask, setInternalEditingTask] = useState<VaultTask | null>(null);
-  const [internalDefaultStatus, setInternalDefaultStatus] = useState<TaskStatus>("todo");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<VaultTask | null>(null);
+  const [defaultStatus, setDefaultStatus] = useState<string>("todo");
 
-  // Optimistic move via PATCH /position. setQueryData on onMutate so the UI
-  // feels instant, rollback + invalidate on error.
   const moveMutation = useMutation({
-    mutationFn: ({ id, position, status }: { id: number; position: number; status: TaskStatus }) =>
+    mutationFn: ({ id, position, status }: { id: number; position: number; status: string }) =>
       api.vaultTasks.tasksPositionPartialUpdate(vaultId, id, { position, status }),
     onMutate: async ({ id, position, status }) => {
       await queryClient.cancelQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
@@ -80,13 +72,20 @@ export default function TasksKanban({ vaultId, tasks, onTaskClick }: TasksKanban
     },
   });
 
+  // Bucket tasks by status slug. Tasks whose slug doesn't match any
+  // configured status get placed in the default column as a safety net
+  // (the cascade-delete on the server should prevent this from happening).
   const columns = useMemo(() => {
-    const grouped: Record<TaskStatus, VaultTask[]> = { todo: [], in_progress: [], done: [] };
+    const fallback = defaultStatusSlug(statuses);
+    const grouped: Record<string, VaultTask[]> = {};
+    for (const s of statuses) grouped[s.slug] = [];
     for (const task of tasks) {
-      grouped[normalizeTaskStatus(task.status)].push(task);
+      const slug = task.status && grouped[task.status] ? task.status : fallback;
+      if (!grouped[slug]) grouped[slug] = [];
+      grouped[slug].push(task);
     }
     return grouped;
-  }, [tasks]);
+  }, [statuses, tasks]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -96,60 +95,78 @@ export default function TasksKanban({ vaultId, tasks, onTaskClick }: TasksKanban
     if (!activeTask) return;
 
     const overId = String(over.id);
-    let destStatus: TaskStatus;
+    let destStatus: string;
     let destPosition: number;
 
     if (overId.startsWith("col:")) {
-      destStatus = overId.slice(4) as TaskStatus;
-      destPosition = columns[destStatus].length;
+      destStatus = overId.slice(4);
+      destPosition = (columns[destStatus] ?? []).length;
     } else {
       const overTask = tasks.find((t) => t.id === Number(overId));
       if (!overTask) return;
-      destStatus = normalizeTaskStatus(overTask.status);
-      destPosition = columns[destStatus].findIndex((t) => t.id === overTask.id);
-      if (destPosition < 0) destPosition = columns[destStatus].length;
+      destStatus = overTask.status ?? defaultStatusSlug(statuses);
+      const destColumn = columns[destStatus] ?? [];
+      destPosition = destColumn.findIndex((t) => t.id === overTask.id);
+      if (destPosition < 0) destPosition = destColumn.length;
     }
 
-    const srcStatus = normalizeTaskStatus(activeTask.status);
-    const srcPosition = columns[srcStatus].findIndex((t) => t.id === activeId);
+    const srcStatus = activeTask.status ?? defaultStatusSlug(statuses);
+    const srcPosition = (columns[srcStatus] ?? []).findIndex((t) => t.id === activeId);
     if (srcStatus === destStatus && srcPosition === destPosition) return;
 
     moveMutation.mutate({ id: activeId, position: destPosition, status: destStatus });
   };
 
-  const openInternalCreateModal = (status: TaskStatus) => {
-    setInternalEditingTask(null);
-    setInternalDefaultStatus(status);
-    setInternalModalOpen(true);
+  const openCreateModal = (slug: string) => {
+    setEditingTask(null);
+    setDefaultStatus(slug);
+    setModalOpen(true);
+  };
+  const openEditModal = (task: VaultTask) => {
+    setEditingTask(task);
+    setModalOpen(true);
   };
 
-  const openInternalEditModal = (task: VaultTask) => {
-    setInternalEditingTask(task);
-    setInternalModalOpen(true);
-  };
+  if (loadingStatuses) {
+    return (
+      <div style={{ textAlign: "center", padding: 40 }}>
+        <Spin />
+      </div>
+    );
+  }
 
-  // Card click handler — defer to parent if it's wired one up, else open
-  // our own modal.
-  const handleCardClick = onTaskClick ?? openInternalEditModal;
+  // No statuses configured (shouldn't happen post-seed, but guard anyway).
+  if (statuses.length === 0) {
+    return (
+      <div
+        style={{
+          padding: 40,
+          textAlign: "center",
+          color: token.colorTextSecondary,
+        }}
+      >
+        {t("vault.tasks.no_statuses_configured")}
+      </div>
+    );
+  }
 
   const columnGrid = isWide
-    ? { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16 }
+    ? { display: "grid", gridTemplateColumns: `repeat(${statuses.length}, minmax(0, 1fr))`, gap: 16 }
     : { display: "flex", flexDirection: "column" as const, gap: 16 };
 
   const renderColumns = () => (
     <div style={columnGrid}>
-      {TASK_STATUSES.map((status) => (
+      {statuses.map((status) => (
         <KanbanColumn
-          key={status}
+          key={status.slug}
           status={status}
-          title={t(`vault.tasks.col_${status}`)}
-          tasks={columns[status]}
+          tasks={columns[status.slug] ?? []}
           token={token}
           dateFormats={dateFormats}
           dueLabel={t("vault.tasks.due", { date: "" }).replace(/\s*$/, "")}
           emptyLabel={t("vault.tasks.empty_column")}
-          onAdd={() => openInternalCreateModal(status)}
-          onTaskClick={handleCardClick}
+          onAdd={() => openCreateModal(status.slug)}
+          onTaskClick={openEditModal}
           addLabel={t("vault.tasks.new_task")}
           interactive={isWide}
         />
@@ -167,23 +184,19 @@ export default function TasksKanban({ vaultId, tasks, onTaskClick }: TasksKanban
         renderColumns()
       )}
 
-      {/* Only mount our own modal if the parent isn't handling clicks */}
-      {!onTaskClick && (
-        <TaskEditModal
-          vaultId={vaultId}
-          open={internalModalOpen}
-          task={internalEditingTask}
-          defaultStatus={internalDefaultStatus}
-          onClose={() => setInternalModalOpen(false)}
-        />
-      )}
+      <TaskEditModal
+        vaultId={vaultId}
+        open={modalOpen}
+        task={editingTask}
+        defaultStatus={defaultStatus}
+        statuses={statuses}
+        onClose={() => setModalOpen(false)}
+      />
     </div>
   );
 }
 
-// Pure helper: move a task to (status, position) inside a flat task array.
-// Used by optimistic update in onMutate so the cache reflects the drop instantly.
-function reorderInCache(tasks: VaultTask[], id: number, status: TaskStatus, position: number): VaultTask[] {
+function reorderInCache(tasks: VaultTask[], id: number, status: string, position: number): VaultTask[] {
   const moved = tasks.find((t) => t.id === id);
   if (!moved) return tasks;
   const filtered = tasks.filter((t) => t.id !== id);
@@ -201,7 +214,6 @@ function reorderInCache(tasks: VaultTask[], id: number, status: TaskStatus, posi
 
 interface KanbanColumnProps {
   status: TaskStatus;
-  title: string;
   tasks: VaultTask[];
   token: ReturnType<typeof theme.useToken>["token"];
   dateFormats: ReturnType<typeof useDateFormat>;
@@ -210,17 +222,15 @@ interface KanbanColumnProps {
   addLabel: string;
   onAdd: () => void;
   onTaskClick: (task: VaultTask) => void;
-  // When false, render plain task cards (no drag/sort hooks). Used on
-  // narrow viewports where drag conflicts with touch scrolling.
   interactive: boolean;
 }
 
 function KanbanColumn(props: KanbanColumnProps) {
-  const { status, title, tasks, token, dateFormats, dueLabel, emptyLabel, addLabel, onAdd, onTaskClick, interactive } = props;
+  const { status, tasks, token, dateFormats, dueLabel, emptyLabel, addLabel, onAdd, onTaskClick, interactive } = props;
 
   return (
     <div
-      data-status={status}
+      data-status={status.slug}
       style={{
         background: token.colorFillQuaternary,
         borderRadius: token.borderRadiusLG,
@@ -233,13 +243,13 @@ function KanbanColumn(props: KanbanColumnProps) {
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Text strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          {title} <Text type="secondary" style={{ fontWeight: 400 }}>· {tasks.length}</Text>
+          {status.label} <Text type="secondary" style={{ fontWeight: 400 }}>· {tasks.length}</Text>
         </Text>
         <Button type="text" size="small" icon={<PlusOutlined />} onClick={onAdd} aria-label={addLabel} />
       </div>
 
       {interactive ? (
-        <DroppableColumnArea status={status} token={token} empty={tasks.length === 0} emptyLabel={emptyLabel}>
+        <DroppableColumnArea slug={status.slug} token={token} empty={tasks.length === 0} emptyLabel={emptyLabel}>
           <SortableContext items={tasks.map((t) => String(t.id))} strategy={verticalListSortingStrategy}>
             {tasks.map((task) => (
               <SortableTaskCard
@@ -276,13 +286,13 @@ function KanbanColumn(props: KanbanColumnProps) {
 }
 
 function DroppableColumnArea(props: {
-  status: TaskStatus;
+  slug: string;
   token: ReturnType<typeof theme.useToken>["token"];
   empty: boolean;
   emptyLabel: string;
   children: React.ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `col:${props.status}` });
+  const { setNodeRef, isOver } = useDroppable({ id: `col:${props.slug}` });
   return (
     <div
       ref={setNodeRef}
@@ -361,8 +371,6 @@ function SortableTaskCard(props: TaskCardCommonProps) {
     opacity: isDragging ? 0.5 : 1,
     cursor: "grab",
   };
-  // PointerSensor is configured with activationConstraint.distance:6 above —
-  // a stationary mousedown+up fires onClick normally without triggering drag.
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={props.onClick}>
       <TaskCardBody {...props} />
