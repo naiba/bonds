@@ -23,6 +23,7 @@ import type { VaultTask } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatShortDate } from "@/utils/dateFormat";
 import TasksKanban from "./TasksKanban";
+import TaskEditModal from "./TaskEditModal";
 
 const { Title } = Typography;
 
@@ -36,6 +37,10 @@ export default function VaultTasks() {
   const { token } = theme.useToken();
   const dateFormats = useDateFormat();
   const [view, setView] = useState<ViewMode>("list");
+
+  // Modal state owned by VaultTasks for the list view's row clicks. The
+  // kanban view has its own modal instance for "+ create" and card clicks.
+  const [editTask, setEditTask] = useState<VaultTask | null>(null);
 
   const { data: tasks = [], isLoading } = useQuery<VaultTask[]>({
     queryKey: ["vaults", vaultId, "all-tasks"],
@@ -57,15 +62,22 @@ export default function VaultTasks() {
   const pending = tasks.filter((t) => !t.completed);
   const completed = tasks.filter((t) => t.completed);
 
+  const stop = (e: React.MouseEvent | React.SyntheticEvent) => e.stopPropagation();
+
+  // Contact link in a row needs to navigate without triggering the row's
+  // edit-modal-open click. stopPropagation on the button click bubble.
   const renderContactLink = (task: VaultTask) =>
     task.contact_id && task.contact_name ? (
-      <div style={{ marginLeft: 24, marginTop: 4 }}>
+      <div style={{ marginLeft: 24, marginTop: 4 }} onClick={stop}>
         <Button
           type="link"
           size="small"
           icon={<UserOutlined />}
           style={{ padding: 0, height: "auto", fontSize: 12, color: token.colorTextSecondary }}
-          onClick={() => navigate(`/vaults/${vaultId}/contacts/${task.contact_id}`)}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/vaults/${vaultId}/contacts/${task.contact_id}`);
+          }}
         >
           {task.contact_name}
         </Button>
@@ -135,6 +147,7 @@ export default function VaultTasks() {
             }}
             renderItem={(task: VaultTask) => (
               <List.Item
+                onClick={() => setEditTask(task)}
                 style={{
                   borderLeft: `3px solid ${token.colorSuccess}`,
                   marginBottom: 4,
@@ -142,10 +155,15 @@ export default function VaultTasks() {
                   borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
                   background: token.colorFillQuaternary,
                   display: "block",
+                  cursor: "pointer",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Checkbox checked={false}>{task.label}</Checkbox>
+                  {/* Stop click on the checkbox itself from opening the modal —
+                      checkbox-toggle UX should be separate from edit. */}
+                  <span onClick={stop}>
+                    <Checkbox checked={false}>{task.label}</Checkbox>
+                  </span>
                   {task.due_at && (
                     <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
                       {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
@@ -188,6 +206,7 @@ export default function VaultTasks() {
                 dataSource={completed}
                 renderItem={(task: VaultTask) => (
                   <List.Item
+                    onClick={() => setEditTask(task)}
                     style={{
                       borderLeft: `3px solid ${token.colorBorder}`,
                       marginBottom: 4,
@@ -195,12 +214,15 @@ export default function VaultTasks() {
                       borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
                       opacity: 0.6,
                       display: "block",
+                      cursor: "pointer",
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <Checkbox checked style={{ textDecoration: "line-through" }}>
-                        {task.label}
-                      </Checkbox>
+                      <span onClick={stop}>
+                        <Checkbox checked style={{ textDecoration: "line-through" }}>
+                          {task.label}
+                        </Checkbox>
+                      </span>
                     </div>
                     {renderContactLink(task)}
                   </List.Item>
@@ -210,6 +232,13 @@ export default function VaultTasks() {
           )}
         </Card>
       )}
+
+      <TaskEditModal
+        vaultId={vaultId}
+        open={editTask !== null}
+        task={editTask}
+        onClose={() => setEditTask(null)}
+      />
     </div>
   );
 }
