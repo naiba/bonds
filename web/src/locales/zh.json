@@ -1001,6 +1001,7 @@
       "move_down": "下移",
       "post_templates": "文章模板",
       "group_types": "群组类型",
+      "task_statuses": "任务状态",
       "name_reverse": "反向关系名称",
       "degree": "亲等度数",
       "degree_tooltip": "用于亲等计算的距离权重，留空则不参与计算。",
