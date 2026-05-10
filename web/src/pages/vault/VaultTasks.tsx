@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -8,6 +9,7 @@ import {
   Tag,
   Spin,
   Divider,
+  Segmented,
   theme,
 } from "antd";
 import {
@@ -16,11 +18,14 @@ import {
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Task } from "@/api";
+import type { VaultTask } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatShortDate } from "@/utils/dateFormat";
+import TasksKanban from "./TasksKanban";
 
 const { Title } = Typography;
+
+type ViewMode = "list" | "kanban";
 
 export default function VaultTasks() {
   const { id } = useParams<{ id: string }>();
@@ -29,12 +34,13 @@ export default function VaultTasks() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const dateFormats = useDateFormat();
+  const [view, setView] = useState<ViewMode>("list");
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "all-tasks"],
     queryFn: async () => {
       const res = await api.vaultTasks.tasksList(String(vaultId));
-      return res.data ?? [];
+      return (res.data ?? []) as VaultTask[];
     },
     enabled: !!vaultId,
   });
@@ -47,12 +53,20 @@ export default function VaultTasks() {
     );
   }
 
-  const pending = tasks.filter((t: Task) => !t.completed);
-  const completed = tasks.filter((t: Task) => t.completed);
+  const pending = tasks.filter((t) => !t.completed);
+  const completed = tasks.filter((t) => t.completed);
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+    <div style={{ maxWidth: view === "kanban" ? 1200 : 720, margin: "0 auto" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 24,
+          flexWrap: "wrap",
+        }}
+      >
         <Button
           type="text"
           icon={<ArrowLeftOutlined />}
@@ -60,82 +74,115 @@ export default function VaultTasks() {
           style={{ color: token.colorTextSecondary }}
         />
         <CheckSquareOutlined style={{ fontSize: 20, color: token.colorPrimary }} />
-        <Title level={4} style={{ margin: 0 }}>{t("vault.tasks.title")}</Title>
+        <Title level={4} style={{ margin: 0, flex: 1 }}>
+          {t("vault.tasks.title")}
+        </Title>
+        <Segmented
+          value={view}
+          onChange={(v) => setView(v as ViewMode)}
+          options={[
+            { label: t("vault.tasks.view_list"), value: "list" },
+            { label: t("vault.tasks.view_kanban"), value: "kanban" },
+          ]}
+        />
       </div>
 
-      <Card
-        style={{
-          boxShadow: token.boxShadowTertiary,
-          borderRadius: token.borderRadiusLG,
-        }}
-      >
-        <List
-          dataSource={pending}
-          locale={{ emptyText: (
-            <div className="bonds-empty-hero">
-              <div className="bonds-empty-hero-icon" style={{ background: token.colorPrimaryBg }}>
-                <CheckSquareOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
-              </div>
-              <div className="bonds-empty-hero-title">{t("vault.tasks.no_pending")}</div>
-              <div className="bonds-empty-hero-desc" style={{ color: token.colorTextSecondary }}>{t("empty.tasks")}</div>
-            </div>
-          ) }}
-          renderItem={(task: Task) => (
-            <List.Item
-              style={{
-                borderLeft: `3px solid ${token.colorSuccess}`,
-                marginBottom: 4,
-                paddingLeft: 12,
-                borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
-                background: token.colorFillQuaternary,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                <Checkbox checked={false}>{task.label}</Checkbox>
-                {task.due_at && (
-                  <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
-                    {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
-                  </Tag>
-                )}
-              </div>
-            </List.Item>
-          )}
-        />
+      {view === "kanban" ? (
+        <TasksKanban vaultId={vaultId} tasks={tasks} />
+      ) : (
+        <Card
+          style={{
+            boxShadow: token.boxShadowTertiary,
+            borderRadius: token.borderRadiusLG,
+          }}
+        >
+          <List
+            dataSource={pending}
+            locale={{
+              emptyText: (
+                <div className="bonds-empty-hero">
+                  <div
+                    className="bonds-empty-hero-icon"
+                    style={{ background: token.colorPrimaryBg }}
+                  >
+                    <CheckSquareOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
+                  </div>
+                  <div className="bonds-empty-hero-title">{t("vault.tasks.no_pending")}</div>
+                  <div
+                    className="bonds-empty-hero-desc"
+                    style={{ color: token.colorTextSecondary }}
+                  >
+                    {t("empty.tasks")}
+                  </div>
+                </div>
+              ),
+            }}
+            renderItem={(task: VaultTask) => (
+              <List.Item
+                style={{
+                  borderLeft: `3px solid ${token.colorSuccess}`,
+                  marginBottom: 4,
+                  paddingLeft: 12,
+                  borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
+                  background: token.colorFillQuaternary,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <Checkbox checked={false}>{task.label}</Checkbox>
+                  {task.contact_name ? (
+                    <Tag color="blue" style={{ marginLeft: 8, borderRadius: 12 }}>
+                      {task.contact_name}
+                    </Tag>
+                  ) : !task.contact_id ? (
+                    <Tag style={{ marginLeft: 8, borderRadius: 12 }}>
+                      {t("vault.tasks.standalone")}
+                    </Tag>
+                  ) : null}
+                  {task.due_at && (
+                    <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
+                      {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
+                    </Tag>
+                  )}
+                </div>
+              </List.Item>
+            )}
+          />
 
-        {completed.length > 0 && (
-          <>
-            <Divider
-              orientationMargin={0}
-              plain
-              style={{
-                fontSize: 12,
-                color: token.colorTextSecondary,
-                borderColor: token.colorBorderSecondary,
-              }}
-            >
-              {t("vault.tasks.completed", { count: completed.length })}
-            </Divider>
-            <List
-              dataSource={completed}
-              renderItem={(task: Task) => (
-                <List.Item
-                  style={{
-                    borderLeft: `3px solid ${token.colorBorder}`,
-                    marginBottom: 4,
-                    paddingLeft: 12,
-                    borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
-                    opacity: 0.6,
-                  }}
-                >
-                  <Checkbox checked style={{ textDecoration: "line-through" }}>
-                    {task.label}
-                  </Checkbox>
-                </List.Item>
-              )}
-            />
-          </>
-        )}
-      </Card>
+          {completed.length > 0 && (
+            <>
+              <Divider
+                orientationMargin={0}
+                plain
+                style={{
+                  fontSize: 12,
+                  color: token.colorTextSecondary,
+                  borderColor: token.colorBorderSecondary,
+                }}
+              >
+                {t("vault.tasks.completed", { count: completed.length })}
+              </Divider>
+              <List
+                dataSource={completed}
+                renderItem={(task: VaultTask) => (
+                  <List.Item
+                    style={{
+                      borderLeft: `3px solid ${token.colorBorder}`,
+                      marginBottom: 4,
+                      paddingLeft: 12,
+                      borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
+                      opacity: 0.6,
+                    }}
+                  >
+                    <Checkbox checked style={{ textDecoration: "line-through" }}>
+                      {task.label}
+                    </Checkbox>
+                  </List.Item>
+                )}
+              />
+            </>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
