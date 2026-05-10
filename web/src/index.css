@@ -359,7 +359,15 @@ html[data-theme="dark"] .bonds-search-dropdown {
   font-family: 'Playfair Display', serif;
   font-size: 22px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  line-height: 1.3;
+}
+
+.bonds-empty-hero-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 360px;
+  margin: 0 auto 24px;
 }
 
 /* Scrollbar styling */
