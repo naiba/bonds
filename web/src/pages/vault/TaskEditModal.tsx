@@ -1,6 +1,8 @@
-import { Modal, Form, Input, Select, App, Button, Space } from "antd";
+import { Modal, Form, Input, Select, App, Button, Space, DatePicker, Popconfirm } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import dayjs, { type Dayjs } from "dayjs";
 import { api } from "@/api";
 import type { VaultTask, Contact } from "@/api";
 import { useTaskStatuses, defaultStatusSlug, type TaskStatus } from "@/utils/taskStatus";
@@ -26,6 +28,9 @@ interface FormValues {
   description?: string;
   contact_id?: string;
   status?: string;
+  // AntD DatePicker hands back a Dayjs (or null when cleared). The
+  // submit handler converts to ISO string for the API.
+  due_at?: Dayjs | null;
 }
 
 /**
@@ -104,8 +109,9 @@ function TaskEditModalContent({
         description: task.description ?? "",
         contact_id: task.contact_id || undefined,
         status: task.status || fallbackSlug,
+        due_at: task.due_at ? dayjs(task.due_at) : null,
       }
-    : { label: "", status: fallbackSlug };
+    : { label: "", status: fallbackSlug, due_at: null };
 
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", "for-task-modal"],
@@ -128,6 +134,7 @@ function TaskEditModalContent({
         description: values.description ?? "",
         contact_id: values.contact_id ?? "",
         status: values.status ?? fallbackSlug,
+        due_at: values.due_at ? values.due_at.toISOString() : undefined,
       }),
     onSuccess,
     onError,
@@ -140,12 +147,19 @@ function TaskEditModalContent({
         description: values.description ?? "",
         contact_id: values.contact_id ?? "",
         status: values.status ?? fallbackSlug,
+        due_at: values.due_at ? values.due_at.toISOString() : undefined,
       }),
     onSuccess,
     onError,
   });
 
-  const submitting = createMutation.isPending || updateMutation.isPending;
+  const deleteMutation = useMutation({
+    mutationFn: () => api.vaultTasks.tasksDelete(vaultId, task!.id!),
+    onSuccess,
+    onError,
+  });
+
+  const submitting = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
     <Form
@@ -192,13 +206,36 @@ function TaskEditModalContent({
           }))}
         />
       </Form.Item>
-      <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
-        <Space>
-          <Button onClick={onClose}>{t("vault.tasks.cancel")}</Button>
-          <Button type="primary" htmlType="submit" loading={submitting}>
-            {isEdit ? t("vault.tasks.save") : t("vault.tasks.create")}
-          </Button>
-        </Space>
+      <Form.Item name="due_at" label={t("vault.tasks.due_label")}>
+        <DatePicker
+          style={{ width: "100%" }}
+          showTime={{ format: "HH:mm" }}
+          format="YYYY-MM-DD HH:mm"
+          allowClear
+        />
+      </Form.Item>
+      <Form.Item style={{ marginBottom: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {isEdit ? (
+            <Popconfirm
+              title={t("vault.tasks.delete_confirm")}
+              onConfirm={() => deleteMutation.mutate()}
+              okButtonProps={{ danger: true }}
+            >
+              <Button danger icon={<DeleteOutlined />} loading={deleteMutation.isPending}>
+                {t("vault.tasks.delete")}
+              </Button>
+            </Popconfirm>
+          ) : (
+            <span />
+          )}
+          <Space>
+            <Button onClick={onClose}>{t("vault.tasks.cancel")}</Button>
+            <Button type="primary" htmlType="submit" loading={submitting}>
+              {isEdit ? t("vault.tasks.save") : t("vault.tasks.create")}
+            </Button>
+          </Space>
+        </div>
       </Form.Item>
     </Form>
   );

@@ -539,6 +539,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.GET("/tasks", vaultTaskHandler.List)
 	vaultScoped.POST("/tasks", vaultTaskHandler.Create, requireEditor)
 	vaultScoped.PATCH("/tasks/:id", vaultTaskHandler.Update, requireEditor)
+	vaultScoped.DELETE("/tasks/:id", vaultTaskHandler.Delete, requireEditor)
 	vaultScoped.PATCH("/tasks/:id/status", vaultTaskHandler.UpdateStatus, requireEditor)
 	vaultScoped.PATCH("/tasks/:id/position", vaultTaskHandler.UpdatePosition, requireEditor)
 

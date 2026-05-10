@@ -231,3 +231,33 @@ func (h *VaultTaskHandler) UpdatePosition(c echo.Context) error {
 	}
 	return response.OK(c, task)
 }
+
+// Delete godoc
+//
+//	@Summary		Delete a vault task
+//	@Description	Permanently delete a task. Both contact-attached and standalone tasks are removable through this endpoint.
+//	@Tags			vault-tasks
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path	string	true	"Vault ID"
+//	@Param			id			path	integer	true	"Task ID"
+//	@Success		204			"No Content"
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/tasks/{id} [delete]
+func (h *VaultTaskHandler) Delete(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_task_id", nil)
+	}
+	if err := h.vaultTaskService.Delete(uint(id), vaultID); err != nil {
+		if errors.Is(err, services.ErrTaskNotFound) {
+			return response.NotFound(c, "err.task_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_delete_task")
+	}
+	return response.NoContent(c)
+}
