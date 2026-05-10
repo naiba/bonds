@@ -83,7 +83,7 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { label: string; contact_id?: string; status: ColumnStatus }) =>
+    mutationFn: (values: { label: string; description?: string; contact_id?: string; status: ColumnStatus }) =>
       api.vaultTasks.tasksCreate(vaultId, values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
@@ -161,7 +161,6 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
               tasks={columns[status]}
               token={token}
               dateFormats={dateFormats}
-              standaloneLabel={t("vault.tasks.standalone")}
               dueLabel={t("vault.tasks.due", { date: "" }).replace(/\s*$/, "")}
               emptyLabel={t("vault.tasks.empty_column")}
               onAdd={() => openCreateModal(status)}
@@ -183,9 +182,10 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
         <Form
           form={form}
           layout="vertical"
-          onFinish={(values: { label: string; contact_id?: string }) =>
+          onFinish={(values: { label: string; description?: string; contact_id?: string }) =>
             createMutation.mutate({
               label: values.label,
+              description: values.description || undefined,
               contact_id: values.contact_id || undefined,
               status: modalStatus,
             })
@@ -193,6 +193,12 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
         >
           <Form.Item name="label" rules={[{ required: true }]}>
             <Input placeholder={t("vault.tasks.new_task_label_placeholder")} autoFocus />
+          </Form.Item>
+          <Form.Item name="description">
+            <Input.TextArea
+              placeholder={t("vault.tasks.new_task_description_placeholder")}
+              autoSize={{ minRows: 2, maxRows: 6 }}
+            />
           </Form.Item>
           <Form.Item name="contact_id" label={t("vault.tasks.new_task_contact_optional")}>
             <Select
@@ -236,7 +242,6 @@ interface KanbanColumnProps {
   tasks: VaultTask[];
   token: ReturnType<typeof theme.useToken>["token"];
   dateFormats: ReturnType<typeof useDateFormat>;
-  standaloneLabel: string;
   dueLabel: string;
   emptyLabel: string;
   addLabel: string;
@@ -244,7 +249,7 @@ interface KanbanColumnProps {
 }
 
 function KanbanColumn(props: KanbanColumnProps) {
-  const { status, title, tasks, token, dateFormats, standaloneLabel, dueLabel, emptyLabel, addLabel, onAdd } = props;
+  const { status, title, tasks, token, dateFormats, dueLabel, emptyLabel, addLabel, onAdd } = props;
   const taskIds = tasks.map((t) => String(t.id));
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
 
@@ -294,7 +299,6 @@ function KanbanColumn(props: KanbanColumnProps) {
                 task={task}
                 token={token}
                 dateFormats={dateFormats}
-                standaloneLabel={standaloneLabel}
                 dueLabel={dueLabel}
               />
             ))
@@ -309,11 +313,10 @@ interface SortableTaskCardProps {
   task: VaultTask;
   token: ReturnType<typeof theme.useToken>["token"];
   dateFormats: ReturnType<typeof useDateFormat>;
-  standaloneLabel: string;
   dueLabel: string;
 }
 
-function SortableTaskCard({ task, token, dateFormats, standaloneLabel, dueLabel }: SortableTaskCardProps) {
+function SortableTaskCard({ task, token, dateFormats, dueLabel }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: String(task.id),
   });
@@ -330,25 +333,23 @@ function SortableTaskCard({ task, token, dateFormats, standaloneLabel, dueLabel 
         styles={{ body: { padding: 12 } }}
         style={{ borderRadius: token.borderRadius }}
       >
-        <div style={{ fontWeight: 500, marginBottom: task.contact_id || task.due_at ? 6 : 0 }}>
+        <div style={{ fontWeight: 500, marginBottom: task.contact_name || task.due_at ? 6 : 0 }}>
           {task.label}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-          {task.contact_id ? (
-            task.contact_name ? (
+        {(task.contact_name || task.due_at) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+            {task.contact_id && task.contact_name && (
               <Tag color="blue" style={{ marginRight: 0 }}>
                 {task.contact_name}
               </Tag>
-            ) : null
-          ) : (
-            <Tag style={{ marginRight: 0 }}>{standaloneLabel}</Tag>
-          )}
-          {task.due_at && (
-            <Tag color="orange" style={{ marginRight: 0 }}>
-              {dueLabel} {formatShortDate(task.due_at, dateFormats)}
-            </Tag>
-          )}
-        </div>
+            )}
+            {task.due_at && (
+              <Tag color="orange" style={{ marginRight: 0 }}>
+                {dueLabel} {formatShortDate(task.due_at, dateFormats)}
+              </Tag>
+            )}
+          </div>
+        )}
       </Card>
     </div>
   );

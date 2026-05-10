@@ -226,6 +226,7 @@
       "new_task": "New task",
       "new_task_modal_title": "Create task",
       "new_task_label_placeholder": "What needs doing?",
+      "new_task_description_placeholder": "Add details (optional)",
       "new_task_contact_optional": "Tied to a contact (optional)",
       "new_task_no_contact": "No contact (standalone)",
       "create": "Create",
