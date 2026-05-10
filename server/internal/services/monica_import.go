@@ -373,7 +373,7 @@ func (s *MonicaImportService) importContactSubResources(
 ) {
 	s.importNotes(tx, mc, contactID, vaultID, userID, resp)
 	s.importCalls(tx, mc, contactID, userID, resp)
-	s.importTasks(tx, mc, contactID, userID, resp)
+	s.importTasks(tx, mc, contactID, vaultID, userID, resp)
 	s.importReminders(tx, mc, contactID, resp)
 	s.importAddresses(tx, mc, contactID, vaultID, accountID, resp)
 	s.importContactFields(tx, mc, contactID, accountID, fieldTypeByUUID, resp)
@@ -463,7 +463,7 @@ func (s *MonicaImportService) importCalls(
 }
 
 func (s *MonicaImportService) importTasks(
-	tx *gorm.DB, mc *MonicaContact, contactID, userID string,
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, userID string,
 	resp *dto.MonicaImportResponse,
 ) {
 	for _, raw := range getCollectionByType(mc.Data, "tasks") {
@@ -471,8 +471,10 @@ func (s *MonicaImportService) importTasks(
 		if err := json.Unmarshal(raw, &mt); err != nil {
 			continue
 		}
+		cid := contactID
 		task := models.ContactTask{
-			ContactID:  contactID,
+			VaultID:    vaultID,
+			ContactID:  &cid,
 			Label:      mt.Properties.Title,
 			AuthorID:   &userID,
 			AuthorName: "Monica Import",
