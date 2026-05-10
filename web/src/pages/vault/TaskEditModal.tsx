@@ -1,4 +1,4 @@
-import { Modal, Form, Input, Select, App } from "antd";
+import { Modal, Form, Input, Select, App, Button, Space } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
@@ -29,40 +29,75 @@ interface FormValues {
 }
 
 /**
- * Shared modal for both creating and editing vault tasks.
- *
- * Mounted by both VaultTasks (list view) and TasksKanban (kanban view).
- * Fully self-contained: owns its form, contacts query, and mutations.
- * Parent only manages open/close state and which task (or null) is being
- * edited.
+ * Outer wrapper. Owns the Modal chrome and a key on the inner content so
+ * each (task, open) transition mounts a brand-new TaskEditModalContent
+ * with its own Form.useForm() instance. Without this, switching from
+ * editing task A to task B caused B's initialValues to be ignored
+ * because the shared form instance still held A's values.
  */
 export default function TaskEditModal({
   vaultId,
   open,
   task,
   defaultStatus,
-  statuses: statusesProp,
+  statuses,
   onClose,
 }: TaskEditModalProps) {
+  const { t } = useTranslation();
+  return (
+    <Modal
+      title={
+        task !== null
+          ? t("vault.tasks.edit_task_modal_title")
+          : t("vault.tasks.new_task_modal_title")
+      }
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      destroyOnHidden
+    >
+      {open && (
+        <TaskEditModalContent
+          key={task?.id ?? "create"}
+          vaultId={vaultId}
+          task={task}
+          defaultStatus={defaultStatus}
+          statusesProp={statuses}
+          onClose={onClose}
+        />
+      )}
+    </Modal>
+  );
+}
+
+interface ContentProps {
+  vaultId: string;
+  task: VaultTask | null;
+  defaultStatus?: string;
+  statusesProp?: TaskStatus[];
+  onClose: () => void;
+}
+
+function TaskEditModalContent({
+  vaultId,
+  task,
+  defaultStatus,
+  statusesProp,
+  onClose,
+}: ContentProps) {
   const { t } = useTranslation();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<FormValues>();
 
-  // Fetch our own copy if the parent didn't pass one. Both call sites share
-  // the same queryKey so the cache is reused; this is just a fallback.
   const { data: ownStatuses = [] } = useTaskStatuses();
   const statuses = statusesProp && statusesProp.length > 0 ? statusesProp : ownStatuses;
 
   const isEdit = task !== null;
   const fallbackSlug = defaultStatus ?? defaultStatusSlug(statuses);
 
-  // Build initialValues from the task (or empty defaults for create mode).
-  // Used together with a `key` prop on the Form below so that switching
-  // between tasks remounts the Form with the right initial values — more
-  // reliable than setFieldsValue in a useEffect, which races with the
-  // Form's internal field registration when destroyOnHidden destroys and
-  // re-mounts the form on every open.
+  // initialValues are applied on first (and only) mount of this component;
+  // the parent ensures a fresh mount per task via its `key` prop.
   const initialValues: FormValues = isEdit && task
     ? {
         label: task.label ?? "",
@@ -71,25 +106,18 @@ export default function TaskEditModal({
         status: task.status || fallbackSlug,
       }
     : { label: "", status: fallbackSlug };
-  // Stable key per "edit session": new key whenever modal reopens with a
-  // different task (or transitions create<->edit). The form remounts
-  // cleanly each time.
-  const formKey = `${task?.id ?? "create"}-${open ? "open" : "closed"}`;
 
-  // Only fetch contacts when modal is open — no point pre-fetching
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", "for-task-modal"],
     queryFn: async () => {
       const res = await api.contacts.contactsList(String(vaultId), { per_page: 200 });
       return (res.data ?? []) as Contact[];
     },
-    enabled: open,
   });
 
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
     onClose();
-    form.resetFields();
   };
   const onError = () => message.error(t("vault.tasks.save_failed"));
 
@@ -117,71 +145,61 @@ export default function TaskEditModal({
     onError,
   });
 
+  const submitting = createMutation.isPending || updateMutation.isPending;
+
   return (
-    <Modal
-      title={
-        isEdit
-          ? t("vault.tasks.edit_task_modal_title")
-          : t("vault.tasks.new_task_modal_title")
-      }
-      open={open}
-      onCancel={onClose}
-      onOk={() => form.submit()}
-      confirmLoading={createMutation.isPending || updateMutation.isPending}
-      okText={isEdit ? t("vault.tasks.save") : t("vault.tasks.create")}
-      cancelText={t("vault.tasks.cancel")}
-      destroyOnHidden
+    <Form
+      form={form}
+      layout="vertical"
+      initialValues={initialValues}
+      onFinish={(values) => {
+        if (isEdit) updateMutation.mutate(values);
+        else createMutation.mutate(values);
+      }}
+      onFinishFailed={({ errorFields }) => {
+        const first = errorFields[0]?.errors?.[0];
+        if (first) message.error(first);
+      }}
     >
-      <Form
-        key={formKey}
-        form={form}
-        layout="vertical"
-        initialValues={initialValues}
-        onFinish={(values) => {
-          if (isEdit) updateMutation.mutate(values);
-          else createMutation.mutate(values);
-        }}
-        onFinishFailed={({ errorFields }) => {
-          // Surface validation failures so users see *why* nothing happened
-          // instead of a silent dead Save button.
-          if (errorFields.length > 0) {
-            const first = errorFields[0]?.errors?.[0];
-            if (first) message.error(first);
-          }
-        }}
-      >
-        <Form.Item name="label" rules={[{ required: true }]}>
-          <Input placeholder={t("vault.tasks.new_task_label_placeholder")} autoFocus />
-        </Form.Item>
-        <Form.Item name="description">
-          <Input.TextArea
-            placeholder={t("vault.tasks.new_task_description_placeholder")}
-            autoSize={{ minRows: 2, maxRows: 6 }}
-          />
-        </Form.Item>
-        {isEdit && (
-          <Form.Item name="status" label={t("vault.tasks.status_label")}>
-            <Select
-              options={statuses.map((s) => ({
-                value: s.slug,
-                label: s.label,
-              }))}
-            />
-          </Form.Item>
-        )}
-        <Form.Item name="contact_id" label={t("vault.tasks.new_task_contact_optional")}>
+      <Form.Item name="label" rules={[{ required: true }]}>
+        <Input placeholder={t("vault.tasks.new_task_label_placeholder")} autoFocus />
+      </Form.Item>
+      <Form.Item name="description">
+        <Input.TextArea
+          placeholder={t("vault.tasks.new_task_description_placeholder")}
+          autoSize={{ minRows: 2, maxRows: 6 }}
+        />
+      </Form.Item>
+      {isEdit && (
+        <Form.Item name="status" label={t("vault.tasks.status_label")}>
           <Select
-            allowClear
-            placeholder={t("vault.tasks.new_task_no_contact")}
-            showSearch
-            optionFilterProp="label"
-            options={contacts.map((c) => ({
-              value: c.id,
-              label: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.id,
+            options={statuses.map((s) => ({
+              value: s.slug,
+              label: s.label,
             }))}
           />
         </Form.Item>
-      </Form>
-    </Modal>
+      )}
+      <Form.Item name="contact_id" label={t("vault.tasks.new_task_contact_optional")}>
+        <Select
+          allowClear
+          placeholder={t("vault.tasks.new_task_no_contact")}
+          showSearch
+          optionFilterProp="label"
+          options={contacts.map((c) => ({
+            value: c.id,
+            label: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.id,
+          }))}
+        />
+      </Form.Item>
+      <Form.Item style={{ marginBottom: 0, textAlign: "right" }}>
+        <Space>
+          <Button onClick={onClose}>{t("vault.tasks.cancel")}</Button>
+          <Button type="primary" htmlType="submit" loading={submitting}>
+            {isEdit ? t("vault.tasks.save") : t("vault.tasks.create")}
+          </Button>
+        </Space>
+      </Form.Item>
+    </Form>
   );
 }
