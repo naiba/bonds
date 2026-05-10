@@ -242,7 +242,7 @@ function KanbanColumn(props: KanbanColumnProps) {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Text strong style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        <Text strong style={{ fontSize: 13 }}>
           {status.label} <Text type="secondary" style={{ fontWeight: 400 }}>· {tasks.length}</Text>
         </Text>
         <Button type="text" size="small" icon={<PlusOutlined />} onClick={onAdd} aria-label={addLabel} />
