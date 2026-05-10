@@ -338,8 +338,10 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		return nil, webdav.NewHTTPError(http.StatusBadRequest, fmt.Errorf("no contacts in vault"))
 	}
 
+	contactID := contact.ID
 	task := models.ContactTask{
-		ContactID:  contact.ID,
+		VaultID:    vaultID,
+		ContactID:  &contactID,
 		AuthorID:   &userID,
 		UUID:       &uid,
 		Label:      summary,

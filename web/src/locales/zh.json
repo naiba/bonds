@@ -217,7 +217,22 @@
       "back": "返回保险库",
       "no_pending": "暂无待办任务",
       "completed": "已完成 ({{count}})",
-      "due": "截止 {{date}}"
+      "due": "截止 {{date}}",
+      "view_list": "列表",
+      "view_kanban": "看板",
+      "col_todo": "待办",
+      "col_in_progress": "进行中",
+      "col_done": "已完成",
+      "new_task": "新建任务",
+      "new_task_modal_title": "创建任务",
+      "new_task_label_placeholder": "需要做什么？",
+      "new_task_contact_optional": "关联联系人（可选）",
+      "new_task_no_contact": "无联系人（独立任务）",
+      "create": "创建",
+      "cancel": "取消",
+      "empty_column": "拖放任务到此处",
+      "standalone": "独立",
+      "save_failed": "保存失败"
     },
     "feed": {
       "title": "动态",

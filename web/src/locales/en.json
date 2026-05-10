@@ -217,7 +217,22 @@
       "back": "Back to vault",
       "no_pending": "No pending tasks",
       "completed": "Completed ({{count}})",
-      "due": "Due {{date}}"
+      "due": "Due {{date}}",
+      "view_list": "List",
+      "view_kanban": "Kanban",
+      "col_todo": "Todo",
+      "col_in_progress": "In progress",
+      "col_done": "Done",
+      "new_task": "New task",
+      "new_task_modal_title": "Create task",
+      "new_task_label_placeholder": "What needs doing?",
+      "new_task_contact_optional": "Tied to a contact (optional)",
+      "new_task_no_contact": "No contact (standalone)",
+      "create": "Create",
+      "cancel": "Cancel",
+      "empty_column": "Drop tasks here",
+      "standalone": "Standalone",
+      "save_failed": "Could not save"
     },
     "feed": {
       "title": "Activity Feed",
