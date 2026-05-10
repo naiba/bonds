@@ -890,7 +890,7 @@ function AvatarImageLoader({
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
       ) : (
-        <span style={{ fontSize: 30, color: "#fff", fontWeight: 500 }}>
+        <span style={{ fontSize: 30, color: token.colorTextLightSolid, fontWeight: 500 }}>
           {initials}
         </span>
       )}
@@ -925,8 +925,8 @@ function AvatarImageLoader({
             >
               <Button
                 type="text"
-                icon={<CameraOutlined style={{ color: "#fff", fontSize: 20 }} />}
-                style={{ color: "#fff" }}
+                icon={<CameraOutlined style={{ color: token.colorTextLightSolid, fontSize: 20 }} />}
+                style={{ color: token.colorTextLightSolid }}
               />
             </Upload>
             {hasAvatar && (
@@ -936,7 +936,7 @@ function AvatarImageLoader({
               >
                  <Button
                   type="text"
-                  icon={<DeleteOutlined style={{ color: "#fff", fontSize: 16 }} />}
+                  icon={<DeleteOutlined style={{ color: token.colorTextLightSolid, fontSize: 16 }} />}
                   danger
                 />
               </Popconfirm>

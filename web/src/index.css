@@ -141,6 +141,12 @@ html[data-theme="dark"] .ant-list-item:hover {
   opacity: 1;
 }
 
+/* Dark mode: the same gradient sinks into the dark card bg. Use the
+   lighter shade range so the accent stays visible. */
+html[data-theme="dark"] .bonds-vault-card::before {
+  background: linear-gradient(90deg, #7ec496, #aed4b8);
+}
+
 /* Buttons with distinct character */
 .ant-btn {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -161,6 +167,18 @@ html[data-theme="dark"] .ant-list-item:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(74, 124, 89, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.2) inset !important;
   background: linear-gradient(135deg, #568f66, #427553) !important;
+}
+
+/* Dark mode: lift the gradient one stop so the button doesn't sink into
+   a dark container. Same lighter green the focus ring already adopts. */
+html[data-theme="dark"] .ant-btn-primary {
+  background: linear-gradient(135deg, #5e9b73, #4a7c59) !important;
+  box-shadow: 0 4px 12px rgba(126, 196, 150, 0.25) !important;
+}
+
+html[data-theme="dark"] .ant-btn-primary:not(:disabled):hover {
+  background: linear-gradient(135deg, #7ec496, #5e9b73) !important;
+  box-shadow: 0 6px 16px rgba(126, 196, 150, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.15) inset !important;
 }
 
 /* Beautiful tag design */
@@ -392,15 +410,18 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.22);
 }
 
-/* Inputs & Form */
+/* Inputs & Form
+   Solid backgrounds (vs. the previous semi-transparent + backdrop-filter
+   treatment). The frosted-glass look made placeholder text fight the
+   layout's noise/grid texture and read as muddy in both modes; opaque
+   bg keeps inputs crisp. Focus state below restores the brand accent. */
 .ant-input, .ant-input-password, .ant-select-selector {
   border-color: rgba(0,0,0,0.1) !important;
-  background-color: rgba(255,255,255,0.7) !important;
-  backdrop-filter: blur(4px);
+  background-color: #ffffff !important;
 }
 html[data-theme="dark"] .ant-input, html[data-theme="dark"] .ant-input-password, html[data-theme="dark"] .ant-select-selector {
   border-color: rgba(255,255,255,0.1) !important;
-  background-color: rgba(0,0,0,0.2) !important;
+  background-color: #1a1e1b !important;
 }
 
 .ant-input:focus, .ant-input-focused, .ant-select-focused .ant-select-selector {
