@@ -410,6 +410,8 @@ html[data-theme="dark"] .ant-input, html[data-theme="dark"] .ant-input-password,
 }
 
 html[data-theme="dark"] .ant-input:focus, html[data-theme="dark"] .ant-input-focused, html[data-theme="dark"] .ant-select-focused .ant-select-selector {
+  border-color: #7ec496 !important;
+  box-shadow: 0 0 0 3px rgba(126, 196, 150, 0.25) !important;
   background-color: #1a1e1b !important;
 }
 
