@@ -129,15 +129,6 @@ export default function VaultTasks() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
                   <Checkbox checked={false}>{task.label}</Checkbox>
-                  {task.contact_name ? (
-                    <Tag color="blue" style={{ marginLeft: 8, borderRadius: 12 }}>
-                      {task.contact_name}
-                    </Tag>
-                  ) : !task.contact_id ? (
-                    <Tag style={{ marginLeft: 8, borderRadius: 12 }}>
-                      {t("vault.tasks.standalone")}
-                    </Tag>
-                  ) : null}
                   {task.due_at && (
                     <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
                       {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}

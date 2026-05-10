@@ -226,6 +226,7 @@
       "new_task": "新建任务",
       "new_task_modal_title": "创建任务",
       "new_task_label_placeholder": "需要做什么？",
+      "new_task_description_placeholder": "补充说明（可选）",
       "new_task_contact_optional": "关联联系人（可选）",
       "new_task_no_contact": "无联系人（独立任务）",
       "create": "创建",
