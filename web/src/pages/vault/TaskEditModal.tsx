@@ -12,13 +12,8 @@ const TASK_QUERY_KEY = (vaultId: string) => ["vaults", vaultId, "all-tasks"];
 interface TaskEditModalProps {
   vaultId: string;
   open: boolean;
-  // null = create mode; set = edit mode
   task: VaultTask | null;
-  // Default status slug when creating (column the "+" came from). Ignored
-  // in edit mode (the form's Status select is the source of truth there).
   defaultStatus?: string;
-  // Optional: pass through the parent's already-fetched status list to
-  // avoid a duplicate query. The hook below falls back to its own fetch.
   statuses?: TaskStatus[];
   onClose: () => void;
 }
@@ -26,20 +21,12 @@ interface TaskEditModalProps {
 interface FormValues {
   label: string;
   description?: string;
-  contact_id?: string;
+  contact_ids?: string[];
+  parent_task_id?: number | null;
   status?: string;
-  // AntD DatePicker hands back a Dayjs (or null when cleared). The
-  // submit handler converts to ISO string for the API.
   due_at?: Dayjs | null;
 }
 
-/**
- * Outer wrapper. Owns the Modal chrome and a key on the inner content so
- * each (task, open) transition mounts a brand-new TaskEditModalContent
- * with its own Form.useForm() instance. Without this, switching from
- * editing task A to task B caused B's initialValues to be ignored
- * because the shared form instance still held A's values.
- */
 export default function TaskEditModal({
   vaultId,
   open,
@@ -101,17 +88,16 @@ function TaskEditModalContent({
   const isEdit = task !== null;
   const fallbackSlug = defaultStatus ?? defaultStatusSlug(statuses);
 
-  // initialValues are applied on first (and only) mount of this component;
-  // the parent ensures a fresh mount per task via its `key` prop.
   const initialValues: FormValues = isEdit && task
     ? {
         label: task.label ?? "",
         description: task.description ?? "",
-        contact_id: task.contact_id || undefined,
+        contact_ids: (task.contacts ?? []).map((c) => c.id!).filter(Boolean),
+        parent_task_id: task.parent_task_id ?? null,
         status: task.status || fallbackSlug,
         due_at: task.due_at ? dayjs(task.due_at) : null,
       }
-    : { label: "", status: fallbackSlug, due_at: null };
+    : { label: "", contact_ids: [], parent_task_id: null, status: fallbackSlug, due_at: null };
 
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", "for-task-modal"],
@@ -120,6 +106,19 @@ function TaskEditModalContent({
       return (res.data ?? []) as Contact[];
     },
   });
+
+  // Parent-task candidates: every top-level task in this vault, excluding
+  // this task itself (a task can't be its own parent).
+  const { data: allTasks = [] } = useQuery({
+    queryKey: TASK_QUERY_KEY(vaultId),
+    queryFn: async () => {
+      const res = await api.vaultTasks.tasksList(vaultId, {});
+      return (res.data ?? []) as VaultTask[];
+    },
+  });
+  const parentOptions = allTasks
+    .filter((t) => !t.parent_task_id && t.id !== task?.id)
+    .map((t) => ({ value: t.id, label: t.label }));
 
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
@@ -132,7 +131,8 @@ function TaskEditModalContent({
       api.vaultTasks.tasksCreate(vaultId, {
         label: values.label,
         description: values.description ?? "",
-        contact_id: values.contact_id ?? "",
+        contact_ids: values.contact_ids ?? [],
+        parent_task_id: values.parent_task_id ?? undefined,
         status: values.status ?? fallbackSlug,
         due_at: values.due_at ? values.due_at.toISOString() : undefined,
       }),
@@ -145,7 +145,8 @@ function TaskEditModalContent({
       api.vaultTasks.tasksPartialUpdate(vaultId, task!.id!, {
         label: values.label,
         description: values.description ?? "",
-        contact_id: values.contact_id ?? "",
+        contact_ids: values.contact_ids ?? [],
+        parent_task_id: values.parent_task_id ?? undefined,
         status: values.status ?? fallbackSlug,
         due_at: values.due_at ? values.due_at.toISOString() : undefined,
       }),
@@ -194,16 +195,26 @@ function TaskEditModalContent({
           />
         </Form.Item>
       )}
-      <Form.Item name="contact_id" label={t("vault.tasks.new_task_contact_optional")}>
+      <Form.Item name="contact_ids" label={t("vault.tasks.contacts_label")}>
         <Select
+          mode="multiple"
           allowClear
-          placeholder={t("vault.tasks.new_task_no_contact")}
+          placeholder={t("vault.tasks.no_contacts_placeholder")}
           showSearch
           optionFilterProp="label"
           options={contacts.map((c) => ({
             value: c.id,
             label: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.id,
           }))}
+        />
+      </Form.Item>
+      <Form.Item name="parent_task_id" label={t("vault.tasks.parent_label")}>
+        <Select
+          allowClear
+          placeholder={t("vault.tasks.no_parent_placeholder")}
+          showSearch
+          optionFilterProp="label"
+          options={parentOptions}
         />
       </Form.Item>
       <Form.Item name="due_at" label={t("vault.tasks.due_label")}>

@@ -190,7 +190,6 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 			&models.ContactInformation{},
 			&models.ContactImportantDate{},
 			&models.ContactReminder{},
-			&models.ContactTask{},
 			&models.ContactFeedItem{},
 			&models.Call{},
 			&models.Pet{},
@@ -305,6 +304,19 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 		tx.Where("address_book_subscription_id IN ?", subIDs).Delete(&models.DavSyncLog{})
 		tx.Where("address_book_subscription_id IN ?", subIDs).Delete(&models.ContactSubscriptionState{})
 		tx.Where("id IN ?", subIDs).Delete(&models.AddressBookSubscription{})
+	}
+
+	// ContactTask cascade: TaskContact pivot rows must go first since they
+	// reference the task by FK, then the tasks themselves.
+	var taskIDs []uint
+	tx.Model(&models.ContactTask{}).Where("vault_id = ?", vaultID).Pluck("id", &taskIDs)
+	if len(taskIDs) > 0 {
+		if err := tx.Where("contact_task_id IN ?", taskIDs).Delete(&models.TaskContact{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Unscoped().Where("id IN ?", taskIDs).Delete(&models.ContactTask{}).Error; err != nil {
+			return err
+		}
 	}
 
 	// --- Simple vault-level tables (no children of their own, or children already deleted) ---

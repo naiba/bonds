@@ -69,6 +69,7 @@ func main() {
 
 	migrateUploadDir(cfg.Storage.UploadDir)
 	migrateModulesToContactPage(db)
+	migrateContactTasksToManyToMany(db)
 	services.BackfillImportantDateReminderSchedules(db)
 	if err := models.BackfillTaskStatuses(db); err != nil {
 		log.Printf("WARNING: failed to backfill task statuses: %v", err)
@@ -187,6 +188,36 @@ func migrateModulesToContactPage(db *gorm.DB) {
 	if result.RowsAffected > 0 {
 		log.Printf("Migrated %d module-page bindings from 'social' to 'contact' page", result.RowsAffected)
 	}
+}
+
+// migrateContactTasksToManyToMany copies any pre-existing single contact_id
+// values from contact_tasks into the new task_contacts pivot, then drops the
+// old column. Idempotent: a no-op once the column is gone.
+func migrateContactTasksToManyToMany(db *gorm.DB) {
+	m := db.Migrator()
+	if !m.HasColumn(&models.ContactTask{}, "contact_id") {
+		return
+	}
+
+	copied := db.Exec(`
+		INSERT INTO task_contacts (contact_task_id, contact_id, created_at, updated_at)
+		SELECT id, contact_id, COALESCE(created_at, CURRENT_TIMESTAMP), COALESCE(updated_at, CURRENT_TIMESTAMP)
+		FROM contact_tasks
+		WHERE contact_id IS NOT NULL AND contact_id <> ''
+		  AND NOT EXISTS (
+		    SELECT 1 FROM task_contacts tc
+		    WHERE tc.contact_task_id = contact_tasks.id AND tc.contact_id = contact_tasks.contact_id
+		  )
+	`)
+	if copied.Error != nil {
+		log.Printf("WARNING: failed to copy contact_tasks.contact_id into task_contacts: %v", copied.Error)
+		return
+	}
+	if err := m.DropColumn(&models.ContactTask{}, "contact_id"); err != nil {
+		log.Printf("WARNING: failed to drop contact_tasks.contact_id: %v", err)
+		return
+	}
+	log.Printf("Migrated %d contact_tasks.contact_id rows into task_contacts; dropped legacy column", copied.RowsAffected)
 }
 
 func migrateUploadDir(currentDir string) {

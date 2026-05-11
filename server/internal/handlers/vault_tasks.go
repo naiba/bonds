@@ -94,6 +94,9 @@ func (h *VaultTaskHandler) Create(c echo.Context) error {
 		if errors.Is(err, services.ErrInvalidTaskStatus) {
 			return response.BadRequest(c, "err.invalid_task_status", nil)
 		}
+		if errors.Is(err, services.ErrInvalidParentTask) {
+			return response.BadRequest(c, "err.invalid_parent_task", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_task")
 	}
 	return response.Created(c, task)
@@ -141,6 +144,9 @@ func (h *VaultTaskHandler) Update(c echo.Context) error {
 		}
 		if errors.Is(err, services.ErrInvalidTaskStatus) {
 			return response.BadRequest(c, "err.invalid_task_status", nil)
+		}
+		if errors.Is(err, services.ErrInvalidParentTask) {
+			return response.BadRequest(c, "err.invalid_parent_task", nil)
 		}
 		return response.InternalError(c, "err.failed_to_update_task")
 	}

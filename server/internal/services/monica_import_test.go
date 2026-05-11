@@ -612,7 +612,10 @@ func TestMonicaImportTasks(t *testing.T) {
 		t.Fatalf("John not found: %v", err)
 	}
 	var tasks []models.ContactTask
-	if err := svc.DB.Where("contact_id = ?", john.ID).Find(&tasks).Error; err != nil {
+	if err := svc.DB.
+		Joins("JOIN task_contacts tc ON tc.contact_task_id = contact_tasks.id").
+		Where("tc.contact_id = ?", john.ID).
+		Find(&tasks).Error; err != nil {
 		t.Fatalf("failed to query tasks: %v", err)
 	}
 	if len(tasks) != 1 {
