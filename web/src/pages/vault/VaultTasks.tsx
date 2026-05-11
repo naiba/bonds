@@ -64,25 +64,34 @@ export default function VaultTasks() {
 
   const stop = (e: React.MouseEvent | React.SyntheticEvent) => e.stopPropagation();
 
-  // Contact link in a row needs to navigate without triggering the row's
-  // edit-modal-open click. stopPropagation on the button click bubble.
-  const renderContactLink = (task: VaultTask) =>
-    task.contact_id && task.contact_name ? (
-      <div style={{ marginLeft: 24, marginTop: 4 }} onClick={stop}>
-        <Button
-          type="link"
-          size="small"
-          icon={<UserOutlined />}
-          style={{ padding: 0, height: "auto", fontSize: 12, color: token.colorTextSecondary }}
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/vaults/${vaultId}/contacts/${task.contact_id}`);
-          }}
-        >
-          {task.contact_name}
-        </Button>
+  // Contact links in a row need to navigate without triggering the row's
+  // edit-modal-open click. stopPropagation on each button's click bubble.
+  const renderContactLink = (task: VaultTask) => {
+    const contacts = task.contacts ?? [];
+    if (contacts.length === 0) return null;
+    return (
+      <div
+        style={{ marginLeft: 24, marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8 }}
+        onClick={stop}
+      >
+        {contacts.map((c) => (
+          <Button
+            key={c.id}
+            type="link"
+            size="small"
+            icon={<UserOutlined />}
+            style={{ padding: 0, height: "auto", fontSize: 12, color: token.colorTextSecondary }}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/vaults/${vaultId}/contacts/${c.id}`);
+            }}
+          >
+            {c.name || c.id}
+          </Button>
+        ))}
       </div>
-    ) : null;
+    );
+  };
 
   return (
     <div style={{ maxWidth: view === "kanban" ? 1200 : 720, margin: "0 auto" }}>

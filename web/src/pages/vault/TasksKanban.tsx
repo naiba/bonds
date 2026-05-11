@@ -338,18 +338,20 @@ interface TaskCardCommonProps {
 }
 
 function TaskCardBody({ task, token, dateFormats, dueLabel }: Omit<TaskCardCommonProps, "onClick">) {
+  const contacts = task.contacts ?? [];
+  const hasMeta = contacts.length > 0 || task.due_at;
   return (
     <Card size="small" styles={{ body: { padding: 12 } }} style={{ borderRadius: token.borderRadius }}>
-      <div style={{ fontWeight: 500, marginBottom: task.contact_name || task.due_at ? 6 : 0 }}>
+      <div style={{ fontWeight: 500, marginBottom: hasMeta ? 6 : 0 }}>
         {task.label}
       </div>
-      {(task.contact_name || task.due_at) && (
+      {hasMeta && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-          {task.contact_id && task.contact_name && (
-            <Tag color="blue" style={{ marginRight: 0 }}>
-              {task.contact_name}
+          {contacts.map((c) => (
+            <Tag key={c.id} color="blue" style={{ marginRight: 0 }}>
+              {c.name || c.id}
             </Tag>
-          )}
+          ))}
           {task.due_at && (
             <Tag color="orange" style={{ marginRight: 0 }}>
               {dueLabel} {formatShortDate(task.due_at, dateFormats)}

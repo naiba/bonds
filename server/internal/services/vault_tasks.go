@@ -10,9 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// VaultTaskService manages tasks at the vault level. Tasks can be either
-// attached to a contact (ContactID set) or standalone vault-level tasks
-// (ContactID NULL). Both kinds are surfaced in the same kanban board.
+// VaultTaskService manages tasks at the vault level. A task has zero or more
+// contact assignees via the task_contacts pivot — zero = standalone.
 type VaultTaskService struct {
 	db           *gorm.DB
 	feedRecorder *FeedRecorder
@@ -28,92 +27,92 @@ func (s *VaultTaskService) SetFeedRecorder(fr *FeedRecorder) {
 
 // VaultTaskFilters narrows the kanban list. All fields are optional.
 type VaultTaskFilters struct {
-	ContactID *string // nil = no filter; "" or pointer to "" treated as "standalone only"
+	// ContactID: nil = no filter; pointer to "" = standalone only (no
+	// assignees); pointer to a real ID = tasks where that contact is among
+	// the assignees.
+	ContactID *string
 	Status    *string // nil = no filter
 }
 
-// List returns all tasks in a vault (contact-attached and standalone),
-// ordered by status column, then by Position within each column, then by
-// CreatedAt as a stable tiebreaker. Optional filters narrow the result.
+// List returns all tasks in a vault, ordered by status column then Position
+// within each column, with CreatedAt as a stable tiebreaker.
 func (s *VaultTaskService) List(vaultID string, filters VaultTaskFilters) ([]dto.VaultTaskResponse, error) {
-	q := s.db.Where("vault_id = ?", vaultID)
+	q := s.db.Model(&models.ContactTask{}).Where("contact_tasks.vault_id = ?", vaultID)
 	if filters.ContactID != nil {
 		if *filters.ContactID == "" {
-			q = q.Where("contact_id IS NULL")
+			// Standalone: no row in the pivot.
+			q = q.Where(`NOT EXISTS (
+				SELECT 1 FROM task_contacts tc WHERE tc.contact_task_id = contact_tasks.id
+			)`)
 		} else {
-			q = q.Where("contact_id = ?", *filters.ContactID)
+			q = q.Where(`EXISTS (
+				SELECT 1 FROM task_contacts tc
+				WHERE tc.contact_task_id = contact_tasks.id AND tc.contact_id = ?
+			)`, *filters.ContactID)
 		}
 	}
 	if filters.Status != nil && *filters.Status != "" {
-		q = q.Where("status = ?", *filters.Status)
+		q = q.Where("contact_tasks.status = ?", *filters.Status)
 	}
 
 	var tasks []models.ContactTask
-	if err := q.Order("status ASC, position ASC, created_at DESC").Find(&tasks).Error; err != nil {
+	if err := q.Order("contact_tasks.status ASC, contact_tasks.position ASC, contact_tasks.created_at DESC").
+		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
-	if len(tasks) == 0 {
-		return []dto.VaultTaskResponse{}, nil
-	}
-
-	contactNames, err := s.collectContactNames(tasks)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]dto.VaultTaskResponse, len(tasks))
-	for i, t := range tasks {
-		result[i] = toVaultTaskResponse(&t, contactNames)
-	}
-	return result, nil
+	return s.buildResponses(tasks)
 }
 
-// Create makes a vault-level task. ContactID is optional; when empty, the
-// task is standalone. When set, the contact must belong to the same vault.
 func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
 	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
-	var contactPtr *string
-	if req.ContactID != "" {
-		if err := validateContactBelongsToVault(s.db, req.ContactID, vaultID); err != nil {
-			return nil, err
-		}
-		c := req.ContactID
-		contactPtr = &c
+	if err := validateContactsBelongToVault(s.db, req.ContactIDs, vaultID); err != nil {
+		return nil, err
+	}
+	if err := validateParentTask(s.db, req.ParentTaskID, 0, vaultID); err != nil {
+		return nil, err
 	}
 
 	task := models.ContactTask{
-		VaultID:     vaultID,
-		ContactID:   contactPtr,
-		AuthorID:    strPtrOrNil(authorID),
-		AuthorName:  "User",
-		Label:       req.Label,
-		Description: strPtrOrNil(req.Description),
-		Status:      resolveTaskStatusOrDefault(s.db, req.Status, vaultID),
-		DueAt:       req.DueAt,
+		VaultID:      vaultID,
+		ParentTaskID: req.ParentTaskID,
+		AuthorID:     strPtrOrNil(authorID),
+		AuthorName:   "User",
+		Label:        req.Label,
+		Description:  strPtrOrNil(req.Description),
+		Status:       resolveTaskStatusOrDefault(s.db, req.Status, vaultID),
+		DueAt:        req.DueAt,
 	}
-	if err := s.db.Create(&task).Error; err != nil {
-		return nil, err
-	}
-
-	if s.feedRecorder != nil && contactPtr != nil {
-		entityType := "ContactTask"
-		s.feedRecorder.Record(*contactPtr, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType)
-	}
-
-	contactNames, err := s.collectContactNames([]models.ContactTask{task})
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&task).Error; err != nil {
+			return err
+		}
+		return replaceTaskAssignees(tx, task.ID, req.ContactIDs)
+	})
 	if err != nil {
 		return nil, err
 	}
-	resp := toVaultTaskResponse(&task, contactNames)
-	return &resp, nil
+
+	if s.feedRecorder != nil {
+		entityType := "ContactTask"
+		// Feed entry is per-assignee so each contact's feed reflects the
+		// task that was just created for them.
+		for _, cid := range req.ContactIDs {
+			s.feedRecorder.Record(cid, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType)
+		}
+	}
+
+	resps, err := s.buildResponses([]models.ContactTask{task})
+	if err != nil {
+		return nil, err
+	}
+	return &resps[0], nil
 }
 
 // Update replaces the editable fields of a vault task in one call. Used by
-// the click-to-edit modal. ContactID may be cleared (empty string) or
-// changed to a different contact in the same vault. Status is also kept in
-// sync with Completed so the list view stays consistent.
+// the click-to-edit modal. When ContactIDs is provided, the assignee set is
+// replaced; nil means "leave assignees untouched".
 func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
 	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
@@ -126,22 +125,20 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 		}
 		return nil, err
 	}
-
-	// Resolve contact pointer: empty = standalone, non-empty = must belong to vault
-	var contactPtr *string
-	if req.ContactID != "" {
-		if err := validateContactBelongsToVault(s.db, req.ContactID, vaultID); err != nil {
+	if err := validateParentTask(s.db, req.ParentTaskID, task.ID, vaultID); err != nil {
+		return nil, err
+	}
+	if req.ContactIDs != nil {
+		if err := validateContactsBelongToVault(s.db, *req.ContactIDs, vaultID); err != nil {
 			return nil, err
 		}
-		c := req.ContactID
-		contactPtr = &c
 	}
 
 	updates := map[string]interface{}{
-		"label":       req.Label,
-		"description": strPtrOrNil(req.Description),
-		"due_at":      req.DueAt,
-		"contact_id":  contactPtr,
+		"label":          req.Label,
+		"description":    strPtrOrNil(req.Description),
+		"due_at":         req.DueAt,
+		"parent_task_id": req.ParentTaskID,
 	}
 	if req.Status != "" {
 		updates["status"] = req.Status
@@ -157,7 +154,18 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 		}
 	}
 
-	if err := s.db.Model(&task).Updates(updates).Error; err != nil {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&task).Updates(updates).Error; err != nil {
+			return err
+		}
+		if req.ContactIDs != nil {
+			if err := replaceTaskAssignees(tx, task.ID, *req.ContactIDs); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	// Reload to pick up canonical values (timestamps, etc.)
@@ -165,12 +173,11 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 		return nil, err
 	}
 
-	contactNames, err := s.collectContactNames([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task})
 	if err != nil {
 		return nil, err
 	}
-	resp := toVaultTaskResponse(&task, contactNames)
-	return &resp, nil
+	return &resps[0], nil
 }
 
 // UpdateStatus moves a task to a different kanban column. Used by drag-drop
@@ -187,8 +194,6 @@ func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateT
 		return nil, err
 	}
 	updates := map[string]interface{}{"status": req.Status}
-	// Keep Completed in sync with the Done column so existing contact-level
-	// list views (which filter on Completed) continue to behave correctly.
 	if req.Status == models.TaskStatusDone && !task.Completed {
 		now := time.Now()
 		updates["completed"] = true
@@ -206,32 +211,32 @@ func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateT
 	}
 	task.Status = req.Status
 
-	contactNames, err := s.collectContactNames([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task})
 	if err != nil {
 		return nil, err
 	}
-	resp := toVaultTaskResponse(&task, contactNames)
-	return &resp, nil
+	return &resps[0], nil
 }
 
 // Delete removes a vault task. Returns ErrTaskNotFound if the task doesn't
-// belong to the given vault. Bypasses any audit-feed entry — task removals
-// are user-initiated and explicit.
+// belong to the given vault. Pivot rows go too.
 func (s *VaultTaskService) Delete(id uint, vaultID string) error {
-	result := s.db.Where("id = ? AND vault_id = ?", id, vaultID).Delete(&models.ContactTask{})
-	if result.Error != nil {
-		return result.Error
+	var task models.ContactTask
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&task).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTaskNotFound
+		}
+		return err
 	}
-	if result.RowsAffected == 0 {
-		return ErrTaskNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("contact_task_id = ?", task.ID).Delete(&models.TaskContact{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&task).Error
+	})
 }
 
-// UpdatePosition reorders a task within (or across) columns. The Status field
-// is optional in the request — when present, the task is also moved to that
-// column (drag across columns + reorder in one call). Position is the new
-// 0-based index within the destination column.
+// UpdatePosition reorders a task within (or across) columns.
 func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.UpdateTaskPositionRequest) (*dto.VaultTaskResponse, error) {
 	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
@@ -253,39 +258,28 @@ func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.Updat
 	}
 	task.Position = req.Position
 
-	contactNames, err := s.collectContactNames([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task})
 	if err != nil {
 		return nil, err
 	}
-	resp := toVaultTaskResponse(&task, contactNames)
-	return &resp, nil
+	return &resps[0], nil
 }
 
-// collectContactNames batches a single SELECT for all referenced contacts so
-// the list endpoint stays at 2 queries (tasks + contacts) regardless of size.
-func (s *VaultTaskService) collectContactNames(tasks []models.ContactTask) (map[string]string, error) {
-	idSet := make(map[string]struct{})
-	for _, t := range tasks {
-		if t.ContactID != nil {
-			idSet[*t.ContactID] = struct{}{}
-		}
+func (s *VaultTaskService) buildResponses(tasks []models.ContactTask) ([]dto.VaultTaskResponse, error) {
+	if len(tasks) == 0 {
+		return []dto.VaultTaskResponse{}, nil
 	}
-	if len(idSet) == 0 {
-		return map[string]string{}, nil
+	ids := make([]uint, len(tasks))
+	for i, t := range tasks {
+		ids[i] = t.ID
 	}
-	ids := make([]string, 0, len(idSet))
-	for id := range idSet {
-		ids = append(ids, id)
-	}
-	var contacts []models.Contact
-	if err := s.db.Where("id IN ?", ids).Select("id", "first_name", "last_name").Find(&contacts).Error; err != nil {
+	assignees, err := taskAssignees(s.db, ids)
+	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]string, len(contacts))
-	for _, c := range contacts {
-		first := ptrToStr(c.FirstName)
-		last := ptrToStr(c.LastName)
-		out[c.ID] = formatPersonName(first, last)
+	out := make([]dto.VaultTaskResponse, len(tasks))
+	for i, t := range tasks {
+		out[i] = toVaultTaskResponse(&t, assignees[t.ID])
 	}
 	return out, nil
 }
@@ -303,30 +297,28 @@ func formatPersonName(first, last string) string {
 	return fmt.Sprintf("%s %s", first, last)
 }
 
-func toVaultTaskResponse(t *models.ContactTask, names map[string]string) dto.VaultTaskResponse {
-	contactID := ptrToStr(t.ContactID)
-	contactName := ""
-	if contactID != "" {
-		contactName = names[contactID]
+func toVaultTaskResponse(t *models.ContactTask, contacts []dto.TaskContactRef) dto.VaultTaskResponse {
+	if contacts == nil {
+		contacts = []dto.TaskContactRef{}
 	}
 	desc := ""
 	if t.Description != nil {
 		desc = *t.Description
 	}
 	return dto.VaultTaskResponse{
-		ID:          t.ID,
-		ContactID:   contactID,
-		VaultID:     t.VaultID,
-		ContactName: contactName,
-		AuthorName:  t.AuthorName,
-		Label:       t.Label,
-		Description: desc,
-		Status:      t.Status,
-		Position:    t.Position,
-		Completed:   t.Completed,
-		CompletedAt: t.CompletedAt,
-		DueAt:       t.DueAt,
-		CreatedAt:   t.CreatedAt,
-		UpdatedAt:   t.UpdatedAt,
+		ID:           t.ID,
+		VaultID:      t.VaultID,
+		AuthorName:   t.AuthorName,
+		Label:        t.Label,
+		Description:  desc,
+		Status:       t.Status,
+		Position:     t.Position,
+		Completed:    t.Completed,
+		CompletedAt:  t.CompletedAt,
+		DueAt:        t.DueAt,
+		ParentTaskID: t.ParentTaskID,
+		Contacts:     contacts,
+		CreatedAt:    t.CreatedAt,
+		UpdatedAt:    t.UpdatedAt,
 	}
 }

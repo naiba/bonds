@@ -2,13 +2,24 @@ package dto
 
 import "time"
 
+// TaskContactRef is the lightweight contact view embedded in task responses
+// so the UI can render every assignee without a follow-up request per contact.
+type TaskContactRef struct {
+	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name string `json:"name" example:"Jane Doe"`
+}
+
 type CreateTaskRequest struct {
 	Label       string     `json:"label" validate:"required" example:"Buy birthday gift"`
 	Description string     `json:"description" example:"Get a nice book from the bookstore"`
 	DueAt       *time.Time `json:"due_at" example:"2026-01-15T10:30:00Z"`
 	Status      string     `json:"status" example:"todo"`
-	// ContactID — optional. When omitted/empty, the task is a standalone vault-level task.
-	ContactID string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	// ContactIDs — additional assignees besides the contact in the URL. The
+	// URL's contact is always included; extras here add a multi-person task.
+	ContactIDs []string `json:"contact_ids" example:"[\"550e8400-e29b-41d4-a716-446655440000\"]"`
+	// ParentTaskID — optional. When set, this task is a sub-task of the
+	// given parent task. Parent must live in the same vault.
+	ParentTaskID *uint `json:"parent_task_id" example:"42"`
 }
 
 type UpdateTaskRequest struct {
@@ -16,6 +27,12 @@ type UpdateTaskRequest struct {
 	Description string     `json:"description" example:"Get a nice book from the bookstore"`
 	DueAt       *time.Time `json:"due_at" example:"2026-01-15T10:30:00Z"`
 	Status      string     `json:"status" example:"todo"`
+	// ContactIDs — when nil, assignees are left untouched. When provided
+	// (even as an empty slice), the assignee set is replaced verbatim. The
+	// contact in the URL path is always re-added to keep the task visible
+	// from this contact's task list.
+	ContactIDs *[]string `json:"contact_ids" example:"[\"550e8400-e29b-41d4-a716-446655440000\"]"`
+	ParentTaskID *uint   `json:"parent_task_id" example:"42"`
 }
 
 type UpdateTaskStatusRequest struct {
@@ -28,17 +45,18 @@ type UpdateTaskPositionRequest struct {
 }
 
 type TaskResponse struct {
-	ID          uint       `json:"id" example:"1"`
-	ContactID   string     `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	VaultID     string     `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	AuthorID    string     `json:"author_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Label       string     `json:"label" example:"Buy birthday gift"`
-	Description string     `json:"description" example:"Get a nice book from the bookstore"`
-	Status      string     `json:"status" example:"todo"`
-	Position    int        `json:"position" example:"0"`
-	Completed   bool       `json:"completed" example:"false"`
-	CompletedAt *time.Time `json:"completed_at" example:"2026-01-15T10:30:00Z"`
-	DueAt       *time.Time `json:"due_at" example:"2026-01-15T10:30:00Z"`
-	CreatedAt   time.Time  `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt   time.Time  `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	ID           uint             `json:"id" example:"1"`
+	VaultID      string           `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AuthorID     string           `json:"author_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Label        string           `json:"label" example:"Buy birthday gift"`
+	Description  string           `json:"description" example:"Get a nice book from the bookstore"`
+	Status       string           `json:"status" example:"todo"`
+	Position     int              `json:"position" example:"0"`
+	Completed    bool             `json:"completed" example:"false"`
+	CompletedAt  *time.Time       `json:"completed_at" example:"2026-01-15T10:30:00Z"`
+	DueAt        *time.Time       `json:"due_at" example:"2026-01-15T10:30:00Z"`
+	ParentTaskID *uint            `json:"parent_task_id" example:"42"`
+	Contacts     []TaskContactRef `json:"contacts"`
+	CreatedAt    time.Time        `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt    time.Time        `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }

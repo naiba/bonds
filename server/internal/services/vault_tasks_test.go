@@ -39,6 +39,15 @@ func setupVaultTaskTest(t *testing.T) (*VaultTaskService, *TaskService, string, 
 	return NewVaultTaskService(db), NewTaskService(db), vault.ID, contact.ID, resp.User.ID
 }
 
+func hasAssignee(task *dto.VaultTaskResponse, contactID string) bool {
+	for _, c := range task.Contacts {
+		if c.ID == contactID {
+			return true
+		}
+	}
+	return false
+}
+
 func TestVaultTaskListEmpty(t *testing.T) {
 	svc, _, vaultID, _, _ := setupVaultTaskTest(t)
 
@@ -81,8 +90,8 @@ func TestVaultTaskCreateStandalone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create standalone failed: %v", err)
 	}
-	if task.ContactID != "" {
-		t.Errorf("standalone task should have empty ContactID, got %q", task.ContactID)
+	if len(task.Contacts) != 0 {
+		t.Errorf("standalone task should have no assignees, got %d", len(task.Contacts))
 	}
 	if task.VaultID != vaultID {
 		t.Errorf("VaultID mismatch: got %q, want %q", task.VaultID, vaultID)
@@ -96,21 +105,45 @@ func TestVaultTaskCreateWithContact(t *testing.T) {
 	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
 
 	task, err := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
-		Label:     "Birthday card",
-		ContactID: contactID,
-		Status:    models.TaskStatusInProgress,
+		Label:      "Birthday card",
+		ContactIDs: []string{contactID},
+		Status:     models.TaskStatusInProgress,
 	})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	if task.ContactID != contactID {
-		t.Errorf("ContactID mismatch: got %q, want %q", task.ContactID, contactID)
+	if !hasAssignee(task, contactID) {
+		t.Errorf("expected contact %q in assignees, got %+v", contactID, task.Contacts)
 	}
 	if task.Status != models.TaskStatusInProgress {
 		t.Errorf("Status mismatch: got %q, want 'in_progress'", task.Status)
 	}
-	if task.ContactName == "" {
-		t.Errorf("ContactName should be populated when ContactID set")
+	if task.Contacts[0].Name == "" {
+		t.Errorf("contact name should be populated, got empty")
+	}
+}
+
+func TestVaultTaskCreateMultiContact(t *testing.T) {
+	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
+	db := svc.db
+	contactSvc := NewContactService(db)
+	second, err := contactSvc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Mary"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	task, err := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
+		Label:      "Plan dinner",
+		ContactIDs: []string{contactID, second.ID},
+	})
+	if err != nil {
+		t.Fatalf("Create multi failed: %v", err)
+	}
+	if len(task.Contacts) != 2 {
+		t.Fatalf("expected 2 assignees, got %d", len(task.Contacts))
+	}
+	if !hasAssignee(task, contactID) || !hasAssignee(task, second.ID) {
+		t.Errorf("missing one of the expected assignees: %+v", task.Contacts)
 	}
 }
 
@@ -129,10 +162,9 @@ func TestVaultTaskCreateRejectsInvalidStatus(t *testing.T) {
 func TestVaultTaskCreateRejectsCrossVaultContact(t *testing.T) {
 	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
 
-	// Use a fresh DB to create a contact in a different vault.
 	_, err := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
-		Label:     "Bad",
-		ContactID: "00000000-0000-0000-0000-000000000000",
+		Label:      "Bad",
+		ContactIDs: []string{"00000000-0000-0000-0000-000000000000"},
 	})
 	if err == nil {
 		t.Errorf("expected error for nonexistent contact, got nil")
@@ -166,9 +198,7 @@ func TestVaultTaskUpdateStatusFromDoneClearsCompleted(t *testing.T) {
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
 		Label: "x", Status: models.TaskStatusDone,
 	})
-	// First move to Done so completed flips on
 	_, _ = svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: models.TaskStatusDone})
-	// Then move back
 	updated, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{
 		Status: models.TaskStatusInProgress,
 	})
@@ -229,10 +259,11 @@ func TestVaultTaskUpdateAllFields(t *testing.T) {
 	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "old"})
 
+	assignees := []string{contactID}
 	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:       "new label",
 		Description: "richer description",
-		ContactID:   contactID,
+		ContactIDs:  &assignees,
 		Status:      models.TaskStatusInProgress,
 	})
 	if err != nil {
@@ -241,8 +272,8 @@ func TestVaultTaskUpdateAllFields(t *testing.T) {
 	if updated.Label != "new label" || updated.Description != "richer description" {
 		t.Errorf("fields didn't update: %+v", updated)
 	}
-	if updated.ContactID != contactID {
-		t.Errorf("ContactID didn't update: got %q", updated.ContactID)
+	if !hasAssignee(updated, contactID) {
+		t.Errorf("expected contact %q in assignees, got %+v", contactID, updated.Contacts)
 	}
 	if updated.Status != models.TaskStatusInProgress {
 		t.Errorf("Status didn't update: got %q", updated.Status)
@@ -252,28 +283,47 @@ func TestVaultTaskUpdateAllFields(t *testing.T) {
 func TestVaultTaskUpdateClearsContactWhenEmpty(t *testing.T) {
 	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
-		Label: "x", ContactID: contactID,
+		Label: "x", ContactIDs: []string{contactID},
 	})
-	if task.ContactID != contactID {
-		t.Fatalf("setup: expected attached, got %q", task.ContactID)
+	if !hasAssignee(task, contactID) {
+		t.Fatalf("setup: expected assignee, got %+v", task.Contacts)
 	}
 
+	empty := []string{}
 	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
-		Label:     "x",
-		ContactID: "",
+		Label:      "x",
+		ContactIDs: &empty,
 	})
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
-	if updated.ContactID != "" {
-		t.Errorf("expected ContactID cleared, got %q", updated.ContactID)
+	if len(updated.Contacts) != 0 {
+		t.Errorf("expected no assignees, got %+v", updated.Contacts)
+	}
+}
+
+func TestVaultTaskUpdateLeavesAssigneesAloneWhenNil(t *testing.T) {
+	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
+	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
+		Label: "x", ContactIDs: []string{contactID},
+	})
+
+	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
+		Label:      "renamed",
+		ContactIDs: nil, // intentionally untouched
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if !hasAssignee(updated, contactID) {
+		t.Errorf("nil ContactIDs should leave assignees untouched, got %+v", updated.Contacts)
 	}
 }
 
 func TestVaultTaskListFilterStandaloneOnly(t *testing.T) {
 	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
 	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "personal"})
-	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "for contact", ContactID: contactID})
+	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "for contact", ContactIDs: []string{contactID}})
 
 	noContact := ""
 	tasks, err := svc.List(vaultID, VaultTaskFilters{ContactID: &noContact})
@@ -283,7 +333,78 @@ func TestVaultTaskListFilterStandaloneOnly(t *testing.T) {
 	if len(tasks) != 1 {
 		t.Errorf("expected 1 standalone task, got %d", len(tasks))
 	}
-	if tasks[0].ContactID != "" {
-		t.Errorf("standalone task should have empty ContactID, got %q", tasks[0].ContactID)
+	if len(tasks[0].Contacts) != 0 {
+		t.Errorf("standalone task should have no assignees, got %+v", tasks[0].Contacts)
+	}
+}
+
+func TestVaultTaskListFilterByContact(t *testing.T) {
+	svc, _, vaultID, contactID, userID := setupVaultTaskTest(t)
+	db := svc.db
+	contactSvc := NewContactService(db)
+	other, err := contactSvc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Other"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "first", ContactIDs: []string{contactID}})
+	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "second", ContactIDs: []string{other.ID}})
+	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "both", ContactIDs: []string{contactID, other.ID}})
+
+	cid := contactID
+	tasks, err := svc.List(vaultID, VaultTaskFilters{ContactID: &cid})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks assigned to contact, got %d", len(tasks))
+	}
+}
+
+func TestVaultTaskSubTaskHierarchy(t *testing.T) {
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
+
+	parent, err := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "Plan trip"})
+	if err != nil {
+		t.Fatalf("Create parent failed: %v", err)
+	}
+	if parent.ParentTaskID != nil {
+		t.Errorf("parent task should have nil ParentTaskID, got %v", parent.ParentTaskID)
+	}
+
+	child, err := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
+		Label:        "Book flights",
+		ParentTaskID: &parent.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create child failed: %v", err)
+	}
+	if child.ParentTaskID == nil || *child.ParentTaskID != parent.ID {
+		t.Errorf("child ParentTaskID = %v, want %d", child.ParentTaskID, parent.ID)
+	}
+}
+
+func TestVaultTaskSubTaskRejectsMissingParent(t *testing.T) {
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
+
+	bogus := uint(99999)
+	_, err := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
+		Label:        "Orphan",
+		ParentTaskID: &bogus,
+	})
+	if err != ErrInvalidParentTask {
+		t.Errorf("expected ErrInvalidParentTask, got %v", err)
+	}
+}
+
+func TestVaultTaskSubTaskRejectsSelfParent(t *testing.T) {
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
+
+	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "x"})
+	_, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
+		Label:        "x",
+		ParentTaskID: &task.ID,
+	})
+	if err != ErrInvalidParentTask {
+		t.Errorf("expected ErrInvalidParentTask, got %v", err)
 	}
 }

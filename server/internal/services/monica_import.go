@@ -471,10 +471,8 @@ func (s *MonicaImportService) importTasks(
 		if err := json.Unmarshal(raw, &mt); err != nil {
 			continue
 		}
-		cid := contactID
 		task := models.ContactTask{
 			VaultID:    vaultID,
-			ContactID:  &cid,
 			Label:      mt.Properties.Title,
 			AuthorID:   &userID,
 			AuthorName: "Monica Import",
@@ -488,9 +486,13 @@ func (s *MonicaImportService) importTasks(
 				task.CompletedAt = &t
 			}
 		}
-		if err := tx.Create(&task).Error; err == nil {
-			resp.ImportedTasks++
+		if err := tx.Create(&task).Error; err != nil {
+			continue
 		}
+		if err := tx.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contactID}).Error; err != nil {
+			continue
+		}
+		resp.ImportedTasks++
 	}
 }
 

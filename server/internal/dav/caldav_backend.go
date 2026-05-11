@@ -121,8 +121,8 @@ func (b *CalDAVBackend) GetCalendarObject(ctx context.Context, path string, _ *c
 
 	// Try tasks
 	var task models.ContactTask
-	if err := b.db.Preload("Contact").First(&task, "uuid = ?", objectID).Error; err == nil {
-		if err := b.verifyVaultAccess(userID, task.Contact.VaultID); err != nil {
+	if err := b.db.First(&task, "uuid = ?", objectID).Error; err == nil {
+		if err := b.verifyVaultAccess(userID, task.VaultID); err != nil {
 			return nil, err
 		}
 		return taskToCalendarObject(&task, userID), nil
@@ -176,9 +176,13 @@ func (b *CalDAVBackend) ListCalendarObjects(ctx context.Context, path string, _ 
 			objects = append(objects, *importantDateToCalendarObject(&dates[i], userID))
 		}
 
-		// Get tasks
+		// Get tasks for any of these contacts via the m2m pivot, plus any
+		// vault-scoped standalone tasks (no assignees).
 		var tasks []models.ContactTask
-		if err := b.db.Preload("Contact").Where("contact_id IN ?", contactIDs).Find(&tasks).Error; err != nil {
+		if err := b.db.Distinct().
+			Joins("LEFT JOIN task_contacts tc ON tc.contact_task_id = contact_tasks.id").
+			Where("contact_tasks.vault_id = ? AND (tc.contact_id IN ? OR tc.contact_id IS NULL)", vaultID, contactIDs).
+			Find(&tasks).Error; err != nil {
 			return nil, err
 		}
 
@@ -332,16 +336,15 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		}, nil
 	}
 
-	// Need a contact
+	// Pick any contact in the vault to attach as the initial assignee; the
+	// user can adjust assignees later from the UI. Vault-level standalone
+	// tasks (no contact) are valid too — we still create the task even when
+	// the vault has no contacts.
 	var contact models.Contact
-	if err := b.db.Where("vault_id = ?", vaultID).First(&contact).Error; err != nil {
-		return nil, webdav.NewHTTPError(http.StatusBadRequest, fmt.Errorf("no contacts in vault"))
-	}
+	hasContact := b.db.Where("vault_id = ?", vaultID).First(&contact).Error == nil
 
-	contactID := contact.ID
 	task := models.ContactTask{
 		VaultID:    vaultID,
-		ContactID:  &contactID,
 		AuthorID:   &userID,
 		UUID:       &uid,
 		Label:      summary,
@@ -354,6 +357,11 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 	}
 	if err := b.db.Create(&task).Error; err != nil {
 		return nil, err
+	}
+	if hasContact {
+		if err := b.db.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contact.ID}).Error; err != nil {
+			return nil, err
+		}
 	}
 
 	return &caldav.CalendarObject{
@@ -386,8 +394,8 @@ func (b *CalDAVBackend) DeleteCalendarObject(ctx context.Context, path string) e
 
 	// Try task
 	var task models.ContactTask
-	if err := b.db.Preload("Contact").First(&task, "uuid = ?", objectID).Error; err == nil {
-		if err := b.verifyVaultAccess(userID, task.Contact.VaultID); err != nil {
+	if err := b.db.First(&task, "uuid = ?", objectID).Error; err == nil {
+		if err := b.verifyVaultAccess(userID, task.VaultID); err != nil {
 			return err
 		}
 		return b.db.Delete(&task).Error
@@ -431,7 +439,7 @@ func taskToCalendarObject(t *models.ContactTask, userID string) *caldav.Calendar
 	cal := buildCalendarFromTask(t)
 
 	return &caldav.CalendarObject{
-		Path:    "/dav/calendars/" + userID + "/" + t.Contact.VaultID + "/" + uid + ".ics",
+		Path:    "/dav/calendars/" + userID + "/" + t.VaultID + "/" + uid + ".ics",
 		ModTime: t.UpdatedAt,
 		ETag:    fmt.Sprintf("%d", t.UpdatedAt.Unix()),
 		Data:    cal,
