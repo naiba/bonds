@@ -193,6 +193,12 @@ func migrateModulesToContactPage(db *gorm.DB) {
 // migrateContactTasksToManyToMany copies any pre-existing single contact_id
 // values from contact_tasks into the new task_contacts pivot, then drops the
 // old column. Idempotent: a no-op once the column is gone.
+//
+// The column drop is dialect-aware because the original schema declared a
+// named FK constraint (fk_contacts_tasks) on contact_id. Plain DROP COLUMN
+// fails on both SQLite (GORM's table-rewrite parser chokes on the stale FK)
+// and Postgres (FK blocks the drop). We rewrite the table on SQLite and use
+// CASCADE on Postgres.
 func migrateContactTasksToManyToMany(db *gorm.DB) {
 	m := db.Migrator()
 	if !m.HasColumn(&models.ContactTask{}, "contact_id") {
@@ -213,11 +219,96 @@ func migrateContactTasksToManyToMany(db *gorm.DB) {
 		log.Printf("WARNING: failed to copy contact_tasks.contact_id into task_contacts: %v", copied.Error)
 		return
 	}
-	if err := m.DropColumn(&models.ContactTask{}, "contact_id"); err != nil {
+
+	var err error
+	switch db.Dialector.Name() {
+	case "sqlite":
+		err = dropContactIDColumnSQLite(db)
+	case "postgres":
+		err = db.Exec(`ALTER TABLE contact_tasks DROP COLUMN IF EXISTS contact_id CASCADE`).Error
+	default:
+		err = m.DropColumn(&models.ContactTask{}, "contact_id")
+	}
+	if err != nil {
 		log.Printf("WARNING: failed to drop contact_tasks.contact_id: %v", err)
 		return
 	}
 	log.Printf("Migrated %d contact_tasks.contact_id rows into task_contacts; dropped legacy column", copied.RowsAffected)
+}
+
+// dropContactIDColumnSQLite rewrites contact_tasks without the contact_id
+// column. SQLite has no ALTER TABLE DROP CONSTRAINT, and GORM's DropColumn
+// path fails to recreate the table while a stale FK references the column
+// being dropped. Strategy: rename → AutoMigrate (recreates the new schema)
+// → INSERT … SELECT (preserving every other column) → drop the renamed
+// original. PRAGMA foreign_keys=OFF avoids cascading deletes during the
+// swap; the constraint is re-enabled at exit.
+func dropContactIDColumnSQLite(db *gorm.DB) error {
+	type colInfo struct{ Name string }
+	var infos []colInfo
+	if err := db.Raw(`SELECT name FROM pragma_table_info('contact_tasks')`).Scan(&infos).Error; err != nil {
+		return fmt.Errorf("inspect contact_tasks columns: %w", err)
+	}
+	cols := make([]string, 0, len(infos))
+	for _, c := range infos {
+		if c.Name == "contact_id" {
+			continue
+		}
+		cols = append(cols, fmt.Sprintf("%q", c.Name))
+	}
+	if len(cols) == 0 {
+		return fmt.Errorf("no columns to preserve")
+	}
+	colList := joinStrings(cols, ", ")
+
+	// SQLite's PRAGMA foreign_keys must be set OUTSIDE a transaction (it's a
+	// no-op inside one). With FKs on, ALTER TABLE RENAME rewrites referring
+	// FKs in other tables to point at the renamed table, which we don't want
+	// for this in-place swap. Pin to a single connection so the PRAGMA
+	// applies for the whole sequence.
+	return db.Connection(func(conn *gorm.DB) error {
+		if err := conn.Exec(`PRAGMA foreign_keys = OFF`).Error; err != nil {
+			return err
+		}
+		defer conn.Exec(`PRAGMA foreign_keys = ON`)
+
+		return conn.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec(`ALTER TABLE contact_tasks RENAME TO contact_tasks_old`).Error; err != nil {
+				return err
+			}
+			// Indexes don't get renamed with the table. Drop the orphan
+			// indexes that previously attached to contact_tasks so
+			// AutoMigrate can recreate them on the new table without name
+			// collisions.
+			var oldIndexNames []string
+			if err := tx.Raw(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'contact_tasks_old' AND name NOT LIKE 'sqlite_autoindex_%'`).Scan(&oldIndexNames).Error; err != nil {
+				return fmt.Errorf("inspect orphan indexes: %w", err)
+			}
+			for _, idx := range oldIndexNames {
+				if err := tx.Exec(fmt.Sprintf("DROP INDEX IF EXISTS %q", idx)).Error; err != nil {
+					return fmt.Errorf("drop orphan index %s: %w", idx, err)
+				}
+			}
+			if err := tx.AutoMigrate(&models.ContactTask{}); err != nil {
+				return err
+			}
+			if err := tx.Exec(fmt.Sprintf("INSERT INTO contact_tasks (%s) SELECT %s FROM contact_tasks_old", colList, colList)).Error; err != nil {
+				return err
+			}
+			return tx.Exec(`DROP TABLE contact_tasks_old`).Error
+		})
+	})
+}
+
+func joinStrings(parts []string, sep string) string {
+	out := ""
+	for i, p := range parts {
+		if i > 0 {
+			out += sep
+		}
+		out += p
+	}
+	return out
 }
 
 func migrateUploadDir(currentDir string) {
