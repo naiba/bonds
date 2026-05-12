@@ -29,6 +29,16 @@ const { Title } = Typography;
 
 type ViewMode = "list" | "kanban";
 
+const VIEW_STORAGE_KEY = "bonds_vault_tasks_view";
+
+function loadView(): ViewMode {
+  try {
+    const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (saved === "list" || saved === "kanban") return saved;
+  } catch { /* fallback */ }
+  return "list";
+}
+
 export default function VaultTasks() {
   const { id } = useParams<{ id: string }>();
   const vaultId = id!;
@@ -36,7 +46,12 @@ export default function VaultTasks() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const dateFormats = useDateFormat();
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>(loadView);
+
+  const updateView = (next: ViewMode) => {
+    setView(next);
+    try { localStorage.setItem(VIEW_STORAGE_KEY, next); } catch { /* quota or private mode */ }
+  };
 
   // Modal state owned by VaultTasks for the list view's row clicks. The
   // kanban view has its own modal instance for "+ create" and card clicks.
@@ -116,7 +131,7 @@ export default function VaultTasks() {
         </Title>
         <Segmented
           value={view}
-          onChange={(v) => setView(v as ViewMode)}
+          onChange={(v) => updateView(v as ViewMode)}
           options={[
             { label: t("vault.tasks.view_list"), value: "list" },
             { label: t("vault.tasks.view_kanban"), value: "kanban" },
