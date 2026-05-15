@@ -81,7 +81,7 @@ export default function Settings() {
             {initials ? (
               <span
                 style={{
-                  color: "#fff",
+                  color: token.colorTextLightSolid,
                   fontSize: 20,
                   fontWeight: 600,
                   lineHeight: 1,
@@ -90,7 +90,7 @@ export default function Settings() {
                 {initials}
               </span>
             ) : (
-              <UserOutlined style={{ color: "#fff", fontSize: 24 }} />
+              <UserOutlined style={{ color: token.colorTextLightSolid, fontSize: 24 }} />
             )}
           </div>
           <div style={{ minWidth: 0 }}>

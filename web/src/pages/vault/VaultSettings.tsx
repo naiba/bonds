@@ -772,7 +772,7 @@ export default function VaultSettings() {
                                         onClick={(e) => { e.stopPropagation(); setEditingCatId(cat.id!); setEditingCatLabel(cat.label ?? ""); }}
                                     />
                                     <Popconfirm title={t("common.delete_confirm")} onConfirm={(e) => { e?.stopPropagation(); deleteCategory.mutate(cat.id!); }}>
-                                        <DeleteOutlined onClick={(e) => e.stopPropagation()} style={{color: 'red'}} />
+                                        <DeleteOutlined onClick={(e) => e.stopPropagation()} style={{ color: token.colorError }} />
                                     </Popconfirm>
                                 </Space>
                             }

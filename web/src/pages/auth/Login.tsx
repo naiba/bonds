@@ -243,7 +243,7 @@ export default function Login() {
           }}>
             <img src={logoImg} alt="Bonds" style={{ width: 32, height: 32, borderRadius: 8 }} />
             <span style={{
-              fontSize: 20, fontWeight: 700, color: "#fff",
+              fontSize: 20, fontWeight: 700, color: token.colorTextLightSolid,
               letterSpacing: "0.12em", textTransform: "uppercase",
             }}>
               Bonds
@@ -251,7 +251,7 @@ export default function Login() {
           </div>
 
           <h1 style={{
-            fontSize: 34, fontWeight: 400, color: "#fff", lineHeight: 1.3, fontFamily: "\x27Playfair Display\x27, serif",
+            fontSize: 34, fontWeight: 400, color: token.colorTextLightSolid, lineHeight: 1.3, fontFamily: "\x27Playfair Display\x27, serif",
             margin: "0 0 16px 0", letterSpacing: "-0.01em",
           }}>
             {t("auth.login.hero_title")}

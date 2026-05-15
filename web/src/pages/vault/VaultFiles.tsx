@@ -82,7 +82,7 @@ export default function VaultFiles() {
     if (mimeType.startsWith("image/"))
       return <FileImageOutlined style={{ fontSize: 18, color: token.colorSuccess }} />;
     if (mimeType === "application/pdf")
-      return <FilePdfOutlined style={{ fontSize: 18, color: "#e74c3c" }} />;
+      return <FilePdfOutlined style={{ fontSize: 18, color: token.colorError }} />;
     return <FileOutlined style={{ fontSize: 18, color: token.colorPrimary }} />;
   }
 

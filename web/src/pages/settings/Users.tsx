@@ -139,7 +139,7 @@ export default function Users() {
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                color: "#fff",
+                color: token.colorTextLightSolid,
                 fontSize: 13,
                 fontWeight: 600,
               }}
