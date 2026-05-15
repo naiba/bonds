@@ -414,5 +414,11 @@
   "seed.life_event_types.had_a_promotion": "Had a promotion",
 
   "seed.quick_facts.hobbies": "Hobbies",
-  "seed.quick_facts.food_preferences": "Food preferences"
+  "seed.quick_facts.food_preferences": "Food preferences",
+
+  "seed.task_statuses.todo": "Todo",
+  "seed.task_statuses.in_progress": "In progress",
+  "seed.task_statuses.done": "Done",
+  "seed.task_statuses.blocked": "Blocked",
+  "seed.task_statuses.cancelled": "Cancelled"
 }

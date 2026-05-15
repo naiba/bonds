@@ -28,6 +28,7 @@ const sectionKeys = [
   "contact-info-types", "relationship-types", "templates", "modules",
   "currencies", "religions", "call-reasons",
   "gift-occasions", "gift-states", "post-templates", "group-types",
+  "task-statuses",
 ];
 
 const sectionI18nMap: Record<string, string> = {
@@ -47,6 +48,7 @@ const sectionI18nMap: Record<string, string> = {
   "gift-states": "settings.personalize.gift_states",
   "post-templates": "settings.personalize.post_templates",
   "group-types": "settings.personalize.group_types",
+  "task-statuses": "settings.personalize.task_statuses",
 };
 
 interface SubItemConfig {
@@ -123,6 +125,7 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
   const [expandedModulePageId, setExpandedModulePageId] = useState<number | null>(null);
   const showModules = sectionKey === "templates";
   const queryClient = useQueryClient();
+  const { token } = theme.useToken();
   const { message } = App.useApp();
   const { t } = useTranslation();
   const qk = ["settings", "personalize", sectionKey, "sub-items", parentId];
@@ -282,7 +285,7 @@ function SubItemsPanel({ parentId, sectionKey }: { parentId: number; sectionKey:
                     icon={<AppstoreOutlined />}
                     title={t("settings.personalize.page_modules")}
                     onClick={() => setExpandedModulePageId(expandedModulePageId === (item.id as number) ? null : (item.id as number))}
-                    style={expandedModulePageId === (item.id as number) ? { color: '#1677ff' } : undefined}
+                    style={expandedModulePageId === (item.id as number) ? { color: token.colorPrimary } : undefined}
                   />,
                 ] : []),
                 <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
@@ -734,6 +737,7 @@ function SectionCollapseLabel({
   sectionKey: string;
   label: string;
 }) {
+  const { token } = theme.useToken();
   const { data: items = [] } = useQuery({
     queryKey: ["settings", "personalize", sectionKey],
     queryFn: async () => {
@@ -748,8 +752,8 @@ function SectionCollapseLabel({
       <Badge
         count={items.length}
         showZero
-        color="#d9d9d9"
-        style={{ color: "#666", fontSize: 11 }}
+        color={token.colorBorderSecondary}
+        style={{ color: token.colorTextTertiary, fontSize: 11 }}
       />
     </span>
   );

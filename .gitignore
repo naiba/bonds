@@ -20,3 +20,5 @@ web/test-results/
 .opencode/
 .sisyphus/
 monica-php
+
+.claude/

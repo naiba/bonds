@@ -36,7 +36,9 @@ function loadView(): ViewMode {
   try {
     const saved = localStorage.getItem(VIEW_STORAGE_KEY);
     if (saved === "list" || saved === "kanban") return saved;
-  } catch { /* fallback */ }
+  } catch {
+    // Ignore storage errors in private mode or restricted environments.
+  }
   return "list";
 }
 
@@ -51,7 +53,11 @@ export default function VaultTasks() {
 
   const updateView = (next: ViewMode) => {
     setView(next);
-    try { localStorage.setItem(VIEW_STORAGE_KEY, next); } catch { /* quota or private mode */ }
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Ignore storage errors in private mode or restricted environments.
+    }
   };
 
   // Modal state owned by VaultTasks for the list view's row clicks. The
@@ -80,34 +86,25 @@ export default function VaultTasks() {
 
   const stop = (e: React.MouseEvent | React.SyntheticEvent) => e.stopPropagation();
 
-  // Contact links in a row need to navigate without triggering the row's
-  // edit-modal-open click. stopPropagation on each button's click bubble.
-  const renderContactLink = (task: VaultTask) => {
-    const contacts = task.contacts ?? [];
-    if (contacts.length === 0) return null;
-    return (
-      <div
-        style={{ marginLeft: 24, marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8 }}
-        onClick={stop}
-      >
-        {contacts.map((c) => (
-          <Button
-            key={c.id}
-            type="link"
-            size="small"
-            icon={<UserOutlined />}
-            style={{ padding: 0, height: "auto", fontSize: 12, color: token.colorTextSecondary }}
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/vaults/${vaultId}/contacts/${c.id}`);
-            }}
-          >
-            {c.name || c.id}
-          </Button>
-        ))}
+  // Contact link in a row needs to navigate without triggering the row's
+  // edit-modal-open click. stopPropagation on the button click bubble.
+  const renderContactLink = (task: VaultTask) =>
+    task.contact_id && task.contact_name ? (
+      <div style={{ marginLeft: 24, marginTop: 4 }} onClick={stop}>
+        <Button
+          type="link"
+          size="small"
+          icon={<UserOutlined />}
+          style={{ padding: 0, height: "auto", fontSize: 12, color: token.colorTextSecondary }}
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/vaults/${vaultId}/contacts/${task.contact_id}`);
+          }}
+        >
+          {task.contact_name}
+        </Button>
       </div>
-    );
-  };
+    ) : null;
 
   return (
     <div style={{ width: "100%", margin: "0 auto" }}>
@@ -183,6 +180,8 @@ export default function VaultTasks() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* Stop click on the checkbox itself from opening the modal —
+                        checkbox-toggle UX should be separate from edit. */}
                     <span onClick={stop}>
                       <Checkbox checked={false}>{task.label}</Checkbox>
                     </span>

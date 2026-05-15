@@ -31,6 +31,7 @@ var entityConfigs = map[string]entityConfig{
 	"genders":            {table: "genders", hasName: true},
 	"pronouns":           {table: "pronouns", hasName: true},
 	"address-types":      {table: "address_types", hasName: true},
+	"task-statuses":      {table: "task_statuses", hasName: true},
 	"pet-categories":     {table: "pet_categories", hasName: true},
 	"contact-info-types": {table: "contact_information_types", hasName: true},
 	"call-reasons":       {table: "call_reason_types", hasLabel: true},
@@ -50,6 +51,10 @@ func (s *PersonalizeService) List(accountID, entity string) ([]dto.PersonalizeEn
 	cfg, ok := entityConfigs[entity]
 	if !ok {
 		return nil, ErrUnknownEntityType
+	}
+
+	if entity == "task-statuses" {
+		return s.listTaskStatuses(accountID)
 	}
 
 	var results []dto.PersonalizeEntityResponse
@@ -87,6 +92,10 @@ func (s *PersonalizeService) Create(accountID, entity string, req dto.Personaliz
 	cfg, ok := entityConfigs[entity]
 	if !ok {
 		return nil, ErrUnknownEntityType
+	}
+
+	if entity == "task-statuses" {
+		return s.createTaskStatus(accountID, req)
 	}
 
 	labelCol := s.getLabelCol(cfg)
@@ -143,6 +152,10 @@ func (s *PersonalizeService) Delete(accountID, entity string, id uint) error {
 	cfg, ok := entityConfigs[entity]
 	if !ok {
 		return ErrUnknownEntityType
+	}
+
+	if entity == "task-statuses" {
+		return s.deleteTaskStatus(accountID, id)
 	}
 
 	result := s.db.Exec(
@@ -210,6 +223,7 @@ var accountSyncEntities = []syncableEntity{
 	{table: "templates", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
 	{table: "template_pages", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id", parentTable: "templates", parentJoinCol: "template_id"},
 	{table: "modules", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
+	{table: "task_statuses", displayCol: "name", keyCol: "name_translation_key", ownerCol: "account_id"},
 }
 
 var vaultSyncEntities = []syncableEntity{

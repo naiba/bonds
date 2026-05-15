@@ -35,12 +35,19 @@ type Address struct {
 }
 
 type ContactAddress struct {
-	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ContactID     string    `json:"contact_id" gorm:"type:text;not null;index"`
-	AddressID     uint      `json:"address_id" gorm:"not null;index"`
-	IsPastAddress bool      `json:"is_past_address" gorm:"default:false"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID            uint       `json:"id" gorm:"primaryKey;autoIncrement"`
+	ContactID     string     `json:"contact_id" gorm:"type:text;not null;index"`
+	AddressID     uint       `json:"address_id" gorm:"not null;index"`
+	IsPastAddress bool       `json:"is_past_address" gorm:"default:false"`
+	// DateFrom: when the contact moved in. Nullable — old rows have no
+	// timeline data; users can fill in over time.
+	DateFrom *time.Time `json:"date_from"`
+	// DateTo: when they moved out. Setting this implies IsPastAddress=true
+	// (the service enforces that). Nullable means "still living there"
+	// when IsPastAddress=false, "unknown end date" when IsPastAddress=true.
+	DateTo    *time.Time `json:"date_to"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 func (ContactAddress) TableName() string {

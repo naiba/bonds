@@ -213,8 +213,10 @@ func TestListCalendarObjectsWithTasks(t *testing.T) {
 	contact := createTestContact(t, db, vaultID, userID, "Task", "User")
 
 	uid := uuid.New().String()
+	contactID := contact.ID
 	task := models.ContactTask{
-		ContactID:  contact.ID,
+		VaultID:    vaultID,
+		ContactID:  &contactID,
 		AuthorID:   &userID,
 		UUID:       &uid,
 		AuthorName: "Test",
@@ -262,8 +264,10 @@ func TestGetCalendarObjectTask(t *testing.T) {
 	uid := uuid.New().String()
 	desc := "A detailed description"
 	dueAt := time.Now().Add(24 * time.Hour)
+	contactID := contact.ID
 	task := models.ContactTask{
-		ContactID:   contact.ID,
+		VaultID:     vaultID,
+		ContactID:   &contactID,
 		AuthorID:    &userID,
 		UUID:        &uid,
 		AuthorName:  "Test",

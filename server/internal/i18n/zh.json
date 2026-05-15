@@ -414,5 +414,11 @@
   "seed.life_event_types.had_a_promotion": "升职",
 
   "seed.quick_facts.hobbies": "兴趣爱好",
-  "seed.quick_facts.food_preferences": "饮食偏好"
+  "seed.quick_facts.food_preferences": "饮食偏好",
+
+  "seed.task_statuses.todo": "待办",
+  "seed.task_statuses.in_progress": "进行中",
+  "seed.task_statuses.done": "已完成",
+  "seed.task_statuses.blocked": "受阻",
+  "seed.task_statuses.cancelled": "已取消"
 }

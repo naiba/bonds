@@ -70,6 +70,9 @@ func main() {
 	migrateUploadDir(cfg.Storage.UploadDir)
 	migrateModulesToContactPage(db)
 	services.BackfillImportantDateReminderSchedules(db)
+	if err := models.BackfillTaskStatuses(db); err != nil {
+		log.Printf("WARNING: failed to backfill task statuses: %v", err)
+	}
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()

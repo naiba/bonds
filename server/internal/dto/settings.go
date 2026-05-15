@@ -80,4 +80,9 @@ type PersonalizeEntityResponse struct {
 	Position  *int      `json:"position" example:"1"`
 	CreatedAt time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	// Optional metadata fields. Populated only for entities that need them
+	// (today: task-statuses); left zero/null for everything else.
+	Slug         string `json:"slug,omitempty" example:"in-progress"`
+	IsDefault    *bool  `json:"is_default,omitempty"`
+	CanBeDeleted *bool  `json:"can_be_deleted,omitempty"`
 }
