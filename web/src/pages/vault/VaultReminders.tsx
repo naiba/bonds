@@ -14,7 +14,7 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { api } from "@/api";
-import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import { useDateFormat, formatDate, formatShortDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -97,10 +97,13 @@ export default function VaultReminders() {
             key: "date",
             render: (_, record) => {
               if (record.month == null || record.day == null) return "-";
-              // year is null for recurring yearly reminders; fall back to current year for formatting.
-              const y = record.year ?? new Date().getFullYear();
-              const dateStr = `${y}-${String(record.month).padStart(2, "0")}-${String(record.day).padStart(2, "0")}`;
-              return formatDate(dateStr, dateFormats);
+              // year is null for recurring yearly reminders → render day+month only.
+              const mm = String(record.month).padStart(2, "0");
+              const dd = String(record.day).padStart(2, "0");
+              const probe = `${record.year ?? 2000}-${mm}-${dd}`;
+              return record.year != null
+                ? formatDate(probe, dateFormats)
+                : formatShortDate(probe, dateFormats);
             },
             sorter: (a, b) => {
               if (!a.year) return -1;
