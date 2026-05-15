@@ -27,6 +27,13 @@ export default function VaultReminders() {
   const nameOrder = useNameOrder();
   const dateFormats = useDateFormat();
 
+  const frequencyLabels: Record<string, string> = {
+    one_time: t("modules.reminders.freq_one_time"),
+    recurring_week: t("modules.reminders.freq_weekly"),
+    recurring_month: t("modules.reminders.freq_monthly"),
+    recurring_year: t("modules.reminders.freq_yearly"),
+  };
+
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "reminders"],
     queryFn: async () => {
@@ -89,9 +96,10 @@ export default function VaultReminders() {
             title: t("vault.reminders.date"),
             key: "date",
             render: (_, record) => {
-              if (!record.year || !record.month || !record.day) return "-";
-              // 使用用户日期格式偏好，而非硬编码格式（fix #65）
-              const dateStr = `${record.year}-${String(record.month).padStart(2, "0")}-${String(record.day).padStart(2, "0")}`;
+              if (record.month == null || record.day == null) return "-";
+              // year is null for recurring yearly reminders; fall back to current year for formatting.
+              const y = record.year ?? new Date().getFullYear();
+              const dateStr = `${y}-${String(record.month).padStart(2, "0")}-${String(record.day).padStart(2, "0")}`;
               return formatDate(dateStr, dateFormats);
             },
             sorter: (a, b) => {
@@ -106,7 +114,7 @@ export default function VaultReminders() {
             title: t("vault.reminders.type"),
             dataIndex: "type",
             key: "type",
-            render: (text) => <Tag>{text}</Tag>,
+            render: (text) => <Tag>{frequencyLabels[text] ?? text}</Tag>,
           },
         ]}
       />

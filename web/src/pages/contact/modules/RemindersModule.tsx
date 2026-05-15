@@ -33,9 +33,10 @@ const freqColor: Record<string, string> = {
 };
 
 function formatReminderDate(r: Reminder, dateFormats: DateFormatVariants): string {
+  // year is null for recurring yearly reminders; fall back to current year for formatting.
   const buildDateStr = () =>
-    r.year && r.month && r.day
-      ? `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`
+    r.month != null && r.day != null
+      ? `${r.year ?? new Date().getFullYear()}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`
       : "";
 
   if (r.calendar_type && r.calendar_type !== "gregorian" && r.original_month != null && r.original_day != null) {
@@ -195,7 +196,9 @@ export default function RemindersModule({
               description={
                 <>
                   <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r, dateFormats)}</span>{" "}
-                  <Tag color={freqColor[r.type!] ?? "default"}>{r.type}</Tag>
+                  <Tag color={freqColor[r.type!] ?? "default"}>
+                    {frequencyOptions.find((o) => o.value === r.type)?.label ?? r.type}
+                  </Tag>
                   {altCalendar && r.calendar_type && r.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{r.calendar_type}</Tag>
                   )}
