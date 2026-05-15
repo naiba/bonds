@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/testutil"
@@ -131,6 +132,78 @@ func TestDeleteAddress(t *testing.T) {
 	}
 	if len(addresses) != 0 {
 		t.Errorf("Expected 0 addresses after delete, got %d", len(addresses))
+	}
+}
+
+func TestAddressTimeline(t *testing.T) {
+	svc, contactID, vaultID := setupAddressTest(t)
+
+	from := time.Date(2024, 9, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2025, 8, 31, 0, 0, 0, 0, time.UTC)
+
+	// Create with date_to set; service should auto-flip is_past_address.
+	addr, err := svc.Create(contactID, vaultID, dto.CreateAddressRequest{
+		Line1:    "10 rue François Mouthon",
+		City:     "Paris",
+		Country:  "FR",
+		DateFrom: &from,
+		DateTo:   &to,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if !addr.IsPastAddress {
+		t.Errorf("DateTo set should auto-flip IsPastAddress=true, got false")
+	}
+	if addr.DateFrom == nil || !addr.DateFrom.Equal(from) {
+		t.Errorf("DateFrom not round-tripped: got %v, want %v", addr.DateFrom, from)
+	}
+	if addr.DateTo == nil || !addr.DateTo.Equal(to) {
+		t.Errorf("DateTo not round-tripped: got %v, want %v", addr.DateTo, to)
+	}
+
+	// List should return the same dates.
+	all, err := svc.List(contactID, vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(all) != 1 {
+		t.Fatalf("expected 1 address, got %d", len(all))
+	}
+	if all[0].DateFrom == nil || !all[0].DateFrom.Equal(from) {
+		t.Errorf("List lost DateFrom")
+	}
+
+	// Current address (no DateTo): IsPastAddress stays false.
+	current, err := svc.Create(contactID, vaultID, dto.CreateAddressRequest{
+		Line1:    "Malet Street",
+		City:     "London",
+		Country:  "GB",
+		DateFrom: &to, // moved here when she left Paris
+	})
+	if err != nil {
+		t.Fatalf("Create current failed: %v", err)
+	}
+	if current.IsPastAddress {
+		t.Errorf("DateTo nil should leave IsPastAddress=false (default), got true")
+	}
+	if current.DateTo != nil {
+		t.Errorf("Expected DateTo nil for current address, got %v", current.DateTo)
+	}
+
+	// Update: setting DateTo should also flip IsPastAddress on existing rows.
+	end := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
+	updated, err := svc.Update(current.ID, contactID, vaultID, dto.UpdateAddressRequest{
+		Line1:   "Malet Street",
+		City:    "London",
+		Country: "GB",
+		DateTo:  &end,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if !updated.IsPastAddress {
+		t.Errorf("Setting DateTo on update should flip IsPastAddress=true")
 	}
 }
 
