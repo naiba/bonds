@@ -12,6 +12,7 @@ import {
   Segmented,
   theme,
 } from "antd";
+import { Virtuoso } from "react-virtuoso";
 import {
   ArrowLeftOutlined,
   CheckSquareOutlined,
@@ -109,7 +110,7 @@ export default function VaultTasks() {
   };
 
   return (
-    <div style={{ maxWidth: view === "kanban" ? 1200 : 720, margin: "0 auto" }}>
+    <div style={{ width: "100%", margin: "0 auto" }}>
       <div
         style={{
           display: "flex",
@@ -148,70 +149,68 @@ export default function VaultTasks() {
             borderRadius: token.borderRadiusLG,
           }}
         >
-          <List
-            dataSource={pending}
-            locale={{
-              emptyText: (
-                <div className="bonds-empty-hero">
-                  <div
-                    className="bonds-empty-hero-icon"
-                    style={{ background: token.colorPrimaryBg }}
-                  >
-                    <CheckSquareOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
-                  </div>
-                  <div className="bonds-empty-hero-title">{t("vault.tasks.no_pending")}</div>
-                  <div
-                    className="bonds-empty-hero-desc"
-                    style={{ color: token.colorTextSecondary }}
-                  >
-                    {t("empty.tasks")}
-                  </div>
-                </div>
-              ),
-            }}
-            renderItem={(task: VaultTask) => (
-              <List.Item
-                onClick={() => setEditTask(task)}
-                style={{
-                  borderLeft: `3px solid ${token.colorSuccess}`,
-                  marginBottom: 4,
-                  paddingLeft: 12,
-                  borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
-                  background: token.colorFillQuaternary,
-                  display: "block",
-                  cursor: "pointer",
-                }}
+          {pending.length === 0 ? (
+            <div className="bonds-empty-hero">
+              <div
+                className="bonds-empty-hero-icon"
+                style={{ background: token.colorPrimaryBg }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {/* Stop click on the checkbox itself from opening the modal —
-                      checkbox-toggle UX should be separate from edit. */}
-                  <span onClick={stop}>
-                    <Checkbox checked={false}>{task.label}</Checkbox>
-                  </span>
-                  {task.due_at && (
-                    <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
-                      {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
-                    </Tag>
-                  )}
-                </div>
-                {renderContactLink(task)}
-                {task.description && (
-                  <div
-                    style={{
-                      marginLeft: 24,
-                      marginTop: 4,
-                      fontSize: 13,
-                      color: token.colorTextSecondary,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {task.description}
+                <CheckSquareOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
+              </div>
+              <div className="bonds-empty-hero-title">{t("vault.tasks.no_pending")}</div>
+              <div
+                className="bonds-empty-hero-desc"
+                style={{ color: token.colorTextSecondary }}
+              >
+                {t("empty.tasks")}
+              </div>
+            </div>
+          ) : (
+            <Virtuoso
+              useWindowScroll
+              data={pending}
+              itemContent={(_, task) => (
+                <List.Item
+                  onClick={() => setEditTask(task)}
+                  style={{
+                    borderLeft: `3px solid ${token.colorSuccess}`,
+                    marginBottom: 4,
+                    paddingLeft: 12,
+                    borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
+                    background: token.colorFillQuaternary,
+                    display: "block",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span onClick={stop}>
+                      <Checkbox checked={false}>{task.label}</Checkbox>
+                    </span>
+                    {task.due_at && (
+                      <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12 }}>
+                        {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
+                      </Tag>
+                    )}
                   </div>
-                )}
-              </List.Item>
-            )}
-          />
+                  {renderContactLink(task)}
+                  {task.description && (
+                    <div
+                      style={{
+                        marginLeft: 24,
+                        marginTop: 4,
+                        fontSize: 13,
+                        color: token.colorTextSecondary,
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {task.description}
+                    </div>
+                  )}
+                </List.Item>
+              )}
+            />
+          )}
 
           {completed.length > 0 && (
             <>
@@ -226,9 +225,10 @@ export default function VaultTasks() {
               >
                 {t("vault.tasks.completed", { count: completed.length })}
               </Divider>
-              <List
-                dataSource={completed}
-                renderItem={(task: VaultTask) => (
+              <Virtuoso
+                useWindowScroll
+                data={completed}
+                itemContent={(_, task) => (
                   <List.Item
                     onClick={() => setEditTask(task)}
                     style={{
