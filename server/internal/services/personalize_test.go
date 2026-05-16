@@ -76,6 +76,84 @@ func TestListUnknownEntity(t *testing.T) {
 	}
 }
 
+func TestDeleteTaskStatusOnlyReassignsTasksInSameAccount(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+	personalizeSvc := NewPersonalizeService(db)
+	taskSvc := NewVaultTaskService(db)
+
+	firstUser, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "First",
+		LastName:  "User",
+		Email:     "first-task-status-delete@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("register first user failed: %v", err)
+	}
+	secondUser, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Second",
+		LastName:  "User",
+		Email:     "second-task-status-delete@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("register second user failed: %v", err)
+	}
+
+	firstVault, err := vaultSvc.CreateVault(firstUser.User.AccountID, firstUser.User.ID, dto.CreateVaultRequest{Name: "First Vault"}, "en")
+	if err != nil {
+		t.Fatalf("create first vault failed: %v", err)
+	}
+	secondVault, err := vaultSvc.CreateVault(secondUser.User.AccountID, secondUser.User.ID, dto.CreateVaultRequest{Name: "Second Vault"}, "en")
+	if err != nil {
+		t.Fatalf("create second vault failed: %v", err)
+	}
+
+	firstStatus, err := personalizeSvc.Create(firstUser.User.AccountID, "task-statuses", dto.PersonalizeEntityRequest{Name: "Waiting"})
+	if err != nil {
+		t.Fatalf("create first custom status failed: %v", err)
+	}
+	secondStatus, err := personalizeSvc.Create(secondUser.User.AccountID, "task-statuses", dto.PersonalizeEntityRequest{Name: "Waiting"})
+	if err != nil {
+		t.Fatalf("create second custom status failed: %v", err)
+	}
+	if firstStatus.Slug != secondStatus.Slug {
+		t.Fatalf("setup expected same slug in both accounts, got %q and %q", firstStatus.Slug, secondStatus.Slug)
+	}
+
+	firstTask, err := taskSvc.Create(firstVault.ID, firstUser.User.ID, dto.CreateVaultTaskRequest{Label: "first", Status: firstStatus.Slug})
+	if err != nil {
+		t.Fatalf("create first task failed: %v", err)
+	}
+	secondTask, err := taskSvc.Create(secondVault.ID, secondUser.User.ID, dto.CreateVaultTaskRequest{Label: "second", Status: secondStatus.Slug})
+	if err != nil {
+		t.Fatalf("create second task failed: %v", err)
+	}
+
+	if err := personalizeSvc.Delete(firstUser.User.AccountID, "task-statuses", firstStatus.ID); err != nil {
+		t.Fatalf("delete first custom status failed: %v", err)
+	}
+
+	var firstStored models.ContactTask
+	if err := db.Where("id = ?", firstTask.ID).First(&firstStored).Error; err != nil {
+		t.Fatalf("load first task failed: %v", err)
+	}
+	if firstStored.Status == firstStatus.Slug {
+		t.Fatalf("first account task was not reassigned away from deleted status %q", firstStatus.Slug)
+	}
+
+	var secondStored models.ContactTask
+	if err := db.Where("id = ?", secondTask.ID).First(&secondStored).Error; err != nil {
+		t.Fatalf("load second task failed: %v", err)
+	}
+	if secondStored.Status != secondStatus.Slug {
+		t.Fatalf("second account task status = %q, want %q", secondStored.Status, secondStatus.Slug)
+	}
+}
+
 func TestSyncAllTranslations_AccountEntities(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()

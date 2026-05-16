@@ -235,6 +235,8 @@
       "no_contacts_placeholder": "No contacts (standalone)",
       "parent_label": "Parent task (optional)",
       "no_parent_placeholder": "No parent (top-level task)",
+      "sub_tasks_label": "Sub-tasks ({{count}})",
+      "add_sub_task": "Add sub-task",
       "create": "Create",
       "cancel": "Cancel",
       "empty_column": "Drop tasks here",

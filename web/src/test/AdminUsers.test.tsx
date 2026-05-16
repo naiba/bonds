@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import AdminUsers from "@/pages/admin/Users";
+import { api } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -34,10 +35,35 @@ vi.mock("@/stores/auth", () => ({
 }));
 
 const mockUseQuery = vi.fn();
+const mockSetQueriesData = vi.fn();
+const mockInvalidateQueries = vi.fn();
+const mutationOptions: Array<{
+  mutationFn: (variables: unknown) => Promise<unknown>;
+  onSuccess?: (data: unknown, variables: unknown) => void;
+  onError?: (error: unknown) => void;
+}> = [];
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: (options: {
+    mutationFn: (variables: unknown) => Promise<unknown>;
+    onSuccess?: (data: unknown, variables: unknown) => void;
+    onError?: (error: unknown) => void;
+  }) => {
+    mutationOptions.push(options);
+    return {
+      mutate: (variables: unknown) => {
+        options
+          .mutationFn(variables)
+          .then((data) => options.onSuccess?.(data, variables))
+          .catch((error) => options.onError?.(error));
+      },
+      isPending: false,
+    };
+  },
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+    setQueriesData: mockSetQueriesData,
+  }),
 }));
 
 function renderAdminUsers() {
@@ -55,6 +81,8 @@ function renderAdminUsers() {
 describe("AdminUsers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mutationOptions.length = 0;
+    vi.mocked(api.admin.usersDelete).mockResolvedValue(undefined);
   });
 
   function mockUsersData(users: unknown[]) {
@@ -153,5 +181,61 @@ describe("AdminUsers", () => {
     renderAdminUsers();
     expect(screen.queryByText("Disable")).not.toBeInTheDocument();
     expect(screen.queryByText("Remove Admin")).not.toBeInTheDocument();
+  });
+
+  it("removes a deleted user from cached admin users data", () => {
+    mockUseQuery.mockReturnValue(
+      mockUsersData([
+        {
+          id: "admin-1",
+          first_name: "Self",
+          last_name: "Admin",
+          email: "self@example.com",
+          is_instance_administrator: true,
+          disabled: false,
+          contact_count: 0,
+          vault_count: 0,
+          storage_used: 0,
+          created_at: "2024-01-01T00:00:00Z",
+        },
+        {
+          id: "user-2",
+          first_name: "Throw",
+          last_name: "Away",
+          email: "throwaway@example.com",
+          is_instance_administrator: false,
+          disabled: false,
+          contact_count: 0,
+          vault_count: 0,
+          storage_used: 0,
+          created_at: "2024-01-02T00:00:00Z",
+        },
+      ]),
+    );
+
+    renderAdminUsers();
+
+    const deleteMutation = mutationOptions[2];
+    deleteMutation.onSuccess?.(undefined, "user-2");
+
+    expect(mockSetQueriesData).toHaveBeenCalledWith(
+      { queryKey: ["admin", "users"] },
+      expect.any(Function),
+    );
+
+    const updateCachedUsers = mockSetQueriesData.mock.calls[0][1] as (oldData: {
+      users: Array<{ id: string; email: string }>;
+      meta: { total: number };
+    }) => { users: Array<{ id: string; email: string }>; meta: { total: number } };
+    const updated = updateCachedUsers({
+      users: [
+        { id: "admin-1", email: "self@example.com" },
+        { id: "user-2", email: "throwaway@example.com" },
+      ],
+      meta: { total: 2 },
+    });
+
+    expect(updated.users).toEqual([{ id: "admin-1", email: "self@example.com" }]);
+    expect(updated.meta.total).toBe(1);
   });
 });

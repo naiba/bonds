@@ -100,7 +100,21 @@ export default function AdminUsers() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.admin.usersDelete(id),
-    onSuccess: () => {
+    onSuccess: (_data, deletedUserID) => {
+      queryClient.setQueriesData<{
+        users: AdminUser[];
+        meta?: PaginationMeta;
+      }>({ queryKey: invalidateKey }, (oldData) => {
+        if (!oldData) return oldData;
+        const users = oldData.users.filter((user) => user.id !== deletedUserID);
+        return {
+          ...oldData,
+          users,
+          meta: oldData.meta
+            ? { ...oldData.meta, total: Math.max(0, (oldData.meta.total ?? users.length) - 1) }
+            : oldData.meta,
+        };
+      });
       queryClient.invalidateQueries({ queryKey: invalidateKey });
       message.success(t("admin.users.deleted"));
     },

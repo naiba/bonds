@@ -351,6 +351,7 @@ func TestDeleteVault_CleanupCompleteness(t *testing.T) {
 		{"Address", &models.Address{}},
 		{"LifeMetric", &models.LifeMetric{}},
 		{"Note", &models.Note{}},
+		{"ContactTask", &models.ContactTask{}},
 		{"Journal", &models.Journal{}},
 		{"TimelineEvent", &models.TimelineEvent{}},
 		{"ContactVaultUser", &models.ContactVaultUser{}},
@@ -406,9 +407,21 @@ func TestDeleteVault_WithForeignKeysEnabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateVault failed: %v", err)
 	}
+	taskSvc := NewVaultTaskService(db)
+	if _, err := taskSvc.Create(vault.ID, resp.User.ID, dto.CreateVaultTaskRequest{
+		Label: "Standalone vault task",
+	}); err != nil {
+		t.Fatalf("Create standalone vault task failed: %v", err)
+	}
 
 	if err := vaultSvc.DeleteVault(vault.ID); err != nil {
 		t.Fatalf("DeleteVault with foreign_keys=ON failed: %v", err)
+	}
+
+	var taskCount int64
+	db.Model(&models.ContactTask{}).Where("vault_id = ?", vault.ID).Count(&taskCount)
+	if taskCount != 0 {
+		t.Errorf("Expected standalone vault tasks to be deleted, got %d", taskCount)
 	}
 
 	_, err = vaultSvc.GetVault(vault.ID, resp.User.ID)

@@ -234,6 +234,7 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 		accountTables := []interface{}{
 			&models.Invitation{},
 			&models.AccountCurrency{},
+			&models.TaskStatus{},
 			&models.Gender{},
 			&models.Pronoun{},
 			&models.AddressType{},
@@ -381,6 +382,7 @@ func (s *AdminService) deleteVaultData(tx *gorm.DB, vaultID string) error {
 		&models.AddressBookSubscription{},
 		&models.Address{},
 		&models.Loan{},
+		&models.ContactTask{},
 		&models.TimelineEvent{},
 		&models.LifeMetric{},
 	}

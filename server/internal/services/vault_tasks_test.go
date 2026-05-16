@@ -1,6 +1,7 @@
 package services
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -46,6 +47,24 @@ func hasAssignee(task *dto.VaultTaskResponse, contactID string) bool {
 		}
 	}
 	return false
+}
+
+func createTaskStatusForVaultTaskTest(t *testing.T, svc *VaultTaskService, vaultID, name string) string {
+	t.Helper()
+
+	var vault models.Vault
+	if err := svc.db.Where("id = ?", vaultID).First(&vault).Error; err != nil {
+		t.Fatalf("load vault failed: %v", err)
+	}
+
+	resp, err := NewPersonalizeService(svc.db).Create(vault.AccountID, "task-statuses", dto.PersonalizeEntityRequest{Name: name})
+	if err != nil {
+		t.Fatalf("create task status failed: %v", err)
+	}
+	if resp.Slug == "" {
+		t.Fatalf("created task status has empty slug: %+v", resp)
+	}
+	return resp.Slug
 }
 
 func TestVaultTaskListEmpty(t *testing.T) {
@@ -220,6 +239,20 @@ func TestVaultTaskUpdateStatusRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestVaultTaskUpdateStatusAcceptsCustomStatus(t *testing.T) {
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
+	customStatus := createTaskStatusForVaultTaskTest(t, svc, vaultID, "Waiting Review")
+	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "x"})
+
+	updated, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: customStatus})
+	if err != nil {
+		t.Fatalf("UpdateStatus rejected account task status %q: %v", customStatus, err)
+	}
+	if updated.Status != customStatus {
+		t.Errorf("status mismatch: got %q, want %q", updated.Status, customStatus)
+	}
+}
+
 func TestVaultTaskUpdatePositionMovesAcrossColumns(t *testing.T) {
 	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
 
@@ -231,11 +264,81 @@ func TestVaultTaskUpdatePositionMovesAcrossColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpdatePosition failed: %v", err)
 	}
-	if updated.Position != 5 {
-		t.Errorf("position not updated, got %d want 5", updated.Position)
+	if updated.Position != 0 {
+		t.Errorf("position should be normalized within destination column, got %d want 0", updated.Position)
 	}
 	if updated.Status != models.TaskStatusInProgress {
 		t.Errorf("status not updated, got %q", updated.Status)
+	}
+}
+
+func TestVaultTaskUpdatePositionResequencesDestinationColumn(t *testing.T) {
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
+
+	taskA, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "A", Status: models.TaskStatusTodo})
+	taskB, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "B", Status: models.TaskStatusTodo})
+	taskC, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "C", Status: models.TaskStatusTodo})
+	_, _ = svc.UpdatePosition(taskA.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo})
+	_, _ = svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 1, Status: models.TaskStatusTodo})
+	_, _ = svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 2, Status: models.TaskStatusTodo})
+
+	_, err := svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo})
+	if err != nil {
+		t.Fatalf("UpdatePosition failed: %v", err)
+	}
+
+	tasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusTodo}[0]})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	gotLabels := []string{tasks[0].Label, tasks[1].Label, tasks[2].Label}
+	wantLabels := []string{"C", "A", "B"}
+	if !reflect.DeepEqual(gotLabels, wantLabels) {
+		t.Fatalf("order mismatch: got %v, want %v", gotLabels, wantLabels)
+	}
+	for i, task := range tasks {
+		if task.Position != i {
+			t.Fatalf("task %s position mismatch: got %d, want %d", task.Label, task.Position, i)
+		}
+	}
+}
+
+func TestVaultTaskUpdatePositionResequencesSourceAndDestinationColumns(t *testing.T) {
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
+
+	taskA, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "A", Status: models.TaskStatusTodo})
+	taskB, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "B", Status: models.TaskStatusTodo})
+	taskC, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "C", Status: models.TaskStatusInProgress})
+	_, _ = svc.UpdatePosition(taskA.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo})
+	_, _ = svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 1, Status: models.TaskStatusTodo})
+	_, _ = svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusInProgress})
+
+	_, err := svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusInProgress})
+	if err != nil {
+		t.Fatalf("UpdatePosition failed: %v", err)
+	}
+
+	todoTasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusTodo}[0]})
+	if err != nil {
+		t.Fatalf("List todo failed: %v", err)
+	}
+	if len(todoTasks) != 1 || todoTasks[0].Label != "A" || todoTasks[0].Position != 0 {
+		t.Fatalf("source column not resequenced: %+v", todoTasks)
+	}
+
+	wipTasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusInProgress}[0]})
+	if err != nil {
+		t.Fatalf("List in_progress failed: %v", err)
+	}
+	gotLabels := []string{wipTasks[0].Label, wipTasks[1].Label}
+	wantLabels := []string{"B", "C"}
+	if !reflect.DeepEqual(gotLabels, wantLabels) {
+		t.Fatalf("destination order mismatch: got %v, want %v", gotLabels, wantLabels)
+	}
+	for i, task := range wipTasks {
+		if task.Position != i {
+			t.Fatalf("destination task %s position mismatch: got %d, want %d", task.Label, task.Position, i)
+		}
 	}
 }
 

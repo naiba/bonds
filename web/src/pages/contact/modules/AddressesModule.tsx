@@ -25,6 +25,7 @@ import dayjs, { type Dayjs } from "dayjs";
 import { api } from "@/api";
 import type { Address, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
+import { formatMonthYear, useDateFormat } from "@/utils/dateFormat";
 
 interface AddressFormValues {
   line_1: string;
@@ -51,6 +52,7 @@ export default function AddressesModule({
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
+  const dateFormats = useDateFormat();
   const { token } = theme.useToken();
   const qk = ["vaults", vaultId, "contacts", contactId, "addresses"];
 
@@ -129,7 +131,7 @@ export default function AddressesModule({
   }
 
   function formatRange(a: Address): string | null {
-    const fmt = (d?: string) => (d ? dayjs(d).format("MMM YYYY") : null);
+    const fmt = (d?: string) => (d ? formatMonthYear(d, dateFormats) : null);
     const from = fmt(a.date_from);
     const to = fmt(a.date_to);
     if (!from && !to) return null;
@@ -187,8 +189,7 @@ export default function AddressesModule({
             >
               <List.Item.Meta
                 avatar={
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (a as any).latitude && (a as any).longitude ? (
+                  a.latitude && a.longitude ? (
                     <img
                       src={mapImageUrl(a)}
                       alt="Map"

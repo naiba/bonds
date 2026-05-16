@@ -36,7 +36,9 @@ function loadView(): ViewMode {
   try {
     const saved = localStorage.getItem(VIEW_STORAGE_KEY);
     if (saved === "list" || saved === "kanban") return saved;
-  } catch { /* fallback */ }
+  } catch {
+    // Ignore storage errors in private mode or restricted environments.
+  }
   return "list";
 }
 
@@ -51,12 +53,24 @@ export default function VaultTasks() {
 
   const updateView = (next: ViewMode) => {
     setView(next);
-    try { localStorage.setItem(VIEW_STORAGE_KEY, next); } catch { /* quota or private mode */ }
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Ignore storage errors in private mode or restricted environments.
+    }
   };
 
   // Modal state owned by VaultTasks for the list view's row clicks. The
   // kanban view has its own modal instance for "+ create" and card clicks.
+  // `createSubParent` lets the modal stay open in create-mode with a
+  // parent_task_id pre-filled when the user clicks "+ Add sub-task".
   const [editTask, setEditTask] = useState<VaultTask | null>(null);
+  const [createSubParent, setCreateSubParent] = useState<number | null>(null);
+  const modalOpen = editTask !== null || createSubParent !== null;
+  const closeModal = () => {
+    setEditTask(null);
+    setCreateSubParent(null);
+  };
 
   const { data: tasks = [], isLoading } = useQuery<VaultTask[]>({
     queryKey: ["vaults", vaultId, "all-tasks"],
@@ -183,6 +197,8 @@ export default function VaultTasks() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {/* Stop click on the checkbox itself from opening the modal —
+                        checkbox-toggle UX should be separate from edit. */}
                     <span onClick={stop}>
                       <Checkbox checked={false}>{task.label}</Checkbox>
                     </span>
@@ -259,9 +275,18 @@ export default function VaultTasks() {
 
       <TaskEditModal
         vaultId={vaultId}
-        open={editTask !== null}
+        open={modalOpen}
         task={editTask}
-        onClose={() => setEditTask(null)}
+        defaultParentTaskId={createSubParent ?? undefined}
+        onClose={closeModal}
+        onSelectTask={(t) => {
+          setCreateSubParent(null);
+          setEditTask(t);
+        }}
+        onCreateSubTask={(parentId) => {
+          setEditTask(null);
+          setCreateSubParent(parentId);
+        }}
       />
     </div>
   );

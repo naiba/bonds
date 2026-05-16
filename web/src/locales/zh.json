@@ -235,6 +235,8 @@
       "no_contacts_placeholder": "无关联联系人（独立任务）",
       "parent_label": "父任务（可选）",
       "no_parent_placeholder": "无父任务（顶层任务）",
+      "sub_tasks_label": "子任务（{{count}}）",
+      "add_sub_task": "添加子任务",
       "create": "创建",
       "cancel": "取消",
       "empty_column": "拖放任务到此处",
