@@ -95,7 +95,7 @@ func TestDecryptCorruptedCiphertext(t *testing.T) {
 	c := New("k")
 	ct, _ := c.Encrypt("secret")
 
-	tampered := strings.TrimSuffix(ct, ct[len(ct)-1:]) + "0"
+	tampered := corruptCiphertextForTest(ct)
 	if _, err := c.Decrypt(tampered); err == nil {
 		t.Fatal("tampered ciphertext must fail GCM auth")
 	}
@@ -107,6 +107,25 @@ func TestDecryptCorruptedCiphertext(t *testing.T) {
 	if _, err := c.Decrypt(CiphertextPrefix + "00"); err == nil {
 		t.Fatal("ciphertext shorter than nonce must fail")
 	}
+}
+
+func TestCorruptCiphertextForTestAlwaysChangesCiphertext(t *testing.T) {
+	ciphertextEndingInZero := CiphertextPrefix + "abc0"
+
+	tampered := corruptCiphertextForTest(ciphertextEndingInZero)
+
+	if tampered == ciphertextEndingInZero {
+		t.Fatal("test tamper must modify ciphertext even when the original ends in 0")
+	}
+}
+
+func corruptCiphertextForTest(ciphertext string) string {
+	last := ciphertext[len(ciphertext)-1]
+	replacement := byte('0')
+	if last == replacement {
+		replacement = '1'
+	}
+	return strings.TrimSuffix(ciphertext, ciphertext[len(ciphertext)-1:]) + string(replacement)
 }
 
 func TestEncryptEmptyString(t *testing.T) {

@@ -321,7 +321,8 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 		&models.File{},
 		&models.Address{},
 		&models.LifeMetric{},
-		&models.Note{}, // Notes with vault_id but no contact (edge case safety)
+		&models.Note{},        // Notes with vault_id but no contact (edge case safety)
+		&models.ContactTask{}, // Standalone vault tasks have vault_id but no contact_id.
 		&models.ContactVaultUser{},
 		&models.UserVault{},
 	}
