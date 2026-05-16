@@ -381,6 +381,7 @@ func (s *AdminService) deleteVaultData(tx *gorm.DB, vaultID string) error {
 		&models.AddressBookSubscription{},
 		&models.Address{},
 		&models.Loan{},
+		&models.ContactTask{},
 		&models.TimelineEvent{},
 		&models.LifeMetric{},
 	}

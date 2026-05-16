@@ -255,6 +255,11 @@ func TestAdminDeleteUser_Success(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
+	vaultTaskSvc := NewVaultTaskService(adminSvc.db)
+	if _, err := vaultTaskSvc.Create(vault.ID, target.User.ID, dto.CreateVaultTaskRequest{Label: "Standalone account task"}); err != nil {
+		t.Fatalf("Create standalone vault task failed: %v", err)
+	}
+
 	err = adminSvc.DeleteUser(admin.User.ID, target.User.ID)
 	if err != nil {
 		t.Fatalf("DeleteUser failed: %v", err)
@@ -282,6 +287,12 @@ func TestAdminDeleteUser_Success(t *testing.T) {
 	adminSvc.db.Model(&models.Contact{}).Where("vault_id = ?", vault.ID).Count(&contactCount)
 	if contactCount != 0 {
 		t.Error("expected contacts to be deleted")
+	}
+
+	var taskCount int64
+	adminSvc.db.Model(&models.ContactTask{}).Where("vault_id = ?", vault.ID).Count(&taskCount)
+	if taskCount != 0 {
+		t.Error("expected standalone vault tasks to be deleted")
 	}
 }
 
