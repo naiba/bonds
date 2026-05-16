@@ -2,8 +2,11 @@ package services
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
+	"github.com/naiba/bonds/internal/config"
+	"github.com/naiba/bonds/internal/database"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
@@ -255,6 +258,11 @@ func TestAdminDeleteUser_Success(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
+	vaultTaskSvc := NewVaultTaskService(adminSvc.db)
+	if _, err := vaultTaskSvc.Create(vault.ID, target.User.ID, dto.CreateVaultTaskRequest{Label: "Standalone account task"}); err != nil {
+		t.Fatalf("Create standalone vault task failed: %v", err)
+	}
+
 	err = adminSvc.DeleteUser(admin.User.ID, target.User.ID)
 	if err != nil {
 		t.Fatalf("DeleteUser failed: %v", err)
@@ -282,6 +290,47 @@ func TestAdminDeleteUser_Success(t *testing.T) {
 	adminSvc.db.Model(&models.Contact{}).Where("vault_id = ?", vault.ID).Count(&contactCount)
 	if contactCount != 0 {
 		t.Error("expected contacts to be deleted")
+	}
+
+	var taskCount int64
+	adminSvc.db.Model(&models.ContactTask{}).Where("vault_id = ?", vault.ID).Count(&taskCount)
+	if taskCount != 0 {
+		t.Error("expected standalone vault tasks to be deleted")
+	}
+}
+
+func TestAdminDeleteUser_RegisteredUserWithDefaultVault(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, err := database.Connect(&config.DatabaseConfig{Driver: "sqlite", DSN: filepath.Join(tmpDir, "bonds.db")}, false)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	if err := database.AutoMigrate(db); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	adminSvc := NewAdminService(db, filepath.Join(tmpDir, "uploads"))
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+
+	// The running server enables SQLite foreign keys; keep this regression aligned
+	// with the HTTP path so account cleanup cannot leave child rows behind.
+	if err := db.Exec("PRAGMA foreign_keys = ON").Error; err != nil {
+		t.Fatalf("Failed to enable foreign keys: %v", err)
+	}
+	if err := models.SeedCurrencies(db); err != nil {
+		t.Fatalf("SeedCurrencies failed: %v", err)
+	}
+
+	admin := registerTestUser(t, authSvc, "del-default-admin@example.com")
+	target := registerTestUser(t, authSvc, "del-default-target@example.com")
+
+	if err := adminSvc.DeleteUser(admin.User.ID, target.User.ID); err != nil {
+		t.Fatalf("DeleteUser failed: %v", err)
+	}
+
+	var userCount int64
+	adminSvc.db.Model(&models.User{}).Where("id = ?", target.User.ID).Count(&userCount)
+	if userCount != 0 {
+		t.Error("expected target user to be deleted")
 	}
 }
 

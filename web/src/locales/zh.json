@@ -731,7 +731,15 @@
       "postal_code": "邮编",
       "country": "国家",
       "is_primary": "主要地址",
-      "view_map": "在谷歌地图查看"
+      "view_map": "在谷歌地图查看",
+      "date_from": "入住时间",
+      "date_from_tooltip": "联系人开始居住的日期。如未知请留空。",
+      "date_to": "搬出时间",
+      "date_to_tooltip": "联系人离开的日期。填写后将标记为过往地址。",
+      "is_past_address": "过往地址",
+      "is_past_address_tooltip": "将此地址标记为旧居。",
+      "past_tag": "过往",
+      "present": "至今"
     },
     "contact_info": {
       "title": "联系方式",

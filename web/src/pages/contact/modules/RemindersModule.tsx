@@ -22,7 +22,7 @@ import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import type { CalendarType } from "@/utils/calendar";
-import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import { useDateFormat, formatDate, formatShortDate } from "@/utils/dateFormat";
 import type { DateFormatVariants } from "@/utils/dateFormat";
 
 const freqColor: Record<string, string> = {
@@ -33,10 +33,13 @@ const freqColor: Record<string, string> = {
 };
 
 function formatReminderDate(r: Reminder, dateFormats: DateFormatVariants): string {
-  const buildDateStr = () =>
-    r.year && r.month && r.day
-      ? `${r.year}-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`
-      : "";
+  // year is null for recurring yearly reminders → render day+month only (no year).
+  if (r.month == null || r.day == null) return "";
+  const mm = String(r.month).padStart(2, "0");
+  const dd = String(r.day).padStart(2, "0");
+  // dayjs needs a real year to parse; use any (the year is discarded by the short formatter).
+  const probe = `${r.year ?? 2000}-${mm}-${dd}`;
+  const gregFormatted = r.year != null ? formatDate(probe, dateFormats) : formatShortDate(probe, dateFormats);
 
   if (r.calendar_type && r.calendar_type !== "gregorian" && r.original_month != null && r.original_day != null) {
     const sys = getCalendarSystem(r.calendar_type as CalendarType);
@@ -45,12 +48,9 @@ function formatReminderDate(r: Reminder, dateFormats: DateFormatVariants): strin
       month: r.original_month,
       year: r.original_year ?? 0,
     });
-    // 公历部分也使用用户日期格式偏好（fix #65）
-    const gd = buildDateStr();
-    return gd ? `${formatted} (${formatDate(gd, dateFormats)})` : formatted;
+    return `${formatted} (${gregFormatted})`;
   }
-  const dateStr = buildDateStr();
-  return dateStr ? formatDate(dateStr, dateFormats) : "";
+  return gregFormatted;
 }
 
 export default function RemindersModule({
@@ -195,7 +195,9 @@ export default function RemindersModule({
               description={
                 <>
                   <span style={{ color: token.colorTextSecondary }}>{formatReminderDate(r, dateFormats)}</span>{" "}
-                  <Tag color={freqColor[r.type!] ?? "default"}>{r.type}</Tag>
+                  <Tag color={freqColor[r.type!] ?? "default"}>
+                    {frequencyOptions.find((o) => o.value === r.type)?.label ?? r.type}
+                  </Tag>
                   {altCalendar && r.calendar_type && r.calendar_type !== "gregorian" && (
                     <Tag color="volcano">{r.calendar_type}</Tag>
                   )}

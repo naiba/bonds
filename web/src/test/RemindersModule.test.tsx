@@ -120,7 +120,7 @@ describe("RemindersModule", () => {
     mockRemindersReturn = { data: mockReminders, isLoading: false };
     mockPrefsReturn = { data: undefined };
     renderModule();
-    const recurringTags = screen.getAllByText("recurring_year");
+    const recurringTags = screen.getAllByText("Yearly");
     expect(recurringTags.length).toBeGreaterThanOrEqual(1);
   });
 });

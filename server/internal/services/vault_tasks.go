@@ -183,7 +183,7 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 // UpdateStatus moves a task to a different kanban column. Used by drag-drop
 // across columns. Validates that the target status is recognized.
 func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateTaskStatusRequest) (*dto.VaultTaskResponse, error) {
-	if !models.IsValidTaskStatus(req.Status) {
+	if !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
 	var task models.ContactTask
@@ -248,21 +248,102 @@ func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.Updat
 		}
 		return nil, err
 	}
-	updates := map[string]interface{}{"position": req.Position}
+	destinationStatus := task.Status
 	if req.Status != "" {
-		updates["status"] = req.Status
-		task.Status = req.Status
+		destinationStatus = req.Status
 	}
-	if err := s.db.Model(&task).Updates(updates).Error; err != nil {
+	if err := s.resequenceTaskPositions(task, destinationStatus, req.Position); err != nil {
 		return nil, err
 	}
-	task.Position = req.Position
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&task).Error; err != nil {
+		return nil, err
+	}
 
 	resps, err := s.buildResponses([]models.ContactTask{task})
 	if err != nil {
 		return nil, err
 	}
 	return &resps[0], nil
+}
+
+func (s *VaultTaskService) resequenceTaskPositions(task models.ContactTask, destinationStatus string, destinationPosition int) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.ContactTask{}).
+			Where("id = ? AND vault_id = ?", task.ID, task.VaultID).
+			Updates(map[string]interface{}{"status": destinationStatus}).Error; err != nil {
+			return err
+		}
+
+		if destinationStatus != task.Status {
+			if err := resequenceExistingTaskColumn(tx, task.VaultID, task.ID, task.Status); err != nil {
+				return err
+			}
+		}
+		return resequenceTaskColumn(tx, task.VaultID, task.ID, destinationStatus, destinationStatus, destinationPosition)
+	})
+}
+
+func resequenceExistingTaskColumn(tx *gorm.DB, vaultID string, movedTaskID uint, status string) error {
+	var tasks []models.ContactTask
+	if err := tx.Where("vault_id = ? AND status = ? AND id != ?", vaultID, status, movedTaskID).
+		Order("position ASC, created_at ASC, id ASC").
+		Find(&tasks).Error; err != nil {
+		return err
+	}
+
+	orderedIDs := make([]uint, 0, len(tasks))
+	for _, t := range tasks {
+		orderedIDs = append(orderedIDs, t.ID)
+	}
+	return updateTaskColumnPositions(tx, orderedIDs)
+}
+
+func resequenceTaskColumn(tx *gorm.DB, vaultID string, movedTaskID uint, status, destinationStatus string, destinationPosition int) error {
+	var tasks []models.ContactTask
+	if err := tx.Where("vault_id = ? AND status = ? AND id != ?", vaultID, status, movedTaskID).
+		Order("position ASC, created_at ASC, id ASC").
+		Find(&tasks).Error; err != nil {
+		return err
+	}
+
+	if status == destinationStatus {
+		insertAt := destinationPosition
+		if insertAt < 0 {
+			insertAt = 0
+		}
+		if insertAt > len(tasks) {
+			insertAt = len(tasks)
+		}
+
+		orderedIDs := make([]uint, 0, len(tasks)+1)
+		for i, t := range tasks {
+			if i == insertAt {
+				orderedIDs = append(orderedIDs, movedTaskID)
+			}
+			orderedIDs = append(orderedIDs, t.ID)
+		}
+		if insertAt == len(tasks) {
+			orderedIDs = append(orderedIDs, movedTaskID)
+		}
+		return updateTaskColumnPositions(tx, orderedIDs)
+	}
+
+	orderedIDs := make([]uint, 0, len(tasks))
+	for _, t := range tasks {
+		orderedIDs = append(orderedIDs, t.ID)
+	}
+	return updateTaskColumnPositions(tx, orderedIDs)
+}
+
+func updateTaskColumnPositions(tx *gorm.DB, orderedIDs []uint) error {
+	for position, id := range orderedIDs {
+		if err := tx.Model(&models.ContactTask{}).
+			Where("id = ?", id).
+			Update("position", position).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *VaultTaskService) buildResponses(tasks []models.ContactTask) ([]dto.VaultTaskResponse, error) {

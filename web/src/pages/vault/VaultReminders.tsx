@@ -14,7 +14,7 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { api } from "@/api";
-import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import { useDateFormat, formatDate, formatShortDate } from "@/utils/dateFormat";
 
 const { Title, Text } = Typography;
 
@@ -26,6 +26,13 @@ export default function VaultReminders() {
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
   const dateFormats = useDateFormat();
+
+  const frequencyLabels: Record<string, string> = {
+    one_time: t("modules.reminders.freq_one_time"),
+    recurring_week: t("modules.reminders.freq_weekly"),
+    recurring_month: t("modules.reminders.freq_monthly"),
+    recurring_year: t("modules.reminders.freq_yearly"),
+  };
 
   const { data: reminders = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "reminders"],
@@ -89,10 +96,14 @@ export default function VaultReminders() {
             title: t("vault.reminders.date"),
             key: "date",
             render: (_, record) => {
-              if (!record.year || !record.month || !record.day) return "-";
-              // 使用用户日期格式偏好，而非硬编码格式（fix #65）
-              const dateStr = `${record.year}-${String(record.month).padStart(2, "0")}-${String(record.day).padStart(2, "0")}`;
-              return formatDate(dateStr, dateFormats);
+              if (record.month == null || record.day == null) return "-";
+              // year is null for recurring yearly reminders → render day+month only.
+              const mm = String(record.month).padStart(2, "0");
+              const dd = String(record.day).padStart(2, "0");
+              const probe = `${record.year ?? 2000}-${mm}-${dd}`;
+              return record.year != null
+                ? formatDate(probe, dateFormats)
+                : formatShortDate(probe, dateFormats);
             },
             sorter: (a, b) => {
               if (!a.year) return -1;
@@ -106,7 +117,7 @@ export default function VaultReminders() {
             title: t("vault.reminders.type"),
             dataIndex: "type",
             key: "type",
-            render: (text) => <Tag>{text}</Tag>,
+            render: (text) => <Tag>{frequencyLabels[text] ?? text}</Tag>,
           },
         ]}
       />

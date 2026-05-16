@@ -57,6 +57,9 @@ export default function ThemedApp() {
                 colorBgContainer: "rgba(18, 22, 19, 0.75)",
                 colorBgElevated: "rgba(24, 30, 26, 0.95)",
                 colorTextBase: "rgba(255, 255, 255, 0.9)",
+                colorTextSecondary: "rgba(255, 255, 255, 0.65)",
+                colorTextTertiary: "rgba(255, 255, 255, 0.45)",
+                colorTextQuaternary: "rgba(255, 255, 255, 0.25)",
                 colorBorder: "rgba(255, 255, 255, 0.08)",
               }
             : {
@@ -64,6 +67,9 @@ export default function ThemedApp() {
                 colorBgContainer: "rgba(255, 255, 255, 0.8)",
                 colorBgElevated: "rgba(255, 255, 255, 0.98)",
                 colorTextBase: "rgba(0, 0, 0, 0.85)",
+                colorTextSecondary: "rgba(0, 0, 0, 0.65)",
+                colorTextTertiary: "rgba(0, 0, 0, 0.45)",
+                colorTextQuaternary: "rgba(0, 0, 0, 0.25)",
                 colorBorder: "rgba(0, 0, 0, 0.08)",
               }),
         },
@@ -98,7 +104,14 @@ export default function ThemedApp() {
             controlHeight: 42,
           },
           Tabs: {
-            itemSelectedColor: "#3b6347",
+            // Selected text color must read against the tab background.
+            // The brand green (#3b6347) is too dark on dark mode's container,
+            // so use the resolved text color in dark mode while keeping the
+            // brand accent in light mode where it works.
+            itemSelectedColor:
+              resolvedTheme === "dark"
+                ? "rgba(255, 255, 255, 0.95)"
+                : "#3b6347",
             inkBarColor: "#3b6347",
             titleFontSizeLG: 16,
           },

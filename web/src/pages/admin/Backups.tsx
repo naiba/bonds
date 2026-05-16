@@ -113,9 +113,9 @@ export default function AdminBackups() {
       content: (
         <div>
           <p>{t("backups.restore_confirm")}</p>
-          <p style={{ color: "red", fontWeight: "bold" }}>
+          <Typography.Text type="danger" strong style={{ display: "block", marginTop: 8 }}>
             {t("backups.restore_warning")}
-          </p>
+          </Typography.Text>
         </div>
       ),
       okButtonProps: { danger: true },

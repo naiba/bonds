@@ -4,7 +4,7 @@
 [![Release](https://github.com/naiba/bonds/actions/workflows/release.yml/badge.svg)](https://github.com/naiba/bonds/actions/workflows/release.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/naiba/bonds)](https://github.com/naiba/bonds/releases)
 
-📖 [Documentation](https://naiba.github.io/bonds/) | [中文文档](README_zh.md)
+📖 [Documentation](https://naiba.github.io/bonds/) | [中文文档](README_zh.md) | 💬 [Discord](https://discord.gg/faaEJyt4h)
 
 <a href="https://www.producthunt.com/products/bonds?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-bonds" target="_blank" rel="noopener noreferrer"><img alt="Bonds - Remember everything about the people who matter. | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1091729&amp;theme=light&amp;t=1772852214754"></a>
 

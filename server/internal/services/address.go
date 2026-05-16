@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -41,10 +42,10 @@ func (s *AddressService) List(contactID, vaultID string) ([]dto.AddressResponse,
 	}
 
 	addressIDs := make([]uint, len(pivots))
-	pastMap := make(map[uint]bool)
+	pivotByAddr := make(map[uint]models.ContactAddress)
 	for i, p := range pivots {
 		addressIDs[i] = p.AddressID
-		pastMap[p.AddressID] = p.IsPastAddress
+		pivotByAddr[p.AddressID] = p
 	}
 
 	var addresses []models.Address
@@ -54,7 +55,8 @@ func (s *AddressService) List(contactID, vaultID string) ([]dto.AddressResponse,
 
 	result := make([]dto.AddressResponse, len(addresses))
 	for i, a := range addresses {
-		result[i] = toAddressResponse(&a, pastMap[a.ID])
+		p := pivotByAddr[a.ID]
+		result[i] = toAddressResponse(&a, p.IsPastAddress, p.DateFrom, p.DateTo)
 	}
 	return result, nil
 }
@@ -76,6 +78,10 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 		Longitude:     req.Longitude,
 	}
 
+	// A non-null DateTo implies the contact has moved out — auto-flip
+	// IsPastAddress to true so the two fields can't disagree silently.
+	isPast := req.IsPastAddress || req.DateTo != nil
+
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&address).Error; err != nil {
 			return err
@@ -83,9 +89,19 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 		pivot := models.ContactAddress{
 			ContactID:     contactID,
 			AddressID:     address.ID,
-			IsPastAddress: req.IsPastAddress,
+			IsPastAddress: isPast,
+			DateFrom:      req.DateFrom,
+			DateTo:        req.DateTo,
 		}
-		return tx.Create(&pivot).Error
+		// Honor the GORM zero-value-bool trap for the false-explicit case
+		// (per AGENTS.md). Create skips false; a separate Update locks it in.
+		if err := tx.Create(&pivot).Error; err != nil {
+			return err
+		}
+		if !isPast {
+			return tx.Model(&pivot).Update("is_past_address", false).Error
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -98,7 +114,7 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 		s.feedRecorder.Record(contactID, "", ActionAddressAdded, "Added an address", &address.ID, &entityType)
 	}
 
-	resp := toAddressResponse(&address, req.IsPastAddress)
+	resp := toAddressResponse(&address, isPast, req.DateFrom, req.DateTo)
 	return &resp, nil
 }
 
@@ -129,18 +145,21 @@ func (s *AddressService) Update(id uint, contactID, vaultID string, req dto.Upda
 	address.Latitude = req.Latitude
 	address.Longitude = req.Longitude
 
+	isPast := req.IsPastAddress || req.DateTo != nil
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&address).Error; err != nil {
 			return err
 		}
-		pivot.IsPastAddress = req.IsPastAddress
+		pivot.IsPastAddress = isPast
+		pivot.DateFrom = req.DateFrom
+		pivot.DateTo = req.DateTo
 		return tx.Save(&pivot).Error
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	resp := toAddressResponse(&address, req.IsPastAddress)
+	resp := toAddressResponse(&address, isPast, req.DateFrom, req.DateTo)
 	return &resp, nil
 }
 
@@ -189,7 +208,7 @@ func (s *AddressService) tryGeocode(address *models.Address) {
 	s.db.Model(address).Select("latitude", "longitude").Updates(address)
 }
 
-func toAddressResponse(a *models.Address, isPastAddress bool) dto.AddressResponse {
+func toAddressResponse(a *models.Address, isPastAddress bool, dateFrom, dateTo *time.Time) dto.AddressResponse {
 	return dto.AddressResponse{
 		ID:            a.ID,
 		VaultID:       a.VaultID,
@@ -203,6 +222,8 @@ func toAddressResponse(a *models.Address, isPastAddress bool) dto.AddressRespons
 		Latitude:      a.Latitude,
 		Longitude:     a.Longitude,
 		IsPastAddress: isPastAddress,
+		DateFrom:      dateFrom,
+		DateTo:        dateTo,
 		CreatedAt:     a.CreatedAt,
 		UpdatedAt:     a.UpdatedAt,
 	}

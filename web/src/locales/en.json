@@ -731,7 +731,15 @@
       "postal_code": "Postal Code",
       "country": "Country",
       "is_primary": "Primary",
-      "view_map": "View on Google Maps"
+      "view_map": "View on Google Maps",
+      "date_from": "Moved in",
+      "date_from_tooltip": "When the contact started living here. Leave blank if unknown.",
+      "date_to": "Moved out",
+      "date_to_tooltip": "When the contact left. Setting this marks the address as past.",
+      "is_past_address": "Past address",
+      "is_past_address_tooltip": "Mark this address as a former residence.",
+      "past_tag": "Past",
+      "present": "Present"
     },
     "contact_info": {
       "title": "Contact Information",

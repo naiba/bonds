@@ -85,11 +85,15 @@ func (s *PersonalizeService) createTaskStatus(accountID string, req dto.Personal
 	}
 
 	resp := dto.PersonalizeEntityResponse{
-		ID:        status.ID,
-		Label:     val,
-		Name:      val,
-		CreatedAt: status.CreatedAt,
-		UpdatedAt: status.UpdatedAt,
+		ID:           status.ID,
+		Label:        val,
+		Name:         val,
+		Position:     &status.Position,
+		CreatedAt:    status.CreatedAt,
+		UpdatedAt:    status.UpdatedAt,
+		Slug:         status.Slug,
+		IsDefault:    &status.IsDefault,
+		CanBeDeleted: &status.CanBeDeleted,
 	}
 	return &resp, nil
 }
@@ -126,9 +130,11 @@ func (s *PersonalizeService) deleteTaskStatus(accountID string, id uint) error {
 			return err
 		}
 
-		// Reassign tasks that point at the slug being deleted.
+		// Task statuses are account-scoped, but tasks store only the status slug;
+		// constrain by this account's vaults so identical slugs in other accounts
+		// are not reassigned when a status is deleted here.
 		if err := tx.Model(&models.ContactTask{}).
-			Where("status = ?", status.Slug).
+			Where("status = ? AND vault_id IN (SELECT id FROM vaults WHERE account_id = ?)", status.Slug, accountID).
 			Update("status", defaultStatus.Slug).Error; err != nil {
 			return err
 		}
