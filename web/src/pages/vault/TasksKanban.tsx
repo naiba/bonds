@@ -49,6 +49,7 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<VaultTask | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<string>("todo");
+  const [createSubParent, setCreateSubParent] = useState<number | null>(null);
 
   const moveMutation = useMutation({
     mutationFn: ({ id, position, status }: { id: number; position: number; status: string }) =>
@@ -189,8 +190,22 @@ export default function TasksKanban({ vaultId, tasks }: TasksKanbanProps) {
         open={modalOpen}
         task={editingTask}
         defaultStatus={defaultStatus}
+        defaultParentTaskId={createSubParent ?? undefined}
         statuses={statuses}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setCreateSubParent(null);
+        }}
+        onSelectTask={(t) => {
+          setCreateSubParent(null);
+          setEditingTask(t);
+          setModalOpen(true);
+        }}
+        onCreateSubTask={(parentId) => {
+          setEditingTask(null);
+          setCreateSubParent(parentId);
+          setModalOpen(true);
+        }}
       />
     </div>
   );

@@ -1,5 +1,5 @@
-import { Modal, Form, Input, Select, App, Button, Space, DatePicker, Popconfirm } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { Modal, Form, Input, Select, App, Button, Space, DatePicker, Popconfirm, Tag, theme } from "antd";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import dayjs, { type Dayjs } from "dayjs";
@@ -14,8 +14,15 @@ interface TaskEditModalProps {
   open: boolean;
   task: VaultTask | null;
   defaultStatus?: string;
+  defaultParentTaskId?: number;
   statuses?: TaskStatus[];
   onClose: () => void;
+  /** Called when the user clicks a sub-task row in the modal — the parent
+   * component is expected to swap which task the modal is showing. */
+  onSelectTask?: (task: VaultTask) => void;
+  /** Called when the user clicks "+ Add sub-task" — the parent is expected
+   * to re-open the modal in create mode with parent_task_id pre-filled. */
+  onCreateSubTask?: (parentTaskId: number) => void;
 }
 
 interface FormValues {
@@ -32,8 +39,11 @@ export default function TaskEditModal({
   open,
   task,
   defaultStatus,
+  defaultParentTaskId,
   statuses,
   onClose,
+  onSelectTask,
+  onCreateSubTask,
 }: TaskEditModalProps) {
   const { t } = useTranslation();
   return (
@@ -50,12 +60,15 @@ export default function TaskEditModal({
     >
       {open && (
         <TaskEditModalContent
-          key={task?.id ?? "create"}
+          key={task?.id ?? `create-${defaultParentTaskId ?? "root"}`}
           vaultId={vaultId}
           task={task}
           defaultStatus={defaultStatus}
+          defaultParentTaskId={defaultParentTaskId}
           statusesProp={statuses}
           onClose={onClose}
+          onSelectTask={onSelectTask}
+          onCreateSubTask={onCreateSubTask}
         />
       )}
     </Modal>
@@ -66,19 +79,26 @@ interface ContentProps {
   vaultId: string;
   task: VaultTask | null;
   defaultStatus?: string;
+  defaultParentTaskId?: number;
   statusesProp?: TaskStatus[];
   onClose: () => void;
+  onSelectTask?: (task: VaultTask) => void;
+  onCreateSubTask?: (parentTaskId: number) => void;
 }
 
 function TaskEditModalContent({
   vaultId,
   task,
   defaultStatus,
+  defaultParentTaskId,
   statusesProp,
   onClose,
+  onSelectTask,
+  onCreateSubTask,
 }: ContentProps) {
   const { t } = useTranslation();
   const { message } = App.useApp();
+  const { token } = theme.useToken();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<FormValues>();
 
@@ -97,7 +117,13 @@ function TaskEditModalContent({
         status: task.status || fallbackSlug,
         due_at: task.due_at ? dayjs(task.due_at) : null,
       }
-    : { label: "", contact_ids: [], parent_task_id: null, status: fallbackSlug, due_at: null };
+    : {
+        label: "",
+        contact_ids: [],
+        parent_task_id: defaultParentTaskId ?? null,
+        status: fallbackSlug,
+        due_at: null,
+      };
 
   const { data: contacts = [] } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", "for-task-modal"],
@@ -119,6 +145,15 @@ function TaskEditModalContent({
   const parentOptions = allTasks
     .filter((t) => !t.parent_task_id && t.id !== task?.id)
     .map((t) => ({ value: t.id, label: t.label }));
+
+  // Sub-tasks: children of the currently-edited task. Read from the same
+  // task list we already loaded — no extra round-trip.
+  const subTasks: VaultTask[] = isEdit && task?.id != null
+    ? allTasks.filter((t) => t.parent_task_id === task.id)
+    : [];
+
+  const statusLabel = (slug?: string) =>
+    statuses.find((s) => s.slug === slug)?.label || slug || "";
 
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: TASK_QUERY_KEY(vaultId) });
@@ -217,6 +252,66 @@ function TaskEditModalContent({
           options={parentOptions}
         />
       </Form.Item>
+      {isEdit && (
+        <Form.Item
+          label={t("vault.tasks.sub_tasks_label", { count: subTasks.length })}
+          style={{ marginBottom: 16 }}
+        >
+          {subTasks.length > 0 && (
+            <div
+              style={{
+                border: `1px solid ${token.colorBorderSecondary}`,
+                borderRadius: token.borderRadius,
+                padding: 4,
+                marginBottom: 8,
+              }}
+            >
+              {subTasks.map((st) => (
+                <div
+                  key={st.id}
+                  onClick={() => onSelectTask && st.id != null && onSelectTask(st)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 8px",
+                    cursor: onSelectTask ? "pointer" : "default",
+                    borderRadius: token.borderRadius,
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (onSelectTask) e.currentTarget.style.background = token.colorFillQuaternary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  <Tag style={{ marginRight: 0 }}>{statusLabel(st.status)}</Tag>
+                  <span
+                    style={{
+                      flex: 1,
+                      textDecoration: st.completed ? "line-through" : undefined,
+                      color: st.completed ? token.colorTextSecondary : undefined,
+                    }}
+                  >
+                    {st.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {onCreateSubTask && task?.id != null && (
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() => onCreateSubTask(task.id!)}
+              style={{ width: "100%" }}
+            >
+              {t("vault.tasks.add_sub_task")}
+            </Button>
+          )}
+        </Form.Item>
+      )}
       <Form.Item name="due_at" label={t("vault.tasks.due_label")}>
         <DatePicker
           style={{ width: "100%" }}
