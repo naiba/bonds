@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { apiUrl } from './api-base-url';
 
 let counter = 0;
 
@@ -46,7 +47,7 @@ async function createContactsViaAPI(
 ) {
   for (let i = 1; i <= count; i++) {
     const name = `Contact${String(i).padStart(2, '0')}`;
-    const resp = await page.request.post(`http://localhost:8080/api/vaults/${vaultId}/contacts`, {
+    const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts`), {
       headers: { Authorization: `Bearer ${token}` },
       data: { first_name: name, last_name: 'Test' },
     });
@@ -116,7 +117,7 @@ test.describe('Contact List Pagination', () => {
     const token = await getAuthToken(page);
 
     for (const name of ['Zara', 'Alice', 'Mike']) {
-      const resp = await page.request.post(`http://localhost:8080/api/vaults/${vaultId}/contacts`, {
+      const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts`), {
         headers: { Authorization: `Bearer ${token}` },
         data: { first_name: name, last_name: 'Sorttest' },
       });
@@ -160,7 +161,7 @@ async function createContactViaAPI(
   firstName: string,
   lastName: string,
 ): Promise<string> {
-  const resp = await page.request.post(`http://localhost:8080/api/vaults/${vaultId}/contacts`, {
+  const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts`), {
     headers: { Authorization: `Bearer ${token}` },
     data: { first_name: firstName, last_name: lastName },
   });
@@ -178,7 +179,7 @@ async function createNotesViaAPI(
 ) {
   for (let i = 1; i <= count; i++) {
     const resp = await page.request.post(
-      `http://localhost:8080/api/vaults/${vaultId}/contacts/${contactId}/notes`,
+      apiUrl(`/vaults/${vaultId}/contacts/${contactId}/notes`),
       {
         headers: { Authorization: `Bearer ${token}` },
         data: { title: `Note ${String(i).padStart(2, '0')}`, body: `Body of note ${i}` },
@@ -197,7 +198,7 @@ async function createCallsViaAPI(
 ) {
   for (let i = 1; i <= count; i++) {
     const resp = await page.request.post(
-      `http://localhost:8080/api/vaults/${vaultId}/contacts/${contactId}/calls`,
+      apiUrl(`/vaults/${vaultId}/contacts/${contactId}/calls`),
       {
         headers: { Authorization: `Bearer ${token}` },
         data: {
