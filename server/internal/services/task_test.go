@@ -177,6 +177,71 @@ func TestTaskNotFound(t *testing.T) {
 	}
 }
 
+func TestContactScopedTaskAttachesExtras(t *testing.T) {
+	svc, contactID, vaultID, userID := setupTaskTest(t)
+	db := svc.db
+	contactSvc := NewContactService(db)
+	second, err := contactSvc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Two"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	task, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{
+		Label:      "Plan dinner",
+		ContactIDs: []string{second.ID},
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if len(task.Contacts) != 2 {
+		t.Fatalf("expected 2 assignees (URL contact + extra), got %d", len(task.Contacts))
+	}
+}
+
+func TestContactScopedTaskUpdateKeepsUrlContact(t *testing.T) {
+	svc, contactID, vaultID, userID := setupTaskTest(t)
+	db := svc.db
+	contactSvc := NewContactService(db)
+	second, err := contactSvc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Two"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	task, _ := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "x"})
+	// Caller attempts to assign only `second` — service should still keep the
+	// URL contact attached so the task remains visible from its task list.
+	onlySecond := []string{second.ID}
+	updated, err := svc.Update(task.ID, contactID, vaultID, dto.UpdateTaskRequest{
+		Label:      "x",
+		ContactIDs: &onlySecond,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if len(updated.Contacts) != 2 {
+		t.Errorf("expected URL contact + second, got %+v", updated.Contacts)
+	}
+}
+
+func TestContactScopedTaskSubTask(t *testing.T) {
+	svc, contactID, vaultID, userID := setupTaskTest(t)
+
+	parent, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{Label: "Parent"})
+	if err != nil {
+		t.Fatalf("Create parent failed: %v", err)
+	}
+	child, err := svc.Create(contactID, vaultID, userID, dto.CreateTaskRequest{
+		Label:        "Child",
+		ParentTaskID: &parent.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create child failed: %v", err)
+	}
+	if child.ParentTaskID == nil || *child.ParentTaskID != parent.ID {
+		t.Errorf("child ParentTaskID = %v, want %d", child.ParentTaskID, parent.ID)
+	}
+}
+
 func TestListCompletedTasks(t *testing.T) {
 	svc, contactID, vaultID, userID := setupTaskTest(t)
 

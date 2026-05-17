@@ -616,3 +616,78 @@ func TestDeleteVault_HardDeletesContactImportantDates(t *testing.T) {
 		t.Errorf("Expected ContactImportantDate to be hard-deleted, got %d remaining (likely soft-deleted via gorm.DeletedAt)", importantDateCount)
 	}
 }
+
+// Regression for the #122/#107 merge interaction: ContactTask lost its
+// contact_id column in #107 (assignees moved to the task_contacts pivot), so
+// any cascade that still tried to delete ContactTask by contact_id — or that
+// dropped ContactTask rows before their task_contacts pivot rows were gone —
+// would either error with "no such column: contact_id" or trip a FK
+// violation on task_contacts.contact_task_id. Both failure modes are
+// reproduced here under real FK constraints with a task that has two
+// assignees, so the dedicated ContactTask cascade must pluck task ids, drop
+// task_contacts first, then hard-delete the tasks.
+func TestDeleteVault_MultiContactTaskCleansPivot(t *testing.T) {
+	db := testutil.SetupTestDBWithFKConstraints(t)
+
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Multi",
+		LastName:  "Task",
+		Email:     "multi-task@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vaultSvc := NewVaultService(db)
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{
+		Name: "Multi-assignee vault",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactA := models.Contact{VaultID: vault.ID, FirstName: strPtrOrNil("Alice")}
+	if err := db.Create(&contactA).Error; err != nil {
+		t.Fatalf("Create contact A failed: %v", err)
+	}
+	contactB := models.Contact{VaultID: vault.ID, FirstName: strPtrOrNil("Bob")}
+	if err := db.Create(&contactB).Error; err != nil {
+		t.Fatalf("Create contact B failed: %v", err)
+	}
+
+	taskSvc := NewVaultTaskService(db)
+	taskResp, err := taskSvc.Create(vault.ID, resp.User.ID, dto.CreateVaultTaskRequest{
+		Label:      "Shared task",
+		ContactIDs: []string{contactA.ID, contactB.ID},
+	})
+	if err != nil {
+		t.Fatalf("Create multi-contact task failed: %v", err)
+	}
+
+	// Sanity: pivot rows actually exist before the cascade runs — otherwise
+	// the test would pass for the wrong reason (no FK to violate).
+	var pivotCount int64
+	db.Model(&models.TaskContact{}).Where("contact_task_id = ?", taskResp.ID).Count(&pivotCount)
+	if pivotCount != 2 {
+		t.Fatalf("expected 2 TaskContact pivot rows for the new task, got %d", pivotCount)
+	}
+
+	if err := vaultSvc.DeleteVault(vault.ID); err != nil {
+		t.Fatalf("DeleteVault with multi-contact task failed under FK constraints: %v", err)
+	}
+
+	var remainingTasks int64
+	db.Unscoped().Model(&models.ContactTask{}).Where("vault_id = ?", vault.ID).Count(&remainingTasks)
+	if remainingTasks != 0 {
+		t.Errorf("expected all ContactTask rows hard-deleted, got %d", remainingTasks)
+	}
+
+	var remainingPivots int64
+	db.Model(&models.TaskContact{}).Where("contact_task_id = ?", taskResp.ID).Count(&remainingPivots)
+	if remainingPivots != 0 {
+		t.Errorf("expected all TaskContact pivot rows deleted, got %d", remainingPivots)
+	}
+}

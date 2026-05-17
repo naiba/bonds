@@ -35,30 +35,51 @@ func NormalizeTaskStatus(s string) string {
 	return TaskStatusTodo
 }
 
+// ContactTask represents a vault-scoped task. It can be assigned to any number
+// of contacts via the task_contacts pivot (zero contacts = standalone task)
+// and can have one parent task (ParentTaskID) to form a sub-task hierarchy.
 type ContactTask struct {
 	ID uint `json:"id" gorm:"primaryKey;autoIncrement"`
-	// VaultID — required. Tasks always belong to a vault, even when not tied to a contact.
+	// VaultID — required. Tasks always belong to a vault.
 	VaultID string `json:"vault_id" gorm:"type:text;not null;index"`
-	// ContactID — optional. NULL means a standalone vault-level task.
-	ContactID   *string        `json:"contact_id" gorm:"type:text;index"`
-	AuthorID    *string        `json:"author_id" gorm:"type:text;index"`
-	UUID        *string        `json:"uuid" gorm:"type:text;index"`
-	Vcalendar   *string        `json:"vcalendar" gorm:"type:text"`
-	DistantUUID *string        `json:"distant_uuid" gorm:"size:256"`
-	DistantEtag *string        `json:"distant_etag" gorm:"size:256"`
-	DistantURI  *string        `json:"distant_uri" gorm:"size:2096"`
-	AuthorName  string         `json:"author_name" gorm:"not null"`
-	Label       string         `json:"label" gorm:"not null"`
-	Description *string        `json:"description" gorm:"type:text"`
-	Status      string         `json:"status" gorm:"type:text;default:'todo';index"`
-	Position    int            `json:"position" gorm:"default:0"`
-	Completed   bool           `json:"completed" gorm:"default:false"`
-	CompletedAt *time.Time     `json:"completed_at"`
-	DueAt       *time.Time     `json:"due_at"`
-	DeletedAt   gorm.DeletedAt `json:"deleted_at" gorm:"index"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	// ParentTaskID — optional. Non-NULL means this row is a sub-task of the
+	// referenced task. Sub-tasks live in the same vault as their parent.
+	ParentTaskID *uint          `json:"parent_task_id" gorm:"index"`
+	AuthorID     *string        `json:"author_id" gorm:"type:text;index"`
+	UUID         *string        `json:"uuid" gorm:"type:text;index"`
+	Vcalendar    *string        `json:"vcalendar" gorm:"type:text"`
+	DistantUUID  *string        `json:"distant_uuid" gorm:"size:256"`
+	DistantEtag  *string        `json:"distant_etag" gorm:"size:256"`
+	DistantURI   *string        `json:"distant_uri" gorm:"size:2096"`
+	AuthorName   string         `json:"author_name" gorm:"not null"`
+	Label        string         `json:"label" gorm:"not null"`
+	Description  *string        `json:"description" gorm:"type:text"`
+	Status       string         `json:"status" gorm:"type:text;default:'todo';index"`
+	Position     int            `json:"position" gorm:"default:0"`
+	Completed    bool           `json:"completed" gorm:"default:false"`
+	CompletedAt  *time.Time     `json:"completed_at"`
+	DueAt        *time.Time     `json:"due_at"`
+	DeletedAt    gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 
-	Contact *Contact `json:"contact,omitempty" gorm:"foreignKey:ContactID"`
-	Author  *User    `json:"author,omitempty" gorm:"foreignKey:AuthorID"`
+	Author     *User         `json:"author,omitempty" gorm:"foreignKey:AuthorID"`
+	ParentTask *ContactTask  `json:"parent_task,omitempty" gorm:"foreignKey:ParentTaskID"`
+	SubTasks   []ContactTask `json:"sub_tasks,omitempty" gorm:"foreignKey:ParentTaskID"`
+	Contacts   []Contact     `json:"contacts,omitempty" gorm:"many2many:task_contacts;joinForeignKey:ContactTaskID;joinReferences:ContactID"`
+}
+
+// TaskContact is the explicit pivot for the ContactTask <-> Contact m2m. Kept
+// as a real struct (rather than the GORM-auto-generated join) so timestamps
+// are tracked and per-assignment metadata can be added later (assigned_at,
+// role, etc.) without another migration.
+type TaskContact struct {
+	ContactTaskID uint      `json:"contact_task_id" gorm:"primaryKey"`
+	ContactID     string    `json:"contact_id" gorm:"type:text;primaryKey"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+func (TaskContact) TableName() string {
+	return "task_contacts"
 }

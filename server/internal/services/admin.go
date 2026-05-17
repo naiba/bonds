@@ -411,7 +411,6 @@ func (s *AdminService) deleteContactData(tx *gorm.DB, contactID string) error {
 	contactTables := []interface{}{
 		&models.Note{},
 		&models.ContactReminder{},
-		&models.ContactTask{},
 		&models.ContactFeedItem{},
 		&models.ContactImportantDate{},
 		&models.Call{},
@@ -433,6 +432,12 @@ func (s *AdminService) deleteContactData(tx *gorm.DB, contactID string) error {
 		if err := tx.Where("contact_id = ?", contactID).Delete(model).Error; err != nil {
 			return fmt.Errorf("delete contact data for %T: %w", model, err)
 		}
+	}
+
+	// Detach the contact from any tasks via the m2m pivot. The tasks
+	// themselves are vault-scoped and are deleted in the vault cascade.
+	if err := tx.Where("contact_id = ?", contactID).Delete(&models.TaskContact{}).Error; err != nil {
+		return fmt.Errorf("delete contact data for *models.TaskContact: %w", err)
 	}
 
 	if err := tx.Where("loaner_id = ? OR loanee_id = ?", contactID, contactID).Delete(&models.ContactLoan{}).Error; err != nil {

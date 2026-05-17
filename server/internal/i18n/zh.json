@@ -74,6 +74,8 @@
   "err.failed_to_update_task": "更新任务失败",
   "err.failed_to_toggle_task": "切换任务状态失败",
   "err.failed_to_delete_task": "删除任务失败",
+  "err.invalid_task_status": "无效的任务状态",
+  "err.invalid_parent_task": "无效的父任务",
 
   "err.failed_to_list_calls": "获取通话列表失败",
   "err.failed_to_create_call": "创建通话记录失败",

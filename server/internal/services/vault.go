@@ -191,7 +191,6 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 			&models.ContactInformation{},
 			&models.ContactImportantDate{},
 			&models.ContactReminder{},
-			&models.ContactTask{},
 			&models.ContactFeedItem{},
 			&models.Call{},
 			&models.Pet{},
@@ -203,13 +202,18 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 			&models.Note{}, // Note has both contact_id and vault_id; delete by contact_id here
 		}
 		// Hard-delete (Unscoped) is required: soft-deletable child models
-		// (ContactImportantDate and ContactTask here; Group in the vault-scoped
-		// loop further down) carry gorm.DeletedAt, so a regular Delete leaves
+		// (ContactImportantDate here; Group and ContactTask in the vault-scoped
+		// path further down) carry gorm.DeletedAt, so a regular Delete leaves
 		// the row in the table with its FKs to vault-scoped parents intact
 		// (e.g. contact_important_dates → contact_important_date_types).
 		// Postgres then rejects the parent delete in Step 3 with a foreign-key
 		// violation. A vault delete is intentionally destructive, so
 		// soft-delete is the wrong semantic here.
+		// NB: ContactTask is intentionally NOT in this list — since #107 it
+		// has no contact_id column (assignees live in the task_contacts pivot
+		// instead), so deleting by contact_id would be a SQL error. The
+		// dedicated ContactTask cascade further down handles tasks by id and
+		// drops the task_contacts pivot rows first to satisfy the FK.
 		for _, m := range contactChildModels {
 			if err := tx.Unscoped().Where("contact_id IN ?", contactIDs).Delete(m).Error; err != nil {
 				return fmt.Errorf("delete contact child %T: %w", m, err)
@@ -425,6 +429,24 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 			).
 			Delete(d.instance).Error; err != nil {
 			return fmt.Errorf("delete cross-vault %T by %s: %w", d.instance, d.instanceFKCol, err)
+		}
+	}
+
+	// ContactTask cascade: TaskContact pivot rows must go first since they
+	// reference the task by FK, then the tasks themselves. Pluck is Unscoped
+	// so soft-deleted ContactTask rows are also caught — otherwise their
+	// lingering TaskContact rows would block the Unscoped delete that the
+	// vaultChildModels safety net runs below.
+	var taskIDs []uint
+	if err := tx.Model(&models.ContactTask{}).Unscoped().Where("vault_id = ?", vaultID).Pluck("id", &taskIDs).Error; err != nil {
+		return fmt.Errorf("pluck ContactTask ids: %w", err)
+	}
+	if len(taskIDs) > 0 {
+		if err := tx.Where("contact_task_id IN ?", taskIDs).Delete(&models.TaskContact{}).Error; err != nil {
+			return fmt.Errorf("delete TaskContact: %w", err)
+		}
+		if err := tx.Unscoped().Where("id IN ?", taskIDs).Delete(&models.ContactTask{}).Error; err != nil {
+			return fmt.Errorf("delete ContactTask: %w", err)
 		}
 	}
 

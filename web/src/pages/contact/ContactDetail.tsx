@@ -335,7 +335,7 @@ export default function ContactDetail() {
       }
       if (isContactPage && moduleType === "quick_facts") {
         children.push(
-          <QuickFactsModule key={`mod-${mod.id}`} {...moduleProps} templateId={tabsData?.template_id ?? 1} />,
+          <QuickFactsModule key={`mod-${mod.id}`} {...moduleProps} />,
         );
         continue;
       }
@@ -384,7 +384,7 @@ export default function ContactDetail() {
         <Space direction="vertical" style={{ width: "100%" }} size={16}>
           {overviewCard}
           <LabelsModule {...moduleProps} />
-          <QuickFactsModule {...moduleProps} templateId={1} />
+          <QuickFactsModule {...moduleProps} />
           <NotesModule {...moduleProps} />
         </Space>
       ),

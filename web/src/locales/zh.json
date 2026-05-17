@@ -231,8 +231,12 @@
       "no_statuses_configured": "未配置任务状态。请前往「设置 → 个性化 → 任务状态」添加。",
       "new_task_label_placeholder": "需要做什么？",
       "new_task_description_placeholder": "补充说明（可选）",
-      "new_task_contact_optional": "关联联系人（可选）",
-      "new_task_no_contact": "无联系人（独立任务）",
+      "contacts_label": "受指派人（可选）",
+      "no_contacts_placeholder": "无关联联系人（独立任务）",
+      "parent_label": "父任务（可选）",
+      "no_parent_placeholder": "无父任务（顶层任务）",
+      "sub_tasks_label": "子任务（{{count}}）",
+      "add_sub_task": "添加子任务",
       "create": "创建",
       "cancel": "取消",
       "empty_column": "拖放任务到此处",
@@ -800,11 +804,15 @@
     "quick_facts": {
       "title": "速览",
       "add": "添加",
+      "category_placeholder": "选择分类",
       "content_placeholder": "内容",
       "no_facts": "暂无速览",
       "delete_confirm": "确定删除？",
       "toggle": "切换可见性",
-      "toggled": "可见性已更新"
+      "toggled": "可见性已更新",
+      "select_category_required": "请选择速览分类",
+      "missing_fact_reference": "此速览缺少分类",
+      "untitled_category": "未命名分类"
     },
     "relationships": {
       "title": "关系",

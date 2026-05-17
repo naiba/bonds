@@ -74,6 +74,8 @@
   "err.failed_to_update_task": "Failed to update task",
   "err.failed_to_toggle_task": "Failed to toggle task",
   "err.failed_to_delete_task": "Failed to delete task",
+  "err.invalid_task_status": "Invalid task status",
+  "err.invalid_parent_task": "Invalid parent task",
 
   "err.failed_to_list_calls": "Failed to list calls",
   "err.failed_to_create_call": "Failed to create call",
