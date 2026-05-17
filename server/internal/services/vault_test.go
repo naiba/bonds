@@ -429,3 +429,57 @@ func TestDeleteVault_WithForeignKeysEnabled(t *testing.T) {
 		t.Errorf("Expected ErrVaultNotFound after deletion, got %v", err)
 	}
 }
+
+// Regression for #122: deleting a vault that has a contact with an
+// important date used to leave the ContactImportantDate row soft-deleted
+// (deleted_at set) while its parent ContactImportantDateType was hard-deleted
+// in Step 3 — under Postgres this trips a foreign-key violation. The cascade
+// must hard-delete soft-deletable child models so no orphan FK references
+// survive.
+func TestDeleteVault_HardDeletesContactImportantDates(t *testing.T) {
+	svc, accountID, userID := setupVaultTest(t)
+	db := svc.db
+
+	vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{
+		Name: "Important Date Vault",
+	}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contact := models.Contact{
+		VaultID:   vault.ID,
+		FirstName: strPtrOrNil("Alice"),
+	}
+	if err := db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	var dateType models.ContactImportantDateType
+	if err := db.Where("vault_id = ?", vault.ID).First(&dateType).Error; err != nil {
+		t.Fatalf("Find seeded ContactImportantDateType failed: %v", err)
+	}
+
+	importantDate := models.ContactImportantDate{
+		ContactID:                  contact.ID,
+		ContactImportantDateTypeID: &dateType.ID,
+		Label:                      "Birthday",
+	}
+	if err := db.Create(&importantDate).Error; err != nil {
+		t.Fatalf("Create ContactImportantDate failed: %v", err)
+	}
+
+	if err := svc.DeleteVault(vault.ID); err != nil {
+		t.Fatalf("DeleteVault failed: %v", err)
+	}
+
+	// Unscoped() counts soft-deleted rows too. The broken cascade soft-deletes
+	// the ContactImportantDate (count > 0); the fixed cascade hard-deletes it.
+	var importantDateCount int64
+	db.Unscoped().Model(&models.ContactImportantDate{}).
+		Where("contact_id = ?", contact.ID).
+		Count(&importantDateCount)
+	if importantDateCount != 0 {
+		t.Errorf("Expected ContactImportantDate to be hard-deleted, got %d remaining (likely soft-deleted via gorm.DeletedAt)", importantDateCount)
+	}
+}

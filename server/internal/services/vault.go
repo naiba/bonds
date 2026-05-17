@@ -202,13 +202,14 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 			&models.QuickFact{},
 			&models.Note{}, // Note has both contact_id and vault_id; delete by contact_id here
 		}
-		// Hard-delete (Unscoped) is required: child models like ContactImportantDate
-		// (and the ContactTask listed below) carry gorm.DeletedAt, so a regular
-		// Delete soft-deletes the row but leaves it in the table with its FKs to
-		// vault-scoped parents intact (e.g. contact_important_dates →
-		// contact_important_date_types). Postgres then rejects the parent delete
-		// in Step 3 with a foreign-key violation. A vault delete is intentionally
-		// destructive, so soft-delete is the wrong semantic here.
+		// Hard-delete (Unscoped) is required: soft-deletable child models
+		// (ContactImportantDate and ContactTask here; Group in the vault-scoped
+		// loop further down) carry gorm.DeletedAt, so a regular Delete leaves
+		// the row in the table with its FKs to vault-scoped parents intact
+		// (e.g. contact_important_dates → contact_important_date_types).
+		// Postgres then rejects the parent delete in Step 3 with a foreign-key
+		// violation. A vault delete is intentionally destructive, so
+		// soft-delete is the wrong semantic here.
 		for _, m := range contactChildModels {
 			if err := tx.Unscoped().Where("contact_id IN ?", contactIDs).Delete(m).Error; err != nil {
 				return fmt.Errorf("delete contact child %T: %w", m, err)
