@@ -10,6 +10,7 @@ import {
   App,
   Divider,
   Empty,
+  Tag,
   theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
@@ -98,6 +99,30 @@ export default function TasksModule({
     const trimmedLabel = label.trim();
     if (!trimmedLabel) return;
     createMutation.mutate({ taskLabel: trimmedLabel, taskDescription: description.trim() });
+  }
+
+  function renderSharedAssignees(task: Task) {
+    const others = (task.contacts ?? []).filter(
+      (c) => String(c.id) !== String(contactId),
+    );
+    if (others.length === 0) return null;
+    return (
+      <div
+        style={{
+          marginLeft: 24,
+          marginTop: 6,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 4,
+        }}
+      >
+        {others.map((c) => (
+          <Tag key={c.id} color="blue" style={{ marginRight: 0 }}>
+            {c.name || c.id}
+          </Tag>
+        ))}
+      </div>
+    );
   }
 
   function renderItem(task: Task) {
@@ -192,6 +217,7 @@ export default function TasksModule({
               {task.description}
             </div>
           )}
+          {renderSharedAssignees(task)}
         </div>
       </List.Item>
     );

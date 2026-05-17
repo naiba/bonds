@@ -48,7 +48,7 @@ type Contact struct {
 	Notes               []Note                 `json:"notes,omitempty" gorm:"foreignKey:ContactID"`
 	ImportantDates      []ContactImportantDate `json:"important_dates,omitempty" gorm:"foreignKey:ContactID"`
 	Reminders           []ContactReminder      `json:"reminders,omitempty" gorm:"foreignKey:ContactID"`
-	Tasks               []ContactTask          `json:"tasks,omitempty" gorm:"foreignKey:ContactID"`
+	Tasks               []ContactTask          `json:"tasks,omitempty" gorm:"many2many:task_contacts;joinForeignKey:ContactID;joinReferences:ContactTaskID"`
 	Calls               []Call                 `json:"calls,omitempty" gorm:"foreignKey:ContactID"`
 	Pets                []Pet                  `json:"pets,omitempty" gorm:"foreignKey:ContactID"`
 	Goals               []Goal                 `json:"goals,omitempty" gorm:"foreignKey:ContactID"`

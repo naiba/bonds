@@ -213,10 +213,8 @@ func TestListCalendarObjectsWithTasks(t *testing.T) {
 	contact := createTestContact(t, db, vaultID, userID, "Task", "User")
 
 	uid := uuid.New().String()
-	contactID := contact.ID
 	task := models.ContactTask{
 		VaultID:    vaultID,
-		ContactID:  &contactID,
 		AuthorID:   &userID,
 		UUID:       &uid,
 		AuthorName: "Test",
@@ -225,6 +223,9 @@ func TestListCalendarObjectsWithTasks(t *testing.T) {
 	}
 	if err := db.Create(&task).Error; err != nil {
 		t.Fatalf("Create task failed: %v", err)
+	}
+	if err := db.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contact.ID}).Error; err != nil {
+		t.Fatalf("attach task assignee: %v", err)
 	}
 
 	path := "/dav/calendars/" + userID + "/" + vaultID + "/"
@@ -264,10 +265,8 @@ func TestGetCalendarObjectTask(t *testing.T) {
 	uid := uuid.New().String()
 	desc := "A detailed description"
 	dueAt := time.Now().Add(24 * time.Hour)
-	contactID := contact.ID
 	task := models.ContactTask{
 		VaultID:     vaultID,
-		ContactID:   &contactID,
 		AuthorID:    &userID,
 		UUID:        &uid,
 		AuthorName:  "Test",
@@ -279,6 +278,9 @@ func TestGetCalendarObjectTask(t *testing.T) {
 	}
 	if err := db.Create(&task).Error; err != nil {
 		t.Fatalf("Create task failed: %v", err)
+	}
+	if err := db.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contact.ID}).Error; err != nil {
+		t.Fatalf("attach task assignee: %v", err)
 	}
 
 	path := "/dav/calendars/" + userID + "/" + vaultID + "/" + uid + ".ics"
