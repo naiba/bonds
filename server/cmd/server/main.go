@@ -69,7 +69,9 @@ func main() {
 
 	migrateUploadDir(cfg.Storage.UploadDir)
 	migrateModulesToContactPage(db)
-	migrateContactTasksToManyToMany(db)
+	if err := migrateContactTasksToManyToMany(db); err != nil {
+		log.Fatalf("Failed to migrate contact_tasks to many-to-many: %v", err)
+	}
 	services.BackfillImportantDateReminderSchedules(db)
 	if err := models.BackfillTaskStatuses(db); err != nil {
 		log.Printf("WARNING: failed to backfill task statuses: %v", err)
@@ -194,15 +196,20 @@ func migrateModulesToContactPage(db *gorm.DB) {
 // values from contact_tasks into the new task_contacts pivot, then drops the
 // old column. Idempotent: a no-op once the column is gone.
 //
+// Failures are fatal to the caller: once the application code no longer
+// reads contact_id, any legacy rows that did not make it into task_contacts
+// would silently disappear from the UI. Aborting at startup keeps the
+// operator in control instead.
+//
 // The column drop is dialect-aware because the original schema declared a
 // named FK constraint (fk_contacts_tasks) on contact_id. Plain DROP COLUMN
 // fails on both SQLite (GORM's table-rewrite parser chokes on the stale FK)
 // and Postgres (FK blocks the drop). We rewrite the table on SQLite and use
 // CASCADE on Postgres.
-func migrateContactTasksToManyToMany(db *gorm.DB) {
+func migrateContactTasksToManyToMany(db *gorm.DB) error {
 	m := db.Migrator()
 	if !m.HasColumn(&models.ContactTask{}, "contact_id") {
-		return
+		return nil
 	}
 
 	copied := db.Exec(`
@@ -216,8 +223,7 @@ func migrateContactTasksToManyToMany(db *gorm.DB) {
 		  )
 	`)
 	if copied.Error != nil {
-		log.Printf("WARNING: failed to copy contact_tasks.contact_id into task_contacts: %v", copied.Error)
-		return
+		return fmt.Errorf("copy contact_tasks.contact_id into task_contacts: %w", copied.Error)
 	}
 
 	var err error
@@ -230,10 +236,10 @@ func migrateContactTasksToManyToMany(db *gorm.DB) {
 		err = m.DropColumn(&models.ContactTask{}, "contact_id")
 	}
 	if err != nil {
-		log.Printf("WARNING: failed to drop contact_tasks.contact_id: %v", err)
-		return
+		return fmt.Errorf("drop contact_tasks.contact_id: %w", err)
 	}
 	log.Printf("Migrated %d contact_tasks.contact_id rows into task_contacts; dropped legacy column", copied.RowsAffected)
+	return nil
 }
 
 // dropContactIDColumnSQLite rewrites contact_tasks without the contact_id
@@ -241,8 +247,18 @@ func migrateContactTasksToManyToMany(db *gorm.DB) {
 // path fails to recreate the table while a stale FK references the column
 // being dropped. Strategy: rename → AutoMigrate (recreates the new schema)
 // → INSERT … SELECT (preserving every other column) → drop the renamed
-// original. PRAGMA foreign_keys=OFF avoids cascading deletes during the
-// swap; the constraint is re-enabled at exit.
+// original.
+//
+// Two PRAGMAs must be set on the SAME connection BEFORE the transaction
+// (both are no-ops inside a transaction, and PRAGMAs only apply to the
+// connection that set them):
+//
+//   - foreign_keys = OFF: avoids cascading deletes during the swap.
+//   - legacy_alter_table = ON: stops ALTER TABLE RENAME from rewriting
+//     foreign-key references in OTHER tables. Without this, modern SQLite
+//     would silently point task_contacts.contact_task_id at the renamed
+//     contact_tasks_old, and the subsequent DROP TABLE contact_tasks_old
+//     would leave that FK dangling.
 func dropContactIDColumnSQLite(db *gorm.DB) error {
 	type colInfo struct{ Name string }
 	var infos []colInfo
@@ -261,25 +277,20 @@ func dropContactIDColumnSQLite(db *gorm.DB) error {
 	}
 	colList := joinStrings(cols, ", ")
 
-	// SQLite's PRAGMA foreign_keys must be set OUTSIDE a transaction (it's a
-	// no-op inside one). With FKs on, ALTER TABLE RENAME rewrites referring
-	// FKs in other tables to point at the renamed table, which we don't want
-	// for this in-place swap. Pin to a single connection so the PRAGMA
-	// applies for the whole sequence.
 	return db.Connection(func(conn *gorm.DB) error {
 		if err := conn.Exec(`PRAGMA foreign_keys = OFF`).Error; err != nil {
 			return err
 		}
 		defer conn.Exec(`PRAGMA foreign_keys = ON`)
+		if err := conn.Exec(`PRAGMA legacy_alter_table = ON`).Error; err != nil {
+			return err
+		}
+		defer conn.Exec(`PRAGMA legacy_alter_table = OFF`)
 
 		return conn.Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec(`ALTER TABLE contact_tasks RENAME TO contact_tasks_old`).Error; err != nil {
 				return err
 			}
-			// Indexes don't get renamed with the table. Drop the orphan
-			// indexes that previously attached to contact_tasks so
-			// AutoMigrate can recreate them on the new table without name
-			// collisions.
 			var oldIndexNames []string
 			if err := tx.Raw(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'contact_tasks_old' AND name NOT LIKE 'sqlite_autoindex_%'`).Scan(&oldIndexNames).Error; err != nil {
 				return fmt.Errorf("inspect orphan indexes: %w", err)
