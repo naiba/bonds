@@ -429,7 +429,12 @@
             "filter_active": "Activos",
             "filter_archived": "Archivados",
             "filter_all": "Todos",
-            "filter_favorites": "Favoritos"
+            "filter_favorites": "Favoritos",
+            "filter_needs_verification": "Por verificar"
+        },
+        "needs_verification": {
+            "badge": "Por verificar",
+            "field_label": "Necesita verificación (revisar más tarde)"
         },
         "create": {
             "title": "Añadir un contacto",

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Typography, App, theme, Select } from "antd";
+import { Card, Form, Input, Button, Typography, App, theme, Select, Checkbox } from "antd";
 import { ArrowLeftOutlined, UserOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
@@ -150,6 +150,10 @@ export default function ContactCreate() {
               <GenderPronounSelect entity="pronouns" vaultId={vaultId} placeholder={t("contact.form.select_pronoun")} />
             </Form.Item>
           </div>
+
+          <Form.Item name="needs_verification" valuePropName="checked" style={{ marginBottom: 8 }}>
+            <Checkbox>{t("contact.needs_verification.field_label")}</Checkbox>
+          </Form.Item>
 
           <Form.Item style={{ marginBottom: 0, marginTop: 8, textAlign: "right" }}>
             <Button

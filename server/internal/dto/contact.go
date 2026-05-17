@@ -14,6 +14,10 @@ type CreateContactRequest struct {
 	PronounID  *uint  `json:"pronoun_id" example:"1"`
 	TemplateID *uint  `json:"template_id" example:"1"`
 	Listed     *bool  `json:"listed" example:"true"`
+	// NeedsVerification flags a contact as needing later review (e.g. captured quickly
+	// or created by an automated agent). When nil, the server picks a default based on
+	// the auth context: true for API-token callers, false for web-session callers.
+	NeedsVerification *bool `json:"needs_verification" example:"false"`
 }
 
 type UpdateContactRequest struct {
@@ -27,6 +31,7 @@ type UpdateContactRequest struct {
 	GenderID   *uint  `json:"gender_id" example:"1"`
 	PronounID  *uint  `json:"pronoun_id" example:"1"`
 	TemplateID *uint  `json:"template_id" example:"1"`
+	NeedsVerification *bool `json:"needs_verification" example:"false"`
 }
 
 type ContactResponse struct {
@@ -50,6 +55,7 @@ type ContactResponse struct {
 	ShowQuickFacts bool                `json:"show_quick_facts" example:"false"`
 	IsArchived     bool                `json:"is_archived" example:"false"`
 	IsFavorite     bool                `json:"is_favorite" example:"true"`
+	NeedsVerification bool             `json:"needs_verification" example:"false"`
 	CreatedAt      time.Time           `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt      time.Time           `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 	Birthday       *string             `json:"birthday,omitempty" example:"1990-06-15"`

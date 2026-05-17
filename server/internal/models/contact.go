@@ -27,6 +27,7 @@ type Contact struct {
 	CanBeDeleted   bool           `json:"can_be_deleted" gorm:"default:true"`
 	ShowQuickFacts bool           `json:"show_quick_facts" gorm:"default:false"`
 	Listed         bool           `json:"listed" gorm:"default:true"`
+	NeedsVerification bool        `json:"needs_verification" gorm:"default:false;index"`
 	Vcard          *string        `json:"vcard" gorm:"type:text"`
 	DistantUUID    *string        `json:"distant_uuid" gorm:"size:256"`
 	DistantEtag    *string        `json:"distant_etag" gorm:"size:256"`
