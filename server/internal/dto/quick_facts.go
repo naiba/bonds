@@ -18,3 +18,10 @@ type QuickFactResponse struct {
 	CreatedAt                 time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt                 time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
+
+type QuickFactGroupResponse struct {
+	TemplateID    uint                `json:"template_id" example:"1"`
+	TemplateLabel string              `json:"template_label" example:"Hobbies"`
+	Position      int                 `json:"position" example:"1"`
+	Facts         []QuickFactResponse `json:"facts"`
+}
