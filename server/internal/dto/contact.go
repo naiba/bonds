@@ -15,8 +15,7 @@ type CreateContactRequest struct {
 	TemplateID *uint  `json:"template_id" example:"1"`
 	Listed     *bool  `json:"listed" example:"true"`
 	// NeedsVerification flags a contact as needing later review (e.g. captured quickly
-	// or created by an automated agent). When nil, the server picks a default based on
-	// the auth context: true for API-token callers, false for web-session callers.
+	// or created by an automated agent). When nil, defaults to false.
 	NeedsVerification *bool `json:"needs_verification" example:"false"`
 }
 
