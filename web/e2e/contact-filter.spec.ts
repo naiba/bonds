@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { apiUrl } from './api-base-url';
 
 let counter = 0;
 
@@ -45,7 +46,7 @@ async function createContactViaAPI(
   firstName: string,
   lastName: string,
 ): Promise<string> {
-  const resp = await page.request.post(`http://localhost:8080/api/vaults/${vaultId}/contacts`, {
+  const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts`), {
     headers: { Authorization: `Bearer ${token}` },
     data: { first_name: firstName, last_name: lastName },
   });
@@ -61,7 +62,7 @@ async function toggleFavoriteViaAPI(
   contactId: string,
 ) {
   const resp = await page.request.put(
-    `http://localhost:8080/api/vaults/${vaultId}/contacts/${contactId}/favorite`,
+    apiUrl(`/vaults/${vaultId}/contacts/${contactId}/favorite`),
     { headers: { Authorization: `Bearer ${token}` } },
   );
   expect(resp.ok()).toBeTruthy();
@@ -74,7 +75,7 @@ async function toggleArchiveViaAPI(
   contactId: string,
 ) {
   const resp = await page.request.put(
-    `http://localhost:8080/api/vaults/${vaultId}/contacts/${contactId}/archive`,
+    apiUrl(`/vaults/${vaultId}/contacts/${contactId}/archive`),
     { headers: { Authorization: `Bearer ${token}` } },
   );
   expect(resp.ok()).toBeTruthy();
