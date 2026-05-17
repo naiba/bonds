@@ -133,8 +133,6 @@ function TaskEditModalContent({
     },
   });
 
-  // Parent-task candidates: every top-level task in this vault, excluding
-  // this task itself (a task can't be its own parent).
   const { data: allTasks = [] } = useQuery({
     queryKey: TASK_QUERY_KEY(vaultId),
     queryFn: async () => {
@@ -142,8 +140,41 @@ function TaskEditModalContent({
       return (res.data ?? []) as VaultTask[];
     },
   });
+
+  // A task may not become its own descendant's child, so the parent picker
+  // excludes itself AND every transitive descendant. The walk is bounded
+  // by the number of tasks to defend against any pre-existing cycles in
+  // the data.
+  const descendantIds = (() => {
+    if (!task?.id) return new Set<number>();
+    const childrenByParent = new Map<number, number[]>();
+    for (const t of allTasks) {
+      if (t.parent_task_id != null && t.id != null) {
+        const arr = childrenByParent.get(t.parent_task_id) ?? [];
+        arr.push(t.id);
+        childrenByParent.set(t.parent_task_id, arr);
+      }
+    }
+    const out = new Set<number>();
+    const queue: number[] = [task.id];
+    let guard = allTasks.length + 1;
+    while (queue.length > 0 && guard-- > 0) {
+      const current = queue.shift()!;
+      for (const child of childrenByParent.get(current) ?? []) {
+        if (!out.has(child)) {
+          out.add(child);
+          queue.push(child);
+        }
+      }
+    }
+    return out;
+  })();
   const parentOptions = allTasks
-    .filter((t) => !t.parent_task_id && t.id !== task?.id)
+    .filter((t) =>
+      t.id != null &&
+      t.id !== task?.id &&
+      !descendantIds.has(t.id),
+    )
     .map((t) => ({ value: t.id, label: t.label }));
 
   // Sub-tasks: children of the currently-edited task. Read from the same
@@ -176,15 +207,24 @@ function TaskEditModalContent({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      api.vaultTasks.tasksPartialUpdate(vaultId, task!.id!, {
+    mutationFn: (values: FormValues) => {
+      // parent_task_id is tri-state on the server (NullableUint): preserve
+      // the distinction between cleared (null) and a real number. AntD
+      // Select with allowClear emits `null` for clear and `undefined` for
+      // "field never touched", which maps cleanly to the server contract
+      // once we forward both literally. The generated TS type narrows the
+      // field to `number | undefined`, so we cast through unknown to keep
+      // the explicit null on the wire.
+      const body = {
         label: values.label,
         description: values.description ?? "",
         contact_ids: values.contact_ids ?? [],
-        parent_task_id: values.parent_task_id ?? undefined,
+        parent_task_id: values.parent_task_id,
         status: values.status ?? fallbackSlug,
         due_at: values.due_at ? values.due_at.toISOString() : undefined,
-      }),
+      } as unknown as Parameters<typeof api.vaultTasks.tasksPartialUpdate>[2];
+      return api.vaultTasks.tasksPartialUpdate(vaultId, task!.id!, body);
+    },
     onSuccess,
     onError,
   });
