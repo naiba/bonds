@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
@@ -155,6 +156,10 @@ func (h *VaultHandler) Delete(c echo.Context) error {
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")
 		}
+		// The cascade is large and silent failures are very hard to diagnose.
+		// Log the wrapped step (set by deleteVaultCascade) so operators can see
+		// which step failed; the HTTP response stays generic.
+		log.Printf("ERROR: vault delete cascade failed (vault_id=%s): %v", vaultID, err)
 		return response.InternalError(c, "err.failed_to_delete_vault")
 	}
 	return response.NoContent(c)
