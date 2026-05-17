@@ -31,7 +31,7 @@ func NewContactHandler(contactService *services.ContactService) *ContactHandler 
 //	@Param			per_page	query		integer	false	"Items per page"
 //	@Param			search		query		string	false	"Search term"
 //	@Param			sort		query		string	false	"Sort order: first_name, last_name, created_at, updated_at (default)"
-//	@Param			filter		query		string	false	"Filter: active (default), archived, all, favorites"
+//	@Param			filter		query		string	false	"Filter: active (default), archived, all, favorites, needs_verification"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.ContactResponse}
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
@@ -64,7 +64,7 @@ func (h *ContactHandler) List(c echo.Context) error {
 //	@Param			page		query		integer	false	"Page number"
 //	@Param			per_page	query		integer	false	"Items per page"
 //	@Param			sort		query		string	false	"Sort order: first_name, last_name, created_at, updated_at (default)"
-//	@Param			filter		query		string	false	"Filter: active (default), archived, all, favorites"
+//	@Param			filter		query		string	false	"Filter: active (default), archived, all, favorites, needs_verification"
 //	@Success		200			{object}	response.APIResponse{data=[]dto.ContactResponse}
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse

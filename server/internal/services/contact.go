@@ -52,7 +52,8 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 		query = query.Where("listed = ?", true)
 		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)
 	case "needs_verification":
-		query = query.Where("listed = ?", true)
+		// Spans active and archived: a contact flagged for verification should
+		// remain discoverable even if the user archived it before reviewing.
 		query = query.Where("needs_verification = ?", true)
 	default: // "active" or empty
 		query = query.Where("listed = ?", true)
@@ -328,7 +329,8 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 		query = query.Where("listed = ?", true)
 		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)
 	case "needs_verification":
-		query = query.Where("listed = ?", true)
+		// Spans active and archived: a contact flagged for verification should
+		// remain discoverable even if the user archived it before reviewing.
 		query = query.Where("needs_verification = ?", true)
 	default: // "active" or empty
 		query = query.Where("listed = ?", true)
