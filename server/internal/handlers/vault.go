@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
@@ -155,7 +156,13 @@ func (h *VaultHandler) Delete(c echo.Context) error {
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")
 		}
-		return response.InternalError(c, "err.failed_to_delete_vault")
+		return c.JSON(http.StatusInternalServerError, response.APIResponse{
+			Success: false,
+			Error: &response.APIError{
+				Code:    "INTERNAL_ERROR",
+				Message: "Failed to delete vault: " + err.Error(),
+			},
+		})
 	}
 	return response.NoContent(c)
 }

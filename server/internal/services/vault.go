@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -163,7 +164,7 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 	if err := tx.Model(&models.Contact{}).Unscoped().
 		Where("vault_id = ?", vaultID).
 		Pluck("id", &contactIDs).Error; err != nil {
-		return err
+		return fmt.Errorf("collect contacts: %w", err)
 	}
 
 	// Step 2: Delete contact-level children (deepest grandchildren first).
@@ -174,14 +175,14 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 		if err := tx.Where("contact_reminder_id IN (?)",
 			tx.Model(&models.ContactReminder{}).Select("id").Where("contact_id IN ?", contactIDs),
 		).Delete(&models.ContactReminderScheduled{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete ContactReminderScheduled: %w", err)
 		}
 
 		// Streak → depends on Goal
 		if err := tx.Where("goal_id IN (?)",
 			tx.Model(&models.Goal{}).Select("id").Where("contact_id IN ?", contactIDs),
 		).Delete(&models.Streak{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete Streak: %w", err)
 		}
 
 		// --- Contact-level children (direct FK to contact_id) ---
@@ -202,13 +203,13 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 		}
 		for _, m := range contactChildModels {
 			if err := tx.Where("contact_id IN ?", contactIDs).Delete(m).Error; err != nil {
-				return err
+				return fmt.Errorf("delete contact child %T: %w", m, err)
 			}
 		}
 
 		// Also delete Relationships where this vault's contacts are the "related" side
 		if err := tx.Where("related_contact_id IN ?", contactIDs).Delete(&models.Relationship{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete Relationship by related_contact_id: %w", err)
 		}
 
 		// --- Pivot tables (contact_id FK) ---
@@ -226,25 +227,25 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 		}
 		for _, m := range contactPivotModels {
 			if err := tx.Where("contact_id IN ?", contactIDs).Delete(m).Error; err != nil {
-				return err
+				return fmt.Errorf("delete contact pivot %T: %w", m, err)
 			}
 		}
 
 		// ContactLoan pivot uses loaner_id / loanee_id instead of contact_id
 		if err := tx.Where("loaner_id IN ? OR loanee_id IN ?", contactIDs, contactIDs).
 			Delete(&models.ContactLoan{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete ContactLoan: %w", err)
 		}
 
 		// ContactGift pivot uses loaner_id / loanee_id (same pattern as ContactLoan)
 		if err := tx.Where("loaner_id IN ? OR loanee_id IN ?", contactIDs, contactIDs).
 			Delete(&models.ContactGift{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete ContactGift: %w", err)
 		}
 
 		// DavSyncLog has nullable contact_id
 		if err := tx.Where("contact_id IN ?", contactIDs).Delete(&models.DavSyncLog{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete DavSyncLog by contact_id: %w", err)
 		}
 	}
 
@@ -312,10 +313,10 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 	tx.Model(&models.ContactTask{}).Where("vault_id = ?", vaultID).Pluck("id", &taskIDs)
 	if len(taskIDs) > 0 {
 		if err := tx.Where("contact_task_id IN ?", taskIDs).Delete(&models.TaskContact{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete TaskContact: %w", err)
 		}
 		if err := tx.Unscoped().Where("id IN ?", taskIDs).Delete(&models.ContactTask{}).Error; err != nil {
-			return err
+			return fmt.Errorf("delete ContactTask by id: %w", err)
 		}
 	}
 
@@ -340,17 +341,20 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 	}
 	for _, m := range vaultChildModels {
 		if err := tx.Where("vault_id = ?", vaultID).Delete(m).Error; err != nil {
-			return err
+			return fmt.Errorf("delete vault child %T: %w", m, err)
 		}
 	}
 
 	// Step 4: Delete contacts (including soft-deleted ones via Unscoped).
 	if err := tx.Unscoped().Where("vault_id = ?", vaultID).Delete(&models.Contact{}).Error; err != nil {
-		return err
+		return fmt.Errorf("delete Contact: %w", err)
 	}
 
 	// Step 5: Delete the vault itself.
-	return tx.Where("id = ?", vaultID).Delete(&models.Vault{}).Error
+	if err := tx.Where("id = ?", vaultID).Delete(&models.Vault{}).Error; err != nil {
+		return fmt.Errorf("delete Vault: %w", err)
+	}
+	return nil
 }
 
 func (s *VaultService) CheckUserVaultAccess(userID, vaultID string, requiredPerm int) error {
