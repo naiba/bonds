@@ -148,6 +148,11 @@ export default function ContactList() {
             {record.is_favorite && (
               <StarFilled style={{ color: token.colorWarning, fontSize: 13 }} />
             )}
+            {record.needs_verification && (
+              <Tag color="warning" style={{ marginInlineEnd: 0 }}>
+                {t("contact.needs_verification.badge")}
+              </Tag>
+            )}
           </div>
         ),
       sorter: (a, b) => (a.first_name ?? '').localeCompare(b.first_name ?? ''),
@@ -387,6 +392,7 @@ export default function ContactList() {
         >
             <Option value="active">{t("contact.list.filter_active")}</Option>
             <Option value="favorites">{t("contact.list.filter_favorites")}</Option>
+            <Option value="needs_verification">{t("contact.list.filter_needs_verification")}</Option>
             <Option value="archived">{t("contact.list.filter_archived")}</Option>
             <Option value="all">{t("contact.list.filter_all")}</Option>
         </Select>

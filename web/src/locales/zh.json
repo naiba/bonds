@@ -513,7 +513,12 @@
       "filter_active": "活跃",
       "filter_archived": "已归档",
       "filter_all": "全部",
-      "filter_favorites": "收藏"
+      "filter_favorites": "收藏",
+      "filter_needs_verification": "待核实"
+    },
+    "needs_verification": {
+      "badge": "待核实",
+      "field_label": "标记为待核实（稍后再确认）"
     },
     "create": {
       "title": "添加联系人",

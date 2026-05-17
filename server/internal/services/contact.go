@@ -51,6 +51,9 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 	case "favorites":
 		query = query.Where("listed = ?", true)
 		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)
+	case "needs_verification":
+		query = query.Where("listed = ?", true)
+		query = query.Where("needs_verification = ?", true)
 	default: // "active" or empty
 		query = query.Where("listed = ?", true)
 	}
@@ -123,6 +126,9 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		PronounID:     req.PronounID,
 		TemplateID:    req.TemplateID,
 		LastUpdatedAt: &now,
+	}
+	if req.NeedsVerification != nil {
+		contact.NeedsVerification = *req.NeedsVerification
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -205,6 +211,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 	contact.PronounID = req.PronounID
 	contact.TemplateID = req.TemplateID
 	contact.LastUpdatedAt = &now
+	if req.NeedsVerification != nil {
+		contact.NeedsVerification = *req.NeedsVerification
+	}
 
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
@@ -318,6 +327,9 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	case "favorites":
 		query = query.Where("listed = ?", true)
 		query = query.Where("id IN (SELECT contact_id FROM contact_vault_user WHERE user_id = ? AND is_favorite = ?)", userID, true)
+	case "needs_verification":
+		query = query.Where("listed = ?", true)
+		query = query.Where("needs_verification = ?", true)
 	default: // "active" or empty
 		query = query.Where("listed = ?", true)
 	}
@@ -474,6 +486,7 @@ func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
 		ShowQuickFacts: c.ShowQuickFacts,
 		IsArchived:     !c.Listed,
 		IsFavorite:     isFavorite,
+		NeedsVerification: c.NeedsVerification,
 		CreatedAt:      c.CreatedAt,
 		UpdatedAt:      c.UpdatedAt,
 	}

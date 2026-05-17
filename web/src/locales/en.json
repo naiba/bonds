@@ -513,7 +513,12 @@
       "filter_active": "Active",
       "filter_archived": "Archived",
       "filter_all": "All",
-      "filter_favorites": "Favorites"
+      "filter_favorites": "Favorites",
+      "filter_needs_verification": "Needs verification"
+    },
+    "needs_verification": {
+      "badge": "To verify",
+      "field_label": "Needs verification (flag for later review)"
     },
     "create": {
       "title": "Add a contact",

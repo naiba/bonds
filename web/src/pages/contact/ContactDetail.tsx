@@ -19,6 +19,7 @@ import {
   Upload,
   theme,
   Dropdown,
+  Checkbox,
 } from "antd";
 import {
   EditOutlined,
@@ -306,6 +307,11 @@ export default function ContactDetail() {
         ) : (
           <Tag color="green" style={{ margin: 0 }}>{t("common.active")}</Tag>
         )}
+        {contact.needs_verification && (
+          <Tag color="warning" style={{ margin: 0 }}>
+            {t("contact.needs_verification.badge")}
+          </Tag>
+        )}
         <Text type="secondary" style={{ fontSize: 12 }}>
           {t("common.created")} {formatDate(contact.created_at, dateFormats)}
           {" · "}
@@ -546,6 +552,7 @@ export default function ContactDetail() {
                 maiden_name: contact.maiden_name,
                 gender_id: contact.gender_id,
                 pronoun_id: contact.pronoun_id,
+                needs_verification: contact.needs_verification,
               });
               setIsEditModalOpen(true);
             }}
@@ -725,6 +732,9 @@ export default function ContactDetail() {
               <GenderPronounSelect entity="pronouns" vaultId={vaultId} placeholder={t("contact.form.select_pronoun")} />
             </Form.Item>
           </div>
+          <Form.Item name="needs_verification" valuePropName="checked" style={{ marginBottom: 16 }}>
+            <Checkbox>{t("contact.needs_verification.field_label")}</Checkbox>
+          </Form.Item>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button onClick={() => setIsEditModalOpen(false)}>
               {t("common.cancel")}
