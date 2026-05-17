@@ -18,6 +18,32 @@ func NewQuickFactHandler(quickFactService *services.QuickFactService) *QuickFact
 	return &QuickFactHandler{quickFactService: quickFactService}
 }
 
+// ListAll godoc
+//
+//	@Summary		List all quick facts
+//	@Description	Return all quick facts for a contact grouped by vault template
+//	@Tags			quick-facts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.QuickFactGroupResponse}
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts [get]
+func (h *QuickFactHandler) ListAll(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	facts, err := h.quickFactService.ListAll(contactID, vaultID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_list_quick_facts")
+	}
+	return response.OK(c, facts)
+}
+
 // List godoc
 //
 //	@Summary		List quick facts
@@ -44,6 +70,9 @@ func (h *QuickFactHandler) List(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrQuickFactTplNotFound) {
+			return response.NotFound(c, "err.quick_fact_template_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_list_quick_facts")
 	}
@@ -85,6 +114,9 @@ func (h *QuickFactHandler) Create(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrQuickFactTplNotFound) {
+			return response.NotFound(c, "err.quick_fact_template_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_create_quick_fact")
 	}

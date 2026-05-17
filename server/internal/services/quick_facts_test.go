@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -79,6 +80,47 @@ func TestListQuickFacts(t *testing.T) {
 	}
 	if len(facts) != 2 {
 		t.Errorf("Expected 2 quick facts, got %d", len(facts))
+	}
+}
+
+func TestListAllQuickFactsGroupsFactsByVaultTemplate(t *testing.T) {
+	svc, contactID, vaultID := setupQuickFactTest(t)
+
+	var templates []models.VaultQuickFactsTemplate
+	if err := svc.db.Where("vault_id = ?", vaultID).Order("position ASC").Find(&templates).Error; err != nil {
+		t.Fatalf("List templates failed: %v", err)
+	}
+	if len(templates) < 2 {
+		t.Fatalf("Expected at least 2 quick fact templates, got %d", len(templates))
+	}
+
+	_, err := svc.Create(contactID, vaultID, templates[0].ID, dto.CreateQuickFactRequest{Content: "Enjoys hiking"})
+	if err != nil {
+		t.Fatalf("Create first template fact failed: %v", err)
+	}
+	_, err = svc.Create(contactID, vaultID, templates[1].ID, dto.CreateQuickFactRequest{Content: "Avoids caffeine"})
+	if err != nil {
+		t.Fatalf("Create second template fact failed: %v", err)
+	}
+
+	groups, err := svc.ListAll(contactID, vaultID)
+	if err != nil {
+		t.Fatalf("ListAll failed: %v", err)
+	}
+	if len(groups) != len(templates) {
+		t.Fatalf("Expected %d template groups, got %d", len(templates), len(groups))
+	}
+	if groups[0].TemplateID != templates[0].ID {
+		t.Errorf("Expected first template ID %d, got %d", templates[0].ID, groups[0].TemplateID)
+	}
+	if groups[0].TemplateLabel == "" {
+		t.Error("Expected first template label to be populated")
+	}
+	if len(groups[0].Facts) != 1 || groups[0].Facts[0].Content != "Enjoys hiking" {
+		t.Fatalf("Expected first group to contain hiking fact, got %+v", groups[0].Facts)
+	}
+	if len(groups[1].Facts) != 1 || groups[1].Facts[0].Content != "Avoids caffeine" {
+		t.Fatalf("Expected second group to contain caffeine fact, got %+v", groups[1].Facts)
 	}
 }
 
