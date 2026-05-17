@@ -280,6 +280,7 @@ export type { GithubComNaibaBondsInternalDtoLifeEventResponse as LifeEvent } fro
 export type { GithubComNaibaBondsInternalDtoMoodTrackingEventResponse as MoodTrackingEvent } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoMoodTrackingParameterResponse as MoodTrackingParameter } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoQuickFactResponse as QuickFact } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoQuickFactGroupResponse as QuickFactGroup } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultFileResponse as Photo } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultFileResponse as Document } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoJournalResponse as Journal } from "./generated/data-contracts";

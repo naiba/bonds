@@ -26,7 +26,7 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        target: `http://localhost:${process.env.PLAYWRIGHT_SERVER_PORT ?? "8080"}`,
         changeOrigin: true,
       },
     },

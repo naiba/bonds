@@ -804,11 +804,15 @@
     "quick_facts": {
       "title": "Quick Facts",
       "add": "Add",
+      "category_placeholder": "Select a category",
       "content_placeholder": "Content",
       "no_facts": "No quick facts",
       "delete_confirm": "Delete?",
       "toggle": "Toggle visibility",
-      "toggled": "Visibility updated"
+      "toggled": "Visibility updated",
+      "select_category_required": "Please select a quick fact category",
+      "missing_fact_reference": "Quick fact is missing its category",
+      "untitled_category": "Untitled category"
     },
     "relationships": {
       "title": "Relationships",
