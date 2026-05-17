@@ -486,10 +486,12 @@ func (s *MonicaImportService) importTasks(
 				task.CompletedAt = &t
 			}
 		}
-		if err := tx.Create(&task).Error; err != nil {
-			continue
-		}
-		if err := tx.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contactID}).Error; err != nil {
+		if err := tx.Transaction(func(itx *gorm.DB) error {
+			if err := itx.Create(&task).Error; err != nil {
+				return err
+			}
+			return itx.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contactID}).Error
+		}); err != nil {
 			continue
 		}
 		resp.ImportedTasks++

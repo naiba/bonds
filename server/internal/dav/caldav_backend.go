@@ -160,14 +160,12 @@ func (b *CalDAVBackend) ListCalendarObjects(ctx context.Context, path string, _ 
 	var objects []caldav.CalendarObject
 
 	if len(contactIDs) > 0 {
-		// Get important dates
 		var dates []models.ContactImportantDate
 		if err := b.db.Preload("Contact").Where("contact_id IN ?", contactIDs).Find(&dates).Error; err != nil {
 			return nil, err
 		}
 
 		for i := range dates {
-			// Ensure UUID exists
 			if dates[i].UUID == nil || *dates[i].UUID == "" {
 				uid := uuid.New().String()
 				dates[i].UUID = &uid
@@ -175,29 +173,53 @@ func (b *CalDAVBackend) ListCalendarObjects(ctx context.Context, path string, _ 
 			}
 			objects = append(objects, *importantDateToCalendarObject(&dates[i], userID))
 		}
+	}
 
-		// Get tasks for any of these contacts via the m2m pivot, plus any
-		// vault-scoped standalone tasks (no assignees).
-		var tasks []models.ContactTask
-		if err := b.db.Distinct().
-			Joins("LEFT JOIN task_contacts tc ON tc.contact_task_id = contact_tasks.id").
-			Where("contact_tasks.vault_id = ? AND (tc.contact_id IN ? OR tc.contact_id IS NULL)", vaultID, contactIDs).
-			Find(&tasks).Error; err != nil {
-			return nil, err
+	// Tasks are vault-scoped and may have zero assignees (standalone), so
+	// list them independently of whether the vault has any contacts.
+	tasks, err := b.listVaultTasksForCalendar(vaultID, contactIDs)
+	if err != nil {
+		return nil, err
+	}
+	for i := range tasks {
+		if tasks[i].UUID == nil || *tasks[i].UUID == "" {
+			uid := uuid.New().String()
+			tasks[i].UUID = &uid
+			b.db.Model(&tasks[i]).Update("uuid", uid)
 		}
-
-		for i := range tasks {
-			// Ensure UUID exists
-			if tasks[i].UUID == nil || *tasks[i].UUID == "" {
-				uid := uuid.New().String()
-				tasks[i].UUID = &uid
-				b.db.Model(&tasks[i]).Update("uuid", uid)
-			}
-			objects = append(objects, *taskToCalendarObject(&tasks[i], userID))
-		}
+		objects = append(objects, *taskToCalendarObject(&tasks[i], userID))
 	}
 
 	return objects, nil
+}
+
+// listVaultTasksForCalendar returns every task in the vault that the
+// requesting user can see in their calendar feed: any task assigned to one
+// of the vault's contacts, plus every standalone (zero-assignee) task. The
+// LEFT JOIN with NOT EXISTS keeps standalone tasks regardless of whether
+// the contactIDs slice is empty.
+func (b *CalDAVBackend) listVaultTasksForCalendar(vaultID string, contactIDs []string) ([]models.ContactTask, error) {
+	var tasks []models.ContactTask
+	q := b.db.Model(&models.ContactTask{}).
+		Distinct().
+		Where("contact_tasks.vault_id = ?", vaultID)
+
+	standalone := `NOT EXISTS (
+		SELECT 1 FROM task_contacts tc WHERE tc.contact_task_id = contact_tasks.id
+	)`
+	if len(contactIDs) == 0 {
+		q = q.Where(standalone)
+	} else {
+		assigned := `EXISTS (
+			SELECT 1 FROM task_contacts tc
+			WHERE tc.contact_task_id = contact_tasks.id AND tc.contact_id IN ?
+		)`
+		q = q.Where("("+assigned+") OR ("+standalone+")", contactIDs)
+	}
+	if err := q.Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
 func (b *CalDAVBackend) QueryCalendarObjects(ctx context.Context, path string, _ *caldav.CalendarQuery) ([]caldav.CalendarObject, error) {
@@ -336,10 +358,6 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		}, nil
 	}
 
-	// Pick any contact in the vault to attach as the initial assignee; the
-	// user can adjust assignees later from the UI. Vault-level standalone
-	// tasks (no contact) are valid too — we still create the task even when
-	// the vault has no contacts.
 	var contact models.Contact
 	hasContact := b.db.Where("vault_id = ?", vaultID).First(&contact).Error == nil
 
@@ -355,13 +373,16 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 	if description != "" {
 		task.Description = &description
 	}
-	if err := b.db.Create(&task).Error; err != nil {
-		return nil, err
-	}
-	if hasContact {
-		if err := b.db.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contact.ID}).Error; err != nil {
-			return nil, err
+	if err := b.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&task).Error; err != nil {
+			return err
 		}
+		if hasContact {
+			return tx.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contact.ID}).Error
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return &caldav.CalendarObject{
@@ -392,13 +413,17 @@ func (b *CalDAVBackend) DeleteCalendarObject(ctx context.Context, path string) e
 		return b.db.Delete(&importantDate).Error
 	}
 
-	// Try task
 	var task models.ContactTask
 	if err := b.db.First(&task, "uuid = ?", objectID).Error; err == nil {
 		if err := b.verifyVaultAccess(userID, task.VaultID); err != nil {
 			return err
 		}
-		return b.db.Delete(&task).Error
+		return b.db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("contact_task_id = ?", task.ID).Delete(&models.TaskContact{}).Error; err != nil {
+				return err
+			}
+			return tx.Delete(&task).Error
+		})
 	}
 
 	return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("calendar object not found"))
