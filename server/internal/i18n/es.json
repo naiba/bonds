@@ -64,6 +64,8 @@
   "err.failed_to_update_task": "Error al actualizar la tarea",
   "err.failed_to_toggle_task": "Error al cambiar el estado de la tarea",
   "err.failed_to_delete_task": "Error al eliminar la tarea",
+  "err.invalid_task_status": "Estado de tarea inválido",
+  "err.invalid_parent_task": "Tarea padre inválida",
   "err.failed_to_list_calls": "Error al listar las llamadas",
   "err.failed_to_create_call": "Error al crear la llamada",
   "err.invalid_call_id": "ID de llamada inválido",
