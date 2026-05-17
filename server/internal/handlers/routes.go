@@ -477,6 +477,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactSub.PUT("/quickFacts/toggle", quickFactHandler.Toggle, requireEditor)
 
 	quickFactRoutes := contactSub.Group("/quickFacts")
+	quickFactRoutes.GET("", quickFactHandler.ListAll)
 	quickFactRoutes.GET("/:templateId", quickFactHandler.List)
 	quickFactRoutes.POST("/:templateId", quickFactHandler.Create, requireEditor)
 	quickFactRoutes.PUT("/:templateId/:id", quickFactHandler.Update, requireEditor)
