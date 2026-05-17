@@ -32,7 +32,9 @@ type UpdateTaskRequest struct {
 	// contact in the URL path is always re-added to keep the task visible
 	// from this contact's task list.
 	ContactIDs *[]string `json:"contact_ids" example:"[\"550e8400-e29b-41d4-a716-446655440000\"]"`
-	ParentTaskID *uint   `json:"parent_task_id" example:"42"`
+	// ParentTaskID — tri-state: omitted = leave unchanged, null = clear,
+	// number = set. See NullableUint.
+	ParentTaskID NullableUint `json:"parent_task_id,omitempty" swaggertype:"integer" example:"42"`
 }
 
 type UpdateTaskStatusRequest struct {

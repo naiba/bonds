@@ -34,12 +34,13 @@ type CreateVaultTaskRequest struct {
 // UpdateVaultTaskRequest replaces the editable fields of a vault task in one
 // call. Status is validated against the known set; an empty Status means
 // "leave unchanged". ContactIDs replaces the assignee set verbatim when
-// provided; nil means "leave assignees untouched".
+// provided; nil means "leave assignees untouched". ParentTaskID is tri-state
+// (omitted = leave unchanged; null = clear; number = set), see NullableUint.
 type UpdateVaultTaskRequest struct {
-	Label        string     `json:"label" validate:"required" example:"Buy birthday gift"`
-	Description  string     `json:"description" example:"Get a nice book from the bookstore"`
-	DueAt        *time.Time `json:"due_at" example:"2026-01-15T10:30:00Z"`
-	Status       string     `json:"status" example:"in_progress"`
-	ContactIDs   *[]string  `json:"contact_ids" example:"[\"550e8400-e29b-41d4-a716-446655440000\"]"`
-	ParentTaskID *uint      `json:"parent_task_id" example:"42"`
+	Label        string       `json:"label" validate:"required" example:"Buy birthday gift"`
+	Description  string       `json:"description" example:"Get a nice book from the bookstore"`
+	DueAt        *time.Time   `json:"due_at" example:"2026-01-15T10:30:00Z"`
+	Status       string       `json:"status" example:"in_progress"`
+	ContactIDs   *[]string    `json:"contact_ids" example:"[\"550e8400-e29b-41d4-a716-446655440000\"]"`
+	ParentTaskID NullableUint `json:"parent_task_id,omitempty" swaggertype:"integer" example:"42"`
 }
