@@ -74,6 +74,7 @@ test.describe('Contact Modules - Quick Facts', () => {
     expect(resp.status()).toBeLessThan(400);
 
     await expect(qfCard.getByText('Loves hiking')).toBeVisible({ timeout: 10000 });
+    await expect(qfCard.getByText('Hobbies')).toBeVisible({ timeout: 10000 });
 
     // --- UPDATE: Edit the quick fact ---
     await qfCard.getByRole('button', { name: /edit/i }).first().click();
