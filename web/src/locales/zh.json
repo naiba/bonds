@@ -800,11 +800,15 @@
     "quick_facts": {
       "title": "速览",
       "add": "添加",
+      "category_placeholder": "选择分类",
       "content_placeholder": "内容",
       "no_facts": "暂无速览",
       "delete_confirm": "确定删除？",
       "toggle": "切换可见性",
-      "toggled": "可见性已更新"
+      "toggled": "可见性已更新",
+      "select_category_required": "请选择速览分类",
+      "missing_fact_reference": "此速览缺少分类",
+      "untitled_category": "未命名分类"
     },
     "relationships": {
       "title": "关系",
