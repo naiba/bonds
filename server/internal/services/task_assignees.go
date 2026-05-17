@@ -4,6 +4,7 @@ import (
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // taskAssignees loads the contact assignees for a set of task IDs in two
@@ -51,7 +52,9 @@ func taskAssignees(db *gorm.DB, taskIDs []uint) (map[uint][]dto.TaskContactRef, 
 }
 
 // replaceTaskAssignees swaps the assignee set for one task. Caller is
-// responsible for validating that every ID belongs to the task's vault.
+// responsible for validating that every ID belongs to the task's vault
+// and for running this inside a transaction (DELETE + INSERT must commit
+// or roll back together).
 func replaceTaskAssignees(tx *gorm.DB, taskID uint, contactIDs []string) error {
 	if err := tx.Where("contact_task_id = ?", taskID).Delete(&models.TaskContact{}).Error; err != nil {
 		return err
@@ -75,6 +78,24 @@ func replaceTaskAssignees(tx *gorm.DB, taskID uint, contactIDs []string) error {
 		return nil
 	}
 	return tx.Create(&rows).Error
+}
+
+// replaceTaskAssigneesLocked is the concurrency-safe variant: it takes a
+// FOR UPDATE lock on the parent task row first so two concurrent
+// "replace assignees" requests serialize instead of interleaving their
+// DELETE/INSERT pairs into a duplicated or merged set.
+//
+// On SQLite the clause is silently ignored (SQLite serializes writers at
+// the DB level anyway). On Postgres it issues a real row lock.
+func replaceTaskAssigneesLocked(tx *gorm.DB, taskID uint, contactIDs []string) error {
+	var lockTarget models.ContactTask
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id").
+		Where("id = ?", taskID).
+		First(&lockTarget).Error; err != nil {
+		return err
+	}
+	return replaceTaskAssignees(tx, taskID, contactIDs)
 }
 
 // validateContactsBelongToVault ensures every contact in the set is in vault.

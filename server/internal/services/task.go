@@ -12,6 +12,7 @@ import (
 var ErrTaskNotFound = errors.New("task not found")
 var ErrInvalidTaskStatus = errors.New("invalid task status")
 var ErrInvalidParentTask = errors.New("invalid parent task")
+var ErrTaskHasSubTasks = errors.New("task has sub-tasks")
 
 type TaskService struct {
 	db           *gorm.DB
@@ -87,7 +88,7 @@ func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.Create
 		if err := tx.Create(&task).Error; err != nil {
 			return err
 		}
-		return replaceTaskAssignees(tx, task.ID, extras)
+		return replaceTaskAssigneesLocked(tx, task.ID, extras)
 	})
 	if err != nil {
 		return nil, err
@@ -122,14 +123,17 @@ func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateT
 		}
 		return nil, err
 	}
-	if err := validateParentTask(s.db, req.ParentTaskID, task.ID, vaultID); err != nil {
+	parentPatch := req.ParentTaskID
+	if err := validateParentTaskPatch(s.db, parentPatch, task.ID, vaultID); err != nil {
 		return nil, err
 	}
 
 	task.Label = req.Label
 	task.Description = strPtrOrNil(req.Description)
 	task.DueAt = req.DueAt
-	task.ParentTaskID = req.ParentTaskID
+	if parentPatch.Present {
+		task.ParentTaskID = parentPatch.Ptr()
+	}
 	if req.Status != "" {
 		task.Status = req.Status
 	}
@@ -141,13 +145,11 @@ func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateT
 		if req.ContactIDs == nil {
 			return nil
 		}
-		// Replace assignees but always keep the URL contact attached so the
-		// task stays visible from the contact's task list.
 		next := append([]string{contactID}, (*req.ContactIDs)...)
 		if err := validateContactsBelongToVault(tx, next, vaultID); err != nil {
 			return err
 		}
-		return replaceTaskAssignees(tx, task.ID, next)
+		return replaceTaskAssigneesLocked(tx, task.ID, next)
 	})
 	if err != nil {
 		return nil, err
@@ -205,7 +207,6 @@ func (s *TaskService) Delete(id uint, contactID, vaultID string) error {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return err
 	}
-	// Must be visible from this contact's list (i.e. the contact is among the assignees).
 	var task models.ContactTask
 	if err := s.db.
 		Joins("JOIN task_contacts tc ON tc.contact_task_id = contact_tasks.id").
@@ -216,16 +217,15 @@ func (s *TaskService) Delete(id uint, contactID, vaultID string) error {
 		}
 		return err
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("contact_task_id = ?", task.ID).Delete(&models.TaskContact{}).Error; err != nil {
-			return err
-		}
-		return tx.Delete(&task).Error
-	})
+	return deleteTaskCascade(s.db, &task)
 }
 
-// validateParentTask ensures the parent exists in the same vault and is not
-// the task itself (trivial self-loop). selfID is 0 on create.
+// validateParentTask ensures the parent exists in the same vault and that
+// the resulting hierarchy stays acyclic. selfID is 0 on create.
+//
+// Cycle detection: walk parentID -> parent.ParentTaskID -> ... up to a
+// hard bound (defends against pre-existing cycles in the data). Rejects
+// when the walk encounters selfID or exceeds the bound.
 func validateParentTask(db *gorm.DB, parentID *uint, selfID uint, vaultID string) error {
 	if parentID == nil {
 		return nil
@@ -233,16 +233,70 @@ func validateParentTask(db *gorm.DB, parentID *uint, selfID uint, vaultID string
 	if selfID != 0 && *parentID == selfID {
 		return ErrInvalidParentTask
 	}
-	var parent models.ContactTask
-	if err := db.Select("id", "vault_id").
-		Where("id = ? AND vault_id = ?", *parentID, vaultID).
-		First(&parent).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	const maxDepth = 256
+	current := *parentID
+	visited := make(map[uint]struct{}, 8)
+	for i := 0; i < maxDepth; i++ {
+		if _, loop := visited[current]; loop {
 			return ErrInvalidParentTask
 		}
-		return err
+		visited[current] = struct{}{}
+
+		var ancestor models.ContactTask
+		if err := db.Select("id", "vault_id", "parent_task_id").
+			Where("id = ? AND vault_id = ?", current, vaultID).
+			First(&ancestor).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrInvalidParentTask
+			}
+			return err
+		}
+		if ancestor.ParentTaskID == nil {
+			return nil
+		}
+		if selfID != 0 && *ancestor.ParentTaskID == selfID {
+			return ErrInvalidParentTask
+		}
+		current = *ancestor.ParentTaskID
 	}
-	return nil
+	return ErrInvalidParentTask
+}
+
+// validateParentTaskPatch is the NullableUint flavor for Update endpoints
+// that need to distinguish "clear parent" from "leave parent unchanged".
+func validateParentTaskPatch(db *gorm.DB, patch dto.NullableUint, selfID uint, vaultID string) error {
+	if !patch.Present || patch.Cleared() {
+		return nil
+	}
+	return validateParentTask(db, patch.Ptr(), selfID, vaultID)
+}
+
+// deleteTaskCascade removes a task and every descendant in the sub-task tree
+// in one transaction. Pivot rows are wiped first so the FK direction is safe.
+// Uses a breadth-first walk over parent_task_id to avoid recursive CTE
+// portability concerns between SQLite and Postgres.
+func deleteTaskCascade(db *gorm.DB, task *models.ContactTask) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		ids := []uint{task.ID}
+		frontier := []uint{task.ID}
+		for len(frontier) > 0 {
+			var children []uint
+			if err := tx.Model(&models.ContactTask{}).
+				Where("parent_task_id IN ?", frontier).
+				Pluck("id", &children).Error; err != nil {
+				return err
+			}
+			if len(children) == 0 {
+				break
+			}
+			ids = append(ids, children...)
+			frontier = children
+		}
+		if err := tx.Where("contact_task_id IN ?", ids).Delete(&models.TaskContact{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id IN ?", ids).Delete(&models.ContactTask{}).Error
+	})
 }
 
 func buildTaskResponses(db *gorm.DB, tasks []models.ContactTask) ([]dto.TaskResponse, error) {

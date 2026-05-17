@@ -88,7 +88,7 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 		if err := tx.Create(&task).Error; err != nil {
 			return err
 		}
-		return replaceTaskAssignees(tx, task.ID, req.ContactIDs)
+		return replaceTaskAssigneesLocked(tx, task.ID, req.ContactIDs)
 	})
 	if err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 		}
 		return nil, err
 	}
-	if err := validateParentTask(s.db, req.ParentTaskID, task.ID, vaultID); err != nil {
+	if err := validateParentTaskPatch(s.db, req.ParentTaskID, task.ID, vaultID); err != nil {
 		return nil, err
 	}
 	if req.ContactIDs != nil {
@@ -135,10 +135,12 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 	}
 
 	updates := map[string]interface{}{
-		"label":          req.Label,
-		"description":    strPtrOrNil(req.Description),
-		"due_at":         req.DueAt,
-		"parent_task_id": req.ParentTaskID,
+		"label":       req.Label,
+		"description": strPtrOrNil(req.Description),
+		"due_at":      req.DueAt,
+	}
+	if req.ParentTaskID.Present {
+		updates["parent_task_id"] = req.ParentTaskID.Ptr()
 	}
 	if req.Status != "" {
 		updates["status"] = req.Status
@@ -159,7 +161,7 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 			return err
 		}
 		if req.ContactIDs != nil {
-			if err := replaceTaskAssignees(tx, task.ID, *req.ContactIDs); err != nil {
+			if err := replaceTaskAssigneesLocked(tx, task.ID, *req.ContactIDs); err != nil {
 				return err
 			}
 		}
@@ -218,8 +220,8 @@ func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateT
 	return &resps[0], nil
 }
 
-// Delete removes a vault task. Returns ErrTaskNotFound if the task doesn't
-// belong to the given vault. Pivot rows go too.
+// Delete removes a vault task and its entire sub-task tree. Returns
+// ErrTaskNotFound if the task doesn't belong to the given vault.
 func (s *VaultTaskService) Delete(id uint, vaultID string) error {
 	var task models.ContactTask
 	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&task).Error; err != nil {
@@ -228,12 +230,7 @@ func (s *VaultTaskService) Delete(id uint, vaultID string) error {
 		}
 		return err
 	}
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("contact_task_id = ?", task.ID).Delete(&models.TaskContact{}).Error; err != nil {
-			return err
-		}
-		return tx.Delete(&task).Error
-	})
+	return deleteTaskCascade(s.db, &task)
 }
 
 // UpdatePosition reorders a task within (or across) columns.

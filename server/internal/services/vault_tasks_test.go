@@ -505,7 +505,7 @@ func TestVaultTaskSubTaskRejectsSelfParent(t *testing.T) {
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "x"})
 	_, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:        "x",
-		ParentTaskID: &task.ID,
+		ParentTaskID: dto.NullableUint{Present: true, Valid: true, Value: task.ID},
 	})
 	if err != ErrInvalidParentTask {
 		t.Errorf("expected ErrInvalidParentTask, got %v", err)
