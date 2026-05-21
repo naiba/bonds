@@ -21,6 +21,33 @@ func TestPersonalizeCreate_WorksOnSQLite(t *testing.T) {
 	}
 }
 
+func TestPersonalizeCreate_LabelOnlyPositionEntities(t *testing.T) {
+	svc, accountID := setupPersonalizeTest(t)
+
+	cases := []struct {
+		entity string
+		label  string
+	}{
+		{entity: "group-types", label: "Custom group type"},
+		{entity: "post-templates", label: "Custom post template"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.entity, func(t *testing.T) {
+			resp, err := svc.Create(accountID, tc.entity, dto.PersonalizeEntityRequest{Label: tc.label})
+			if err != nil {
+				t.Fatalf("Create(%s) failed: %v", tc.entity, err)
+			}
+			if resp.Label != tc.label {
+				t.Fatalf("label = %q, want %q", resp.Label, tc.label)
+			}
+			if resp.Name != tc.label {
+				t.Fatalf("name = %q, want %q", resp.Name, tc.label)
+			}
+		})
+	}
+}
+
 func TestPersonalizeUpdate_WorksOnSQLite(t *testing.T) {
 	svc, accountID := setupPersonalizeTest(t)
 
