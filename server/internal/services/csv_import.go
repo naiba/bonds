@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"strings"
@@ -41,6 +42,7 @@ func (s *CSVImportService) Import(vaultID, userID string, data []byte, mapping d
 	}
 	accountID := vault.AccountID
 
+	data = bytes.TrimPrefix(data, []byte("\xEF\xBB\xBF"))
 	r := csv.NewReader(strings.NewReader(string(data)))
 	r.LazyQuotes = true
 	r.TrimLeadingSpace = true

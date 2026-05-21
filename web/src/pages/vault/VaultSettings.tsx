@@ -995,6 +995,7 @@ export default function VaultSettings() {
           <Upload.Dragger accept=".csv" showUploadList={false} beforeUpload={handleBeforeUpload} multiple={false}>
             <p className="ant-upload-drag-icon"><InboxOutlined /></p>
             <p className="ant-upload-text">{t("vault_settings.csv_import.upload_hint")}</p>
+            <p className="ant-upload-hint">{t("vault_settings.csv_import.upload_next_step")}</p>
             <p className="ant-upload-hint">{t("vault_settings.csv_import.csv_only")}</p>
           </Upload.Dragger>
         )}

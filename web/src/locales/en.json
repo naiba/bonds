@@ -1232,11 +1232,12 @@
     "csv_import": {
       "tab_label": "CSV Import",
       "title": "Import contacts from CSV",
-      "description": "Import contacts from a comma-separated values (CSV) file exported from any app. Map your CSV columns to contact fields below.",
+      "description": "Import contacts from a comma-separated values (CSV) file exported from any app.",
       "step_upload": "Upload file",
       "step_map": "Map columns",
       "step_import": "Import",
       "upload_hint": "Click or drag a CSV file here",
+      "upload_next_step": "After uploading you will be able to map your CSV columns to contact fields before the import starts.",
       "csv_only": "CSV files only (.csv)",
       "column_label": "CSV column",
       "field_label": "Contact field",

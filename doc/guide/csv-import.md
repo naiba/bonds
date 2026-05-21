@@ -6,10 +6,9 @@ Bonds can import contacts from any comma-separated values (CSV) file — Google 
 
 1. Open your vault and go to **Vault Settings** (gear icon in the top navigation).
 2. Click the **CSV Import** tab.
-3. Drag and drop your CSV file onto the upload area, or click to browse.
-4. Bonds reads the column headers from your file and opens the **column mapping** screen.
-5. For each contact field, select the CSV column that contains that data. Columns you do not want to import can be left as **— not mapped —**.
-6. Click **Import**. Bonds processes every row and shows a summary when finished.
+3. Drag and drop your CSV file onto the upload area, or click to browse. After uploading you will be taken to the column mapping screen before any data is imported.
+4. For each contact field, select the CSV column that contains that data. Columns you do not want to import can be left as **— not mapped —**. Common column names are detected and mapped automatically.
+5. Click **Import**. Bonds processes every row and shows a summary when finished.
 
 ## Supported fields
 
@@ -77,3 +76,4 @@ Recognised names (case-insensitive, punctuation ignored):
 - **Duplicate contacts are not detected.** Running the import twice will create duplicate contacts. Check your existing contacts before importing.
 - **Imports are not reversible** from the UI. If you need to undo an import, restore a backup from **Vault Settings → Backups**.
 - Large files (thousands of rows) may take a minute to process. Keep the page open until the result appears.
+- **UTF-8 BOM** files (produced by Excel on Windows and some other apps) are handled automatically — the invisible byte-order mark is stripped before reading column headers.
