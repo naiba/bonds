@@ -210,7 +210,7 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 
 func (s *MonicaImportService) importContact(
 	tx *gorm.DB, mc *MonicaContact, vaultID, accountID, userID string,
-	genderByUUID map[string]string, resp *dto.MonicaImportResponse,
+	genderByUUID map[string]MonicaGenderRef, resp *dto.MonicaImportResponse,
 ) (string, bool, error) {
 	var existingContact models.Contact
 	if err := tx.Where("vault_id = ? AND distant_uuid = ?", vaultID, mc.UUID).First(&existingContact).Error; err == nil {
@@ -220,10 +220,17 @@ func (s *MonicaImportService) importContact(
 
 	var genderID *uint
 	if mc.Properties.Gender != "" {
-		if genderName, ok := genderByUUID[mc.Properties.Gender]; ok {
+		if ref, ok := genderByUUID[mc.Properties.Gender]; ok {
 			var gender models.Gender
-			if err := tx.Where("account_id = ? AND name = ?", accountID, genderName).First(&gender).Error; err == nil {
+			// Try exact name match first (works when Monica and Bonds use
+			// the same locale), then fall back to the translation key which
+			// is locale-independent (M/F/O → seed.genders.*).
+			if tx.Where("account_id = ? AND name = ?", accountID, ref.Properties.Name).First(&gender).Error == nil {
 				genderID = &gender.ID
+			} else if key, ok := monicaTypeToKey[ref.Properties.Type]; ok {
+				if tx.Where("account_id = ? AND name_translation_key = ?", accountID, key).First(&gender).Error == nil {
+					genderID = &gender.ID
+				}
 			}
 		}
 	}
@@ -926,12 +933,20 @@ func monicaRelationshipNameCandidates(monicaType string) []string {
 	return candidates
 }
 
-func buildGenderMap(refs []MonicaGenderRef) map[string]string {
-	m := make(map[string]string, len(refs))
+func buildGenderMap(refs []MonicaGenderRef) map[string]MonicaGenderRef {
+	m := make(map[string]MonicaGenderRef, len(refs))
 	for _, r := range refs {
-		m[r.UUID] = r.Properties.Name
+		m[r.UUID] = r
 	}
 	return m
+}
+
+// monicaTypeToKey maps Monica's canonical gender type codes to the Bonds
+// seeded gender translation keys, used as a locale-independent fallback.
+var monicaTypeToKey = map[string]string{
+	"M": "seed.genders.male",
+	"F": "seed.genders.female",
+	"O": "seed.genders.other",
 }
 
 func buildFieldTypeMap(refs []MonicaContactFieldTypeRef) map[string]MonicaContactFieldTypeRef {
@@ -1190,6 +1205,7 @@ type MonicaGenderRef struct {
 	UUID       string `json:"uuid"`
 	Properties struct {
 		Name string `json:"name"`
+		Type string `json:"type"`
 	} `json:"properties"`
 }
 
