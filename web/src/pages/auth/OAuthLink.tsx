@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Form, Input, Button, Typography, App, Segmented, theme, Tooltip, Tag } from "antd";
-import { MailOutlined, LockOutlined, UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GlobalOutlined, GithubOutlined, GoogleOutlined, LinkOutlined } from "@ant-design/icons";
+import { MailOutlined, LockOutlined, UserOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GithubOutlined, GoogleOutlined, LinkOutlined } from "@ant-design/icons";
 import logoImg from "@/assets/logo.svg";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/stores/theme";
@@ -9,6 +9,7 @@ import type { ThemeMode } from "@/stores/theme";
 import { httpClient } from "@/api";
 import type { APIError } from "@/api";
 import { useAuth } from "@/stores/auth";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const { Title, Text } = Typography;
 
@@ -81,7 +82,7 @@ export default function OAuthLink() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
   const [loading, setLoading] = useState(false);
@@ -105,10 +106,6 @@ export default function OAuthLink() {
   const nextThemeMode = () => {
     const idx = themeModeOrder.indexOf(themeMode);
     setThemeMode(themeModeOrder[(idx + 1) % themeModeOrder.length]);
-  };
-  const toggleLanguage = () => {
-    const next = i18n.language?.startsWith("zh") ? "en" : "zh";
-    i18n.changeLanguage(next);
   };
 
   useEffect(() => {
@@ -325,9 +322,7 @@ export default function OAuthLink() {
           <Tooltip title={themeModeLabels[themeMode]}>
             <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
           </Tooltip>
-          <Tooltip title={i18n.language?.startsWith("zh") ? "English" : "中文"}>
-            <Button type="text" size="small" icon={<GlobalOutlined />} onClick={toggleLanguage} />
-          </Tooltip>
+          <LanguageSwitcher />
         </div>
 
         <div style={{ width: "100%", maxWidth: 400 }}>

@@ -19,6 +19,7 @@ import { api } from "@/api";
 import type { UserPreferences, APIError } from "@/api";
 import { formatContactName } from "@/utils/nameFormat";
 import type { ContactNameFields } from "@/utils/nameFormat";
+import { SUPPORTED_LANGUAGES } from "@/i18n";
 
 const { Title, Text } = Typography;
 
@@ -44,15 +45,10 @@ const timezones = [
   "Australia/Sydney",
 ].map((tz) => ({ value: tz, label: tz }));
 
-const locales = [
-  { value: "en", label: "English" },
-  { value: "fr", label: "Français" },
-  { value: "de", label: "Deutsch" },
-  { value: "es", label: "Español" },
-  { value: "pt", label: "Português" },
-  { value: "zh", label: "中文" },
-  { value: "ja", label: "日本語" },
-];
+// Keep this in sync with `SUPPORTED_LANGUAGES` in `@/i18n`. Offering a locale
+// here that the i18n bundle does not load would persist a preference the UI
+// can never honor (it would silently fall back to English).
+const locales = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
 const mapSites = [
   { value: "google_maps", label: "Google Maps" },

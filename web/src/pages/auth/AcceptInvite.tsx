@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, Form, Input, Button, Typography, App, theme, Tooltip } from "antd";
-import { UserOutlined, LockOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GlobalOutlined } from "@ant-design/icons";
+import { UserOutlined, LockOutlined, SunOutlined, MoonOutlined, DesktopOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/stores/theme";
 import type { ThemeMode } from "@/stores/theme";
 import logoImg from "@/assets/logo.svg";
 import { api } from "@/api";
 import type { APIError } from "@/api";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const { Title, Text } = Typography;
 
@@ -16,7 +17,7 @@ export default function AcceptInvite() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { token: themeToken } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
   const token = searchParams.get("token") ?? "";
@@ -35,10 +36,6 @@ export default function AcceptInvite() {
   const nextThemeMode = () => {
     const idx = themeModeOrder.indexOf(themeMode);
     setThemeMode(themeModeOrder[(idx + 1) % themeModeOrder.length]);
-  };
-  const toggleLanguage = () => {
-    const next = i18n.language?.startsWith("zh") ? "en" : "zh";
-    i18n.changeLanguage(next);
   };
 
   async function onFinish(values: {
@@ -76,9 +73,7 @@ export default function AcceptInvite() {
         <Tooltip title={themeModeLabels[themeMode]}>
           <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
         </Tooltip>
-        <Tooltip title={i18n.language?.startsWith("zh") ? "English" : "中文"}>
-          <Button type="text" size="small" icon={<GlobalOutlined />} onClick={toggleLanguage} />
-        </Tooltip>
+        <LanguageSwitcher />
       </div>
       <Card
         style={{

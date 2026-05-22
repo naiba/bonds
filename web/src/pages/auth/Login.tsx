@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Form, Input, Button, Typography, App, Divider, theme, Tooltip } from "antd";
-import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined, KeyOutlined, SunOutlined, MoonOutlined, DesktopOutlined, GlobalOutlined, LinkOutlined } from "@ant-design/icons";
+import { MailOutlined, LockOutlined, GithubOutlined, GoogleOutlined, KeyOutlined, SunOutlined, MoonOutlined, DesktopOutlined, LinkOutlined } from "@ant-design/icons";
 import { useAuth } from "@/stores/auth";
 import logoImg from "@/assets/logo.svg";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,7 @@ import type { LoginRequest, APIError, InstanceInfo } from "@/api";
 import { startAuthentication, browserSupportsWebAuthn } from "@simplewebauthn/browser";
 import type { PublicKeyCredentialRequestOptionsJSON } from "@simplewebauthn/browser";
 import { httpClient } from "@/api";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const { Title, Text } = Typography;
 
@@ -52,7 +53,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { message } = App.useApp();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
   const [isWebAuthnSupported, setIsWebAuthnSupported] = useState(false);
@@ -72,10 +73,6 @@ export default function Login() {
   const nextThemeMode = () => {
     const idx = themeModeOrder.indexOf(themeMode);
     setThemeMode(themeModeOrder[(idx + 1) % themeModeOrder.length]);
-  };
-  const toggleLanguage = () => {
-    const next = i18n.language?.startsWith("zh") ? "en" : "zh";
-    i18n.changeLanguage(next);
   };
 
   useEffect(() => {
@@ -289,9 +286,7 @@ export default function Login() {
           <Tooltip title={themeModeLabels[themeMode]}>
             <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
           </Tooltip>
-          <Tooltip title={i18n.language?.startsWith("zh") ? "English" : "中文"}>
-            <Button type="text" size="small" icon={<GlobalOutlined />} onClick={toggleLanguage} />
-          </Tooltip>
+          <LanguageSwitcher />
         </div>
 
         <div style={{ width: "100%", maxWidth: 400 }}>

@@ -22,7 +22,6 @@ import {
   BellOutlined,
   ControlOutlined,
   UserSwitchOutlined,
-  GlobalOutlined,
   LockOutlined,
   MailOutlined,
   SunOutlined,
@@ -41,6 +40,7 @@ import { useTheme } from "@/stores/theme";
 import type { ThemeMode } from "@/stores/theme";
 import { useTranslation } from "react-i18next";
 import SearchBar from "@/components/SearchBar";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
 
@@ -53,7 +53,7 @@ export default function Layout() {
   const { id: vaultId } = useParams();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { themeMode, setThemeMode } = useTheme();
   const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
   const themeModeIcons: Record<ThemeMode, React.ReactNode> = {
@@ -155,11 +155,6 @@ export default function Layout() {
     setThemeMode(themeModeOrder[(idx + 1) % themeModeOrder.length]);
   };
 
-  const toggleLanguage = () => {
-    const next = i18n.language?.startsWith("zh") ? "en" : "zh";
-    i18n.changeLanguage(next);
-  };
-
   const initials = user ? formatContactInitials(nameOrder, user) : "";
 
   return (
@@ -219,9 +214,7 @@ export default function Layout() {
             <Tooltip title={themeModeLabels[themeMode]}>
               <Button type="text" size="small" icon={themeModeIcons[themeMode]} onClick={nextThemeMode} />
             </Tooltip>
-            <Tooltip title={i18n.language?.startsWith("zh") ? "English" : "中文"}>
-              <Button type="text" size="small" icon={<GlobalOutlined />} onClick={toggleLanguage} />
-            </Tooltip>
+            <LanguageSwitcher />
             <Dropdown
               menu={{
                 items: userMenuItems,

@@ -9,6 +9,7 @@
  * Run `bun run gen:api` (or `make gen-api`) to regenerate after backend changes.
  */
 
+import i18n, { normalizeLanguageCode } from "@/i18n";
 import type { GithubComNaibaBondsPkgResponseAPIResponse } from "./generated/data-contracts";
 import { HttpClient } from "./generated/http-client";
 import { Account } from "./generated/Account";
@@ -88,6 +89,12 @@ httpClient.instance.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Forward the active UI language so the backend uses the right locale for
+  // seeded labels (mood params, life events, …) and personalize sync. Without
+  // this header the backend's locale middleware defaults to "en", which made
+  // "Sync translations" silently overwrite Chinese labels with English and
+  // caused freshly registered Chinese vaults to be seeded in English.
+  config.headers["Accept-Language"] = normalizeLanguageCode(i18n.language);
   return config;
 });
 
