@@ -110,9 +110,11 @@
   "err.failed_to_delete_loan": "删除借贷失败",
 
   "err.failed_to_list_pets": "获取宠物列表失败",
+  "err.failed_to_list_pet_categories": "获取宠物类别列表失败",
   "err.failed_to_create_pet": "创建宠物失败",
   "err.invalid_pet_id": "无效的宠物ID",
   "err.pet_not_found": "宠物未找到",
+  "err.pet_category_not_found": "宠物类别未找到",
   "err.failed_to_update_pet": "更新宠物失败",
   "err.failed_to_delete_pet": "删除宠物失败",
 

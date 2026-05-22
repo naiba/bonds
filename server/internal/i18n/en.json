@@ -110,9 +110,11 @@
   "err.failed_to_delete_loan": "Failed to delete loan",
 
   "err.failed_to_list_pets": "Failed to list pets",
+  "err.failed_to_list_pet_categories": "Failed to list pet categories",
   "err.failed_to_create_pet": "Failed to create pet",
   "err.invalid_pet_id": "Invalid pet ID",
   "err.pet_not_found": "Pet not found",
+  "err.pet_category_not_found": "Pet category not found",
   "err.failed_to_update_pet": "Failed to update pet",
   "err.failed_to_delete_pet": "Failed to delete pet",
 
