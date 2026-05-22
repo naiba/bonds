@@ -8,42 +8,44 @@
 
 <a href="https://www.producthunt.com/products/bonds?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-bonds" target="_blank" rel="noopener noreferrer"><img alt="Bonds - Remember everything about the people who matter. | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1091729&amp;theme=light&amp;t=1772852214754"></a>
 
-A modern, community-driven personal relationship manager — inspired by [Monica](https://github.com/monicahq/monica), rebuilt with **Go** and **React**.
+A modern, community-driven personal relationship manager, inspired by [Monica](https://github.com/monicahq/monica), rebuilt with **Go** and **React**.
 
 ## Why Bonds?
 
-Monica is a beloved open-source personal CRM with 24k+ stars. But as a side project maintained by a tiny team ([their own words](https://github.com/monicahq/monica/issues/6626)), development has slowed — 700+ open issues and limited bandwidth.
+Monica is a beloved open-source personal CRM with 24k+ stars. But as a side project maintained by a tiny team ([their own words](https://github.com/monicahq/monica/issues/6626)), development has slowed, leaving 700+ open issues and limited bandwidth.
 
 **Bonds** picks up where Monica left off:
 
-- **Fast & lightweight** — Single binary, starts in milliseconds, minimal memory
-- **Easy to deploy** — One binary + SQLite. No PHP, no Composer, no Node runtime
-- **Modern UI** — React 19 + TypeScript, smooth SPA experience
-- **Well tested** — 1014 backend tests, 129 frontend tests, 180 E2E tests
-- **Community first** — Built for contributions and fast iteration
+- **Fast and lightweight**: Single binary, starts in milliseconds, minimal memory.
+- **Easy to deploy**: One binary + SQLite. No PHP, no Composer, no Node runtime.
+- **Modern UI**: React 19 + TypeScript, smooth SPA experience.
+- **Well tested**: 1014 backend tests, 129 frontend tests, 180 E2E tests.
+- **Community first**: Built for contributions and fast iteration.
 
 > **Credits**: Bonds stands on the shoulders of [@djaiss](https://github.com/djaiss), [@asbiin](https://github.com/asbiin), and the entire Monica community. The original Monica remains available under AGPL-3.0 at [monicahq/monica](https://github.com/monicahq/monica).
 
 ## Features
 
-- **Contacts** — Full lifecycle management with notes, tasks, reminders, gifts, debts, activities, life events, pets, and more
-- **Vault Dashboard** — 3-column layout with activity feed, life events, life metrics tracking (+1 counter), mood recording, upcoming reminders, and due tasks
-- **Vaults** — Multi-vault data isolation with role-based access (Manager / Editor / Viewer)
-- **Reminders** — One-time and recurring (weekly/monthly/yearly), with email and Telegram notifications
-- **Full-text Search** — Bleve-powered CJK-aware search across contacts and notes
-- **CardDAV / CalDAV** — Sync contacts and calendars with Apple, Thunderbird, and other DAV clients
-- **vCard Import/Export** — Bulk import `.vcf` files, export individual or all contacts
-- **CSV Import** — Import contacts from a CSV file with a user-defined column mapping (name, email, phone, birthday, address, tags, groups, notes)
-- **Monica Import** — Migrate contacts directly from a Monica instance via API
-- **File Upload** — Photos and documents attached to contacts, with generated initials avatars
-- **Two-Factor Auth (TOTP)** — TOTP-based 2FA with recovery codes
-- **WebAuthn / FIDO2** — Passkey login (hardware keys, biometrics)
-- **OAuth Login** — GitHub and Google single sign-on
-- **User Invitations** — Invite others to your account via email with permission levels
-- **Audit Log** — Feed of all changes across contacts
-- **Geocoding** — Address coordinates via Nominatim (free) or LocationIQ
-- **Telegram Notifications** — Reminder delivery via Telegram bot
-- **i18n** — English and Chinese, frontend and backend
+- **Contacts**: Full lifecycle management with notes, tasks, reminders, gifts, debts, activities, life events, pets, and more. Includes a needs-verification flag to keep your data fresh.
+- **Vault Dashboard**: Responsive 3-column layout with activity feed, life events, life metrics tracking (+1 counter), mood recording, upcoming reminders, and due tasks.
+- **Vaults**: Multi-vault data isolation with role-based access (Manager, Editor, Viewer).
+- **Reminders**: One-time and recurring (weekly, monthly, yearly), with email and Telegram notifications.
+- **Full-text Search**: Bleve-powered CJK-aware search across contacts and notes.
+- **CardDAV / CalDAV**: Sync contacts and calendars with Apple, Thunderbird, and other DAV clients. Supports Personal Access Tokens.
+- **DAV Sync Subscriptions**: Subscribe to and sync from external CardDAV address books directly into a vault.
+- **Personal Access Tokens**: Generate secure API and sync tokens to access endpoints safely.
+- **CSV Import**: Import contacts from a CSV file with a user-defined column mapping (name, email, phone, birthday, address, tags, groups, notes).
+- **Monica Import**: Migrate contacts directly from a Monica instance via API.
+- **vCard Import/Export**: Bulk import `.vcf` files, export individual or all contacts.
+- **File Upload**: Photos and documents attached to contacts, with generated initials avatars. Storage size limits managed directly from the UI.
+- **Two-Factor Auth (TOTP)**: TOTP-based 2FA with recovery codes.
+- **WebAuthn / FIDO2**: Passkey login (hardware keys, biometrics).
+- **OAuth Login**: GitHub and Google single sign-on.
+- **User Invitations**: Invite others to your account via email with permission levels.
+- **Audit Log**: Feed of all changes across contacts.
+- **Geocoding**: Address coordinates via Nominatim (free) or LocationIQ.
+- **Telegram Notifications**: Reminder delivery via Telegram bot.
+- **i18n**: English and Chinese, frontend and backend.
 
 ## Quick Start
 
@@ -100,8 +102,8 @@ export JWT_SECRET=your-secret-key-here
 
 Bonds uses a **hybrid configuration** approach:
 
-- **Environment variables** — For essential infrastructure settings (database, server, security)
-- **Admin UI** — For all runtime settings (SMTP, OAuth, Telegram, WebAuthn, etc.)
+- **Environment variables**: For essential infrastructure settings (database, server, security).
+- **Admin UI**: For all runtime settings (SMTP, OAuth, Telegram, WebAuthn, storage size limit, etc.).
 
 On first startup, environment variables are seeded into the database. After that, manage settings from **Admin > System Settings** in the web UI.
 
@@ -129,17 +131,17 @@ cp server/.env.example server/.env
 
 The following are managed from the **Admin > System Settings** page after login:
 
-- **Application** — Name, URL, Announcement banner
-- **Authentication** — Password auth toggle, User registration toggle
-- **JWT** — Token expiry, Refresh window
-- **SMTP** — Host, Port, Username, Password, Sender email
-- **OAuth / OIDC** — GitHub, Google, and OIDC/SSO credentials
-- **WebAuthn** — Relying Party ID, Display Name, Origins
-- **Telegram** — Bot token for notifications
-- **Geocoding** — Provider (Nominatim/LocationIQ), API key
-- **Storage** — Max upload size
-- **Backup** — Cron schedule, Retention days
- **Swagger** — Enable/disable API documentation UI
+- **Application**: Name, URL, Announcement banner.
+- **Authentication**: Password auth toggle, User registration toggle.
+- **JWT**: Token expiry, Refresh window.
+- **SMTP**: Host, Port, Username, Password, Sender email.
+- **OAuth / OIDC**: GitHub, Google, and OIDC/SSO credentials.
+- **WebAuthn**: Relying Party ID, Display Name, Origins.
+- **Telegram**: Bot token for notifications.
+- **Geocoding**: Provider (Nominatim/LocationIQ), API key.
+- **Storage**: Max upload size limit.
+- **Backup**: Cron schedule, Retention days.
+- **Swagger**: Enable or disable API documentation UI.
 
 ## Development
 
@@ -158,7 +160,7 @@ This runs the Go backend on `:8080` and the Vite dev server on `:5173`. The fron
 
 ### Code Generation Pipeline
 
-The frontend TypeScript API client is **auto-generated** from the backend's OpenAPI/Swagger spec. The generated files are not committed to git — they are regenerated in CI and during development.
+The frontend TypeScript API client is **auto-generated** from the backend OpenAPI schema. The generated files are not committed to git. They are regenerated in CI and during development.
 
 ```
 Go handlers (swag annotations)
@@ -213,11 +215,11 @@ Bonds is a ground-up rewrite inspired by [Monica](https://github.com/monicahq/mo
 
 ## License
 
-[Business Source License 1.1](LICENSE) (BSL 1.1) — Source Available license with the following terms:
+[Business Source License 1.1](LICENSE) (BSL 1.1), Source Available license with the following terms:
 
-- **Individuals**: Free for any non-commercial use
-- **Organizations**: Commercial use requires a paid license from the Licensor
-- **Prohibited**: Reselling, sublicensing, or offering as a managed/hosted service
-- **Change Date**: February 17, 2030 — automatically converts to [AGPL-3.0](LICENSE) (same as original Monica)
+- **Individuals**: Free for any non-commercial use.
+- **Organizations**: Commercial use requires a paid license from the Licensor.
+- **Prohibited**: Reselling, sublicensing, or offering as a managed/hosted service.
+- **Change Date**: February 17, 2030, automatically converts to [AGPL-3.0](LICENSE) (same as original Monica).
 
 After the Change Date, the software becomes fully open source under AGPL-3.0.

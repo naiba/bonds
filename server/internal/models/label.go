@@ -4,9 +4,9 @@ import "time"
 
 type Label struct {
 	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	VaultID     string    `json:"vault_id" gorm:"type:text;not null;index"`
+	VaultID     string    `json:"vault_id" gorm:"type:text;not null;uniqueIndex:idx_labels_vault_slug"`
 	Name        string    `json:"name" gorm:"not null"`
-	Slug        string    `json:"slug" gorm:"not null"`
+	Slug        string    `json:"slug" gorm:"not null;uniqueIndex:idx_labels_vault_slug"`
 	Description *string   `json:"description" gorm:"type:text"`
 	BgColor     string    `json:"bg_color" gorm:"default:'bg-zinc-200'"`
 	TextColor   string    `json:"text_color" gorm:"default:'text-zinc-700'"`

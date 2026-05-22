@@ -217,15 +217,8 @@ func TestCSVImport_MalformedCSV(t *testing.T) {
 func TestCSVImport_EmailMapping(t *testing.T) {
 	svc, db, vaultID, userID := setupCSVImportTest(t)
 
-	var vault models.Vault
-	db.First(&vault, "id = ?", vaultID)
-	emailKey := "seed.contact_info_types.email_address"
-	if err := db.Exec(
-		"INSERT INTO contact_information_types (account_id, name, name_translation_key, created_at, updated_at) VALUES (?, 'Email', ?, datetime('now'), datetime('now'))",
-		vault.AccountID, emailKey,
-	).Error; err != nil {
-		t.Fatalf("seed email CI type: %v", err)
-	}
+	// SeedAccountDefaults already creates the "seed.contact_info_types.email_address"
+	// type when the user registers, so no extra setup is needed here.
 
 	m := dto.CSVColumnMapping{FirstName: "first_name", Email: "email"}
 	data := csvData(
@@ -260,15 +253,8 @@ func TestCSVImport_EmailMapping(t *testing.T) {
 func TestCSVImport_PhoneMapping(t *testing.T) {
 	svc, db, vaultID, userID := setupCSVImportTest(t)
 
-	var vault models.Vault
-	db.First(&vault, "id = ?", vaultID)
-	phoneKey := "seed.contact_info_types.phone"
-	if err := db.Exec(
-		"INSERT INTO contact_information_types (account_id, name, name_translation_key, created_at, updated_at) VALUES (?, 'Phone', ?, datetime('now'), datetime('now'))",
-		vault.AccountID, phoneKey,
-	).Error; err != nil {
-		t.Fatalf("seed phone CI type: %v", err)
-	}
+	// SeedAccountDefaults already creates the "seed.contact_info_types.phone"
+	// type when the user registers, so no extra setup is needed here.
 
 	m := dto.CSVColumnMapping{FirstName: "first_name", Phone: "phone"}
 	data := csvData(
@@ -303,13 +289,8 @@ func TestCSVImport_PhoneMapping(t *testing.T) {
 func TestCSVImport_BirthdayMapping(t *testing.T) {
 	svc, db, vaultID, userID := setupCSVImportTest(t)
 
-	// Seed a birthdate date type so the import can find it.
-	if err := db.Exec(
-		"INSERT INTO contact_important_date_types (vault_id, label, internal_type, created_at, updated_at) VALUES (?, 'Birthday', 'birthdate', datetime('now'), datetime('now'))",
-		vaultID,
-	).Error; err != nil {
-		t.Fatalf("seed date type: %v", err)
-	}
+	// SeedVaultDefaults already creates the "birthdate" important-date type
+	// when the vault is created, so no extra setup is needed here.
 
 	m := dto.CSVColumnMapping{FirstName: "first_name", Birthday: "birthday"}
 	data := csvData(
@@ -346,17 +327,8 @@ func TestCSVImport_BirthdayMapping(t *testing.T) {
 func TestCSVImport_AddressMapping(t *testing.T) {
 	svc, db, vaultID, userID := setupCSVImportTest(t)
 
-	// We need to know the account for the address-type lookup.
-	var vault models.Vault
-	db.First(&vault, "id = ?", vaultID)
-
-	// Seed a home address type.
-	if err := db.Exec(
-		"INSERT INTO address_types (account_id, name, name_translation_key, created_at, updated_at) VALUES (?, 'Home', 'seed.address_types.home', datetime('now'), datetime('now'))",
-		vault.AccountID,
-	).Error; err != nil {
-		t.Fatalf("seed address type: %v", err)
-	}
+	// SeedAccountDefaults already creates the "seed.address_types.home" type
+	// when the user registers, so no extra setup is needed here.
 
 	m := dto.CSVColumnMapping{
 		FirstName:     "first_name",
@@ -670,13 +642,7 @@ func TestCSVImport_EmptyCSV(t *testing.T) {
 func TestCSVImport_BirthdayFormats(t *testing.T) {
 	svc, db, vaultID, userID := setupCSVImportTest(t)
 
-	// Seed a birthdate date type.
-	if err := db.Exec(
-		"INSERT INTO contact_important_date_types (vault_id, label, internal_type, created_at, updated_at) VALUES (?, 'Birthday', 'birthdate', datetime('now'), datetime('now'))",
-		vaultID,
-	).Error; err != nil {
-		t.Fatalf("seed date type: %v", err)
-	}
+	// SeedVaultDefaults already creates the "birthdate" important-date type.
 
 	cases := []struct {
 		name   string
@@ -723,14 +689,9 @@ func TestCSVImport_BirthdayFormats(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCSVImport_BadBirthdayFormat(t *testing.T) {
-	svc, db, vaultID, userID := setupCSVImportTest(t)
+	svc, _, vaultID, userID := setupCSVImportTest(t)
 
-	if err := db.Exec(
-		"INSERT INTO contact_important_date_types (vault_id, label, internal_type, created_at, updated_at) VALUES (?, 'Birthday', 'birthdate', datetime('now'), datetime('now'))",
-		vaultID,
-	).Error; err != nil {
-		t.Fatalf("seed: %v", err)
-	}
+	// SeedVaultDefaults already creates the "birthdate" important-date type.
 
 	m := dto.CSVColumnMapping{FirstName: "first_name", Birthday: "birthday"}
 	data := csvData(

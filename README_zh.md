@@ -8,42 +8,44 @@
 
 <a href="https://www.producthunt.com/products/bonds?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-bonds" target="_blank" rel="noopener noreferrer"><img alt="Bonds - Remember everything about the people who matter. | Product Hunt" width="250" height="54" src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1091729&amp;theme=light&amp;t=1772852214754"></a>
 
-现代化的社区驱动个人关系管理器 — 受 [Monica](https://github.com/monicahq/monica) 启发，使用 **Go** 和 **React** 全新重写。
+现代化的社区驱动个人关系管理器，受 [Monica](https://github.com/monicahq/monica) 启发，使用 **Go** 和 **React** 全新重写。
 
 ## 为什么做 Bonds？
 
-Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由小团队业余维护的项目（[他们自己的话](https://github.com/monicahq/monica/issues/6626)），开发速度已经明显放缓 — 700+ 未关闭 issue，响应能力有限。
+Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由小团队业余维护的项目（[他们自己的话](https://github.com/monicahq/monica/issues/6626)），开发速度已经明显放缓，有 700+ 未关闭 issue，响应能力有限。
 
 **Bonds** 就是下一代版本：
 
-- **快速轻量** — 单个二进制文件，毫秒级启动，内存占用极低
-- **部署简单** — 一个二进制 + SQLite 即可运行，无需 PHP/Composer/Node 运行时
-- **现代界面** — React 19 + TypeScript，流畅的 SPA 体验
-- **测试完善** — 1014 后端测试、129 前端测试、180 个 E2E 测试
-- **社区优先** — 为接受贡献和快速迭代而生
+- **快速轻量**：单个二进制文件，毫秒级启动，内存占用极低。
+- **部署简单**：一个二进制 + SQLite 即可运行，无需 PHP/Composer/Node 运行时。
+- **现代界面**：React 19 + TypeScript，流畅的 SPA 体验。
+- **测试完善**：1014 后端测试、129 前端测试、180 个 E2E 测试。
+- **社区优先**：为接受贡献和快速迭代而生。
 
 > **致谢**：Bonds 站在 [@djaiss](https://github.com/djaiss)、[@asbiin](https://github.com/asbiin) 以及整个 Monica 社区的肩膀上。原版 Monica 仍以 AGPL-3.0 许可证在 [monicahq/monica](https://github.com/monicahq/monica) 持续提供。
 
 ## 功能特性
 
-- **联系人管理** — 笔记、任务、提醒、礼物、债务、活动、人生事件、宠物等完整生命周期管理
-- **Vault 仪表盘** — 三栏布局：活动动态、生活事件、生活指标追踪（+1 计数）、心情记录、即将到来的提醒和待办任务
-- **多 Vault** — 数据隔离 + 基于角色的权限控制（管理者 / 编辑者 / 查看者）
-- **提醒系统** — 一次性和周期性（每周/每月/每年），支持邮件和 Telegram 通知
-- **全文搜索** — 基于 Bleve 的中英文混合搜索，覆盖联系人和笔记
-- **CardDAV / CalDAV** — 与 Apple 通讯录、Thunderbird 等 DAV 客户端同步联系人和日历
-- **vCard 导入导出** — 批量导入 `.vcf` 文件，导出单个或全部联系人
-- **CSV 导入** — 通过用户自定义列映射从 CSV 文件导入联系人（姓名、邮箱、电话、生日、地址、标签、分组、笔记）
-- **Monica 迁移** — 通过 API 直接从 Monica 实例迁移联系人
-- **文件上传** — 照片和文档附加到联系人，自动生成首字母头像
-- **两步验证 (TOTP)** — 基于 TOTP 的双因素认证 + 恢复码
-- **WebAuthn / FIDO2** — 通行密钥登录（硬件密钥、生物识别）
-- **OAuth 登录** — GitHub 和 Google 单点登录
-- **用户邀请** — 通过邮件邀请他人加入账户，支持权限级别
-- **审计日志** — 联系人所有变更的操作记录
-- **地理编码** — 通过 Nominatim（免费）或 LocationIQ 获取地址坐标
-- **Telegram 通知** — 通过 Telegram Bot 发送提醒
-- **国际化** — 英文和中文，前后端全覆盖
+- **联系人管理**：笔记、任务、提醒、礼物、债务、活动、人生事件、宠物等完整生命周期管理。包含需要验证标记以保持您的数据时刻最新。
+- **Vault 仪表盘**：三栏布局，包含活动动态、生活事件、生活指标追踪（+1 计数）、心情记录、即将到来的提醒和待办任务。
+- **多 Vault**：数据隔离与基于角色的权限控制（管理者、编辑者、查看者）。
+- **提醒系统**：一次性和周期性（每周、每月、每年），支持邮件和 Telegram 通知。
+- **全文搜索**：基于 Bleve 的中英文混合搜索，覆盖联系人和笔记。
+- **CardDAV / CalDAV**：与 Apple 通讯录、Thunderbird 等 DAV 客户端同步联系人和日历。支持个人访问令牌认证。
+- **DAV 同步订阅**：支持直接从外部 CardDAV 数据源同步联系人至 Vault。
+- **个人访问令牌**：生成安全的 API 与同步令牌，保障接口调用与第三方集成的安全。
+- **CSV 导入**：通过用户自定义列映射从 CSV 文件导入联系人（姓名、邮箱、电话、生日、地址、标签、分组、笔记）。
+- **Monica 迁移**：通过 API 直接从 Monica 实例迁移联系人。
+- **vCard 导入导出**：批量导入 `.vcf` 文件，导出单个或全部联系人。
+- **文件上传**：照片和文档附加到联系人，自动生成首字母头像。最大上传限制支持在管理后台中动态调整。
+- **两步验证 (TOTP)**：基于 TOTP 的双因素认证与恢复码。
+- **WebAuthn / FIDO2**：通行密钥登录（硬件密钥、生物识别）。
+- **OAuth 登录**：GitHub 和 Google 单点登录。
+- **用户邀请**：通过邮件邀请他人加入账户，支持权限级别。
+- **审计日志**：联系人所有变更的操作记录。
+- **地理编码**：通过 Nominatim（免费）或 LocationIQ 获取地址坐标。
+- **Telegram 通知**：通过 Telegram Bot 发送提醒。
+- **国际化**：英文和中文，前后端全覆盖。
 
 ## 快速开始
 
@@ -101,8 +103,8 @@ export JWT_SECRET=你的密钥
 
 Bonds 采用**混合配置**方式：
 
-- **环境变量** — 基础设施设置（数据库、服务器、安全）
-- **管理后台** — 所有运行时设置（SMTP、OAuth、Telegram、WebAuthn 等）
+- **环境变量**：基础设施设置（数据库、服务器、安全）。
+- **管理后台**：所有运行时设置（SMTP、OAuth、Telegram、WebAuthn、上传大小限制等）。
 
 首次启动时，环境变量会自动导入数据库。之后，请在 Web 界面的 **管理员 > 系统设置** 中管理设置。
 
@@ -130,17 +132,17 @@ cp server/.env.example server/.env
 
 以下设置在登录后通过 **管理员 > 系统设置** 页面管理：
 
-- **应用** — 名称、URL、公告横幅
-- **认证** — 密码登录开关、用户注册开关
-- **JWT** — 令牌过期时间、刷新窗口
-- **SMTP** — 主机、端口、用户名、密码、发件人邮箱
-- **OAuth / OIDC** — GitHub、Google 和 OIDC/SSO 凭据
-- **WebAuthn** — 依赖方 ID、显示名称、允许来源
-- **Telegram** — Bot Token（通知推送）
-- **地理编码** — 服务商（Nominatim/LocationIQ）、API Key
-- **存储** — 最大上传大小
-- **备份** — Cron 定时计划、保留天数
- **Swagger** — 启用/禁用 API 文档界面
+- **应用**：名称、URL、公告横幅。
+- **认证**：密码登录开关、用户注册开关。
+- **JWT**：令牌过期时间、刷新窗口。
+- **SMTP**：主机、端口、用户名、密码、发件人邮箱。
+- **OAuth / OIDC**：GitHub、Google 和 OIDC/SSO 凭据。
+- **WebAuthn**：依赖方 ID、显示名称、允许来源。
+- **Telegram**：Bot Token（通知推送）。
+- **地理编码**：服务商（Nominatim/LocationIQ）、API Key。
+- **存储**：最大上传大小限制。
+- **备份**：Cron 定时计划、保留天数。
+- **Swagger**：启用或禁用 API 文档界面。
 
 ## 开发
 
@@ -157,9 +159,9 @@ make dev
 
 Go 后端运行在 `:8080`，Vite 开发服务器运行在 `:5173`。前端自动将 API 请求代理到后端。
 
-### 代码生成管线
+### Code Generation Pipeline
 
-前端 TypeScript API 客户端从后端 OpenAPI/Swagger 规范**自动生成**。生成的文件不纳入 git 版本控制 — 在 CI 和开发过程中按需重新生成。
+前端 TypeScript API 客户端从后端 OpenAPI/Swagger 规范**自动生成**。生成的文件不纳入 git 版本控制。在 CI 和开发过程中按需重新生成。
 
 ```
 Go handlers（swag 注解）
@@ -214,11 +216,11 @@ Bonds 是受 [Monica](https://github.com/monicahq/monica)（AGPL-3.0）启发的
 
 ## 许可证
 
-[Business Source License 1.1](LICENSE) (BSL 1.1) — 源码可见许可证，条款如下：
+[Business Source License 1.1](LICENSE) (BSL 1.1), 源码可见许可证，条款如下：
 
-- **个人用户**：非商业使用完全免费
-- **组织/企业**：商业使用需向 Licensor 购买许可
-- **禁止行为**：转售、再许可、作为托管/管理服务提供
-- **转换日期**：2030年2月17日 — 届时自动转为 [AGPL-3.0](LICENSE)（与原版 Monica 相同）
+- **个人用户**：非商业使用完全免费。
+- **组织/企业**：商业使用需向 Licensor 购买许可。
+- **禁止行为**：转售、再许可、作为托管/管理服务提供。
+- **转换日期**：2030年2月17日，届时自动转为 [AGPL-3.0](LICENSE)（与原版 Monica 相同）。
 
 转换日期后，软件将以 AGPL-3.0 完全开源。

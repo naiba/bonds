@@ -10,6 +10,7 @@ import (
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // birthdayLayouts are tried in order when parsing a birthday column.
@@ -360,9 +361,19 @@ func (s *CSVImportService) findOrCreateLabel(tx *gorm.DB, vaultID, name string) 
 	if err := tx.Where("vault_id = ? AND slug = ?", vaultID, slug).First(&label).Error; err == nil {
 		return &label, nil
 	}
+	// Race-safe insert: another concurrent import could create the same
+	// (vault_id, slug) between our SELECT above and CREATE below. The
+	// uniqueIndex on Label (vault_id, slug) makes the conflict deterministic;
+	// DoNothing lets us re-SELECT the winning row instead of bubbling up an
+	// error. Without this, duplicate labels accumulate under concurrent imports.
 	label = models.Label{VaultID: vaultID, Name: name, Slug: slug}
-	if err := tx.Create(&label).Error; err != nil {
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&label).Error; err != nil {
 		return nil, err
+	}
+	if label.ID == 0 {
+		if err := tx.Where("vault_id = ? AND slug = ?", vaultID, slug).First(&label).Error; err != nil {
+			return nil, err
+		}
 	}
 	return &label, nil
 }
