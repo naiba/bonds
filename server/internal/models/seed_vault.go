@@ -34,10 +34,12 @@ func seedContactImportantDateTypes(tx *gorm.DB, vaultID, locale string) error {
 	}
 	items := make([]ContactImportantDateType, len(defs))
 	for idx, d := range defs {
+		key := d.key
 		items[idx] = ContactImportantDateType{
-			VaultID:      vaultID,
-			Label:        i18n.T(locale, d.key),
-			InternalType: strPtr(d.internalType),
+			VaultID:             vaultID,
+			Label:               i18n.T(locale, d.key),
+			LabelTranslationKey: &key,
+			InternalType:        strPtr(d.internalType),
 		}
 	}
 	if err := tx.Create(&items).Error; err != nil {

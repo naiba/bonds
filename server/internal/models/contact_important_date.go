@@ -7,13 +7,19 @@ import (
 )
 
 type ContactImportantDateType struct {
-	ID           uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	VaultID      string    `json:"vault_id" gorm:"type:text;not null;index"`
-	Label        string    `json:"label" gorm:"not null"`
-	InternalType *string   `json:"internal_type"`
-	CanBeDeleted bool      `json:"can_be_deleted" gorm:"default:true"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID      uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	VaultID string `json:"vault_id" gorm:"type:text;not null;index"`
+	Label   string `json:"label" gorm:"not null"`
+	// LabelTranslationKey is the i18n key the row was seeded from. Persisting it
+	// lets PersonalizeService.SyncAllTranslations re-translate the row when the
+	// user changes their locale — without it, seeded rows freeze at whichever
+	// language was active during vault creation. Optional because user-created
+	// custom types do not have a translation key.
+	LabelTranslationKey *string   `json:"label_translation_key"`
+	InternalType        *string   `json:"internal_type"`
+	CanBeDeleted        bool      `json:"can_be_deleted" gorm:"default:true"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 
 	Vault Vault `json:"vault,omitempty" gorm:"foreignKey:VaultID"`
 }

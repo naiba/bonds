@@ -254,6 +254,12 @@ var vaultSyncEntities = []syncableEntity{
 	{table: "life_event_categories", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id"},
 	{table: "life_event_types", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id", parentTable: "life_event_categories", parentJoinCol: "life_event_category_id"},
 	{table: "vault_quick_facts_templates", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id"},
+	// contact_important_date_types was historically absent from this list, which
+	// is why switching locales and clicking "Sync translations" left birthday /
+	// anniversary / wedding type labels frozen in whatever language the vault
+	// was created in. Adding label_translation_key on the model + this entry
+	// closes the loop.
+	{table: "contact_important_date_types", displayCol: "label", keyCol: "label_translation_key", ownerCol: "vault_id"},
 }
 
 func (s *PersonalizeService) SyncAllTranslations(accountID, locale string) error {

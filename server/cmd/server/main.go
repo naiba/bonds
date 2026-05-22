@@ -73,6 +73,9 @@ func main() {
 	if err := models.BackfillTaskStatuses(db); err != nil {
 		log.Printf("WARNING: failed to backfill task statuses: %v", err)
 	}
+	if err := models.BackfillContactImportantDateTranslationKeys(db); err != nil {
+		log.Printf("WARNING: failed to backfill important date type translation keys: %v", err)
+	}
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
