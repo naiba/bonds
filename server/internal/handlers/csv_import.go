@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
@@ -45,6 +46,17 @@ func (h *CSVImportHandler) Import(c echo.Context) error {
 		return response.BadRequest(c, "err.file_required", nil)
 	}
 
+	// Server-side size guard (accept header is only a browser hint).
+	if file.Size > services.MaxCSVFileSize {
+		return response.BadRequest(c, "err.file_too_large", nil)
+	}
+
+	// Server-side type guard: reject obvious non-CSV uploads.
+	ct := file.Header.Get("Content-Type")
+	if ct != "" && !isCSVContentType(ct) {
+		return response.BadRequest(c, "err.invalid_file_type", nil)
+	}
+
 	src, err := file.Open()
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_read_file")
@@ -70,4 +82,13 @@ func (h *CSVImportHandler) Import(c echo.Context) error {
 	}
 
 	return response.OK(c, result)
+}
+
+// isCSVContentType returns true for content types that represent CSV data.
+func isCSVContentType(ct string) bool {
+	ct = strings.ToLower(strings.TrimSpace(ct))
+	return strings.Contains(ct, "csv") ||
+		strings.HasPrefix(ct, "text/plain") ||
+		strings.HasPrefix(ct, "text/") ||
+		strings.HasPrefix(ct, "application/octet-stream")
 }

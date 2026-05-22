@@ -167,6 +167,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	noteService.SetSearchService(searchService)
 	monicaImportService.SetFeedRecorder(feedRecorder)
 	monicaImportService.SetSearchEngine(searchEngine)
+	csvImportService.SetFeedRecorder(feedRecorder)
+	csvImportService.SetSearchService(searchService)
+	csvImportService.SetDavPushService(davPushService)
 
 	postPhotoHandler := NewPostPhotoHandler(vaultFileService, storageInfoService, systemSettingService)
 	contactPhotoHandler := NewContactPhotoHandler(vaultFileService)

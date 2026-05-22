@@ -45,7 +45,10 @@ import type {
   LifeEventCategoryResponse,
   LifeEventCategoryTypeResponse,
 } from "@/api";
-import type { GithubComNaibaBondsInternalDtoMonicaImportResponse } from "@/api/generated/data-contracts";
+import type {
+  GithubComNaibaBondsInternalDtoMonicaImportResponse,
+  GithubComNaibaBondsInternalDtoCSVImportResponse,
+} from "@/api/generated/data-contracts";
 import VaultCompanies from "./VaultCompanies";
 
 const { Title, Text } = Typography;
@@ -942,7 +945,7 @@ export default function VaultSettings() {
     const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
     const [mapping, setMapping] = useState<Record<string, string>>({});
     const [importing, setImporting] = useState(false);
-    const [importResult, setImportResult] = useState<{ imported_contacts: number; skipped_count: number; errors: string[] } | null>(null);
+    const [importResult, setImportResult] = useState<GithubComNaibaBondsInternalDtoCSVImportResponse | null>(null);
     const [importError, setImportError] = useState<string | null>(null);
 
     const handleBeforeUpload = (file: File): boolean => {
@@ -964,21 +967,15 @@ export default function VaultSettings() {
       setImporting(true);
       setImportError(null);
       try {
-        const form = new FormData();
-        form.append("file", csvFile);
-        form.append("mapping", JSON.stringify(mapping));
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/vaults/${vaultId}/settings/import/csv`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: form,
+        const res = await api.vaultSettings.settingsImportCsvCreate(String(vaultId), {
+          file: csvFile,
+          mapping: JSON.stringify(mapping),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json?.message ?? t("vault_settings.csv_import.error"));
-        setImportResult(json.data);
+        setImportResult(res.data ?? null);
         setStep("done");
       } catch (err: unknown) {
-        setImportError(err instanceof Error ? err.message : t("vault_settings.csv_import.error"));
+        const msg = (err instanceof Error) ? err.message : t("vault_settings.csv_import.error");
+        setImportError(msg);
       } finally {
         setImporting(false);
       }

@@ -27,12 +27,30 @@ var birthdayLayouts = []string{
 	"Jan 2, 2006",
 }
 
+// MaxCSVFileSize is the maximum accepted file size for CSV uploads (10 MB).
+const MaxCSVFileSize = 10 * 1024 * 1024
+
 type CSVImportService struct {
-	db *gorm.DB
+	db             *gorm.DB
+	feedRecorder   *FeedRecorder
+	searchService  *SearchService
+	davPushService *DavPushService
 }
 
 func NewCSVImportService(db *gorm.DB) *CSVImportService {
 	return &CSVImportService{db: db}
+}
+
+func (s *CSVImportService) SetFeedRecorder(fr *FeedRecorder) {
+	s.feedRecorder = fr
+}
+
+func (s *CSVImportService) SetSearchService(ss *SearchService) {
+	s.searchService = ss
+}
+
+func (s *CSVImportService) SetDavPushService(ps *DavPushService) {
+	s.davPushService = ps
 }
 
 func (s *CSVImportService) Import(vaultID, userID string, data []byte, mapping dto.CSVColumnMapping) (*dto.CSVImportResponse, error) {
@@ -122,34 +140,41 @@ func (s *CSVImportService) importRow(
 	}
 
 	contact := models.Contact{
-		VaultID:     vaultID,
-		FirstName:   strPtrOrNil(firstName),
-		LastName:    strPtrOrNil(col(row, colIndex, m.LastName)),
-		MiddleName:  strPtrOrNil(col(row, colIndex, m.MiddleName)),
-		Nickname:    strPtrOrNil(col(row, colIndex, m.Nickname)),
-		Prefix:      strPtrOrNil(col(row, colIndex, m.Prefix)),
-		Suffix:      strPtrOrNil(col(row, colIndex, m.Suffix)),
-		JobPosition: strPtrOrNil(col(row, colIndex, m.JobTitle)),
-		GenderID:    genderID,
-		Listed:      true,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		VaultID:       vaultID,
+		FirstName:     strPtrOrNil(firstName),
+		LastName:      strPtrOrNil(col(row, colIndex, m.LastName)),
+		MiddleName:    strPtrOrNil(col(row, colIndex, m.MiddleName)),
+		Nickname:      strPtrOrNil(col(row, colIndex, m.Nickname)),
+		Prefix:        strPtrOrNil(col(row, colIndex, m.Prefix)),
+		Suffix:        strPtrOrNil(col(row, colIndex, m.Suffix)),
+		JobPosition:   strPtrOrNil(col(row, colIndex, m.JobTitle)),
+		GenderID:      genderID,
+		Listed:        true,
+		LastUpdatedAt: &now,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
-	if err := s.db.Create(&contact).Error; err != nil {
-		return fmt.Errorf("failed to create contact: %w", err)
+	// Contact + ContactVaultUser in one atomic transaction.
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&contact).Error; err != nil {
+			return fmt.Errorf("failed to create contact: %w", err)
+		}
+		cvu := models.ContactVaultUser{
+			ContactID: contact.ID,
+			VaultID:   vaultID,
+			UserID:    userID,
+		}
+		if err := tx.Create(&cvu).Error; err != nil {
+			return fmt.Errorf("vault user link: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+
 	resp.ImportedContacts++
-
-	// ContactVaultUser association (required for vault membership).
-	cvu := models.ContactVaultUser{
-		ContactID: contact.ID,
-		VaultID:   vaultID,
-		UserID:    userID,
-	}
-	if err := s.db.Create(&cvu).Error; err != nil {
-		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: vault user link: %v", rowNum, err))
-	}
 
 	// Email.
 	if emailVal := col(row, colIndex, m.Email); emailVal != "" {
@@ -174,7 +199,9 @@ func (s *CSVImportService) importRow(
 				resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: tag %q: %v", rowNum, tag, err))
 				continue
 			}
-			s.db.Create(&models.ContactLabel{ContactID: contact.ID, LabelID: label.ID})
+			if err := s.db.Create(&models.ContactLabel{ContactID: contact.ID, LabelID: label.ID}).Error; err != nil {
+				resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: tag %q link: %v", rowNum, tag, err))
+			}
 		}
 	}
 
@@ -183,15 +210,18 @@ func (s *CSVImportService) importRow(
 		for _, groupName := range splitCSVList(groupsVal) {
 			var group models.Group
 			if s.db.Where("vault_id = ? AND name = ?", vaultID, groupName).First(&group).Error == nil {
-				s.db.Create(&models.ContactGroup{GroupID: group.ID, ContactID: contact.ID})
+				if err := s.db.Create(&models.ContactGroup{GroupID: group.ID, ContactID: contact.ID}).Error; err != nil {
+					resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: group %q link: %v", rowNum, groupName, err))
+				}
 			} else {
 				resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: group %q not found (create it first)", rowNum, groupName))
 			}
 		}
 	}
 
-	// Notes — also append company name if provided (company is not a plain
+	// Notes — also prepend company name if provided (company is not a plain
 	// string field on Contact; full company linking is out of scope for CSV import).
+	var createdNote *models.Note
 	notesVal := col(row, colIndex, m.Notes)
 	if companyVal := col(row, colIndex, m.Company); companyVal != "" {
 		if notesVal != "" {
@@ -211,11 +241,35 @@ func (s *CSVImportService) importRow(
 		}
 		if err := s.db.Create(&note).Error; err != nil {
 			resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: note: %v", rowNum, err))
+		} else {
+			createdNote = &note
 		}
 	}
 
 	// Address (only created if at least one field is non-empty).
 	s.createAddress(accountID, vaultID, contact.ID, row, colIndex, m, resp, rowNum)
+
+	// Side effects: feed, search index, DAV push — mirror ContactService.CreateContact.
+	if s.feedRecorder != nil {
+		s.feedRecorder.Record(contact.ID, userID, ActionContactCreated, "Imported contact "+firstName, nil, nil)
+	}
+	if s.searchService != nil {
+		s.searchService.IndexContact(&contact)
+	}
+	if s.davPushService != nil {
+		go s.davPushService.PushContactChange(contact.ID, vaultID)
+	}
+
+	// Note side effects: mirror NoteService.Create.
+	if createdNote != nil {
+		if s.feedRecorder != nil {
+			entityType := "Note"
+			s.feedRecorder.Record(contact.ID, userID, ActionNoteCreated, "Created a note", &createdNote.ID, &entityType)
+		}
+		if s.searchService != nil {
+			s.searchService.IndexNote(createdNote)
+		}
+	}
 
 	return nil
 }
@@ -295,7 +349,9 @@ func (s *CSVImportService) createAddress(accountID, vaultID, contactID string, r
 		return
 	}
 
-	s.db.Create(&models.ContactAddress{ContactID: contactID, AddressID: addr.ID})
+	if err := s.db.Create(&models.ContactAddress{ContactID: contactID, AddressID: addr.ID}).Error; err != nil {
+		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: address link: %v", rowNum, err))
+	}
 }
 
 func (s *CSVImportService) findOrCreateLabel(tx *gorm.DB, vaultID, name string) (*models.Label, error) {

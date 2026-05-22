@@ -424,5 +424,9 @@
   "seed.task_statuses.blocked": "Blocked",
   "seed.task_statuses.cancelled": "Cancelled",
   "err.invalid_csv_mapping": "Invalid column mapping",
-  "err.failed_to_import_csv": "Failed to import CSV"
+  "err.failed_to_import_csv": "Failed to import CSV",
+  "err.file_required": "A file is required",
+  "err.file_too_large": "File exceeds the 10 MB size limit",
+  "err.invalid_file_type": "Only CSV files are accepted",
+  "err.failed_to_read_file": "Failed to read the uploaded file"
 }
