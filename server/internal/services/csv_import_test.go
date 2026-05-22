@@ -45,11 +45,26 @@ func setupCSVImportTest(t *testing.T) (*CSVImportService, *gorm.DB, string, stri
 	return svc, db, vault.ID, resp.User.ID
 }
 
+func csvQuote(s string) string {
+	if strings.ContainsAny(s, ",\"\n") {
+		return `"` + strings.ReplaceAll(s, `"`, `""`) + `"`
+	}
+	return s
+}
+
 func csvData(headers []string, rows ...[]string) []byte {
 	var b strings.Builder
-	b.WriteString(strings.Join(headers, ",") + "\n")
+	quoted := make([]string, len(headers))
+	for i, h := range headers {
+		quoted[i] = csvQuote(h)
+	}
+	b.WriteString(strings.Join(quoted, ",") + "\n")
 	for _, row := range rows {
-		b.WriteString(strings.Join(row, ",") + "\n")
+		cells := make([]string, len(row))
+		for i, v := range row {
+			cells[i] = csvQuote(v)
+		}
+		b.WriteString(strings.Join(cells, ",") + "\n")
 	}
 	return []byte(b.String())
 }
@@ -86,7 +101,7 @@ func TestCSVImport_SuccessBasic(t *testing.T) {
 	}
 
 	var count int64
-	db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&count)
+	db.Model(&models.Contact{}).Where("vault_id = ? AND listed = ?", vaultID, true).Count(&count)
 	if count != 2 {
 		t.Errorf("expected 2 contacts in DB, got %d", count)
 	}
@@ -173,7 +188,7 @@ func TestCSVImport_MissingFirstName(t *testing.T) {
 	}
 
 	var count int64
-	db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&count)
+	db.Model(&models.Contact{}).Where("vault_id = ? AND listed = ?", vaultID, true).Count(&count)
 	if count != 1 {
 		t.Errorf("expected 1 contact in DB, got %d", count)
 	}
@@ -490,8 +505,10 @@ func TestCSVImport_NonexistentVault(t *testing.T) {
 		t.Error("expected error for nonexistent vault, got nil")
 	}
 
+	// The nonexistent vault ID should yield zero contacts; the real vault's
+	// self-contact (Listed=false) is excluded from this assertion.
 	var count int64
-	db.Model(&models.Contact{}).Count(&count)
+	db.Model(&models.Contact{}).Where("vault_id = ? AND listed = ?", "nonexistent-vault-id", true).Count(&count)
 	if count != 0 {
 		t.Errorf("expected 0 contacts created, got %d", count)
 	}
