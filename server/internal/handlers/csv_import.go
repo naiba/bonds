@@ -84,12 +84,14 @@ func (h *CSVImportHandler) Import(c echo.Context) error {
 	return response.OK(c, result)
 }
 
-// isCSVContentType returns true for content types that unambiguously represent
-// text or CSV data. application/octet-stream is intentionally excluded because
-// it is a generic binary type used by every kind of file upload.
+// isCSVContentType returns true for content types that represent CSV data.
+// application/vnd.ms-excel is included because Windows browsers report .csv
+// files with that type when Excel is the default handler.
+// application/octet-stream is excluded — it is a generic fallback for any
+// binary file and would defeat the guard.
 func isCSVContentType(ct string) bool {
 	ct = strings.ToLower(strings.TrimSpace(ct))
 	return strings.Contains(ct, "csv") ||
-		ct == "text/plain" ||
-		strings.HasPrefix(ct, "text/")
+		strings.HasPrefix(ct, "text/") ||
+		ct == "application/vnd.ms-excel"
 }
