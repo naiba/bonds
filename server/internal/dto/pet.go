@@ -12,11 +12,19 @@ type UpdatePetRequest struct {
 	Name          string `json:"name" example:"Buddy"`
 }
 
+type PetCategoryResponse struct {
+	ID        uint      `json:"id" example:"1"`
+	Name      string    `json:"name" example:"Dog"`
+	CreatedAt time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+}
+
 type PetResponse struct {
-	ID            uint      `json:"id" example:"1"`
-	ContactID     string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	PetCategoryID uint      `json:"pet_category_id" example:"1"`
-	Name          string    `json:"name" example:"Buddy"`
-	CreatedAt     time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt     time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	ID              uint      `json:"id" example:"1"`
+	ContactID       string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	PetCategoryID   uint      `json:"pet_category_id" example:"1"`
+	PetCategoryName string    `json:"pet_category_name" example:"Dog"`
+	Name            string    `json:"name" example:"Buddy"`
+	CreatedAt       time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt       time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
