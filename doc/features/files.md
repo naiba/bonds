@@ -1,10 +1,10 @@
 # Files & Avatars
 
-Bonds supports file uploads for contact photos, documents, and vault-level files.
+Bonds supports secure file uploads for contact photos, documents, and vault-level files.
 
 ## File Upload
 
-Upload files to contacts or vaults:
+Upload files to contacts or vaults using the following endpoints:
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -14,19 +14,18 @@ Upload files to contacts or vaults:
 
 ### Supported File Types
 
-Bonds enforces a MIME type whitelist:
+Bonds enforces a strict MIME type whitelist:
 
-- **Images**: JPEG, PNG, GIF, WebP
-- **Documents**: PDF
-- Additional types may be supported in future releases
+- **Images**: JPEG, PNG, GIF, WebP.
+- **Documents**: PDF.
 
 ### Size Limits
 
-The default maximum upload size is **10 MB**, configurable via `STORAGE_MAX_SIZE` environment variable (value in bytes).
+The maximum upload size is managed dynamically in the web UI under **Admin > System Settings > Storage**. It is not configured via environment variables.
 
 ### Storage
 
-Uploaded files are stored on disk in a date-organized directory structure:
+Uploaded files are stored on disk inside the directory configured by the `STORAGE_UPLOAD_DIR` environment variable (defaults to `uploads`), organized by date:
 
 ```
 {STORAGE_UPLOAD_DIR}/{yyyy/MM/dd}/{uuid}{ext}
@@ -42,15 +41,15 @@ Every contact has an avatar displayed in lists and detail pages.
 
 If no photo is uploaded, Bonds generates an **initials avatar** automatically:
 
-- Extracts the first letter of the first and last name
-- Picks a background color deterministically from the name's MD5 hash
-- Renders as a PNG image using Go's standard `image` package
+- Extracts the first letter of the first and last name.
+- Picks a background color deterministically from the name's MD5 hash.
+- Renders as a PNG image using Go's standard `image` package.
 
 The same name always produces the same color, providing visual consistency.
 
 ### Custom Avatars
 
-Upload a photo to a contact to override the generated avatar. The uploaded photo is served directly; if removed, Bonds falls back to the generated initials avatar.
+Upload a photo to a contact to override the generated avatar. The uploaded photo is served directly. If removed, Bonds falls back to the generated initials avatar.
 
 ### Avatar API
 
