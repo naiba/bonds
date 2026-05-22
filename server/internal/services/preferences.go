@@ -5,12 +5,19 @@ import (
 	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/i18n"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
 
 var (
 	ErrInvalidNameOrder = errors.New("name_order must contain at least one variable like %first_name%")
+
+	// ErrUnsupportedLocale is returned when a caller tries to persist a locale
+	// code that the embedded i18n bundle does not load. Without this guard the
+	// preference would silently be ignored at translation time (the UI falls
+	// back to English), making the saved value look like a no-op to the user.
+	ErrUnsupportedLocale = errors.New("locale is not supported")
 
 	// validNameOrderVars lists all allowed template variables for name_order.
 	validNameOrderVars = map[string]bool{
@@ -71,6 +78,9 @@ func (s *PreferenceService) UpdateTimezone(userID string, req dto.UpdateTimezone
 }
 
 func (s *PreferenceService) UpdateLocale(userID string, req dto.UpdateLocaleRequest) error {
+	if !i18n.IsSupported(req.Locale) {
+		return ErrUnsupportedLocale
+	}
 	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("locale", req.Locale).Error
 }
 
@@ -131,6 +141,9 @@ func (s *PreferenceService) UpdateAll(userID string, req dto.UpdatePreferencesRe
 		updates["timezone"] = req.Timezone
 	}
 	if req.Locale != "" {
+		if !i18n.IsSupported(req.Locale) {
+			return nil, ErrUnsupportedLocale
+		}
 		updates["locale"] = req.Locale
 	}
 	if req.NumberFormat != "" {

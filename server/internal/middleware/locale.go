@@ -4,27 +4,27 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+
+	"github.com/naiba/bonds/internal/i18n"
 )
 
-// Locale parses the Accept-Language header and stores the locale in the context.
-// Supports "zh", "zh-CN", "zh-Hans" → "zh"; everything else → "en".
+// Locale parses the Accept-Language header and stores the matched code in the
+// echo context. The whitelist comes from i18n.Supported so adding a language
+// is a one-line change there. Tags are normalized to the primary subtag
+// (e.g. "zh-CN" → "zh") so callers that send region-qualified codes still
+// match the loaded bundles. Anything not in the bundle defaults to "en".
 func Locale() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			lang := "en"
 			accept := c.Request().Header.Get("Accept-Language")
 			if accept != "" {
-				// Take the first language tag (before any comma)
 				tag := strings.SplitN(accept, ",", 2)[0]
-				// Remove quality value if present (e.g. "zh-CN;q=0.9")
 				tag = strings.SplitN(tag, ";", 2)[0]
 				tag = strings.TrimSpace(tag)
-				primary := strings.SplitN(tag, "-", 2)[0]
-				primary = strings.ToLower(primary)
-				if primary == "zh" {
-					lang = "zh"
-				} else if primary == "es" {
-					lang = "es"
+				primary := strings.ToLower(strings.SplitN(tag, "-", 2)[0])
+				if i18n.IsSupported(primary) {
+					lang = primary
 				}
 			}
 			c.Set("locale", lang)

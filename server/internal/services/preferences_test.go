@@ -76,7 +76,7 @@ func TestPreferenceUpdateSingleField(t *testing.T) {
 		{
 			"locale",
 			func() error {
-				return svc.UpdateLocale(userID, dto.UpdateLocaleRequest{Locale: "fr"})
+				return svc.UpdateLocale(userID, dto.UpdateLocaleRequest{Locale: "es"})
 			},
 			func(p *dto.PreferencesResponse) string { return p.Locale },
 		},
@@ -128,7 +128,7 @@ func TestPreferenceUpdateAll(t *testing.T) {
 func TestPreferenceUpdateAllPartial(t *testing.T) {
 	svc, userID := setupPreferenceTest(t)
 
-	if err := svc.UpdateLocale(userID, dto.UpdateLocaleRequest{Locale: "de"}); err != nil {
+	if err := svc.UpdateLocale(userID, dto.UpdateLocaleRequest{Locale: "zh"}); err != nil {
 		t.Fatalf("UpdateLocale failed: %v", err)
 	}
 
@@ -141,8 +141,8 @@ func TestPreferenceUpdateAllPartial(t *testing.T) {
 	if prefs.Timezone != "Europe/Berlin" {
 		t.Errorf("Expected timezone 'Europe/Berlin', got '%s'", prefs.Timezone)
 	}
-	if prefs.Locale != "de" {
-		t.Errorf("Expected locale to remain 'de', got '%s'", prefs.Locale)
+	if prefs.Locale != "zh" {
+		t.Errorf("Expected locale to remain 'zh', got '%s'", prefs.Locale)
 	}
 }
 
