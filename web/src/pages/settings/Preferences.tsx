@@ -30,20 +30,18 @@ const dateFormats = [
   { value: "MMM D, YYYY", label: "Jan 15, 2026" },
 ];
 
-const timezones = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "Europe/London",
-  "Europe/Paris",
-  "Europe/Berlin",
-  "Asia/Tokyo",
-  "Asia/Shanghai",
-  "Asia/Kolkata",
-  "Australia/Sydney",
-].map((tz) => ({ value: tz, label: tz }));
+// Pull the full IANA timezone list from the runtime rather than maintaining a
+// hardcoded subset — users in zones we forgot to enumerate (e.g. Africa/Cairo,
+// Pacific/Honolulu, half-hour offsets like Asia/Kolkata) can now pick their
+// own. Sorted alphabetically so the Select's search box is easy to scan.
+const timezones = (
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone")
+    : ["UTC"]
+)
+  .slice()
+  .sort()
+  .map((tz: string) => ({ value: tz, label: tz }));
 
 // Keep this in sync with `SUPPORTED_LANGUAGES` in `@/i18n`. Offering a locale
 // here that the i18n bundle does not load would persist a preference the UI
