@@ -6,16 +6,17 @@ Contacts are the core entity in Bonds. Each contact lives inside a [Vault](/feat
 
 Each contact supports:
 
-- **Names** — First name, last name, nickname, maiden name
-- **Contact methods** — Email addresses, phone numbers, social media links (12 built-in types)
-- **Addresses** — Multiple addresses with types (Home, Work, etc.), with optional geocoding
-- **Company** — Job title and company association
-- **Gender & Pronouns** — Customizable gender and pronoun options
-- **Religion** — Optional religious affiliation
+- **Names**: First name, last name, nickname, maiden name.
+- **Contact methods**: Email addresses, phone numbers, social media links (12 built-in types).
+- **Addresses**: Multiple addresses with types (Home, Work, etc.), with optional geocoding.
+- **Company**: Job title and company association.
+- **Gender & Pronouns**: Customizable gender and pronoun options.
+- **Religion**: Optional religious affiliation.
+- **Verification Flag**: Mark a contact as needing verification when their details might be out of date. This acts as a visual indicator to review and confirm their details periodically.
 
 ## Modules
 
-Contact detail pages are built from **modules** — configurable building blocks displayed on template pages. Default modules include:
+Contact detail pages are built from **modules**, which are configurable building blocks displayed on template pages. Default modules include:
 
 | Module | Description |
 |--------|-------------|
@@ -30,7 +31,7 @@ Contact detail pages are built from **modules** — configurable building blocks
 | Debts / Loans | Money lent or borrowed |
 | Activities | Shared activities and events |
 | Life events | Major milestones (graduation, marriage, etc.) |
-| Pets | Pets with names and categories |
+| Pets | Pets with names and categories (categories are managed at the account level) |
 | Groups | Contact group membership |
 | Documents | Uploaded files (PDF, images) |
 | Photos | Photo gallery |
@@ -42,11 +43,11 @@ Contact detail pages are built from **modules** — configurable building blocks
 
 Templates control the layout of contact detail pages. Each template has **pages** (tabs), and each page displays a set of modules. The default template includes:
 
-1. **Contact information** — Avatar, names, important dates, gender, labels, company, religions
-2. **Feed** — Activity timeline
-3. **Social** — Relationships, pets, groups, addresses, contact methods
-4. **Life & goals** — Life events, goals
-5. **Information** — Documents, photos, notes, reminders, loans, tasks, calls, posts
+1. **Contact information**: Avatar, names, important dates, gender, labels, company, religions.
+2. **Feed**: Activity timeline.
+3. **Social**: Relationships, pets, groups, addresses, contact methods.
+4. **Life & goals**: Life events, goals.
+5. **Information**: Documents, photos, notes, reminders, loans, tasks, calls, posts.
 
 Templates and module assignments are customizable through the [personalization settings](/features/admin#personalization).
 
@@ -56,11 +57,15 @@ Labels are tags you can assign to contacts for organization and filtering. Creat
 
 ## Avatar
 
-Each contact has an avatar. If no photo is uploaded, Bonds auto-generates an **initials avatar** — a colored circle with the contact's first and last initials. The color is deterministic (based on the name hash), so the same name always gets the same color.
+Each contact has an avatar. If no photo is uploaded, Bonds auto-generates an **initials avatar**, which is a colored circle with the contact's first and last initials. The color is deterministic (based on the name hash), so the same name always gets the same color.
+
+## Pets
+
+You can add pets to contacts. Pet categories are account-scoped, allowing you to select from a predefined list of categories such as Dog, Cat, or Bird. You can manage these categories in Settings, under the Personalize tab.
 
 ## Look Up Contacts by Identity
 
-Integrations and AI assistants frequently need to answer the question _"which contact owns this email address / phone number?"_ without paginating through every contact in a vault.
+Integrations and AI assistants frequently need to answer the question: _"which contact owns this email address / phone number?"_ without paginating through every contact in a vault.
 
 Bonds exposes a vault-scoped lookup endpoint:
 
@@ -68,10 +73,10 @@ Bonds exposes a vault-scoped lookup endpoint:
 GET /api/vaults/{vault_id}/contactInformation/by-identity?data=<value>&type_id=<n>
 ```
 
-- `data` (required) — the identity value to search for. Matching is **case-insensitive**.
-- `type_id` (optional) — restrict the match to a single `ContactInformationType` (e.g. only emails).
+- `data` (required): the identity value to search for. Matching is **case-insensitive**.
+- `type_id` (optional): restrict the match to a single `ContactInformationType` (e.g. only emails).
 
-The response is an array of matches; each match includes the `contact_id`, the contact's name, and the full `ContactInformationResponse` object. Searches are scoped to a single vault and require Viewer permission on it.
+The response is an array of matches. Each match includes the `contact_id`, the contact's name, and the full `ContactInformationResponse` object. Searches are scoped to a single vault and require Viewer permission on it.
 
 Example:
 
@@ -82,18 +87,17 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ## Relationships
 
-Define relationships between contacts — parent, child, partner, friend, colleague, and more. Relationship types are organized into groups:
+Define relationships between contacts, including parent, child, partner, friend, colleague, and more. Relationship types are organized into groups:
 
-- **Love** — Partner, spouse, significant other
-- **Family** — Parent, child, sibling
-- **Friend** — Close friend, acquaintance
-
-- **Work** — Colleague, mentor, boss
+- **Love**: Partner, spouse, significant other.
+- **Family**: Parent, child, sibling.
+- **Friend**: Close friend, acquaintance.
+- **Work**: Colleague, mentor, boss.
 
 ### Cross-Vault Relationships
 
 Relationships can span across vaults. When adding a relationship, the contact selector shows contacts from **all vaults** you have access to, grouped by vault name.
 
-- If you have **Editor** permission on the target vault, a **bidirectional** relationship is created automatically (both contacts see the relationship)
-- If you only have **Viewer** permission, a **one-way** relationship is created, with a hint in the UI explaining why
-- Deleting a cross-vault relationship automatically cleans up the reverse record on the other side
+- If you have **Editor** permission on the target vault, a **bidirectional** relationship is created automatically (both contacts see the relationship).
+- If you only have **Viewer** permission, a **one-way** relationship is created, with a hint in the UI explaining why.
+- Deleting a cross-vault relationship automatically cleans up the reverse record on the other side.
