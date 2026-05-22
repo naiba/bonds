@@ -162,23 +162,17 @@ test.describe('Relationship type selection shows both directions', () => {
     await page.waitForTimeout(500);
     const dropdown = page.locator('.ant-select-dropdown:visible');
     await expect(dropdown.getByTitle('parent', { exact: true })).toBeVisible({ timeout: 5000 });
+    await dropdown.getByTitle('parent', { exact: true }).click();
 
-    // Clear the search, close and reopen the dropdown to reset filter state
-    await typeSelect.locator('input').fill('');
-    await modal.locator('.ant-modal-header').click();
-    await page.waitForTimeout(300);
-
-    // Reopen and search "child"
+    // Select the visible option to close the AntD dropdown before reopening it.
+    // Clicking outside can be intercepted by the virtualized option overlay.
     await typeSelect.click();
     await page.waitForTimeout(200);
     await typeSelect.locator('input').fill('child');
     await page.waitForTimeout(500);
     const dropdown2 = page.locator('.ant-select-dropdown:visible');
     await expect(dropdown2.getByTitle('child', { exact: true })).toBeVisible({ timeout: 5000 });
-
-    // Close the dropdown before clicking Cancel to avoid "grand child" option intercepting the click
-    await modal.locator('.ant-modal-header').click();
-    await page.waitForTimeout(300);
+    await dropdown2.getByTitle('child', { exact: true }).click();
 
     await modal.getByRole('button', { name: /cancel/i }).click();
   });
