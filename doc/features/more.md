@@ -4,12 +4,22 @@
 
 Bonds records a feed of all changes across contacts, providing a complete audit trail:
 
-- Contact created, updated, deleted
-- Notes added, edited, removed
-- Reminders created, triggered
-- Tasks, gifts, debts, activities, and other entity changes
+- Contact created, updated, deleted.
+- Notes added, edited, removed.
+- Reminders created, triggered.
+- Tasks, gifts, debts, activities, and other entity changes.
 
 The feed is accessible per vault at `GET /api/vaults/:vault_id/feed`, showing who made what change and when.
+
+## Personal Access Tokens {#personal-access-tokens}
+
+Bonds allows you to create Personal Access Tokens, also shown in the UI as API Tokens, for secure API access and DAV synchronization:
+
+- **Location**: Manage your tokens under **Settings > API Tokens**.
+- **Creation**: Specify a custom description and an optional expiration period.
+- **Security**: The token is only shown once upon creation. Ensure you copy it immediately.
+- **Usage**: Use the token as a password in external integrations and DAV clients. When Two-Factor Authentication is active, standard password logins are disabled for CardDAV and CalDAV sync. You must use a Personal Access Token instead.
+- **Format**: All Personal Access Tokens are prefixed with `bonds_` for easy identification.
 
 ## Geocoding
 
@@ -20,7 +30,7 @@ Bonds can geocode addresses to obtain latitude/longitude coordinates. Two provid
 | **Nominatim** | Free (OSM) | No API key needed |
 | **LocationIQ** | Freemium | Requires API key |
 
-Geocoding runs asynchronously when an address is created. If it fails, the address is still saved — coordinates are simply left empty.
+Geocoding runs asynchronously when an address is created. If it fails, the address is still saved. Coordinates are simply left empty.
 
 Configure the provider and API key in the admin panel.
 
@@ -30,10 +40,10 @@ Receive reminder notifications via Telegram:
 
 ### Setup
 
-1. Create a Telegram bot via [@BotFather](https://t.me/BotFather)
-2. Copy the bot token
-3. Enter it in the admin panel under Telegram settings
-4. In your user settings, add a Telegram notification channel with your chat ID
+1. Create a Telegram bot via [@BotFather](https://t.me/BotFather).
+2. Copy the bot token.
+3. Enter it in the admin panel under Telegram settings.
+4. In your user settings, add a Telegram notification channel with your chat ID.
 
 ### Getting Your Chat ID
 
@@ -47,8 +57,8 @@ Look for the `chat.id` field in the response.
 
 Bonds supports English and Chinese in both frontend and backend:
 
-- **Frontend**: React i18next with `en.json` and `zh.json` locale files
-- **Backend**: Embedded JSON locale files, parsed from the `Accept-Language` header
+- **Frontend**: React i18next with `en.json` and `zh.json` locale files.
+- **Backend**: Embedded JSON locale files, parsed from the `Accept-Language` header.
 
 The language is detected automatically from the browser's language setting. Users can also switch languages manually.
 
@@ -72,7 +82,7 @@ Bonds includes a comprehensive currency table (160+ currencies) for tracking fin
 
 Bonds supports multiple calendar systems:
 
-- **Gregorian** — Standard calendar (default)
-- **Lunar (Chinese)** — Traditional Chinese calendar powered by `6tail/lunar-go`
+- **Gregorian**: Standard calendar (default).
+- **Lunar (Chinese)**: Traditional Chinese calendar powered by `6tail/lunar-go`.
 
 The calendar system uses a converter interface, making it extensible to additional calendar types.

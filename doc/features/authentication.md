@@ -2,31 +2,34 @@
 
 Bonds supports multiple authentication methods, from traditional password login to modern passkeys.
 
-## Password + JWT
+## Password, JWT, and Email Verification
 
-The default authentication flow:
+The default authentication flow is:
 
-1. Register with email and password
-2. Login returns a JWT token
-3. Token is sent in the `Authorization: Bearer <token>` header
-4. Tokens expire after 24 hours (configurable via `JWT_EXPIRY_HRS`)
-5. Tokens can be refreshed within 7 days (configurable via `JWT_REFRESH_HRS`)
+1. Register with email and password.
+2. **Email Verification**: A verification link is sent to the registered email address. Users must click the link to verify their account before accessing their vaults.
+   - If the verification email is lost or expires, users can click the resend button on the verification screen to trigger a new link.
+   - Email verification is also required when updating your email address from your account settings.
+3. Login returns a JWT token.
+4. Token is sent in the `Authorization: Bearer <token>` header.
+5. Tokens expire after 24 hours (configurable via `JWT_EXPIRY_HRS`).
+6. Tokens can be refreshed within 7 days (configurable via `JWT_REFRESH_HRS`).
 
 ## Two-Factor Authentication (TOTP)
 
 Add an extra layer of security with TOTP-based 2FA:
 
-1. **Enable** — Go to Settings → Security → Enable 2FA
-2. **Scan QR code** — Use any authenticator app (Google Authenticator, Authy, 1Password, etc.)
-3. **Save recovery codes** — 8 one-time-use recovery codes are generated. Store them safely.
-4. **Confirm** — Enter a TOTP code to activate
+1. **Enable**: Go to Settings, Security, Enable 2FA.
+2. **Scan QR code**: Use any authenticator app (Google Authenticator, Authy, 1Password, etc.).
+3. **Save recovery codes**: 8 one-time-use recovery codes are generated. Store them safely.
+4. **Confirm**: Enter a TOTP code to activate.
 
 ### Login with 2FA
 
 When 2FA is enabled, login is a two-step process:
 
-1. Enter email + password → server returns `requires_two_factor: true` + a temporary token
-2. Enter TOTP code (or a recovery code) → server returns the full JWT
+1. Enter email and password. The server returns `requires_two_factor: true` and a temporary token.
+2. Enter the TOTP code (or a recovery code). The server returns the full JWT.
 
 ### Recovery Codes
 
@@ -34,34 +37,34 @@ When 2FA is enabled, login is a two-step process:
 
 ### 2FA and DAV Sync
 
-When 2FA is enabled, **password-based DAV authentication is blocked**. DAV clients (CardDAV/CalDAV) must use a [Personal Access Token](/features/more#personal-access-tokens) instead of your password. This follows the same security model as Google, Apple, and Fastmail — a stolen password alone cannot bypass 2FA to access your data via DAV endpoints.
+When 2FA is enabled, **password-based DAV authentication is blocked**. DAV clients (CardDAV/CalDAV) must use a [Personal Access Token](/features/more#personal-access-tokens) instead of your password. This follows the same security model as Google, Apple, and Fastmail. A stolen password alone cannot bypass 2FA to access your data via DAV endpoints.
 
 To configure your DAV client after enabling 2FA:
 
-1. Go to **Settings → API Tokens** and create a new token
-2. In your DAV client, use your **email** as the username and the **token** (starting with `bonds_`) as the password
+1. Go to **Settings > API Tokens** and create a new token.
+2. In your DAV client, use your **email** as the username and the **token** (starting with `bonds_`) as the password.
 
 ## WebAuthn / FIDO2
 
 Bonds supports passwordless login via WebAuthn:
 
-- **Hardware keys** — YubiKey, Titan Security Key, etc.
-- **Biometrics** — Touch ID, Face ID, Windows Hello
-- **Passkeys** — iCloud Keychain, Android passkeys
+- **Hardware keys**: YubiKey, Titan Security Key, etc.
+- **Biometrics**: Touch ID, Face ID, Windows Hello.
+- **Passkeys**: iCloud Keychain, Android passkeys.
 
 ### Setup
 
-1. Go to Settings → Security → Register a new passkey
-2. Follow your browser's prompt to create a credential
-3. The passkey is now linked to your account
+1. Go to Settings, Security, Register a new passkey.
+2. Follow your browser prompt to create a credential.
+3. The passkey is now linked to your account.
 
 ### Requirements
 
-- HTTPS is **required** (except `localhost` for development)
+- HTTPS is **required** (except `localhost` for development).
 - Configure WebAuthn settings in the admin panel:
-  - **RP ID** — Your domain (e.g., `bonds.example.com`)
-  - **RP Display Name** — Shown to users during authentication
-  - **RP Origins** — Allowed origins (e.g., `https://bonds.example.com`)
+  - **RP ID**: Your domain (e.g., `bonds.example.com`).
+  - **RP Display Name**: Shown to users during authentication.
+  - **RP Origins**: Allowed origins (e.g., `https://bonds.example.com`).
 
 ## OAuth Login
 
@@ -72,15 +75,15 @@ Bonds supports single sign-on via:
 | **GitHub** | OAuth App client ID and secret |
 | **Google** | OAuth client ID and secret |
 
-Configure these in the admin panel. When enabled, "Login with GitHub" / "Login with Google" buttons appear on the login page.
+Configure these in the admin panel. When enabled, "Login with GitHub" or "Login with Google" buttons appear on the login page.
 
 If the OAuth email matches an existing Bonds account, the accounts are automatically linked.
 
 ### OAuth Callback Flow
 
 ```
-GET /api/auth/:provider → Redirect to OAuth provider
-GET /api/auth/:provider/callback → JWT → Redirect to /auth/callback?token=xxx
+GET /api/auth/:provider -> Redirect to OAuth provider
+GET /api/auth/:provider/callback -> JWT -> Redirect to /auth/callback?token=xxx
 ```
 
 ## OIDC (OpenID Connect)
@@ -91,7 +94,7 @@ Bonds supports generic OIDC providers for enterprise SSO:
 |---------|-------------|
 | **Client ID** | OIDC client ID |
 | **Client Secret** | OIDC client secret |
-| **Discovery URL** | Provider's `.well-known/openid-configuration` endpoint |
+| **Discovery URL** | Provider discovery URL |
 | **Display Name** | Button label on login page (default: "SSO") |
 
 Compatible with Authentik, Keycloak, Azure AD, Okta, and other OIDC-compliant providers. Configure in the admin panel.
