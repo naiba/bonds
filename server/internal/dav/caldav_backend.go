@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/emersion/go-ical"
 	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/caldav"
 	"github.com/google/uuid"
+
+	calendarPkg "github.com/naiba/bonds/internal/calendar"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
@@ -508,13 +511,27 @@ func buildCalendarFromImportantDate(d *models.ContactImportantDate) *ical.Calend
 	prop.Value = dtStart.Format("20060102")
 	event.Props.Set(prop)
 
-	if d.Year != nil {
+	// Recurrence: for Gregorian we emit a simple RRULE=YEARLY since the
+	// same Gregorian day every year is correct. For lunar (and any future
+	// non-Gregorian calendars), RRULE=YEARLY would silently drift — lunar
+	// dates land on a different Gregorian day each year — so we instead
+	// compute the next several Gregorian occurrences via the calendar
+	// converter and emit them as RDATE entries. This way Apple Calendar /
+	// Thunderbird / Google Calendar render the lunar birthday on the right
+	// day without needing lunar-calendar support of their own.
+	isAlternative := d.CalendarType != "" && d.CalendarType != "gregorian" && d.OriginalMonth != nil && d.OriginalDay != nil
+	if isAlternative {
+		ct := calendarPkg.CalendarType(d.CalendarType)
+		if converter, ok := calendarPkg.Get(ct); ok {
+			emitLunarRDates(event, converter, d, dtStart)
+		}
+	} else if d.Year != nil {
 		rruleProp := ical.NewProp(ical.PropRecurrenceRule)
 		rruleProp.Value = "FREQ=YEARLY"
 		event.Props.Set(rruleProp)
 	}
 
-	if d.CalendarType != "" && d.CalendarType != "gregorian" && d.OriginalMonth != nil && d.OriginalDay != nil {
+	if isAlternative {
 		desc := fmt.Sprintf("Calendar: %s, Original date: %d/%d", d.CalendarType, *d.OriginalMonth, *d.OriginalDay)
 		if d.OriginalYear != nil {
 			desc = fmt.Sprintf("Calendar: %s, Original date: %d-%d-%d", d.CalendarType, *d.OriginalYear, *d.OriginalMonth, *d.OriginalDay)
@@ -524,6 +541,46 @@ func buildCalendarFromImportantDate(d *models.ContactImportantDate) *ical.Calend
 
 	cal.Children = append(cal.Children, event)
 	return cal
+}
+
+// emitLunarRDates appends RDATE properties to a lunar VEVENT for the next
+// several years of Gregorian projections, derived from the original lunar
+// date. Without this, downstream CalDAV clients would either not recur at
+// all (no RRULE because we removed it) or — under the old code — recur on
+// the wrong Gregorian day every year.
+//
+// The 10-year horizon is a pragmatic balance: long enough for typical
+// calendar views (3-5 years) without bloating every VEVENT with decades of
+// projections. The DTSTART itself remains the canonical first occurrence;
+// RDATE entries supplement it.
+func emitLunarRDates(event *ical.Component, converter calendarPkg.Converter, d *models.ContactImportantDate, dtStart time.Time) {
+	const horizonYears = 10
+	startYear := dtStart.Year()
+	if d.OriginalYear != nil {
+		startYear = *d.OriginalYear
+	}
+
+	values := []string{}
+	for offset := 0; offset < horizonYears; offset++ {
+		orig := calendarPkg.DateInfo{
+			Day:   *d.OriginalDay,
+			Month: *d.OriginalMonth,
+			Year:  startYear + offset,
+		}
+		gd, err := converter.ToGregorian(orig)
+		if err != nil {
+			continue
+		}
+		values = append(values, fmt.Sprintf("%04d%02d%02d", gd.Year, gd.Month, gd.Day))
+	}
+	if len(values) == 0 {
+		return
+	}
+
+	rdateProp := ical.NewProp(ical.PropRecurrenceDates)
+	rdateProp.SetValueType(ical.ValueDate)
+	rdateProp.Value = strings.Join(values, ",")
+	event.Props.Set(rdateProp)
 }
 
 // buildCalendarFromTask creates an iCal VTODO from a ContactTask.

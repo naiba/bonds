@@ -124,8 +124,11 @@ func (s *ReminderSchedulerService) processOne(scheduled *models.ContactReminderS
 		s.handleSuccess(scheduled, channel, reminder, subject, htmlBody, now)
 	}
 
-	// Reschedule if recurring
-	s.rescheduleIfRecurring(reminder, channel.ID, now)
+	// Reschedule if recurring. Hand the user's preferred timezone through so
+	// the next-occurrence's 09:00 lands at 09:00 their local time, not 09:00
+	// in whatever zone the server happens to run in.
+	loc := userLocation(channel.User)
+	s.rescheduleIfRecurring(reminder, channel.ID, now.In(loc), loc)
 }
 
 func (s *ReminderSchedulerService) handleSuccess(
@@ -192,7 +195,7 @@ func (s *ReminderSchedulerService) handleFailure(
 	}
 }
 
-func (s *ReminderSchedulerService) rescheduleIfRecurring(reminder *models.ContactReminder, channelID uint, now time.Time) {
+func (s *ReminderSchedulerService) rescheduleIfRecurring(reminder *models.ContactReminder, channelID uint, now time.Time, loc *time.Location) {
 	if reminder.Type == "one_time" {
 		return
 	}
@@ -219,7 +222,7 @@ func (s *ReminderSchedulerService) rescheduleIfRecurring(reminder *models.Contac
 	case "recurring_month":
 		nextSchedule = now.AddDate(0, freq, 0)
 	case "recurring_year":
-		if ns, ok := calcNextYearlySchedule(reminder, now); ok {
+		if ns, ok := calcNextYearlySchedule(reminder, now, loc); ok {
 			nextSchedule = ns
 		} else {
 			nextSchedule = now.AddDate(freq, 0, 0)
@@ -235,7 +238,7 @@ func (s *ReminderSchedulerService) rescheduleIfRecurring(reminder *models.Contac
 	})
 }
 
-func calcNextYearlySchedule(reminder *models.ContactReminder, now time.Time) (time.Time, bool) {
+func calcNextYearlySchedule(reminder *models.ContactReminder, now time.Time, loc *time.Location) (time.Time, bool) {
 	ct := calendarPkg.CalendarType(reminder.CalendarType)
 	if ct == "" || ct == calendarPkg.Gregorian {
 		return time.Time{}, false
@@ -256,7 +259,28 @@ func calcNextYearlySchedule(reminder *models.ContactReminder, now time.Time) (ti
 		log.Printf("[reminder-scheduler] calendar NextOccurrence failed: %v", err)
 		return time.Time{}, false
 	}
-	return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 9, 0, 0, 0, now.Location()), true
+	// Materialize the next fire at 09:00 in the user's preferred timezone
+	// (passed through from processOne). Using `now.Location()` here was the
+	// bug — a server in UTC would schedule everyone at 09:00 UTC, which is
+	// 18:00 Asia/Tokyo or 04:00 America/New_York.
+	return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 9, 0, 0, 0, loc), true
+}
+
+// userLocation returns the time.Location for the given user's saved
+// timezone preference, falling back to UTC if the user is nil, has no
+// timezone set, or the saved string fails to load. Callers should pass
+// this to any date math that ends up persisted (scheduled fire times,
+// reminder dates) so different users in the same vault don't all fire at
+// the server's wall-clock 09:00.
+func userLocation(user *models.User) *time.Location {
+	if user == nil || user.Timezone == nil || *user.Timezone == "" {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(*user.Timezone)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
 }
 
 func buildContactName(contact *models.Contact, locale string) string {

@@ -504,7 +504,7 @@ func TestCalcNextYearlyScheduleLunar(t *testing.T) {
 		OriginalMonth: &origMonth,
 	}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	nextTime, ok := calcNextYearlySchedule(reminder, now)
+	nextTime, ok := calcNextYearlySchedule(reminder, now, now.Location())
 	if !ok {
 		t.Fatal("expected calcNextYearlySchedule to return ok=true for lunar")
 	}
@@ -525,7 +525,7 @@ func TestCalcNextYearlyScheduleGregorian(t *testing.T) {
 		OriginalMonth: &origMonth,
 	}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	_, ok := calcNextYearlySchedule(reminder, now)
+	_, ok := calcNextYearlySchedule(reminder, now, now.Location())
 	if ok {
 		t.Error("expected calcNextYearlySchedule to return ok=false for gregorian (uses standard path)")
 	}
@@ -536,7 +536,7 @@ func TestCalcNextYearlyScheduleNoOriginal(t *testing.T) {
 		CalendarType: "lunar",
 	}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	_, ok := calcNextYearlySchedule(reminder, now)
+	_, ok := calcNextYearlySchedule(reminder, now, now.Location())
 	if ok {
 		t.Error("expected ok=false when OriginalMonth/OriginalDay are nil")
 	}
