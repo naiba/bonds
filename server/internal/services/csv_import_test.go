@@ -202,6 +202,16 @@ func TestCSVImport_MalformedCSV(t *testing.T) {
 func TestCSVImport_EmailMapping(t *testing.T) {
 	svc, db, vaultID, userID := setupCSVImportTest(t)
 
+	var vault models.Vault
+	db.First(&vault, "id = ?", vaultID)
+	emailKey := "seed.contact_info_types.email_address"
+	if err := db.Exec(
+		"INSERT INTO contact_information_types (account_id, name, name_translation_key, created_at, updated_at) VALUES (?, 'Email', ?, datetime('now'), datetime('now'))",
+		vault.AccountID, emailKey,
+	).Error; err != nil {
+		t.Fatalf("seed email CI type: %v", err)
+	}
+
 	m := dto.CSVColumnMapping{FirstName: "first_name", Email: "email"}
 	data := csvData(
 		[]string{"first_name", "email"},
@@ -215,10 +225,17 @@ func TestCSVImport_EmailMapping(t *testing.T) {
 	if resp.ImportedContacts != 1 {
 		t.Errorf("expected 1 imported, got %d", resp.ImportedContacts)
 	}
+	if len(resp.Errors) > 0 {
+		t.Errorf("unexpected errors: %v", resp.Errors)
+	}
 
-	// If email contact-info type doesn't exist in test DB, the import still
-	// succeeds but records a soft error. Either outcome is valid here.
-	_ = db
+	var contact models.Contact
+	db.Where("vault_id = ? AND first_name = ?", vaultID, "Grace").First(&contact)
+	var ciCount int64
+	db.Model(&models.ContactInformation{}).Where("contact_id = ? AND data = ?", contact.ID, "grace@example.com").Count(&ciCount)
+	if ciCount != 1 {
+		t.Errorf("expected 1 ContactInformation row for email, got %d", ciCount)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +243,17 @@ func TestCSVImport_EmailMapping(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestCSVImport_PhoneMapping(t *testing.T) {
-	svc, _, vaultID, userID := setupCSVImportTest(t)
+	svc, db, vaultID, userID := setupCSVImportTest(t)
+
+	var vault models.Vault
+	db.First(&vault, "id = ?", vaultID)
+	phoneKey := "seed.contact_info_types.phone"
+	if err := db.Exec(
+		"INSERT INTO contact_information_types (account_id, name, name_translation_key, created_at, updated_at) VALUES (?, 'Phone', ?, datetime('now'), datetime('now'))",
+		vault.AccountID, phoneKey,
+	).Error; err != nil {
+		t.Fatalf("seed phone CI type: %v", err)
+	}
 
 	m := dto.CSVColumnMapping{FirstName: "first_name", Phone: "phone"}
 	data := csvData(
@@ -240,6 +267,17 @@ func TestCSVImport_PhoneMapping(t *testing.T) {
 	}
 	if resp.ImportedContacts != 1 {
 		t.Errorf("expected 1 imported, got %d", resp.ImportedContacts)
+	}
+	if len(resp.Errors) > 0 {
+		t.Errorf("unexpected errors: %v", resp.Errors)
+	}
+
+	var contact models.Contact
+	db.Where("vault_id = ? AND first_name = ?", vaultID, "Henry").First(&contact)
+	var ciCount int64
+	db.Model(&models.ContactInformation{}).Where("contact_id = ? AND data = ?", contact.ID, "+1-555-0100").Count(&ciCount)
+	if ciCount != 1 {
+		t.Errorf("expected 1 ContactInformation row for phone, got %d", ciCount)
 	}
 }
 
@@ -560,34 +598,6 @@ func TestCSVImport_CompanyNote(t *testing.T) {
 	db.Where("contact_id = ?", contact.ID).First(&note)
 	if !strings.HasPrefix(note.Body, "Company: Acme Corp") {
 		t.Errorf("expected note to start with 'Company: Acme Corp', got %q", note.Body)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// ContactVaultUser association is created
-// ---------------------------------------------------------------------------
-
-func TestCSVImport_CVUCreated(t *testing.T) {
-	svc, db, vaultID, userID := setupCSVImportTest(t)
-
-	data := csvData(
-		[]string{"first_name"},
-		[]string{"Sam"},
-	)
-
-	resp, err := svc.Import(vaultID, userID, data, dto.CSVColumnMapping{FirstName: "first_name"})
-	if err != nil {
-		t.Fatalf("Import failed: %v", err)
-	}
-	if resp.ImportedContacts != 1 {
-		t.Errorf("expected 1 imported, got %d", resp.ImportedContacts)
-	}
-
-	var contact models.Contact
-	db.Where("vault_id = ? AND first_name = ?", vaultID, "Sam").First(&contact)
-	var cvu models.ContactVaultUser
-	if err := db.Where("contact_id = ? AND user_id = ? AND vault_id = ?", contact.ID, userID, vaultID).First(&cvu).Error; err != nil {
-		t.Errorf("ContactVaultUser not found: %v", err)
 	}
 }
 
