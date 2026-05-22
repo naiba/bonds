@@ -2,8 +2,9 @@ package handlers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
@@ -35,7 +36,7 @@ func (h *CalendarHandler) Get(c echo.Context) error {
 	month := services.ParseIntParam(c.QueryParam("month"), 0)
 	year := services.ParseIntParam(c.QueryParam("year"), 0)
 
-	calendar, err := h.calendarService.GetCalendar(vaultID, month, year)
+	calendar, err := h.calendarService.GetCalendar(vaultID, month, year, middleware.GetLocale(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_calendar_data")
 	}

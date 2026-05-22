@@ -376,5 +376,17 @@
   "seed.task_statuses.in_progress": "En progreso",
   "seed.task_statuses.done": "Hecho",
   "seed.task_statuses.blocked": "Bloqueado",
-  "seed.task_statuses.cancelled": "Cancelado"
+  "seed.task_statuses.cancelled": "Cancelado",
+
+  "email.verify.subject": "Verifica tu dirección de correo electrónico",
+  "email.verify.body": "<h2>Verifica tu correo electrónico</h2>\n<p>Haz clic en el enlace de abajo para verificar tu dirección de correo electrónico:</p>\n<p><a href=\"{{link}}\">Verificar correo</a></p>",
+  "email.invitation.subject": "Te han invitado a Bonds",
+  "email.invitation.body": "<h2>¡Te han invitado!</h2>\n<p>Te han invitado a unirte a una cuenta de Bonds. Haz clic en el enlace de abajo para aceptar la invitación:</p>\n<p><a href=\"{{link}}\">Aceptar invitación</a></p>\n<p>Esta invitación caduca en 7 días.</p>",
+  "notification.channel.verify.subject": "Verifica tu canal de notificaciones",
+  "notification.channel.verify.body": "<p>Verifica tu canal de notificaciones haciendo clic en el enlace de abajo:</p><p><a href=\"{{link}}\">{{link}}</a></p>",
+  "notification.channel.test.subject": "Notificación de prueba",
+  "notification.channel.test.body": "<p>Esta es una notificación de prueba de Bonds.</p>",
+  "reminder.subject": "Recordatorio: {{label}}",
+  "reminder.body": "<h2>Recordatorio: {{label}}</h2><p>Tienes un recordatorio para <strong>{{contact}}</strong>.</p><p>{{label}}</p>",
+  "reminder.unknown_contact": "Desconocido"
 }

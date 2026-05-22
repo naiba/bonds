@@ -42,7 +42,7 @@ func setupCalendarTest(t *testing.T) (*CalendarService, string, string) {
 func TestCalendarEmpty(t *testing.T) {
 	svc, vaultID, _ := setupCalendarTest(t)
 
-	cal, err := svc.GetCalendar(vaultID, 1, 2025)
+	cal, err := svc.GetCalendar(vaultID, 1, 2025, "en")
 	if err != nil {
 		t.Fatalf("GetCalendar failed: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestCalendarWithDates(t *testing.T) {
 	}
 
 	svc := NewCalendarService(db)
-	cal, err := svc.GetCalendar(vault.ID, 3, 2025)
+	cal, err := svc.GetCalendar(vault.ID, 3, 2025, "en")
 	if err != nil {
 		t.Fatalf("GetCalendar failed: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestCalendarWithLunarDates(t *testing.T) {
 	}
 
 	svc := NewCalendarService(db)
-	cal, err := svc.GetCalendar(vault.ID, 2, 2025)
+	cal, err := svc.GetCalendar(vault.ID, 2, 2025, "en")
 	if err != nil {
 		t.Fatalf("GetCalendar failed: %v", err)
 	}

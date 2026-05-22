@@ -16,7 +16,7 @@ func NewCalendarService(db *gorm.DB) *CalendarService {
 	return &CalendarService{db: db}
 }
 
-func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.CalendarResponse, error) {
+func (s *CalendarService) GetCalendar(vaultID string, month, year int, locale string) (*dto.CalendarResponse, error) {
 	var contacts []models.Contact
 	if err := s.db.Where("vault_id = ?", vaultID).Select("id, first_name, last_name").Find(&contacts).Error; err != nil {
 		return nil, err
@@ -25,7 +25,7 @@ func (s *CalendarService) GetCalendar(vaultID string, month, year int) (*dto.Cal
 	contactNames := make(map[string]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
-		contactNames[c.ID] = buildContactName(&contacts[i])
+		contactNames[c.ID] = buildContactName(&contacts[i], locale)
 	}
 
 	resp := &dto.CalendarResponse{

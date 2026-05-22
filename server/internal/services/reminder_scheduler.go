@@ -1,11 +1,11 @@
 package services
 
 import (
-	"fmt"
 	"log"
 	"time"
 
 	calendarPkg "github.com/naiba/bonds/internal/calendar"
+	"github.com/naiba/bonds/internal/i18n"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
@@ -78,13 +78,21 @@ func (s *ReminderSchedulerService) processOne(scheduled *models.ContactReminderS
 		return
 	}
 
-	// Build notification content
-	contactName := buildContactName(&reminder.Contact)
-	subject := fmt.Sprintf("Reminder: %s", reminder.Label)
-	htmlBody := fmt.Sprintf(
-		`<h2>Reminder: %s</h2><p>You have a reminder for <strong>%s</strong>.</p><p>%s</p>`,
-		reminder.Label, contactName, reminder.Label,
-	)
+	// Build notification content. Pull the locale from the channel owner so a
+	// user who reads Chinese gets a Chinese reminder regardless of which
+	// language the server's HTTP request happened to carry. Falls back to "en"
+	// when the user isn't loaded (legacy callers) — i18n.T then returns the
+	// English text rather than the raw key.
+	locale := "en"
+	if channel.User != nil && channel.User.Locale != "" {
+		locale = channel.User.Locale
+	}
+	contactName := buildContactName(&reminder.Contact, locale)
+	subject := i18n.Tt(locale, "reminder.subject", map[string]string{"label": reminder.Label})
+	htmlBody := i18n.Tt(locale, "reminder.body", map[string]string{
+		"label":   reminder.Label,
+		"contact": contactName,
+	})
 
 	var sendErr error
 	switch channel.Type {
@@ -245,7 +253,7 @@ func calcNextYearlySchedule(reminder *models.ContactReminder, now time.Time) (ti
 	return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 9, 0, 0, 0, now.Location()), true
 }
 
-func buildContactName(contact *models.Contact) string {
+func buildContactName(contact *models.Contact, locale string) string {
 	name := ""
 	if contact.FirstName != nil {
 		name = *contact.FirstName
@@ -257,7 +265,7 @@ func buildContactName(contact *models.Contact) string {
 		name += *contact.LastName
 	}
 	if name == "" {
-		name = "Unknown"
+		name = i18n.T(locale, "reminder.unknown_contact")
 	}
 	return name
 }

@@ -430,5 +430,17 @@
   "err.file_required": "A file is required",
   "err.file_too_large": "File exceeds the 10 MB size limit",
   "err.invalid_file_type": "Only CSV files are accepted",
-  "err.failed_to_read_file": "Failed to read the uploaded file"
+  "err.failed_to_read_file": "Failed to read the uploaded file",
+
+  "email.verify.subject": "Verify your email address",
+  "email.verify.body": "<h2>Verify your email</h2>\n<p>Please click the link below to verify your email address:</p>\n<p><a href=\"{{link}}\">Verify Email</a></p>",
+  "email.invitation.subject": "You've been invited to Bonds",
+  "email.invitation.body": "<h2>You've been invited!</h2>\n<p>You've been invited to join a Bonds account. Click the link below to accept the invitation:</p>\n<p><a href=\"{{link}}\">Accept Invitation</a></p>\n<p>This invitation expires in 7 days.</p>",
+  "notification.channel.verify.subject": "Verify your notification channel",
+  "notification.channel.verify.body": "<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"{{link}}\">{{link}}</a></p>",
+  "notification.channel.test.subject": "Test notification",
+  "notification.channel.test.body": "<p>This is a test notification from Bonds.</p>",
+  "reminder.subject": "Reminder: {{label}}",
+  "reminder.body": "<h2>Reminder: {{label}}</h2><p>You have a reminder for <strong>{{contact}}</strong>.</p><p>{{label}}</p>",
+  "reminder.unknown_contact": "Unknown"
 }

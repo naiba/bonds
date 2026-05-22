@@ -430,5 +430,17 @@
   "seed.task_statuses.in_progress": "进行中",
   "seed.task_statuses.done": "已完成",
   "seed.task_statuses.blocked": "受阻",
-  "seed.task_statuses.cancelled": "已取消"
+  "seed.task_statuses.cancelled": "已取消",
+
+  "email.verify.subject": "请验证你的邮箱",
+  "email.verify.body": "<h2>验证你的邮箱</h2>\n<p>请点击下面的链接以验证你的邮箱地址：</p>\n<p><a href=\"{{link}}\">验证邮箱</a></p>",
+  "email.invitation.subject": "你被邀请加入 Bonds",
+  "email.invitation.body": "<h2>你被邀请了！</h2>\n<p>有人邀请你加入一个 Bonds 账户。点击下面的链接接受邀请：</p>\n<p><a href=\"{{link}}\">接受邀请</a></p>\n<p>本邀请将在 7 天后过期。</p>",
+  "notification.channel.verify.subject": "验证你的通知渠道",
+  "notification.channel.verify.body": "<p>请点击下面的链接以验证你的通知渠道：</p><p><a href=\"{{link}}\">{{link}}</a></p>",
+  "notification.channel.test.subject": "测试通知",
+  "notification.channel.test.body": "<p>这是一条来自 Bonds 的测试通知。</p>",
+  "reminder.subject": "提醒：{{label}}",
+  "reminder.body": "<h2>提醒：{{label}}</h2><p>你有一条关于 <strong>{{contact}}</strong> 的提醒。</p><p>{{label}}</p>",
+  "reminder.unknown_contact": "未知联系人"
 }

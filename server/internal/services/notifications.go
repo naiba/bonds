@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/i18n"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
@@ -46,6 +47,23 @@ func (s *NotificationService) getAppURL() string {
 	return "http://localhost:8080"
 }
 
+// loadUserLocale returns the user's persisted locale, falling back to "en"
+// when the user row is missing or the column is empty. Used to localize
+// notification emails the user themselves will read (verify-channel,
+// send-test). The locale is loaded fresh on every call rather than threaded
+// through the call chain so changes to Preferences.locale take effect on
+// the next email without needing every caller plumbing.
+func (s *NotificationService) loadUserLocale(userID string) string {
+	var user models.User
+	if err := s.db.Select("locale").Where("id = ?", userID).First(&user).Error; err != nil {
+		return "en"
+	}
+	if user.Locale == "" {
+		return "en"
+	}
+	return user.Locale
+}
+
 func (s *NotificationService) List(userID string) ([]dto.NotificationChannelResponse, error) {
 	var channels []models.UserNotificationChannel
 	if err := s.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&channels).Error; err != nil {
@@ -75,8 +93,10 @@ func (s *NotificationService) Create(userID string, req dto.CreateNotificationCh
 	if req.Type == "email" {
 		if s.mailer != nil {
 			link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.getAppURL(), ch.ID, token)
-			body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
-			_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
+			locale := s.loadUserLocale(userID)
+			subject := i18n.T(locale, "notification.channel.verify.subject")
+			body := i18n.Tt(locale, "notification.channel.verify.body", map[string]string{"link": link})
+			_ = s.mailer.Send(req.Content, subject, body)
 		}
 	} else {
 		now := time.Now()
@@ -124,8 +144,10 @@ func (s *NotificationService) Update(id uint, userID string, req dto.UpdateNotif
 	if contentChanged && ch.Type == "email" {
 		if s.mailer != nil {
 			link := fmt.Sprintf("%s/settings/notifications/%d/verify/%s", s.getAppURL(), ch.ID, *ch.VerificationToken)
-			body := fmt.Sprintf("<p>Please verify your notification channel by clicking the link below:</p><p><a href=\"%s\">%s</a></p>", link, link)
-			_ = s.mailer.Send(req.Content, "Verify your notification channel", body)
+			locale := s.loadUserLocale(userID)
+			subject := i18n.T(locale, "notification.channel.verify.subject")
+			body := i18n.Tt(locale, "notification.channel.verify.body", map[string]string{"link": link})
+			_ = s.mailer.Send(req.Content, subject, body)
 		}
 	}
 
@@ -192,8 +214,9 @@ func (s *NotificationService) SendTest(id uint, userID string) error {
 		return err
 	}
 
-	subject := "Test notification"
-	body := "<p>This is a test notification from Bonds.</p>"
+	locale := s.loadUserLocale(userID)
+	subject := i18n.T(locale, "notification.channel.test.subject")
+	body := i18n.T(locale, "notification.channel.test.body")
 	var sendErr error
 
 	switch ch.Type {

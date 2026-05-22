@@ -86,12 +86,12 @@ func nextReminderOccurrence(item dto.VaultReminderItem, now time.Time) time.Time
 
 // GetCalendarMonth returns calendar data for a specific year/month
 func (s *CalendarService) GetCalendarMonth(vaultID string, year, month int) (*dto.CalendarResponse, error) {
-	return s.GetCalendar(vaultID, month, year)
+	return s.GetCalendar(vaultID, month, year, "en")
 }
 
 // GetCalendarDay returns calendar data for a specific day
 func (s *CalendarService) GetCalendarDay(vaultID string, year, month, day int) (*dto.CalendarResponse, error) {
-	resp, err := s.GetCalendar(vaultID, month, year)
+	resp, err := s.GetCalendar(vaultID, month, year, "en")
 	if err != nil {
 		return nil, err
 	}

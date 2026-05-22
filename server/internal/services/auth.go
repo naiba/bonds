@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/i18n"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"golang.org/x/crypto/bcrypt"
@@ -68,13 +69,14 @@ func (s *AuthService) sendVerificationEmail(user *models.User) {
 
 	appURL := s.settings.GetWithDefault("app.url", "http://localhost:8080")
 	verifyLink := fmt.Sprintf("%s/verify-email?token=%s", appURL, token)
-	subject := "Verify your email address"
-	body := fmt.Sprintf(
-		`<h2>Verify your email</h2>
-<p>Please click the link below to verify your email address:</p>
-<p><a href="%s">Verify Email</a></p>`,
-		verifyLink,
-	)
+	// Localize on user.Locale so accounts created from a non-English UI get
+	// the verification mail in the language they actually read. Until
+	// Register persists the requested locale onto user.Locale this falls
+	// back to "" → English; the i18n fallback chain then guarantees a
+	// readable email even if the bundle is missing the key for that locale.
+	locale := user.Locale
+	subject := i18n.T(locale, "email.verify.subject")
+	body := i18n.Tt(locale, "email.verify.body", map[string]string{"link": verifyLink})
 	if err := s.mailer.Send(user.Email, subject, body); err != nil {
 		fmt.Printf("[AuthService] Failed to send verification email to %s: %v\n", user.Email, err)
 	}
@@ -106,6 +108,7 @@ func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.Aut
 		LastName:                &req.LastName,
 		Email:                   req.Email,
 		Password:                &hashedStr,
+		Locale:                  locale,
 		IsAccountAdministrator:  true,
 		IsInstanceAdministrator: isFirstUser,
 	}

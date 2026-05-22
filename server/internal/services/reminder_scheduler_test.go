@@ -575,7 +575,7 @@ func TestBuildContactName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := buildContactName(&tt.contact)
+			result := buildContactName(&tt.contact, "en")
 			if result != tt.expected {
 				t.Errorf("buildContactName() = %q, want %q", result, tt.expected)
 			}

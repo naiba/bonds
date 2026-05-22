@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/i18n"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/pkg/response"
 	"golang.org/x/crypto/bcrypt"
@@ -69,14 +70,17 @@ func (s *InvitationService) Create(accountID, createdBy string, req dto.CreateIn
 	}
 
 	inviteLink := fmt.Sprintf("%s/accept-invite?token=%s", s.getAppURL(), token)
-	subject := "You've been invited to Bonds"
-	body := fmt.Sprintf(
-		`<h2>You've been invited!</h2>
-<p>You've been invited to join a Bonds account. Click the link below to accept the invitation:</p>
-<p><a href="%s">Accept Invitation</a></p>
-<p>This invitation expires in 7 days.</p>`,
-		inviteLink,
-	)
+	// Localize on the inviter's locale, not the invitee's: the invitee has no
+	// account yet so no stored preference exists. The inviter at least
+	// understands the language they themselves chose, and is the one who can
+	// re-send a different version if needed.
+	locale := "en"
+	var creator models.User
+	if err := s.db.Select("locale").Where("id = ?", createdBy).First(&creator).Error; err == nil && creator.Locale != "" {
+		locale = creator.Locale
+	}
+	subject := i18n.T(locale, "email.invitation.subject")
+	body := i18n.Tt(locale, "email.invitation.body", map[string]string{"link": inviteLink})
 	if err := s.mailer.Send(req.Email, subject, body); err != nil {
 		fmt.Printf("[InvitationService] Failed to send invitation email to %s: %v\n", req.Email, err)
 	}
