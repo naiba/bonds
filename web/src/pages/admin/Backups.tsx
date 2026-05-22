@@ -89,7 +89,7 @@ export default function AdminBackups() {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("backups.deleted"));
     },
-    onError: () => message.error("Failed to delete backup"),
+    onError: () => message.error(t("backups.delete_failed")),
   });
 
   const restoreMutation = useMutation({
@@ -98,7 +98,7 @@ export default function AdminBackups() {
     onSuccess: () => {
       message.success(t("backups.restored"));
     },
-    onError: () => message.error("Failed to restore backup"),
+    onError: () => message.error(t("backups.restore_failed")),
   });
 
   function handleDownload(filename: string) {

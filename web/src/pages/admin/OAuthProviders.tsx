@@ -87,7 +87,7 @@ export default function AdminOAuthProviders() {
       message.success(t("admin.oauth_providers.created"));
       closeModal();
     },
-    onError: () => message.error("Failed to create provider"),
+    onError: () => message.error(t("admin.oauth_providers.create_failed")),
   });
 
   const updateMutation = useMutation({
@@ -98,7 +98,7 @@ export default function AdminOAuthProviders() {
       message.success(t("admin.oauth_providers.updated"));
       closeModal();
     },
-    onError: () => message.error("Failed to update provider"),
+    onError: () => message.error(t("admin.oauth_providers.update_failed")),
   });
 
   const deleteMutation = useMutation({
@@ -108,7 +108,7 @@ export default function AdminOAuthProviders() {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("admin.oauth_providers.deleted"));
     },
-    onError: () => message.error("Failed to delete provider"),
+    onError: () => message.error(t("admin.oauth_providers.delete_failed")),
   });
 
   function openCreate() {
