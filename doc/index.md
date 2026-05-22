@@ -17,6 +17,9 @@ features:
   - icon: 👥
     title: Contact Management
     details: Full lifecycle management — notes, tasks, reminders, gifts, debts, activities, life events, pets, and more.
+  - icon: 📊
+    title: Vault Dashboard
+    details: 3-column dashboard featuring activity feeds, life events, mood recording, and upcoming task trackers.
   - icon: 🔒
     title: Multi-Vault Isolation
     details: Organize contacts into separate vaults with role-based access control (Manager / Editor / Viewer).

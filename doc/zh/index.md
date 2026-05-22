@@ -17,6 +17,9 @@ features:
   - icon: 👥
     title: 联系人管理
     details: 完整的生命周期管理 — 笔记、任务、提醒、礼物、债务、活动、人生事件、宠物等。
+  - icon: 📊
+    title: Vault 仪表盘
+    details: 包含活动动态、生活事件、心情记录和待办任务的三栏式仪表盘。
   - icon: 🔒
     title: 多 Vault 隔离
     details: 将联系人组织到独立的 Vault 中，支持基于角色的权限控制（管理者 / 编辑者 / 查看者）。
