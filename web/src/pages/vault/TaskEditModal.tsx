@@ -1,11 +1,13 @@
-import { Modal, Form, Input, Select, App, Button, Space, DatePicker, Popconfirm, Tag, theme } from "antd";
+import { Modal, Form, Input, Select, App, Button, Space, Popconfirm, Tag, theme } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import dayjs, { type Dayjs } from "dayjs";
 import { api } from "@/api";
-import type { VaultTask, Contact } from "@/api";
+import type { VaultTask, Contact, UserPreferences } from "@/api";
 import { useTaskStatuses, defaultStatusSlug, type TaskStatus } from "@/utils/taskStatus";
+import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
+import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
+import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
 
 const TASK_QUERY_KEY = (vaultId: string) => ["vaults", vaultId, "all-tasks"];
 
@@ -31,7 +33,7 @@ interface FormValues {
   contact_ids?: string[];
   parent_task_id?: number | null;
   status?: string;
-  due_at?: Dayjs | null;
+  due_at?: CalendarAwareDateValue | null;
 }
 
 export default function TaskEditModal({
@@ -105,6 +107,15 @@ function TaskEditModalContent({
   const { data: ownStatuses = [] } = useTaskStatuses();
   const statuses = statusesProp && statusesProp.length > 0 ? statusesProp : ownStatuses;
 
+  const { data: prefs } = useQuery<UserPreferences>({
+    queryKey: ["preferences"],
+    queryFn: async () => {
+      const res = await api.preferences.preferencesList();
+      return res.data!;
+    },
+  });
+  const altCalendar = !!prefs?.enable_alternative_calendar;
+
   const isEdit = task !== null;
   const fallbackSlug = defaultStatus ?? defaultStatusSlug(statuses);
 
@@ -115,7 +126,15 @@ function TaskEditModalContent({
         contact_ids: (task.contacts ?? []).map((c) => c.id!).filter(Boolean),
         parent_task_id: task.parent_task_id ?? null,
         status: task.status || fallbackSlug,
-        due_at: task.due_at ? dayjs(task.due_at) : null,
+        due_at: task.due_at
+          ? buildCalendarAwareValue(
+              task.due_at,
+              task.calendar_type,
+              task.original_day ?? null,
+              task.original_month ?? null,
+              task.original_year ?? null,
+            )
+          : null,
       }
     : {
         label: "",
@@ -200,7 +219,11 @@ function TaskEditModalContent({
         contact_ids: values.contact_ids ?? [],
         parent_task_id: values.parent_task_id ?? undefined,
         status: values.status ?? fallbackSlug,
-        due_at: values.due_at ? values.due_at.toISOString() : undefined,
+        due_at: values.due_at ? values.due_at.date.toISOString() : undefined,
+        calendar_type: values.due_at?.calendarType,
+        original_day: values.due_at?.originalDay ?? undefined,
+        original_month: values.due_at?.originalMonth ?? undefined,
+        original_year: values.due_at?.originalYear ?? undefined,
       }),
     onSuccess,
     onError,
@@ -221,7 +244,11 @@ function TaskEditModalContent({
         contact_ids: values.contact_ids ?? [],
         parent_task_id: values.parent_task_id,
         status: values.status ?? fallbackSlug,
-        due_at: values.due_at ? values.due_at.toISOString() : undefined,
+        due_at: values.due_at ? values.due_at.date.toISOString() : undefined,
+        calendar_type: values.due_at?.calendarType,
+        original_day: values.due_at?.originalDay ?? undefined,
+        original_month: values.due_at?.originalMonth ?? undefined,
+        original_year: values.due_at?.originalYear ?? undefined,
       } as unknown as Parameters<typeof api.vaultTasks.tasksPartialUpdate>[2];
       return api.vaultTasks.tasksPartialUpdate(vaultId, task!.id!, body);
     },
@@ -353,9 +380,9 @@ function TaskEditModalContent({
         </Form.Item>
       )}
       <Form.Item name="due_at" label={t("vault.tasks.due_label")}>
-        <DatePicker
-          style={{ width: "100%" }}
-          showTime={{ format: "HH:mm" }}
+        <CalendarAwareDatePicker
+          enableAlternativeCalendar={altCalendar}
+          showTime
           format="YYYY-MM-DD HH:mm"
           allowClear
         />

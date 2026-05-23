@@ -8,7 +8,6 @@ import {
   Modal,
   Form,
   Input,
-  DatePicker,
   Popconfirm,
   App,
   Empty,
@@ -31,10 +30,13 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Post, Photo, APIError, JournalMetricResponse, SliceOfLifeResponse } from "@/api";
+import type { Post, Photo, APIError, JournalMetricResponse, SliceOfLifeResponse, UserPreferences } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
+import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
+import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
 
 const { Title, Text } = Typography;
 
@@ -50,6 +52,15 @@ export default function JournalDetail() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const dateFormats = useDateFormat();
+
+  const { data: prefs } = useQuery<UserPreferences>({
+    queryKey: ["preferences"],
+    queryFn: async () => {
+      const res = await api.preferences.preferencesList();
+      return res.data!;
+    },
+  });
+  const altCalendar = !!prefs?.enable_alternative_calendar;
 
   const [metricInput, setMetricInput] = useState("");
   const [isAddingMetric, setIsAddingMetric] = useState(false);
@@ -225,10 +236,14 @@ export default function JournalDetail() {
   });
 
   const createPostMutation = useMutation({
-    mutationFn: (values: { title: string; written_at: dayjs.Dayjs }) =>
+    mutationFn: (values: { title: string; written_at: CalendarAwareDateValue }) =>
       api.posts.journalsPostsCreate(String(vaultId), Number(jId), {
         title: values.title,
-        written_at: values.written_at.toISOString(),
+        written_at: values.written_at.date.toISOString(),
+        calendar_type: values.written_at.calendarType,
+        original_day: values.written_at.originalDay ?? undefined,
+        original_month: values.written_at.originalMonth ?? undefined,
+        original_year: values.written_at.originalYear ?? undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -597,13 +612,13 @@ export default function JournalDetail() {
           form={form}
           layout="vertical"
           onFinish={(v) => createPostMutation.mutate(v)}
-          initialValues={{ written_at: dayjs() }}
+          initialValues={{ written_at: buildCalendarAwareValue(dayjs(), "gregorian", null, null, null) }}
         >
           <Form.Item name="title" label={t("vault.journal_detail.title_label")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           <Form.Item name="written_at" label={t("vault.journal_detail.date_label")} rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+            <CalendarAwareDatePicker enableAlternativeCalendar={altCalendar} />
           </Form.Item>
         </Form>
       </Modal>

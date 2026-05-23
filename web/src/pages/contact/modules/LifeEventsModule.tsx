@@ -13,6 +13,7 @@ import {
   Typography,
   Collapse,
   Space,
+  Tag,
   theme,
 } from "antd";
 import {
@@ -26,10 +27,13 @@ import {
 } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { TimelineEvent as TEvent, PaginationMeta, APIError, LifeEventCategoryResponse } from "@/api";
+import type { TimelineEvent as TEvent, PaginationMeta, APIError, LifeEventCategoryResponse, UserPreferences } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate, formatMonthYear } from "@/utils/dateFormat";
 import dayjs from "dayjs";
+import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
+import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
+import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
 
 const { Text } = Typography;
 
@@ -113,14 +117,27 @@ export default function LifeEventsModule({
     onError: (e: APIError) => message.error(e.message),
   });
 
+  const { data: prefs } = useQuery({
+    queryKey: ["settings", "preferences"],
+    queryFn: async () => {
+      const res = await api.preferences.preferencesList();
+      return res.data as UserPreferences | undefined;
+    },
+  });
+  const altCalendar = prefs?.enable_alternative_calendar ?? false;
+
   const createLifeEventMutation = useMutation({
-    mutationFn: (values: { label: string; happened_at: dayjs.Dayjs; description?: string }) => {
+    mutationFn: (values: { label: string; happened_at: CalendarAwareDateValue; description?: string }) => {
       if (!selectedTimeline) throw new Error("No timeline");
       const data = {
         summary: values.label,
-        happened_at: values.happened_at.toISOString(),
+        happened_at: values.happened_at.date.toISOString(),
         description: values.description,
         life_event_type_id: defaultLifeEventTypeId,
+        calendar_type: values.happened_at.calendarType,
+        original_day: values.happened_at.originalDay ?? undefined,
+        original_month: values.happened_at.originalMonth ?? undefined,
+        original_year: values.happened_at.originalYear ?? undefined,
       };
       if (editingLeId) {
         return api.lifeEvents.contactsTimelineEventsLifeEventsUpdate(String(vaultId), String(contactId), selectedTimeline, editingLeId, data);
@@ -198,6 +215,7 @@ export default function LifeEventsModule({
                setSelectedTimeline(tl.id ?? null);
                setEditingLeId(null);
                leForm.resetFields();
+               leForm.setFieldsValue({ happened_at: buildCalendarAwareValue(dayjs(), "gregorian", null, null, null) });
                setLeOpen(true);
             }}
           >
@@ -233,6 +251,11 @@ export default function LifeEventsModule({
                  <br />
                  <Text type="secondary" style={{ fontSize: 12 }}>
                    {formatDate(le.happened_at, dateFormats)}
+                   {le.calendar_type && le.calendar_type !== "gregorian" && (
+                     <Tag style={{ marginLeft: 6 }} color="processing">
+                       {t(`calendar.${le.calendar_type}`)}
+                     </Tag>
+                   )}
                  </Text>
                 {le.description && (
                   <div style={{ marginTop: 4, color: token.colorTextSecondary }}>{le.description}</div>
@@ -262,7 +285,13 @@ export default function LifeEventsModule({
                     setEditingLeId(le.id!);
                     leForm.setFieldsValue({
                       label: le.summary,
-                      happened_at: dayjs(le.happened_at),
+                      happened_at: buildCalendarAwareValue(
+                        le.happened_at,
+                        le.calendar_type,
+                        le.original_day,
+                        le.original_month,
+                        le.original_year,
+                      ),
                       description: le.description,
                     });
                     setLeOpen(true);
@@ -346,7 +375,7 @@ export default function LifeEventsModule({
             <Input />
           </Form.Item>
           <Form.Item name="happened_at" label={t("modules.life_events.happened_at")} rules={[{ required: true }]}>
-            <DatePicker style={{ width: "100%" }} />
+            <CalendarAwareDatePicker enableAlternativeCalendar={altCalendar} />
           </Form.Item>
           <Form.Item name="description" label={t("common.description")}>
             <Input.TextArea rows={2} />

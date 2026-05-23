@@ -46,10 +46,14 @@ import type {
   TimelineEvent,
   MoodTrackingParameterResponse,
   LifeEventCategoryResponse,
+  UserPreferences,
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
+import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
+import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
 
 dayjs.extend(relativeTime);
 
@@ -543,6 +547,14 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const [hasMore, setHasMore] = useState(true);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm] = Form.useForm();
+  const { data: prefs } = useQuery({
+    queryKey: ["settings", "preferences"],
+    queryFn: async () => {
+      const res = await api.preferences.preferencesList();
+      return res.data as UserPreferences | undefined;
+    },
+  });
+  const altCalendar = prefs?.enable_alternative_calendar ?? false;
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   const { isLoading, isFetching } = useQuery({
@@ -573,8 +585,8 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const filteredTypes = lifeEventCategories.find((c) => c.id === selectedCategoryId)?.types ?? [];
 
   const addLifeEventMutation = useMutation({
-    mutationFn: async (values: { life_event_type_id: number; happened_at: dayjs.Dayjs; summary?: string; description?: string }) => {
-      const dateStr = values.happened_at.toISOString();
+    mutationFn: async (values: { life_event_type_id: number; happened_at: CalendarAwareDateValue; summary?: string; description?: string }) => {
+      const dateStr = values.happened_at.date.toISOString();
       const timelineRes = await api.lifeEvents.contactsTimelineEventsCreate(
         String(vaultId),
         userContactId!,
@@ -591,6 +603,10 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
           happened_at: dateStr,
           summary: values.summary || undefined,
           description: values.description || undefined,
+          calendar_type: values.happened_at.calendarType,
+          original_day: values.happened_at.originalDay ?? undefined,
+          original_month: values.happened_at.originalMonth ?? undefined,
+          original_year: values.happened_at.originalYear ?? undefined,
         },
       );
     },
@@ -716,7 +732,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
         <Form
           form={addForm}
           layout="vertical"
-          initialValues={{ happened_at: dayjs() }}
+          initialValues={{ happened_at: buildCalendarAwareValue(dayjs(), "gregorian", null, null, null) }}
           onFinish={(values) => addLifeEventMutation.mutate(values)}
         >
           <Form.Item
@@ -749,7 +765,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
             label={t("vault.dashboard.life_event_date")}
             rules={[{ required: true, message: t("common.required") }]}
           >
-            <DatePicker style={{ width: "100%" }} />
+            <CalendarAwareDatePicker enableAlternativeCalendar={altCalendar} />
           </Form.Item>
           <Form.Item name="summary" label={t("vault.dashboard.life_event_summary")}>
             <Input />
