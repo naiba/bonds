@@ -132,7 +132,8 @@ func (h *InvitationHandler) Accept(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	invitation, err := h.invitationService.Accept(req)
+	locale := middleware.GetLocale(c)
+	invitation, err := h.invitationService.Accept(req, locale)
 	if err != nil {
 		if errors.Is(err, services.ErrInvitationNotFound) {
 			return response.NotFound(c, "err.invitation_not_found")

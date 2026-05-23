@@ -89,7 +89,7 @@ func (s *InvitationService) Create(accountID, createdBy string, req dto.CreateIn
 	return &resp, nil
 }
 
-func (s *InvitationService) Accept(req dto.AcceptInvitationRequest) (*dto.InvitationResponse, error) {
+func (s *InvitationService) Accept(req dto.AcceptInvitationRequest, locale string) (*dto.InvitationResponse, error) {
 	var invitation models.Invitation
 	err := s.db.Where("token = ?", req.Token).First(&invitation).Error
 	if err != nil {
@@ -122,6 +122,7 @@ func (s *InvitationService) Accept(req dto.AcceptInvitationRequest) (*dto.Invita
 			LastName:             strPtrOrNil(req.LastName),
 			Email:                invitation.Email,
 			Password:             &hashedStr,
+			Locale:               locale,
 			InvitationCode:       &invitation.Token,
 			InvitationAcceptedAt: &now,
 			EmailVerifiedAt:      &now,

@@ -79,7 +79,7 @@ func TestAcceptInvitation(t *testing.T) {
 		FirstName: "New",
 		LastName:  "User",
 		Password:  "newpassword123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Accept failed: %v", err)
 	}
@@ -123,7 +123,7 @@ func TestAcceptExpiredInvitation(t *testing.T) {
 		Token:     invitation.Token,
 		FirstName: "Late",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != ErrInvitationExpired {
 		t.Fatalf("Expected ErrInvitationExpired, got: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestAcceptAlreadyAccepted(t *testing.T) {
 		Token:     invitation.Token,
 		FirstName: "First",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("First accept failed: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestAcceptAlreadyAccepted(t *testing.T) {
 		Token:     invitation.Token,
 		FirstName: "Second",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != ErrInvitationNotFound {
 		t.Fatalf("Expected ErrInvitationNotFound, got: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestAcceptInvitation_VaultAccessGranted(t *testing.T) {
 		FirstName: "Invited",
 		LastName:  "Person",
 		Password:  "password123",
-	})
+	}, "en")
 	if err != nil {
 		t.Fatalf("Accept failed: %v", err)
 	}

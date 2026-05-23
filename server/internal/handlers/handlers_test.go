@@ -1901,6 +1901,62 @@ func TestInvitation_Create_InvalidEmail(t *testing.T) {
 	}
 }
 
+func TestInvitationAccept_PersistsAcceptLanguageLocaleWithoutSeeders(t *testing.T) {
+	ts := setupTestServer(t)
+	ts.e.Use(middleware.Locale())
+	token, auth := ts.registerTestUser(t, "invite-locale-owner@example.com")
+	vault := ts.createTestVault(t, token, "Locale Vault")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/invitations",
+		`{"email":"invite-locale-member@example.com","permission":200}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create invitation: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var invitation models.Invitation
+	if err := ts.db.Where("email = ?", "invite-locale-member@example.com").First(&invitation).Error; err != nil {
+		t.Fatalf("load invitation: %v", err)
+	}
+
+	var gendersBefore int64
+	if err := ts.db.Model(&models.Gender{}).Where("account_id = ?", auth.User.AccountID).Count(&gendersBefore).Error; err != nil {
+		t.Fatalf("count genders before accept: %v", err)
+	}
+	var dateTypesBefore int64
+	if err := ts.db.Model(&models.ContactImportantDateType{}).Where("vault_id = ?", vault.ID).Count(&dateTypesBefore).Error; err != nil {
+		t.Fatalf("count date types before accept: %v", err)
+	}
+
+	acceptBody := fmt.Sprintf(`{"token":%q,"first_name":"Locale","last_name":"Member","password":"password123"}`, invitation.Token)
+	rec = ts.doRequestWithLocale(http.MethodPost, "/api/invitations/accept", acceptBody, "", "zh-CN")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("accept invitation: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var invitedUser models.User
+	if err := ts.db.Where("email = ?", "invite-locale-member@example.com").First(&invitedUser).Error; err != nil {
+		t.Fatalf("load invited user: %v", err)
+	}
+	if invitedUser.Locale != "zh" {
+		t.Fatalf("invited user locale = %q, want zh", invitedUser.Locale)
+	}
+
+	var gendersAfter int64
+	if err := ts.db.Model(&models.Gender{}).Where("account_id = ?", auth.User.AccountID).Count(&gendersAfter).Error; err != nil {
+		t.Fatalf("count genders after accept: %v", err)
+	}
+	if gendersAfter != gendersBefore {
+		t.Fatalf("gender seed count changed after invite accept: before=%d after=%d", gendersBefore, gendersAfter)
+	}
+	var dateTypesAfter int64
+	if err := ts.db.Model(&models.ContactImportantDateType{}).Where("vault_id = ?", vault.ID).Count(&dateTypesAfter).Error; err != nil {
+		t.Fatalf("count date types after accept: %v", err)
+	}
+	if dateTypesAfter != dateTypesBefore {
+		t.Fatalf("vault date type seed count changed after invite accept: before=%d after=%d", dateTypesBefore, dateTypesAfter)
+	}
+}
+
 // ==================== Avatar ====================
 
 func TestAvatar_GetInitials(t *testing.T) {
