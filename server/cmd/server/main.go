@@ -76,6 +76,9 @@ func main() {
 	if err := models.BackfillContactImportantDateTranslationKeys(db); err != nil {
 		log.Printf("WARNING: failed to backfill important date type translation keys: %v", err)
 	}
+	if err := models.BackfillLifeEventTaskPostCalendarTypes(db); err != nil {
+		log.Printf("WARNING: failed to backfill life event/task/post calendar types: %v", err)
+	}
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()

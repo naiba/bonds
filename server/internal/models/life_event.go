@@ -45,12 +45,25 @@ type TimelineEvent struct {
 }
 
 type LifeEvent struct {
-	ID                uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	TimelineEventID   uint      `json:"timeline_event_id" gorm:"not null;index"`
-	LifeEventTypeID   uint      `json:"life_event_type_id" gorm:"not null;index"`
-	EmotionID         *uint     `json:"emotion_id" gorm:"index"`
-	HappenedAt        time.Time `json:"happened_at" gorm:"type:date;not null"`
-	Collapsed         bool      `json:"collapsed" gorm:"default:false"`
+	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	TimelineEventID uint      `json:"timeline_event_id" gorm:"not null;index"`
+	LifeEventTypeID uint      `json:"life_event_type_id" gorm:"not null;index"`
+	EmotionID       *uint     `json:"emotion_id" gorm:"index"`
+	HappenedAt      time.Time `json:"happened_at" gorm:"type:date;not null"`
+	// CalendarType / OriginalDay / OriginalMonth / OriginalYear preserve the
+	// user's input when they record a life event in a non-Gregorian calendar
+	// (e.g. lunar). HappenedAt always stores the Gregorian projection so
+	// existing queries, sorting and timeline rendering keep working unchanged;
+	// the Original* triple lets the UI render the lunar string and lets edits
+	// re-display the user's original input instead of a back-converted value
+	// that may have drifted by a day.
+	// Defaults to "gregorian" so legacy rows pre-dating the column read as
+	// gregorian without a backfill needing to touch them on every boot.
+	CalendarType  string `json:"calendar_type" gorm:"default:'gregorian'"`
+	OriginalDay   *int   `json:"original_day"`
+	OriginalMonth *int   `json:"original_month"`
+	OriginalYear  *int   `json:"original_year"`
+	Collapsed     bool   `json:"collapsed" gorm:"default:false"`
 	Summary           *string   `json:"summary"`
 	Description       *string   `json:"description" gorm:"type:text"`
 	Costs             *int      `json:"costs"`

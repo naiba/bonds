@@ -37,6 +37,19 @@ type Post struct {
 	ViewCount     int       `json:"view_count" gorm:"default:0"`
 	Published     bool      `json:"published" gorm:"default:false"`
 	WrittenAt     time.Time `json:"written_at" gorm:"not null"`
+	// CalendarType / OriginalDay / OriginalMonth / OriginalYear preserve the
+	// user's input when they record a journal post date in a non-Gregorian
+	// calendar (e.g. lunar). WrittenAt always stores the Gregorian projection
+	// so post sorting and the calendar view keep working unchanged; the
+	// Original* triple lets the UI render the lunar label and lets edits
+	// re-display the user's original input instead of a back-converted value
+	// that may have drifted by a day.
+	// Defaults to "gregorian" so legacy rows pre-dating the column read as
+	// gregorian without a backfill needing to touch them on every boot.
+	CalendarType  string    `json:"calendar_type" gorm:"default:'gregorian'"`
+	OriginalDay   *int      `json:"original_day"`
+	OriginalMonth *int      `json:"original_month"`
+	OriginalYear  *int      `json:"original_year"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
