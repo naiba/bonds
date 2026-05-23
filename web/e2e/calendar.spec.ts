@@ -34,8 +34,12 @@ async function setupContactPage(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /new vault/i }).click();
   await page.getByPlaceholder(/e\.g\. family/i).fill('Cal Vault');
   await page.getByPlaceholder(/what is this vault/i).fill('Calendar testing');
+  const createVaultResp = page.waitForResponse(
+    (resp) => resp.url().includes('/vaults') && resp.request().method() === 'POST' && resp.status() < 400
+  );
   await page.getByRole('button', { name: /create vault/i }).click();
-  await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 10000 });
+  await createVaultResp;
+  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 10000 });
   await page.waitForLoadState('networkidle');
 
   // Issue #63: Dashboard 重写后 'View all contacts' 链接已移除，改用 URL 导航
@@ -45,8 +49,15 @@ async function setupContactPage(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: /add contact/i }).click();
   await page.getByPlaceholder('First name').fill('Lunar');
   await page.getByPlaceholder('Last name').fill('Test');
+  const contactResp = page.waitForResponse(
+    (resp) => resp.url().includes('/contacts') && resp.request().method() === 'POST'
+  );
   await page.getByRole('button', { name: /create contact/i }).click();
-  await expect(page.getByText('Lunar Test')).toBeVisible({ timeout: 5000 });
+  // Full-suite runs can make text rendering lag behind the create request; wait for the committed route change.
+  const contactRespResult = await contactResp;
+  expect(contactRespResult.status()).toBeLessThan(400);
+  await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+$/, { timeout: 15000 });
+  await expect(page.getByText('Lunar Test').first()).toBeVisible({ timeout: 10000 });
 }
 
 test.describe('Calendar System', () => {
