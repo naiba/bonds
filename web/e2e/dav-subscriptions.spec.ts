@@ -14,7 +14,7 @@ async function registerAndCreateVault(page: import('@playwright/test').Page) {
   await page.getByPlaceholder(/e\.g\. family/i).fill('DAV Test');
   await page.getByPlaceholder(/what is this vault/i).fill('Test vault');
   await page.getByRole('button', { name: /create vault/i }).click();
-  await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 10000 });
 
   const url = page.url();
   const vaultId = url.split('/vaults/')[1];

@@ -17,7 +17,7 @@ async function registerAndSetup(page: import('@playwright/test').Page, prefix: s
   await page.getByPlaceholder(/e\.g\. family/i).fill('Avatar Vault');
   await page.getByPlaceholder(/what is this vault/i).fill('test');
   await page.getByRole('button', { name: /create vault/i }).click();
-  await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 10000 });
 
   // Issue #63: Dashboard 重写后 'View all contacts' 链接已移除，改用 URL 导航
   await page.goto(page.url().replace(/\/$/, '') + '/contacts');

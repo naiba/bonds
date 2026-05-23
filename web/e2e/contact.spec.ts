@@ -20,7 +20,7 @@ async function setupVault(page: import('@playwright/test').Page, prefix: string)
   await page.getByPlaceholder(/e\.g\. family/i).fill('Test Vault');
   await page.getByPlaceholder(/what is this vault/i).fill('For testing');
   await page.getByRole('button', { name: /create vault/i }).click();
-  await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 20000 });
+  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 20000 });
   await page.waitForLoadState('networkidle');
   await expect(page.getByRole('heading', { name: 'Test Vault' })).toBeVisible({ timeout: 10000 });
 }

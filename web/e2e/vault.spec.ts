@@ -70,7 +70,7 @@ test.describe('Vaults', () => {
     await page.getByPlaceholder(/e\.g\. family/i).fill('Work');
     await page.getByPlaceholder(/what is this vault/i).fill('Work contacts');
     await page.getByRole('button', { name: /create vault/i }).click();
-    await expect(page).toHaveURL(/\/vaults\/[^/]+$/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 10000 });
   });
 });
 
