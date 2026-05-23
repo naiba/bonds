@@ -162,6 +162,8 @@ func (s *LifeEventService) AddLifeEvent(timelineEventID uint, vaultID string, re
 		Place:             strPtrOrNil(req.Place),
 		EmotionID:         req.EmotionID,
 	}
+	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
+		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if err := s.db.Create(&le).Error; err != nil {
 		return nil, err
 	}
@@ -195,6 +197,8 @@ func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, va
 	le.ToPlace = strPtrOrNil(req.ToPlace)
 	le.Place = strPtrOrNil(req.Place)
 	le.EmotionID = req.EmotionID
+	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
+		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 
 	if err := s.db.Save(&le).Error; err != nil {
 		return nil, err
@@ -292,6 +296,10 @@ func toLifeEventResponse(le *models.LifeEvent) dto.LifeEventResponse {
 		LifeEventTypeID:   le.LifeEventTypeID,
 		EmotionID:         le.EmotionID,
 		HappenedAt:        le.HappenedAt,
+		CalendarType:      le.CalendarType,
+		OriginalDay:       le.OriginalDay,
+		OriginalMonth:     le.OriginalMonth,
+		OriginalYear:      le.OriginalYear,
 		Collapsed:         le.Collapsed,
 		Summary:           ptrToStr(le.Summary),
 		Description:       ptrToStr(le.Description),

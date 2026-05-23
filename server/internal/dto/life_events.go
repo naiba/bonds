@@ -11,6 +11,10 @@ type CreateTimelineEventRequest struct {
 type CreateLifeEventRequest struct {
 	LifeEventTypeID   uint      `json:"life_event_type_id" validate:"required" example:"1"`
 	HappenedAt        time.Time `json:"happened_at" validate:"required" example:"2026-01-15T10:30:00Z"`
+	CalendarType      string    `json:"calendar_type" example:"gregorian"`
+	OriginalDay       *int      `json:"original_day" example:"15"`
+	OriginalMonth     *int      `json:"original_month" example:"6"`
+	OriginalYear      *int      `json:"original_year" example:"1990"`
 	Summary           string    `json:"summary" example:"Got promoted at work"`
 	Description       string    `json:"description" example:"Received a promotion to senior engineer"`
 	Costs             *int      `json:"costs" example:"50"`
@@ -27,6 +31,10 @@ type CreateLifeEventRequest struct {
 type UpdateLifeEventRequest struct {
 	LifeEventTypeID   uint      `json:"life_event_type_id" example:"1"`
 	HappenedAt        time.Time `json:"happened_at" example:"2026-01-15T10:30:00Z"`
+	CalendarType      string    `json:"calendar_type" example:"gregorian"`
+	OriginalDay       *int      `json:"original_day" example:"15"`
+	OriginalMonth     *int      `json:"original_month" example:"6"`
+	OriginalYear      *int      `json:"original_year" example:"1990"`
 	Summary           string    `json:"summary" example:"Got promoted at work"`
 	Description       string    `json:"description" example:"Received a promotion to senior engineer"`
 	Costs             *int      `json:"costs" example:"50"`
@@ -57,6 +65,10 @@ type LifeEventResponse struct {
 	LifeEventTypeID   uint      `json:"life_event_type_id" example:"1"`
 	EmotionID         *uint     `json:"emotion_id" example:"1"`
 	HappenedAt        time.Time `json:"happened_at" example:"2026-01-15T10:30:00Z"`
+	CalendarType      string    `json:"calendar_type" example:"gregorian"`
+	OriginalDay       *int      `json:"original_day" example:"15"`
+	OriginalMonth     *int      `json:"original_month" example:"6"`
+	OriginalYear      *int      `json:"original_year" example:"1990"`
 	Collapsed         bool      `json:"collapsed" example:"false"`
 	Summary           string    `json:"summary" example:"Got promoted at work"`
 	Description       string    `json:"description" example:"Received a promotion to senior engineer"`

@@ -84,6 +84,10 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 		Status:       resolveTaskStatusOrDefault(s.db, req.Status, vaultID),
 		DueAt:        req.DueAt,
 	}
+	// Project the optional alternative-calendar anchor (lunar etc.) onto
+	// DueAt and persist the original day/month/year so the reminder
+	// scheduler can re-resolve future recurrences in the same calendar.
+	applyTaskCalendarFields(&task, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&task).Error; err != nil {
 			return err
@@ -139,6 +143,18 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 		"description": strPtrOrNil(req.Description),
 		"due_at":      req.DueAt,
 	}
+	// Mirror the per-contact task path: a nil DueAt clears any prior lunar
+	// anchor, otherwise project the requested calendar onto DueAt. We mutate
+	// a scratch copy so applyTaskCalendarFields can rewrite DueAt's date
+	// component without touching the loaded row prematurely.
+	scratch := task
+	scratch.DueAt = req.DueAt
+	applyTaskCalendarFields(&scratch, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	updates["due_at"] = scratch.DueAt
+	updates["calendar_type"] = scratch.CalendarType
+	updates["original_day"] = scratch.OriginalDay
+	updates["original_month"] = scratch.OriginalMonth
+	updates["original_year"] = scratch.OriginalYear
 	if req.ParentTaskID.Present {
 		updates["parent_task_id"] = req.ParentTaskID.Ptr()
 	}
@@ -384,19 +400,23 @@ func toVaultTaskResponse(t *models.ContactTask, contacts []dto.TaskContactRef) d
 		desc = *t.Description
 	}
 	return dto.VaultTaskResponse{
-		ID:           t.ID,
-		VaultID:      t.VaultID,
-		AuthorName:   t.AuthorName,
-		Label:        t.Label,
-		Description:  desc,
-		Status:       t.Status,
-		Position:     t.Position,
-		Completed:    t.Completed,
-		CompletedAt:  t.CompletedAt,
-		DueAt:        t.DueAt,
-		ParentTaskID: t.ParentTaskID,
-		Contacts:     contacts,
-		CreatedAt:    t.CreatedAt,
-		UpdatedAt:    t.UpdatedAt,
+		ID:            t.ID,
+		VaultID:       t.VaultID,
+		AuthorName:    t.AuthorName,
+		Label:         t.Label,
+		Description:   desc,
+		Status:        t.Status,
+		Position:      t.Position,
+		Completed:     t.Completed,
+		CompletedAt:   t.CompletedAt,
+		DueAt:         t.DueAt,
+		ParentTaskID:  t.ParentTaskID,
+		Contacts:      contacts,
+		CalendarType:  t.CalendarType,
+		OriginalDay:   t.OriginalDay,
+		OriginalMonth: t.OriginalMonth,
+		OriginalYear:  t.OriginalYear,
+		CreatedAt:     t.CreatedAt,
+		UpdatedAt:     t.UpdatedAt,
 	}
 }

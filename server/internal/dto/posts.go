@@ -3,18 +3,26 @@ package dto
 import "time"
 
 type CreatePostRequest struct {
-	Title     string             `json:"title" example:"A Wonderful Day"`
-	Published bool               `json:"published" example:"true"`
-	WrittenAt time.Time          `json:"written_at" validate:"required" example:"2026-01-15T10:30:00Z"`
-	Sections  []PostSectionInput `json:"sections"`
+	Title         string             `json:"title" example:"A Wonderful Day"`
+	Published     bool               `json:"published" example:"true"`
+	WrittenAt     time.Time          `json:"written_at" validate:"required" example:"2026-01-15T10:30:00Z"`
+	CalendarType  string             `json:"calendar_type" example:"gregorian"`
+	OriginalDay   *int               `json:"original_day" example:"15"`
+	OriginalMonth *int               `json:"original_month" example:"8"`
+	OriginalYear  *int               `json:"original_year" example:"2026"`
+	Sections      []PostSectionInput `json:"sections"`
 }
 
 type UpdatePostRequest struct {
-	Title      string             `json:"title" example:"A Wonderful Day"`
-	Published  bool               `json:"published" example:"true"`
-	WrittenAt  time.Time          `json:"written_at" example:"2026-01-15T10:30:00Z"`
-	Sections   []PostSectionInput `json:"sections"`
-	ContactIDs []string           `json:"contact_ids" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Title         string             `json:"title" example:"A Wonderful Day"`
+	Published     bool               `json:"published" example:"true"`
+	WrittenAt     time.Time          `json:"written_at" example:"2026-01-15T10:30:00Z"`
+	CalendarType  string             `json:"calendar_type" example:"gregorian"`
+	OriginalDay   *int               `json:"original_day" example:"15"`
+	OriginalMonth *int               `json:"original_month" example:"8"`
+	OriginalYear  *int               `json:"original_year" example:"2026"`
+	Sections      []PostSectionInput `json:"sections"`
+	ContactIDs    []string           `json:"contact_ids" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
 type PostSectionInput struct {
@@ -24,16 +32,20 @@ type PostSectionInput struct {
 }
 
 type PostResponse struct {
-	ID        uint                  `json:"id" example:"1"`
-	JournalID uint                  `json:"journal_id" example:"1"`
-	Title     string                `json:"title" example:"A Wonderful Day"`
-	Published bool                  `json:"published" example:"true"`
-	WrittenAt time.Time             `json:"written_at" example:"2026-01-15T10:30:00Z"`
-	ViewCount int                   `json:"view_count" example:"10"`
-	Sections  []PostSectionResponse `json:"sections,omitempty"`
-	Contacts  []PostContactResponse `json:"contacts,omitempty"`
-	CreatedAt time.Time             `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt time.Time             `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	ID            uint                  `json:"id" example:"1"`
+	JournalID     uint                  `json:"journal_id" example:"1"`
+	Title         string                `json:"title" example:"A Wonderful Day"`
+	Published     bool                  `json:"published" example:"true"`
+	WrittenAt     time.Time             `json:"written_at" example:"2026-01-15T10:30:00Z"`
+	CalendarType  string                `json:"calendar_type" example:"gregorian"`
+	OriginalDay   *int                  `json:"original_day" example:"15"`
+	OriginalMonth *int                  `json:"original_month" example:"8"`
+	OriginalYear  *int                  `json:"original_year" example:"2026"`
+	ViewCount     int                   `json:"view_count" example:"10"`
+	Sections      []PostSectionResponse `json:"sections,omitempty"`
+	Contacts      []PostContactResponse `json:"contacts,omitempty"`
+	CreatedAt     time.Time             `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt     time.Time             `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
 
 type PostSectionResponse struct {

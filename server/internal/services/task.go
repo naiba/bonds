@@ -84,6 +84,7 @@ func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.Create
 		Status:       resolveTaskStatusOrDefault(s.db, req.Status, vaultID),
 		DueAt:        req.DueAt,
 	}
+	applyTaskCalendarFields(&task, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&task).Error; err != nil {
 			return err
@@ -131,6 +132,7 @@ func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateT
 	task.Label = req.Label
 	task.Description = strPtrOrNil(req.Description)
 	task.DueAt = req.DueAt
+	applyTaskCalendarFields(&task, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if parentPatch.Present {
 		task.ParentTaskID = parentPatch.Ptr()
 	}
@@ -320,19 +322,41 @@ func toTaskResponse(t *models.ContactTask, contacts []dto.TaskContactRef) dto.Ta
 		contacts = []dto.TaskContactRef{}
 	}
 	return dto.TaskResponse{
-		ID:           t.ID,
-		VaultID:      t.VaultID,
-		AuthorID:     ptrToStr(t.AuthorID),
-		Label:        t.Label,
-		Description:  ptrToStr(t.Description),
-		Status:       t.Status,
-		Position:     t.Position,
-		Completed:    t.Completed,
-		CompletedAt:  t.CompletedAt,
-		DueAt:        t.DueAt,
-		ParentTaskID: t.ParentTaskID,
-		Contacts:     contacts,
-		CreatedAt:    t.CreatedAt,
-		UpdatedAt:    t.UpdatedAt,
+		ID:            t.ID,
+		VaultID:       t.VaultID,
+		AuthorID:      ptrToStr(t.AuthorID),
+		Label:         t.Label,
+		Description:   ptrToStr(t.Description),
+		Status:        t.Status,
+		Position:      t.Position,
+		Completed:     t.Completed,
+		CompletedAt:   t.CompletedAt,
+		DueAt:         t.DueAt,
+		CalendarType:  t.CalendarType,
+		OriginalDay:   t.OriginalDay,
+		OriginalMonth: t.OriginalMonth,
+		OriginalYear:  t.OriginalYear,
+		ParentTaskID:  t.ParentTaskID,
+		Contacts:      contacts,
+		CreatedAt:     t.CreatedAt,
+		UpdatedAt:     t.UpdatedAt,
 	}
+}
+
+// applyTaskCalendarFields maps the request's calendar_type + original_* triple
+// onto a ContactTask. Special-cases a nil DueAt: a task with no due date has
+// no calendar semantics, so the row is pinned to gregorian and Original* is
+// cleared — leaving lunar metadata on a dateless task would silently survive
+// across edits and confuse the reminder scheduler if a future edit re-adds a
+// due date in a different calendar.
+func applyTaskCalendarFields(task *models.ContactTask, reqCalType string, reqOrigDay, reqOrigMonth, reqOrigYear *int) {
+	if task.DueAt == nil {
+		task.CalendarType = "gregorian"
+		task.OriginalDay = nil
+		task.OriginalMonth = nil
+		task.OriginalYear = nil
+		return
+	}
+	applyTimeCalendarFields(&task.CalendarType, &task.OriginalDay, &task.OriginalMonth, &task.OriginalYear,
+		task.DueAt, reqCalType, reqOrigDay, reqOrigMonth, reqOrigYear)
 }

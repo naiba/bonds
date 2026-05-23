@@ -37,6 +37,8 @@ func (s *PostService) Create(journalID uint, req dto.CreatePostRequest) (*dto.Po
 		Published: req.Published,
 		WrittenAt: req.WrittenAt,
 	}
+	applyTimeCalendarFields(&post.CalendarType, &post.OriginalDay, &post.OriginalMonth, &post.OriginalYear,
+		&post.WrittenAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&post).Error; err != nil {
@@ -92,6 +94,8 @@ func (s *PostService) Update(id uint, journalID uint, req dto.UpdatePostRequest)
 	if !req.WrittenAt.IsZero() {
 		post.WrittenAt = req.WrittenAt
 	}
+	applyTimeCalendarFields(&post.CalendarType, &post.OriginalDay, &post.OriginalMonth, &post.OriginalYear,
+		&post.WrittenAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&post).Error; err != nil {
@@ -153,14 +157,18 @@ func (s *PostService) Delete(id uint, journalID uint) error {
 
 func toPostResponse(p *models.Post) dto.PostResponse {
 	return dto.PostResponse{
-		ID:        p.ID,
-		JournalID: p.JournalID,
-		Title:     ptrToStr(p.Title),
-		Published: p.Published,
-		WrittenAt: p.WrittenAt,
-		ViewCount: p.ViewCount,
-		CreatedAt: p.CreatedAt,
-		UpdatedAt: p.UpdatedAt,
+		ID:            p.ID,
+		JournalID:     p.JournalID,
+		Title:         ptrToStr(p.Title),
+		Published:     p.Published,
+		WrittenAt:     p.WrittenAt,
+		CalendarType:  p.CalendarType,
+		OriginalDay:   p.OriginalDay,
+		OriginalMonth: p.OriginalMonth,
+		OriginalYear:  p.OriginalYear,
+		ViewCount:     p.ViewCount,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
 	}
 }
 
