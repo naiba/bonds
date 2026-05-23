@@ -559,7 +559,8 @@ test.describe('Contact Modules - Important Dates', () => {
     await dateSelects.nth(1).click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(5).click();
     await dateSelects.nth(2).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(14).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^24$/ }).click();
+    await modal.locator('.ant-modal-header').click();
 
     const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
@@ -612,7 +613,8 @@ test.describe('Contact Modules - Important Date Auto-fill', () => {
     await dateSelects2.nth(1).click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(5).click();
     await dateSelects2.nth(2).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(14).click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^24$/ }).click();
+    await modal.locator('.ant-modal-header').click();
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/dates') && resp.request().method() === 'POST'
