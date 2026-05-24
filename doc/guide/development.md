@@ -130,3 +130,7 @@ DEBUG=true ./bonds-server
 Then open http://localhost:8080/swagger/index.html
 
 > Swagger UI defaults to the `DEBUG` flag, but can be independently toggled from the Admin Settings page.
+
+## MCP Endpoint
+
+AI agent access is served by the backend-native [`/mcp` endpoint](/features/ai-agents). It is intentionally separate from the Swagger/OpenAPI generation pipeline: MCP-only changes do not require `make gen-api`, and `/mcp` is not included in the generated frontend API client.

@@ -130,3 +130,7 @@ DEBUG=true ./bonds-server
 然后打开 http://localhost:8080/swagger/index.html
 
 > Swagger UI 默认跟随 `DEBUG` 标志，也可在管理后台设置页面独立控制。
+
+## MCP 端点
+
+AI Agent 接入由后端内置的 [`/mcp` 端点](/zh/features/ai-agents)提供。它刻意独立于 Swagger/OpenAPI 生成管线：只修改 MCP 时不需要运行 `make gen-api`，`/mcp` 也不会进入前端生成 API client。
