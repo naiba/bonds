@@ -193,7 +193,7 @@ func FormatReminderDate(reminder *models.ContactReminder, user *models.User, loc
 }
 ```
 
-`reminder_scheduler.go:82-87`: extend template variables to include `{{.Date}}`; update `reminder.body_with_contact` / `reminder.body_no_contact` i18n keys to include the date placeholder.
+`reminder_scheduler.go:82-87`: extend template variables to include <code v-pre>{{.Date}}</code>; update `reminder.body_with_contact` / `reminder.body_no_contact` i18n keys to include the date placeholder.
 
 New tests:
 - `reminder_date_format_test.go::TestLunarWithAlternativeCalendarShowsLunarString`
