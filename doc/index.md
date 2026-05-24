@@ -26,6 +26,9 @@ features:
   - icon: 🔍
     title: Full-text Search
     details: Bleve-powered CJK-aware search across contacts and notes. Finds what you need instantly.
+  - icon: 🤖
+    title: AI Agent Access
+    details: Built-in /mcp endpoint for MCP clients, with capability discovery, vault search, resource reads, and API action execution under existing permissions.
   - icon: 📅
     title: CardDAV / CalDAV
     details: Sync contacts and calendars with Apple Contacts, Thunderbird, and other DAV clients.

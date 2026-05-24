@@ -26,6 +26,9 @@ features:
   - icon: 🔍
     title: 全文搜索
     details: 基于 Bleve 的中英文混合搜索，覆盖联系人和笔记，即时返回结果。
+  - icon: 🤖
+    title: AI Agent 接入
+    details: 内置 /mcp 端点，MCP 客户端可发现能力、搜索 Vault、读取资源，并在现有权限下执行 API 操作。
   - icon: 📅
     title: CardDAV / CalDAV
     details: 与 Apple 通讯录、Thunderbird 等 DAV 客户端同步联系人和日历。

@@ -19,6 +19,7 @@ Bonds allows you to create Personal Access Tokens, also shown in the UI as API T
 - **Creation**: Specify a custom description and an optional expiration period.
 - **Security**: The token is only shown once upon creation. Ensure you copy it immediately.
 - **Usage**: Use the token as a password in external integrations and DAV clients. When Two-Factor Authentication is active, standard password logins are disabled for CardDAV and CalDAV sync. You must use a Personal Access Token instead.
+- **AI agents**: Use a Personal Access Token as the Bearer token for the built-in [`/mcp` endpoint](/features/ai-agents).
 - **Format**: All Personal Access Tokens are prefixed with `bonds_` for easy identification.
 
 ## Geocoding
