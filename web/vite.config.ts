@@ -2,6 +2,7 @@
 import path from "path";
 import { execSync } from "child_process";
 import { defineConfig } from "vite";
+import "vitest/config";
 import react from "@vitejs/plugin-react";
 
 function gitVersion(): string {
