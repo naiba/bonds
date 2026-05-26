@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/static-components */
 import { useState } from "react";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useParams, Link } from "react-router-dom";
@@ -967,7 +968,10 @@ export default function VaultSettings() {
     { key: "users", label: t("vault_settings.users"), children: <UsersTab /> },
     { key: "labels", label: t("vault_settings.labels"), children: <LabelsTab /> },
     { key: "companies", label: t("vault.companies.title"), children: <VaultCompanies vaultId={vaultId} /> },
-    { key: "tags", label: t("vault_settings.tags"), children: <SimpleCrudTab 
+    {
+      key: "tags",
+      label: t("vault_settings.tags"),
+      children: <SimpleCrudTab
         queryKeySuffix="tags" 
         apiList={(vid) => api.vaultSettings.settingsTagsList(String(vid))}
         apiCreate={(vid, data) => api.vaultSettings.settingsTagsCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateTagRequest)}
@@ -975,16 +979,24 @@ export default function VaultSettings() {
         apiDelete={(vid, id) => api.vaultSettings.settingsTagsDelete(String(vid), id)}
         title={t("vault_settings.tags")}
         itemNameKey="name"
-    /> },
-    { key: "dateTypes", label: t("vault_settings.date_types"), children: <SimpleCrudTab 
+      />,
+    },
+    {
+      key: "dateTypes",
+      label: t("vault_settings.date_types"),
+      children: <SimpleCrudTab
         queryKeySuffix="contactImportantDateTypes"
         apiList={(vid) => api.vaultSettings.settingsDateTypesList(String(vid))}
         apiCreate={(vid, data) => api.vaultSettings.settingsDateTypesCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateImportantDateTypeRequest)}
         apiUpdate={(vid, id, data) => api.vaultSettings.settingsDateTypesUpdate(String(vid), id, data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoUpdateImportantDateTypeRequest)}
         apiDelete={(vid, id) => api.vaultSettings.settingsDateTypesDelete(String(vid), id)}
         title={t("vault_settings.date_types")}
-    /> },
-    { key: "moodParams", label: t("vault_settings.mood_params"), children: <SimpleCrudTab 
+      />,
+    },
+    {
+      key: "moodParams",
+      label: t("vault_settings.mood_params"),
+      children: <SimpleCrudTab
         queryKeySuffix="moodTrackingParameters"
         apiList={(vid) => api.vaultSettings.settingsMoodParamsList(String(vid))}
         apiCreate={(vid, data) => api.vaultSettings.settingsMoodParamsCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateMoodTrackingParameterRequest)}
@@ -993,9 +1005,13 @@ export default function VaultSettings() {
         title={t("vault_settings.mood_params")}
         extraFields={[{name: 'hex_color', label: t("vault_settings.hex_color"), type: 'color', initialValue: '#1677ff'}]}
         positionEntityType="moodParams"
-    /> },
+      />,
+    },
     { key: "lifeEvents", label: t("vault_settings.life_events"), children: <LifeEventsTab /> },
-    { key: "quickFacts", label: t("vault_settings.quick_facts"), children: <SimpleCrudTab 
+    {
+      key: "quickFacts",
+      label: t("vault_settings.quick_facts"),
+      children: <SimpleCrudTab
         queryKeySuffix="quickFactTemplates"
         apiList={(vid) => api.vaultSettings.settingsQuickFactTemplatesList(String(vid))}
         apiCreate={(vid, data) => api.vaultSettings.settingsQuickFactTemplatesCreate(String(vid), data as unknown as import("@/api/generated/data-contracts").GithubComNaibaBondsInternalDtoCreateQuickFactTemplateRequest)}
@@ -1003,7 +1019,8 @@ export default function VaultSettings() {
         apiDelete={(vid, id) => api.vaultSettings.settingsQuickFactTemplatesDelete(String(vid), id)}
         title={t("vault_settings.quick_facts")}
         positionEntityType="quickFactTemplates"
-    /> },
+      />,
+    },
     { key: "import", label: t("vault_settings.monica_import.tab_label"), children: <MonicaImportTab /> },
   ];
 

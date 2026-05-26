@@ -1,4 +1,3 @@
-/// <reference types="vitest/config" />
 import path from "path";
 import { execSync } from "child_process";
 import { defineConfig } from "vite";

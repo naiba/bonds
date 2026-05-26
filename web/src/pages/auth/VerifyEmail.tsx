@@ -18,13 +18,12 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
   const verifyToken = searchParams.get("token");
 
-  const [verifying, setVerifying] = useState(false);
+  const [verifying, setVerifying] = useState(() => Boolean(verifyToken));
   const [verified, setVerified] = useState(false);
   const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (!verifyToken) return;
-    setVerifying(true);
     api.auth
       .verifyEmailCreate({ token: verifyToken })
       .then(() => {
