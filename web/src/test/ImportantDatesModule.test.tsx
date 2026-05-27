@@ -27,7 +27,7 @@ vi.mock("@/components/CalendarDatePicker", () => ({
 
 let mockDatesReturn: unknown = { data: [], isLoading: false };
 let mockPrefsReturn: unknown = { data: undefined };
-const mockDateTypesReturn: unknown = { data: [], isLoading: false };
+let mockDateTypesReturn: unknown = { data: [], isLoading: false };
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] }) => {
     const key = JSON.stringify(opts.queryKey);
@@ -118,6 +118,71 @@ describe("ImportantDatesModule", () => {
     renderModule();
     expect(screen.getByText("Birthday")).toBeInTheDocument();
     expect(screen.queryByText("gregorian")).not.toBeInTheDocument();
+  });
+
+  it("shows age next to birthdate when contact is alive (Issue #132)", () => {
+    mockDateTypesReturn = {
+      data: [
+        { id: 10, label: "Birthdate", internal_type: "birthdate", can_be_deleted: false },
+        { id: 11, label: "Deceased date", internal_type: "deceased_date", can_be_deleted: false },
+      ],
+    };
+    mockDatesReturn = {
+      data: [
+        {
+          id: 1,
+          contact_id: "c1",
+          label: "Birthdate",
+          day: 15,
+          month: 3,
+          year: 1990,
+          calendar_type: "gregorian",
+          contact_important_date_type_id: 10,
+        },
+      ],
+      isLoading: false,
+    };
+    mockPrefsReturn = { data: undefined };
+    renderModule();
+    expect(screen.getByText(/years old|year old/)).toBeInTheDocument();
+  });
+
+  it("shows age-at-death next to deceased date, not birthdate (Issue #132)", () => {
+    mockDateTypesReturn = {
+      data: [
+        { id: 10, label: "Birthdate", internal_type: "birthdate", can_be_deleted: false },
+        { id: 11, label: "Deceased date", internal_type: "deceased_date", can_be_deleted: false },
+      ],
+    };
+    mockDatesReturn = {
+      data: [
+        {
+          id: 1,
+          contact_id: "c1",
+          label: "Birthdate",
+          day: 15,
+          month: 3,
+          year: 1950,
+          calendar_type: "gregorian",
+          contact_important_date_type_id: 10,
+        },
+        {
+          id: 2,
+          contact_id: "c1",
+          label: "Deceased date",
+          day: 14,
+          month: 3,
+          year: 2020,
+          calendar_type: "gregorian",
+          contact_important_date_type_id: 11,
+        },
+      ],
+      isLoading: false,
+    };
+    mockPrefsReturn = { data: undefined };
+    renderModule();
+    expect(screen.getByText(/69 years old/)).toBeInTheDocument();
+    expect(screen.getAllByText(/years old|year old/).length).toBe(1);
   });
 
   it("displays date without year using short format (Issue #76)", () => {

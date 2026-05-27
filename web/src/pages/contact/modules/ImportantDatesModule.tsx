@@ -26,13 +26,12 @@ import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import type { CalendarType } from "@/utils/calendar";
 
-function computeAge(d: ImportantDate): number | null {
+function computeAge(d: ImportantDate, reference: dayjs.Dayjs = dayjs()): number | null {
   if (!d.year || !d.month || !d.day) return null;
-  const today = dayjs();
   const birth = dayjs(new Date(d.year, d.month - 1, d.day));
-  if (!birth.isValid() || birth.isAfter(today)) return null;
-  let age = today.year() - birth.year();
-  if (today.month() < birth.month() || (today.month() === birth.month() && today.date() < birth.date())) {
+  if (!birth.isValid() || birth.isAfter(reference)) return null;
+  let age = reference.year() - birth.year();
+  if (reference.month() < birth.month() || (reference.month() === birth.month() && reference.date() < birth.date())) {
     age -= 1;
   }
   return age >= 0 ? age : null;
@@ -192,9 +191,30 @@ export default function ImportantDatesModule({
         locale={{ emptyText: <Empty description={t("modules.important_dates.no_dates")} /> }}
         split={false}
         renderItem={(d: ImportantDate) => {
+          const findByInternalType = (kind: string): ImportantDate | undefined =>
+            (dates as ImportantDate[]).find((x: ImportantDate) => {
+              const tp = dateTypes.find((dt) => dt.id === x.contact_important_date_type_id);
+              return tp?.internal_type === kind;
+            });
           const matchedType = dateTypes.find((dt) => dt.id === d.contact_important_date_type_id);
           const isBirthday = matchedType?.internal_type === "birthdate";
-          const age = isBirthday ? computeAge(d) : null;
+          const isDeceasedItem = matchedType?.internal_type === "deceased_date";
+          const birthDate = findByInternalType("birthdate");
+          const deceasedDate = findByInternalType("deceased_date");
+          const isDeceased = !!deceasedDate;
+          let age: number | null = null;
+          if (isBirthday && !isDeceased) {
+            age = computeAge(d);
+          } else if (
+            isDeceasedItem &&
+            birthDate &&
+            deceasedDate?.year &&
+            deceasedDate.month &&
+            deceasedDate.day
+          ) {
+            const ref = dayjs(new Date(deceasedDate.year, deceasedDate.month - 1, deceasedDate.day));
+            age = computeAge(birthDate, ref);
+          }
           return (
             <List.Item
               style={{
