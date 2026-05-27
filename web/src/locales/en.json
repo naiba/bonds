@@ -684,7 +684,9 @@
       "type_other": "Other",
       "date_type": "Date Type",
       "select_type": "Select date type",
-      "remind_me": "Remind me yearly"
+      "remind_me": "Remind me yearly",
+      "age_years": "{{count}} years old",
+      "age_years_one": "{{count}} year old"
     },
     "tasks": {
       "title": "Tasks",

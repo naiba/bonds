@@ -684,7 +684,9 @@
       "type_other": "Otro",
       "date_type": "Tipo de fecha",
       "select_type": "Selecciona el tipo de fecha",
-      "remind_me": "Recordarme anualmente"
+      "remind_me": "Recordarme anualmente",
+      "age_years": "{{count}} años",
+      "age_years_one": "{{count}} año"
     },
     "tasks": {
       "title": "Tareas",

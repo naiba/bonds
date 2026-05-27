@@ -684,7 +684,9 @@
       "type_other": "其他",
       "date_type": "日期类型",
       "select_type": "选择日期类型",
-      "remind_me": "每年提醒"
+      "remind_me": "每年提醒",
+      "age_years": "{{count}} 岁",
+      "age_years_one": "{{count}} 岁"
     },
     "tasks": {
       "title": "任务",
