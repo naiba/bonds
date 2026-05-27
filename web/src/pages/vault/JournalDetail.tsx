@@ -35,6 +35,7 @@ import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
+import LinkifiedText from "@/components/LinkifiedText";
 import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
 import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
 
@@ -298,7 +299,9 @@ export default function JournalDetail() {
         }}
       >
         {journal.description && (
-          <Text type="secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>{journal.description}</Text>
+          <Text type="secondary" style={{ fontSize: 14, lineHeight: 1.6 }}>
+            <LinkifiedText>{journal.description}</LinkifiedText>
+          </Text>
         )}
       </Card>
 
@@ -439,7 +442,11 @@ export default function JournalDetail() {
                   title={slice.name}
                   description={
                     <Text type="secondary" ellipsis={{ tooltip: slice.description }}>
-                      {slice.description || "-"}
+                      {slice.description ? (
+                        <LinkifiedText>{slice.description}</LinkifiedText>
+                      ) : (
+                        "-"
+                      )}
                     </Text>
                   }
                 />

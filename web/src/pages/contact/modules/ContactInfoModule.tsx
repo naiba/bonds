@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { ContactInfo, APIError, PersonalizeItem } from "@/api";
 import { useTranslation } from "react-i18next";
+import LinkifiedText from "@/components/LinkifiedText";
 
 export default function ContactInfoModule({
   vaultId,
@@ -197,7 +198,11 @@ export default function ContactInfoModule({
                     {typeLabel && <Tag>{typeLabel}</Tag>} {labelText}
                   </span>
                 }
-                description={<span style={{ color: token.colorTextSecondary }}>{item.data}</span>}
+                description={
+                  <LinkifiedText style={{ color: token.colorTextSecondary }}>
+                    {item.data}
+                  </LinkifiedText>
+                }
               />
             </List.Item>
           );

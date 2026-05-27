@@ -42,6 +42,7 @@ import type {
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import LinkifiedText from "@/components/LinkifiedText";
 
 const { Title, Text, Paragraph } = Typography;
 const { Dragger } = Upload;
@@ -578,7 +579,7 @@ export default function PostDetail() {
                             whiteSpace: "pre-wrap",
                           }}
                         >
-                          {section.content}
+                          <LinkifiedText>{section.content}</LinkifiedText>
                         </Paragraph>
                       </div>
                     ))

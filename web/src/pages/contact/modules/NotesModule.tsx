@@ -6,6 +6,7 @@ import { api } from "@/api";
 import type { Note, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import LinkifiedText from "@/components/LinkifiedText";
 
 const { TextArea } = Input;
 
@@ -192,7 +193,9 @@ export default function NotesModule({
               title={<span style={{ fontWeight: 500 }}>{note.title}</span>}
               description={
                 <>
-                  <div style={{ color: token.colorTextSecondary }}>{note.body}</div>
+                  <LinkifiedText as="div" style={{ color: token.colorTextSecondary, whiteSpace: "pre-wrap" }}>
+                    {note.body}
+                  </LinkifiedText>
                    <div style={{ fontSize: 12, marginTop: 4, color: token.colorTextQuaternary }}>
                      {formatDate(note.created_at, dateFormats)}
                    </div>

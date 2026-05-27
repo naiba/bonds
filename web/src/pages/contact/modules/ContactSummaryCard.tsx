@@ -328,13 +328,31 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {emails.map((item: any) => (
               <Text key={item.id} style={{ fontSize: 13 }}>
-                📧 {item.data}
+                📧{" "}
+                {item.data ? (
+                  <a
+                    href={`mailto:${item.data}`}
+                    rel="noopener noreferrer nofollow"
+                    style={{ color: token.colorPrimary, wordBreak: "break-word" }}
+                  >
+                    {item.data}
+                  </a>
+                ) : null}
               </Text>
             ))}
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             {phones.map((item: any) => (
               <Text key={item.id} style={{ fontSize: 13 }}>
-                📱 {item.data}
+                📱{" "}
+                {item.data ? (
+                  <a
+                    href={`tel:${String(item.data).replace(/\s+/g, "")}`}
+                    rel="noopener noreferrer nofollow"
+                    style={{ color: token.colorPrimary, wordBreak: "break-word" }}
+                  >
+                    {item.data}
+                  </a>
+                ) : null}
               </Text>
             ))}
           </Space>
