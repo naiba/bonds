@@ -110,6 +110,14 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
     },
   });
 
+  const { data: contactInfoTypes = [] } = useQuery({
+    queryKey: ["personalize", "contact-info-types"],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("contact-info-types");
+      return res.data ?? [];
+    },
+  });
+
   // --- Derived data ---
 
   const contactMap = new Map<string, Contact>();
@@ -124,11 +132,20 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const religionLabel = contact.religion_id ? (religions as any[]).find((r) => r.id === contact.religion_id)?.label : null;
 
-  // Filter emails and phones from contact info
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const emails = (contactInfoItems as any[]).filter((item) => item.kind?.toLowerCase().includes("email"));
+  const typeKindById = new Map<number, string>((contactInfoTypes as any[])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((t: any) => [t.id, (t.name || t.label || "").toLowerCase()] as [number, string]));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const phones = (contactInfoItems as any[]).filter((item) => item.kind?.toLowerCase().includes("phone"));
+  const matchesKind = (item: any, needle: string) => {
+    const typeKind = item.type_id ? typeKindById.get(item.type_id) ?? "" : "";
+    if (typeKind.includes(needle)) return true;
+    return !!item.kind && item.kind.toLowerCase().includes(needle);
+  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const emails = (contactInfoItems as any[]).filter((item) => matchesKind(item, "email"));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const phones = (contactInfoItems as any[]).filter((item) => matchesKind(item, "phone"));
   const hasContactInfo = emails.length > 0 || phones.length > 0;
 
   // First non-past address
