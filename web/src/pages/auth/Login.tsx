@@ -82,8 +82,13 @@ export default function Login() {
       .catch(() => {});
   }, []);
 
-  const from = (location.state as { from?: { pathname: string } })?.from
-    ?.pathname ?? "/vaults";
+  const from = (() => {
+    const redirect = new URLSearchParams(location.search).get("redirect");
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+      return redirect;
+    }
+    return (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/vaults";
+  })();
 
   async function onFinish(values: LoginRequest) {
     setLoading(true);

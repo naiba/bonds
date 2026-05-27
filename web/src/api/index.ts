@@ -101,6 +101,23 @@ httpClient.instance.interceptors.request.use((config) => {
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
 
+// Redirect to /login while preserving the page the user was on, so Login.tsx
+// can send them back after a successful sign-in. Skip if already on /login or
+// other public auth pages.
+function redirectToLogin() {
+  const { pathname, search, hash } = window.location;
+  if (pathname === "/login" || pathname.startsWith("/login/") || pathname === "/register" || pathname.startsWith("/oauth")) {
+    return;
+  }
+  const target = pathname + search + hash;
+  // Skip default landing to avoid redirect=/ which is meaningless.
+  if (target === "/" || target === "") {
+    window.location.href = "/login";
+    return;
+  }
+  window.location.href = `/login?redirect=${encodeURIComponent(target)}`;
+}
+
 function onRefreshed(token: string) {
   refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
@@ -143,9 +160,7 @@ httpClient.instance.interceptors.response.use(
         }
       } catch {
         localStorage.removeItem("token");
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
-        }
+        redirectToLogin();
         return Promise.reject(error);
       } finally {
         isRefreshing = false;
@@ -154,9 +169,7 @@ httpClient.instance.interceptors.response.use(
 
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+      redirectToLogin();
     }
     const apiError = error.response
       ?.data as GithubComNaibaBondsPkgResponseAPIResponse | undefined;
