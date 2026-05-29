@@ -510,6 +510,24 @@ func TestCrossAccountContactMoveBlocked(t *testing.T) {
 	}
 }
 
+func TestCrossAccountContactMoveWithSharedUserBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+	token1, auth1 := ts.registerTestUser(t, "shared-cross-account-owner@example.com")
+	vault1 := ts.createTestVault(t, token1, "Shared Move Owner Vault")
+	contact1 := ts.createTestContact(t, token1, vault1.ID, "SharedMoveContact")
+
+	token2, _ := ts.registerTestUser(t, "shared-cross-account-other@example.com")
+	vault2 := ts.createTestVault(t, token2, "Shared Move Other Vault")
+	addUserToVault(t, ts, auth1.User.ID, vault2.ID, models.PermissionEditor)
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/move", vault1.ID, contact1.ID)
+	body := fmt.Sprintf(`{"target_vault_id":"%s"}`, vault2.ID)
+	rec := ts.doRequest(http.MethodPost, path, body, token1)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-account shared-user contact move, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestShadowContactMoveBlocked(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "shadow-move-owner@example.com")
