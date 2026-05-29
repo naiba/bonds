@@ -27,8 +27,8 @@ func (s *ContactMoveService) Move(contactID, currentVaultID, targetVaultID, user
 		return nil, err
 	}
 
-	var targetVault models.Vault
-	if err := s.db.Where("id = ?", targetVaultID).First(&targetVault).Error; err != nil {
+	var targetUserVault models.UserVault
+	if err := s.db.Where("user_id = ? AND vault_id = ? AND permission <= ?", userID, targetVaultID, models.PermissionEditor).First(&targetUserVault).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrTargetVaultNotFound
 		}
