@@ -64,6 +64,29 @@ func TestMoveContact(t *testing.T) {
 	}
 }
 
+func TestMoveContactTargetVaultViewerBlocked(t *testing.T) {
+	svc, contactID, vault1ID, vault2ID, userID := setupContactMoveTest(t)
+
+	if err := svc.db.Model(&models.UserVault{}).
+		Where("user_id = ? AND vault_id = ?", userID, vault2ID).
+		Update("permission", models.PermissionViewer).Error; err != nil {
+		t.Fatalf("Update target vault permission failed: %v", err)
+	}
+
+	_, err := svc.Move(contactID, vault1ID, vault2ID, userID)
+	if err != ErrTargetVaultNotFound {
+		t.Errorf("Expected ErrTargetVaultNotFound, got %v", err)
+	}
+
+	var contact models.Contact
+	if err := svc.db.First(&contact, "id = ?", contactID).Error; err != nil {
+		t.Fatalf("Load contact failed: %v", err)
+	}
+	if contact.VaultID != vault1ID {
+		t.Errorf("Expected contact to remain in vault '%s', got '%s'", vault1ID, contact.VaultID)
+	}
+}
+
 func TestMoveContactNotFound(t *testing.T) {
 	svc, _, vault1ID, vault2ID, userID := setupContactMoveTest(t)
 
