@@ -18,24 +18,37 @@ export default function VerifyEmail() {
   const navigate = useNavigate();
   const verifyToken = searchParams.get("token");
 
-  const [verifying, setVerifying] = useState(false);
+  const [verifying, setVerifying] = useState(() => Boolean(verifyToken));
   const [verified, setVerified] = useState(false);
   const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (!verifyToken) return;
-    setVerifying(true);
-    api.auth
-      .verifyEmailCreate({ token: verifyToken })
-      .then(() => {
-        setVerified(true);
-        message.success(t("verify_email.success"));
-        setTimeout(() => navigate("/vaults", { replace: true }), 2000);
-      })
-      .catch(() => {
-        message.error(t("verify_email.invalid_token"));
-      })
-      .finally(() => setVerifying(false));
+    let cancelled = false;
+
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setVerifying(true);
+      api.auth
+        .verifyEmailCreate({ token: verifyToken })
+        .then(() => {
+          if (cancelled) return;
+          setVerified(true);
+          message.success(t("verify_email.success"));
+          setTimeout(() => navigate("/vaults", { replace: true }), 2000);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          message.error(t("verify_email.invalid_token"));
+        })
+        .finally(() => {
+          if (!cancelled) setVerifying(false);
+        });
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [verifyToken, message, navigate, t]);
 
   const handleResend = async () => {
