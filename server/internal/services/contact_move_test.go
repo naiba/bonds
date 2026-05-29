@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -52,6 +53,14 @@ func TestMoveContact(t *testing.T) {
 	}
 	if resp.VaultID != vault2ID {
 		t.Errorf("Expected vault_id '%s', got '%s'", vault2ID, resp.VaultID)
+	}
+
+	var contact models.Contact
+	if err := svc.db.First(&contact, "id = ?", contactID).Error; err != nil {
+		t.Fatalf("Load moved contact failed: %v", err)
+	}
+	if contact.VaultID != vault2ID {
+		t.Errorf("Expected persisted vault_id '%s', got '%s'", vault2ID, contact.VaultID)
 	}
 }
 
