@@ -69,10 +69,11 @@ type userData struct {
 }
 
 type vaultData struct {
-	ID          string `json:"id"`
-	AccountID   string `json:"account_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID            string `json:"id"`
+	AccountID     string `json:"account_id"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	UserContactID string `json:"user_contact_id"`
 }
 
 type contactData struct {

@@ -20,7 +20,7 @@ func NewContactMoveService(db *gorm.DB) *ContactMoveService {
 
 func (s *ContactMoveService) Move(contactID, currentVaultID, targetVaultID, userID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
-	if err := s.db.Where("id = ? AND vault_id = ?", contactID, currentVaultID).First(&contact).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ? AND can_be_deleted = ?", contactID, currentVaultID, true).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}
