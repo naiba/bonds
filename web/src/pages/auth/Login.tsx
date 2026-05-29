@@ -55,7 +55,7 @@ export default function Login() {
   const { t, i18n } = useTranslation();
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
-  const [isWebAuthnSupported, setIsWebAuthnSupported] = useState(false);
+  const [isWebAuthnSupported] = useState(() => browserSupportsWebAuthn());
   const [instanceInfo, setInstanceInfo] = useState<InstanceInfo | null>(null);
 
   const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
@@ -79,7 +79,6 @@ export default function Login() {
   };
 
   useEffect(() => {
-    setIsWebAuthnSupported(browserSupportsWebAuthn());
     api.instance.infoList()
       .then(res => setInstanceInfo((res.data ?? null) as InstanceInfo | null))
       .catch(() => {});
