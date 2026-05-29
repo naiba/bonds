@@ -35,7 +35,7 @@ func (s *ContactMoveService) Move(contactID, currentVaultID, targetVaultID, user
 		return nil, err
 	}
 
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := s.db.Model(&models.Contact{}).Where("id = ?", contact.ID).Update("vault_id", targetVaultID).Error; err != nil {
 		return nil, err
 	}
 
