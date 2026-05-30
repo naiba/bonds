@@ -33,7 +33,7 @@
     "saved": "Enregistré",
     "updated": "Mis à jour",
     "load_more": "Charger plus",
-    "copy": "Copie",
+    "copy": "Copier",
     "view": "Voir"
   },
   "pagination": {
@@ -59,7 +59,7 @@
     "users": "Utilisateurs",
     "twoFactor": "Authentification à deux facteurs",
     "invitations": "Invitations",
-    "webauthn": "Mots-clés",
+    "webauthn": "Clés de sécurité",
     "oauth": "Comptes connectés",
     "storage": "Stockage",
     "reminders": "Rappels",
@@ -67,7 +67,7 @@
     "logout": "Déconnexion",
     "admin": "Administration",
     "davSubscriptions": "Synchronisation DAV",
-    "api_tokens": "API Jetons"
+    "api_tokens": "Jetons API"
   },
   "auth": {
     "login": {
@@ -81,9 +81,9 @@
       "submit": "Se connecter",
       "no_account": "Vous n'avez pas de compte ?",
       "create_one": "Créez-en un",
-      "passkey": "Se connecter avec un Passkey",
-      "passkey_failed": "Passkey l'authentification a échoué",
-      "passkey_not_supported": "Passkey n'est pas pris en charge sur cet appareil",
+      "passkey": "Se connecter avec une clé de sécurité",
+      "passkey_failed": "L'authentification par clé de sécurité a échoué",
+      "passkey_not_supported": "L'authentification par clé de sécurité n'est pas pris en charge sur cet appareil",
       "failed": "La connexion a échoué",
       "hero_title": "Entretenir les relations qui comptent le plus",
       "hero_subtitle": "Votre espace personnel pour mémoriser chaque détail, chaque instant, chaque connexion.",
@@ -104,7 +104,7 @@
       "has_account": "Vous avez déjà un compte ?",
       "sign_in": "Se connecter",
       "failed": "L'inscription a échoué",
-      "hero_title": "Commencez votre voyage de connexions significatives",
+      "hero_title": "Commencez votre voyage de relations significatives",
       "hero_subtitle": "Un espace privé et personnel pour chérir les personnes qui vous entourent."
     },
     "two_factor_verify": {
@@ -208,7 +208,7 @@
       "reminders": "Rappels",
       "close": "Fermer",
       "prev": "Mois précédent",
-      "next": "Mois prochain",
+      "next": "Mois suivant",
       "view_month": "Mois",
       "view_year": "Année"
     },
@@ -217,10 +217,10 @@
       "back": "Retour au coffre-fort",
       "no_pending": "Aucune tâche en attente",
       "completed": "Terminé ({{count}})",
-      "due": "À payer {{date}}",
+      "due": "À faire pour le {{date}}",
       "view_list": "Liste",
       "view_kanban": "Kanban",
-      "col_todo": "Faire",
+      "col_todo": "À Faire",
       "col_in_progress": "En cours",
       "col_done": "Fait",
       "new_task": "Nouvelle tâche",
@@ -289,7 +289,7 @@
       "col_country": "Pays",
       "col_province": "Province",
       "col_city": "Ville",
-      "col_count": "Compter",
+      "col_count": "Quantité",
       "col_contact": "Contact",
       "col_label": "Étiquette",
       "col_date": "Date",
@@ -311,7 +311,7 @@
       "edit_title": "Modifier le journal"
     },
     "journal_detail": {
-      "back": "Retour aux revues",
+      "back": "Retour aux journaux",
       "metrics": "Métrique",
       "add_metric": "Ajouter une métrique",
       "metric_placeholder": "Nom de la métrique (par exemple, Bonheur)",
@@ -345,11 +345,11 @@
       "slice_detail": "Détails de la tranche",
       "slice_cover": "Image de couverture",
       "slice_cover_upload": "Télécharger la couverture",
-      "slice_cover_remove": "Retirer le couvercle",
+      "slice_cover_remove": "Retirer la couverture",
       "slice_cover_removed": "Image de couverture supprimée",
       "slice_posts": "Messages dans cette tranche",
       "set_cover": "Définir la couverture",
-      "remove_cover": "Retirer le couvercle",
+      "remove_cover": "Retirer la couverture",
       "cover_set": "Ensemble d'images de couverture",
       "cover_removed": "Image de couverture supprimée",
       "select_cover": "Sélectionnez une image de couverture"
@@ -402,7 +402,7 @@
     "companies": {
       "title": "Entreprises",
       "create": "Ajouter une entreprise",
-      "edit": "Modifier la société",
+      "edit": "Modifier l'entreprise",
       "name": "Nom de l'entreprise",
       "type": "Type",
       "employees": "Employés",
@@ -428,14 +428,14 @@
       "type": "Type"
     },
     "dav_subscriptions": {
-      "title": "CardDAV Abonnements",
+      "title": "Abonnements CardDAV",
       "add": "Ajouter un abonnement",
       "edit": "Modifier l'abonnement",
       "uri": "URI du serveur",
       "uri_placeholder": "https://dav.example.com/addressbooks/user/contacts/",
       "username": "Nom d'utilisateur",
       "password": "Mot de passe",
-      "password_keep": "Laisser vide pour rester à jour",
+      "password_keep": "Laisser vide pour garder l'actuel",
       "sync_way": "Direction de synchronisation",
       "sync_pull": "Tirer seulement",
       "sync_push": "Pousser uniquement",
@@ -517,7 +517,7 @@
       "filter_needs_verification": "Vérification nécessaire"
     },
     "needs_verification": {
-      "badge": "Pour vérifier",
+      "badge": "A vérifier",
       "field_label": "Vérification nécessaire (indicateur pour examen ultérieur)"
     },
     "create": {
@@ -575,7 +575,7 @@
       "status": "Statut",
       "edit_title": "Modifier le contact",
       "edit_success": "Contact mis à jour",
-      "move": "Se déplacer",
+      "move": "Déplacer",
       "move_title": "Déplacer le contact vers un autre coffre-fort",
       "move_success": "Contact déplacé",
       "select_vault": "Sélectionner le coffre-fort cible",
@@ -586,7 +586,7 @@
       "no_jobs": "Aucune information sur l'emploi",
       "job_added": "Travail ajouté",
       "job_deleted": "Travail supprimé",
-      "manage_companies_hint": "Gérer les entreprises dans les paramètres de Vault",
+      "manage_companies_hint": "Gérer les entreprises dans les paramètres du coffre-fort",
       "avatar_upload": "Télécharger un avatar",
       "avatar_delete": "Supprimer l'avatar",
       "avatar_updated": "Avatar mis à jour",
@@ -686,7 +686,7 @@
       "select_type": "Sélectionnez le type de date",
       "remind_me": "Rappelez-moi chaque année",
       "age_years": "{{count}} ans",
-      "age_years_one": "{{count}} ans"
+      "age_years_one": "{{count}} an"
     },
     "tasks": {
       "title": "Tâches",
@@ -699,7 +699,7 @@
       "updated": "Tâche mise à jour",
       "deleted": "Tâche supprimée",
       "completed": "Terminé ({{count}})",
-      "show_completed": "Spectacle terminé",
+      "show_completed": "Afficher terminé",
       "hide_completed": "Masquer terminé"
     },
     "calls": {
@@ -732,15 +732,15 @@
       "modal_add": "Ajouter une adresse",
       "modal_edit": "Modifier l'adresse",
       "label": "Étiquette",
-      "label_placeholder": "Devoirs…",
+      "label_placeholder": "Maison, Travail…",
       "address_line_1": "Adresse Ligne 1",
-      "address_line_2": "Ligne d'adresse 2",
+      "address_line_2": "Adresse Ligne 2",
       "city": "Ville",
       "province": "Province/État",
       "postal_code": "Code Postal",
       "country": "Pays",
       "is_primary": "Principal",
-      "view_map": "Visualiser sur les cartes Google",
+      "view_map": "Visualiser sur Google Maps",
       "date_from": "Emménagé",
       "date_from_tooltip": "Quand le contact a commencé à vivre ici. Laisser vide si inconnu.",
       "date_to": "Déménagé",
@@ -772,9 +772,9 @@
       "deleted": "Objectif supprimé",
       "edit": "Modifier",
       "hide": "Cacher",
-      "streaks": "Traces",
-      "streaks_count": "{{count}} stries",
-      "streaks_for": "Stries pour : {{name}}"
+      "streaks": "Série",
+      "streaks_count": "{{count}} séries",
+      "streaks_for": "Séries pour : {{name}}"
     },
     "pets": {
       "title": "Animaux de compagnie",
@@ -809,7 +809,7 @@
       "currency": "Devise"
     },
     "quick_facts": {
-      "title": "Faits en bref",
+      "title": "Faits rapides",
       "add": "Ajouter",
       "category_placeholder": "Sélectionnez une catégorie",
       "content_placeholder": "Contenu",
@@ -823,7 +823,7 @@
     },
     "relationships": {
       "title": "Relations",
-      "add": "Ajouter",
+      "add": "Ajouter", 
       "no_relationships": "Aucune relation",
       "remove_confirm": "Retirer?",
       "added": "Relation ajoutée",
@@ -876,7 +876,7 @@
       "logged": "Humeur enregistrée",
       "happiness": "Bonheur",
       "energy": "Énergie",
-      "stress": "Stresser"
+      "stress": "Stress"
     },
     "photos": {
       "title": "Photos",
@@ -921,7 +921,7 @@
       "sign_out_message": "Êtes-vous sûr de vouloir vous déconnecter ?",
       "danger_zone": "Zone dangereuse",
       "delete_account": "Supprimer le compte",
-      "delete_confirm": "Es-tu sûr? Cela supprimera définitivement votre compte et toutes vos données.",
+      "delete_confirm": "Êtes-vous sûr? Cela supprimera définitivement votre compte et toutes vos données.",
       "delete_password": "Entrez votre mot de passe pour confirmer",
       "delete_success": "Compte supprimé"
     },
@@ -940,7 +940,7 @@
       "name_order_last_first": "Nom Prénom",
       "name_order_first_last_nickname": "Prénom Nom (Pseudo)",
       "name_order_nickname": "Surnom",
-      "name_order_custom": "Coutume",
+      "name_order_custom": "Personnalisé",
       "name_order_custom_help": "Variables disponibles : %first_name%, %last_name%, %middle_name%, %nickname%, %maiden_name%",
       "name_order_preview": "Aperçu",
       "default_map_site": "Service de carte par défaut",
@@ -966,7 +966,7 @@
       "type_shoutrrr": "Shoutrrr",
       "shoutrrr_url": "Shoutrrr URL",
       "shoutrrr_docs_link": "Afficher les services pris en charge",
-      "shoutrrr_help": "Prend en charge les Telegram, Discord, Slack, Ntfy, Gotify, les webhooks et plus",
+      "shoutrrr_help": "Prend en charge Telegram, Discord, Slack, Ntfy, Gotify, les webhooks et plus",
       "test_send": "Envoyer le test",
       "test_success": "Notification de test envoyée",
       "test_failed": "Échec de l'envoi de la notification de test",
@@ -1096,7 +1096,7 @@
     }
   },
   "api_tokens": {
-    "title": "API Jetons",
+    "title": "Jetons API",
     "description": "Créez des jetons pour accéder aux API par programmation.",
     "create": "Créer un jeton",
     "name": "Nom du jeton",
@@ -1127,7 +1127,7 @@
     "recoveryCodes.warning": "Enregistrez ces codes en toute sécurité. Chacun ne peut être utilisé qu’une seule fois.",
     "scanQR": "Scannez avec votre application d'authentification ou saisissez la clé secrète manuellement",
     "secretKey": "Clé secrète",
-    "davWarning": "Après avoir activé 2FA, les clients CardDAV/CalDAV doivent utiliser un jeton d'accès personnel au lieu de votre mot de passe. Créez-en un dans Paramètres → API Jetons."
+    "davWarning": "Après avoir activé 2FA, les clients CardDAV/CalDAV doivent utiliser un jeton d'accès personnel au lieu de votre mot de passe. Créez-en un dans Paramètres → Jetons API."
   },
   "search": {
     "placeholder": "Rechercher des contacts, des notes...",
@@ -1141,9 +1141,9 @@
     "invite": "Inviter un utilisateur",
     "email": "Adresse email",
     "permission": "Autorisation",
-    "permission.manager": "Directeur",
+    "permission.manager": "Gestionnaire",
     "permission.editor": "Éditeur",
-    "permission.viewer": "Téléspectateur",
+    "permission.viewer": "Spectateur",
     "status": {
       "pending": "En attente",
       "accepted": "Accepté"
@@ -1243,7 +1243,7 @@
       "csv_only": "CSV fichiers uniquement (.csv)",
       "column_label": "Colonne CSV",
       "field_label": "Champ de contact",
-      "not_mapped": "- non cartographié -",
+      "not_mapped": "- non associé -",
       "field_first_name": "Prénom (obligatoire)",
       "field_last_name": "Nom de famille",
       "field_middle_name": "Deuxième prénom",
@@ -1292,7 +1292,7 @@
       "life_events": "Événements de la vie",
       "documents": "Documents",
       "photos": "Photos",
-      "skipped": "Sauté",
+      "skipped": "Ignoré",
       "errors": "Erreurs"
     }
   },
@@ -1333,7 +1333,7 @@
     "tab_backups": "Sauvegardes",
     "tab_oauth": "OAuth",
     "oauth_providers": {
-      "title": "OAuth Fournisseurs",
+      "title": "Fournisseurs OAuth",
       "description": "Configurer les fournisseurs d'identité OAuth et OIDC pour la connexion des utilisateurs",
       "add": "Ajouter un fournisseur",
       "edit": "Modifier le fournisseur",
@@ -1350,11 +1350,11 @@
       "active": "Actif",
       "inactive": "Inactif",
       "delete_confirm": "Etes-vous sûr de vouloir supprimer ce fournisseur OAuth ?",
-      "created": "OAuth fournisseur créé",
+      "created": "Fournisseur OAuth créé",
       "create_failed": "Échec de la création du fournisseur",
-      "updated": "OAuth fournisseur mis à jour",
+      "updated": "Fournisseur OAuth mis à jour",
       "update_failed": "Échec de la mise à jour du fournisseur",
-      "deleted": "OAuth fournisseur supprimé",
+      "deleted": "Fournisseur OAuth supprimé",
       "delete_failed": "Échec de la suppression du fournisseur",
       "name_auto": "Généré automatiquement à partir du type",
       "discovery_url_hint": "Obligatoire pour les OIDC. par ex. https://accounts.google.com/.well-known/openid-configuration",
