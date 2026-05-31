@@ -40,6 +40,7 @@ async function createContact(page: import('@playwright/test').Page, firstName: s
 }
 
 async function navigateToTab(page: import('@playwright/test').Page, tabName: string) {
+  await page.getByText('Edit mode', { exact: true }).click();
   const tab = page.getByRole('tab', { name: tabName });
   await expect(tab).toBeVisible({ timeout: 15000 });
   await tab.click();
@@ -158,8 +159,6 @@ test.describe('Groups - Member Count', () => {
     await goToContacts(page);
     await createContact(page, 'Alice', 'Test');
 
-    // Go to Social tab — wait for tabs to render
-    await expect(page.locator('[role=tab]').first()).toBeVisible({ timeout: 15000 });
     await navigateToTab(page, 'Social');
     // Wait for tab content to load
     await page.waitForTimeout(1000);

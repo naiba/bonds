@@ -41,7 +41,9 @@ async function createContact(page: import('@playwright/test').Page, firstName: s
 }
 
 async function navigateToTab(page: import('@playwright/test').Page, tabName: string, exact = false) {
+  await page.getByText('Edit mode', { exact: true }).click();
   const tab = page.getByRole('tab', { name: tabName, exact });
+  await expect(tab).toBeVisible({ timeout: 10000 });
   await tab.click();
   await page.waitForLoadState('networkidle');
 }
