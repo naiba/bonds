@@ -29,7 +29,7 @@ Each vault has its own set of defaults, seeded on creation:
 - **Important date types**: Birthdate, deceased date (built-in), plus custom types.
 - **Mood tracking parameters**: 5-level mood scale with emoji and colors.
 - **Life event categories**: 4 categories with 20 event types.
-- **Quick facts templates**: Hobbies, food preferences.
+- **Quick facts templates**: How we met, hobbies, food preferences.
 
 ## User Shadow Contacts
 

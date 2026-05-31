@@ -169,7 +169,7 @@ docker-compose.yml         # 单容器部署
 - ContactImportantDateType（2：Birthdate、Deceased date，不可删除）
 - MoodTrackingParameter（5 级，带 emoji + Tailwind 颜色）
 - LifeEventCategory（4 类 20 种事件类型）
-- VaultQuickFactsTemplate（2：Hobbies、Food preferences）
+- VaultQuickFactsTemplate（3：How we met、Hobbies、Food preferences）
 
 ### Vault Dashboard 布局
 
