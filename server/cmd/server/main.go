@@ -79,6 +79,9 @@ func main() {
 	if err := models.BackfillLifeEventTaskPostCalendarTypes(db); err != nil {
 		log.Printf("WARNING: failed to backfill life event/task/post calendar types: %v", err)
 	}
+	if err := models.BackfillHowWeMetQuickFactTemplates(db); err != nil {
+		log.Printf("WARNING: failed to backfill how-we-met quick fact templates: %v", err)
+	}
 
 	scheduler := cron.NewScheduler(db)
 	scheduler.Start()
