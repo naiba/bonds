@@ -60,11 +60,19 @@ async function setupContactPage(page: import('@playwright/test').Page) {
   await expect(page.getByText('Lunar Test').first()).toBeVisible({ timeout: 10000 });
 }
 
+async function navigateToContactTab(page: import('@playwright/test').Page, tabName: string, exact = false) {
+  await page.getByText('Edit mode', { exact: true }).click();
+  const tab = page.getByRole('tab', { name: tabName, exact });
+  await expect(tab).toBeVisible({ timeout: 10000 });
+  await tab.click();
+  await page.waitForLoadState('networkidle');
+}
+
 test.describe('Calendar System', () => {
   test('should show calendar type switcher in important dates modal', async ({ page }) => {
     await setupContactPage(page);
 
-    await page.getByRole('tab', { name: 'Contact information' }).click();
+    await navigateToContactTab(page, 'Contact information');
     const importantDatesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
     await importantDatesCard.getByRole('button', { name: /add/i }).click();
 
@@ -75,7 +83,7 @@ test.describe('Calendar System', () => {
   test('should show calendar type switcher in reminders modal', async ({ page }) => {
     await setupContactPage(page);
 
-    await page.getByRole('tab', { name: 'Information', exact: true }).click();
+    await navigateToContactTab(page, 'Information', true);
     const remindersCard = page.locator('.ant-card').filter({ hasText: 'Reminders' });
     await remindersCard.getByRole('button', { name: /add/i }).click();
 
@@ -86,7 +94,7 @@ test.describe('Calendar System', () => {
   test('should create an important date with lunar calendar', async ({ page }) => {
     await setupContactPage(page);
 
-    await page.getByRole('tab', { name: 'Contact information' }).click();
+    await navigateToContactTab(page, 'Contact information');
     const importantDatesCard = page.locator('.ant-card').filter({ hasText: 'Important Dates' });
     await importantDatesCard.getByRole('button', { name: /add/i }).click();
 
@@ -119,7 +127,7 @@ test.describe('Calendar System', () => {
   test('should create a reminder with lunar calendar', async ({ page }) => {
     await setupContactPage(page);
 
-    await page.getByRole('tab', { name: 'Information', exact: true }).click();
+    await navigateToContactTab(page, 'Information', true);
     const remindersCard = page.locator('.ant-card').filter({ hasText: 'Reminders' });
     await remindersCard.getByRole('button', { name: /add/i }).click();
 

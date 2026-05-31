@@ -62,6 +62,14 @@ async function goToContacts(page: import('@playwright/test').Page) {
   await page.waitForLoadState('networkidle');
 }
 
+async function navigateToContactTab(page: import('@playwright/test').Page, tabName: string, exact = false) {
+  await page.getByText('Edit mode', { exact: true }).click();
+  const tab = page.getByRole('tab', { name: tabName, exact });
+  await expect(tab).toBeVisible({ timeout: 10000 });
+  await tab.click();
+  await page.waitForLoadState('networkidle');
+}
+
 test.describe('Contact List Pagination', () => {
   test('should show all contacts with pagination', async ({ page }) => {
     await setupVault(page, 'pag1');
@@ -273,8 +281,7 @@ test.describe('Notes Module Pagination', () => {
     await page.waitForLoadState('networkidle');
 
     // Go to "Information" tab (exact match to avoid "Contact information")
-    await page.getByRole('tab', { name: 'Information', exact: true }).click();
-    await page.waitForLoadState('networkidle');
+    await navigateToContactTab(page, 'Information', true);
 
     // Find the Notes card by its header title to avoid matching cards containing "NotesTest"
     const notesCard = page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: 'Notes' }) });
@@ -315,8 +322,7 @@ test.describe('Calls Module Pagination', () => {
     await page.waitForLoadState('networkidle');
 
     // Go to "Information" tab (exact match)
-    await page.getByRole('tab', { name: 'Information', exact: true }).click();
-    await page.waitForLoadState('networkidle');
+    await navigateToContactTab(page, 'Information', true);
 
     // Find the Calls card by its header title to avoid matching cards containing "CallsTest"
     const callsCard = page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: 'Calls' }) });
