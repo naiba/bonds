@@ -12,9 +12,10 @@ interface ContactSummaryCardProps {
   vaultId: string;
   contactId: string;
   contact: Contact;
+  readOnly?: boolean;
 }
 
-export default function ContactSummaryCard({ vaultId, contactId, contact }: ContactSummaryCardProps) {
+export default function ContactSummaryCard({ vaultId, contactId, contact, readOnly = false }: ContactSummaryCardProps) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
@@ -177,15 +178,15 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
     marginBottom: 4,
   };
 
-  // Check if any section has data to show (gender/pronoun always show)
   const hasRelationships = relationships.length > 0;
   const hasLabels = labels.length > 0;
   const hasJobs = jobs.length > 0;
+  const hasGenderOrPronoun = !!genderLabel || !!pronounLabel;
   const hasReligion = !!religionLabel;
   const hasAddress = !!primaryAddress;
+  const hasSummaryData = hasRelationships || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress;
 
-  // If absolutely nothing to show except "Not set" for gender/pronoun, still render the card
-  // to maintain consistency
+  if (readOnly && !hasSummaryData) return null;
 
   return (
     <div
@@ -231,30 +232,29 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
         </div>
       )}
 
-      {/* 2. Gender & Pronoun — always shown */}
-      <div style={sectionStyle}>
+      {(!readOnly || hasGenderOrPronoun) && <div style={sectionStyle}>
         <div style={{ display: "flex", gap: 32 }}>
-          <div style={{ flex: 1 }}>
+          {(!readOnly || genderLabel) && <div style={{ flex: 1 }}>
             <Text type="secondary" style={sectionLabelStyle}>
               {t("contact.detail.summary.gender")}
             </Text>
             <Text style={{ fontSize: 13 }}>
               {genderLabel ?? t("contact.detail.summary.not_set")}
             </Text>
-          </div>
-          <div style={{ flex: 1 }}>
+          </div>}
+          {(!readOnly || pronounLabel) && <div style={{ flex: 1 }}>
             <Text type="secondary" style={sectionLabelStyle}>
               {t("contact.detail.summary.pronoun")}
             </Text>
             <Text style={{ fontSize: 13 }}>
               {pronounLabel ?? t("contact.detail.summary.not_set")}
             </Text>
-          </div>
+          </div>}
         </div>
-      </div>
+      </div>}
 
       {/* 3. Labels */}
-      <div style={sectionStyle}>
+      {(!readOnly || hasLabels) && <div style={sectionStyle}>
         <Text type="secondary" style={sectionLabelStyle}>
           {t("contact.detail.summary.labels")}
         </Text>
@@ -282,7 +282,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact }: Cont
             {t("contact.detail.summary.not_set")}
           </Text>
         )}
-      </div>
+      </div>}
 
       {/* 4. Job information */}
       {hasJobs && (

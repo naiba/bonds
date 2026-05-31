@@ -29,16 +29,16 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] }) => {
     const key = JSON.stringify(opts.queryKey);
     if (key.includes("relationships")) return { data: mockRelationships, isLoading: false };
-    if (key.includes("contacts") && !key.includes("information") && !key.includes("Information")) return { data: mockContacts, isLoading: false };
+    if (key.includes("labels")) return { data: mockLabels, isLoading: false };
     if (key.includes("information") || key.includes("Information")) return { data: mockContactInfo, isLoading: false };
     if (key.includes("addresses")) return { data: mockAddresses, isLoading: false };
-    if (key.includes("labels")) return { data: mockLabels, isLoading: false };
     if (key.includes("jobs")) return { data: mockJobs, isLoading: false };
     if (key.includes("companies")) return { data: mockCompanies, isLoading: false };
     if (key.includes("genders")) return { data: mockGenders, isLoading: false };
     if (key.includes("pronouns")) return { data: mockPronouns, isLoading: false };
     if (key.includes("religions")) return { data: mockReligions, isLoading: false };
     if (key.includes("preferences")) return { data: mockPreferences, isLoading: false };
+    if (key.includes("contacts")) return { data: mockContacts, isLoading: false };
     return { data: [], isLoading: false };
   },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -59,12 +59,12 @@ function resetMocks() {
   mockPreferences = { name_order: "%first_name% %last_name%" };
 }
 
-function renderCard() {
+function renderCard({ readOnly = false }: { readOnly?: boolean } = {}) {
   return render(
     <ConfigProvider>
       <AntApp>
         <MemoryRouter>
-          <ContactSummaryCard vaultId="v1" contactId="c1" contact={{ id: "c1" }} />
+          <ContactSummaryCard vaultId="v1" contactId="c1" contact={{ id: "c1" }} readOnly={readOnly} />
         </MemoryRouter>
       </AntApp>
     </ConfigProvider>,
@@ -137,5 +137,25 @@ describe("ContactSummaryCard — Family Summary (Issue #77)", () => {
 
     // Should show UUID when name is empty
     expect(screen.getByText("deadbeef-0000-0000-0000-000000000000")).toBeInTheDocument();
+  });
+
+  it("hides empty summary fields in read mode", () => {
+    resetMocks();
+
+    const { container } = renderCard({ readOnly: true });
+
+    expect(container.querySelector("[data-testid='contact-summary-card']")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not set")).not.toBeInTheDocument();
+  });
+
+  it("keeps populated summary fields in read mode", () => {
+    resetMocks();
+    mockLabels = [{ id: 1, name: "Running club", bg_color: "green", text_color: "#123" }];
+
+    renderCard({ readOnly: true });
+
+    expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
+    expect(screen.getByText("Running club")).toBeInTheDocument();
+    expect(screen.queryByText("Not set")).not.toBeInTheDocument();
   });
 });
