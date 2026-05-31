@@ -13,9 +13,11 @@ const { TextArea } = Input;
 export default function NotesModule({
   vaultId,
   contactId,
+  readOnly = false,
 }: {
   vaultId: string | number;
   contactId: string | number;
+  readOnly?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -99,22 +101,23 @@ export default function NotesModule({
     }
   }
 
-  const showForm = adding || editingId !== null;
+  const showForm = !readOnly && (adding || editingId !== null);
+
+  if (readOnly && !isLoading && notes.length === 0) return null;
 
   return (
     <Card
       title={<span style={{ fontWeight: 500 }}>{t("modules.notes.title")}</span>}
       styles={{
         header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
-        body: { padding: '16px 24px' },
+        body: { padding: "16px 24px" },
       }}
       extra={
-        !showForm && (
+        !readOnly && !showForm && (
           <Button
-            type="text"
+            type="link"
             icon={<PlusOutlined />}
             onClick={() => setAdding(true)}
-            style={{ color: token.colorPrimary }}
           >
             {t("modules.notes.add")}
           </Button>
@@ -172,7 +175,7 @@ export default function NotesModule({
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            actions={[
+            actions={readOnly ? undefined : [
               <Button
                 key="edit"
                 type="text"
