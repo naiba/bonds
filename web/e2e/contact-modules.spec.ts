@@ -563,9 +563,9 @@ test.describe('Contact Modules - Important Dates', () => {
     const dateFormItem = modal.locator('.ant-form-item').filter({ hasText: 'Date' }).last();
     const dateSelects = dateFormItem.locator('.ant-select');
     await dateSelects.nth(1).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(5).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').nth(5).click();
     await dateSelects.nth(2).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^24$/ }).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
     await modal.locator('.ant-modal-header').click();
 
     const createResp = page.waitForResponse(
@@ -617,9 +617,9 @@ test.describe('Contact Modules - Important Date Auto-fill', () => {
     const dateFormItem2 = modal.locator('.ant-form-item').filter({ hasText: 'Date' }).last();
     const dateSelects2 = dateFormItem2.locator('.ant-select');
     await dateSelects2.nth(1).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(5).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').nth(5).click();
     await dateSelects2.nth(2).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^24$/ }).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
     await modal.locator('.ant-modal-header').click();
 
     const responsePromise = page.waitForResponse(

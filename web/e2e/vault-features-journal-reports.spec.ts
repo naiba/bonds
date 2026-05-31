@@ -787,10 +787,10 @@ test.describe('Vault Reports - Overview Counts', () => {
     const dateFormItem = dateModal.locator('.ant-form-item').filter({ hasText: 'Date' }).last();
     const dateSelects = dateFormItem.locator('.ant-select');
     await dateSelects.nth(1).click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').nth(5).click();
+    // AntD keeps hidden portal dropdowns and virtualizes day options; use the latest portal and any rendered day.
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').nth(5).click();
     await dateSelects.nth(2).click();
-    // AntD virtualizes day options, so only select from the rendered range instead of relying on absolute indexes.
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /^24$/ }).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
     await dateModal.locator('.ant-modal-header').click();
 
     const dateResp = page.waitForResponse(
