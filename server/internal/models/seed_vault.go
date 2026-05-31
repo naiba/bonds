@@ -156,8 +156,9 @@ func seedVaultQuickFactsTemplates(tx *gorm.DB, vaultID, locale string) error {
 		position int
 	}
 	defs := []qfDef{
-		{"seed.quick_facts.hobbies", 1},
-		{"seed.quick_facts.food_preferences", 2},
+		{"seed.quick_facts.how_we_met", 1},
+		{"seed.quick_facts.hobbies", 2},
+		{"seed.quick_facts.food_preferences", 3},
 	}
 	items := make([]VaultQuickFactsTemplate, len(defs))
 	for idx, d := range defs {

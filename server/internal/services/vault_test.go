@@ -72,8 +72,16 @@ func TestCreateVault(t *testing.T) {
 
 	var qfCount int64
 	db.Model(&models.VaultQuickFactsTemplate{}).Where("vault_id = ?", vault.ID).Count(&qfCount)
-	if qfCount != 2 {
-		t.Errorf("expected 2 VaultQuickFactsTemplates, got %d", qfCount)
+	if qfCount != 3 {
+		t.Errorf("expected 3 VaultQuickFactsTemplates, got %d", qfCount)
+	}
+
+	var qfTemplates []models.VaultQuickFactsTemplate
+	if err := db.Where("vault_id = ?", vault.ID).Order("position ASC").Find(&qfTemplates).Error; err != nil {
+		t.Fatalf("list quick fact templates: %v", err)
+	}
+	if len(qfTemplates) != 3 || qfTemplates[0].LabelTranslationKey == nil || *qfTemplates[0].LabelTranslationKey != "seed.quick_facts.how_we_met" {
+		t.Fatalf("expected first quick fact template to be how we met, got %+v", qfTemplates)
 	}
 }
 
