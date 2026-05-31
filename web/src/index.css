@@ -157,9 +157,10 @@ html[data-theme="dark"] .bonds-vault-card::before {
   transform: scale(0.96);
 }
 
-.ant-btn-primary {
+.ant-btn-primary:not(:disabled):not(.ant-btn-disabled) {
   background: linear-gradient(135deg, #4a7c59, #3d6a4c) !important;
   border: none !important;
+  color: #fff !important;
   box-shadow: 0 4px 12px rgba(74, 124, 89, 0.3) !important;
 }
 
@@ -171,7 +172,7 @@ html[data-theme="dark"] .bonds-vault-card::before {
 
 /* Dark mode: lift the gradient one stop so the button doesn't sink into
    a dark container. Same lighter green the focus ring already adopts. */
-html[data-theme="dark"] .ant-btn-primary {
+html[data-theme="dark"] .ant-btn-primary:not(:disabled):not(.ant-btn-disabled) {
   background: linear-gradient(135deg, #5e9b73, #4a7c59) !important;
   box-shadow: 0 4px 12px rgba(126, 196, 150, 0.25) !important;
 }
