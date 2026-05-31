@@ -16,7 +16,9 @@ Each contact supports:
 
 ## Modules
 
-Contact detail pages are built from **modules**, which are configurable building blocks displayed on template pages. Default modules include:
+Contact detail pages open in **View mode** by default. This mode shows populated, human-readable details first, including summary fields, quick facts, and notes, without exposing editing controls. Switch to **Edit mode** to access the full template tabs and module CRUD tools.
+
+Contact edit pages are built from **modules**, which are configurable building blocks displayed on template pages. Default modules include:
 
 | Module | Description |
 |--------|-------------|
