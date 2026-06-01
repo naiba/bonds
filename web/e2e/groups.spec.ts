@@ -40,7 +40,7 @@ async function createContact(page: import('@playwright/test').Page, firstName: s
 }
 
 async function navigateToTab(page: import('@playwright/test').Page, tabName: string) {
-  await page.getByText('Edit mode', { exact: true }).click();
+  await page.locator('.ant-segmented-item-label').getByText('Edit', { exact: true }).click();
   const tab = page.getByRole('tab', { name: tabName });
   await expect(tab).toBeVisible({ timeout: 15000 });
   await tab.click();

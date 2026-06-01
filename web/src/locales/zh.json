@@ -557,8 +557,8 @@
       "delete_failed": "删除联系人失败",
       "change_template": "更换模板",
       "template_updated": "模板已更新",
-      "view_mode": "查看模式",
-      "edit_mode": "编辑模式",
+      "view_mode": "摘要",
+      "edit_mode": "编辑",
       "tabs": {
         "overview": "概览",
         "relationships": "关系",

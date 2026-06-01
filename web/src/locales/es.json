@@ -557,8 +557,8 @@
       "delete_failed": "Error al eliminar el contacto",
       "change_template": "Cambiar plantilla",
       "template_updated": "Plantilla actualizada",
-      "view_mode": "Modo vista",
-      "edit_mode": "Modo edición",
+      "view_mode": "Resumen",
+      "edit_mode": "Editar",
       "tabs": {
         "overview": "Resumen",
         "relationships": "Relaciones",

@@ -557,8 +557,8 @@
       "delete_failed": "Failed to delete contact",
       "change_template": "Change Template",
       "template_updated": "Template updated",
-      "view_mode": "View mode",
-      "edit_mode": "Edit mode",
+      "view_mode": "Summary",
+      "edit_mode": "Edit",
       "tabs": {
         "overview": "Overview",
         "relationships": "Relationships",

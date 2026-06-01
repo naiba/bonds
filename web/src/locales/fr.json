@@ -557,8 +557,8 @@
       "delete_failed": "Échec de la suppression du contact",
       "change_template": "Changer de modèle",
       "template_updated": "Modèle mis à jour",
-      "view_mode": "Mode vue",
-      "edit_mode": "Mode édition",
+      "view_mode": "Résumé",
+      "edit_mode": "Modifier",
       "tabs": {
         "overview": "Aperçu",
         "relationships": "Relations",

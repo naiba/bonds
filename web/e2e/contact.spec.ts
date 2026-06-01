@@ -119,7 +119,7 @@ test.describe('Contacts - Feed Tab', () => {
     await goToContacts(page);
     await createContact(page, 'FeedTest', 'User');
 
-    await page.getByText('Edit mode', { exact: true }).click();
+    await page.locator('.ant-segmented-item-label').getByText('Edit', { exact: true }).click();
     const feedTab = page.getByRole('tab', { name: /feed/i });
     await expect(feedTab).toBeVisible({ timeout: 10000 });
     await feedTab.click();
