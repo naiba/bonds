@@ -467,7 +467,7 @@
       "carddav_url": "CardDAV 地址",
       "caldav_url": "CalDAV 地址",
       "auth_note": "认证说明",
-      "auth_note_text": "配置 DAV 客户端时，请使用你的登录邮箱和密码进行 Basic Auth 认证。",
+      "auth_note_text": "配置 DAV 客户端时，请使用你的登录邮箱（{{email}}）和密码进行 Basic Auth 认证。",
       "copy_success": "已复制",
       "address_book": "通讯录",
       "address_book_placeholder": "选择通讯录",

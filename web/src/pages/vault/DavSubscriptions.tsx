@@ -79,6 +79,7 @@ export default function DavSubscriptions() {
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const dateFormats = useDateFormat();
+  const davUserPathSegment = user?.id ?? "";
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSubscription, setEditingSubscription] = useState<DavSubscription | null>(null);
@@ -294,7 +295,7 @@ export default function DavSubscriptions() {
               copyable={{ tooltips: [t("common.copy"), t("vault.dav_subscriptions.copy_success")] }}
               style={{ margin: 0, background: token.colorFillQuaternary, padding: "6px 12px", borderRadius: token.borderRadius, fontFamily: "monospace", fontSize: 13 }}
             >
-              {`${window.location.origin}/dav/addressbooks/${user?.email ?? ""}/`}
+              {`${window.location.origin}/dav/addressbooks/${davUserPathSegment}/`}
             </Paragraph>
           </div>
           <div>
@@ -305,14 +306,14 @@ export default function DavSubscriptions() {
               copyable={{ tooltips: [t("common.copy"), t("vault.dav_subscriptions.copy_success")] }}
               style={{ margin: 0, background: token.colorFillQuaternary, padding: "6px 12px", borderRadius: token.borderRadius, fontFamily: "monospace", fontSize: 13 }}
             >
-              {`${window.location.origin}/dav/calendars/${user?.email ?? ""}/`}
+              {`${window.location.origin}/dav/calendars/${davUserPathSegment}/`}
             </Paragraph>
           </div>
           <Alert
             type="info"
             showIcon
             message={t("vault.dav_subscriptions.auth_note")}
-            description={t("vault.dav_subscriptions.auth_note_text")}
+            description={t("vault.dav_subscriptions.auth_note_text", { email: user?.email ?? "" })}
             style={{ marginTop: 4 }}
           />
         </div>

@@ -467,7 +467,7 @@
       "carddav_url": "CardDAV URL",
       "caldav_url": "CalDAV URL",
       "auth_note": "Authentication",
-      "auth_note_text": "Use your login email and password for Basic Auth when configuring your DAV client.",
+      "auth_note_text": "Use your login email ({{email}}) and password for Basic Auth when configuring your DAV client.",
       "copy_success": "Copied",
       "address_book": "Address Book",
       "address_book_placeholder": "Select an address book",

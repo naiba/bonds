@@ -44,7 +44,7 @@ vi.mock("react-router-dom", async () => {
 
 vi.mock("@/stores/auth", () => ({
   useAuth: () => ({
-    user: { email: "test@example.com" },
+    user: { id: "user-123", email: "test@example.com" },
     token: "test-token",
     login: vi.fn(),
     logout: vi.fn(),
@@ -86,5 +86,22 @@ describe("DavSubscriptions", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderPage();
     expect(screen.getByText("Add Subscription")).toBeInTheDocument();
+  });
+
+  it("renders DAV server URLs with user ID while keeping email as Basic Auth username", () => {
+    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    renderPage();
+    const origin = window.location.origin;
+
+    expect(
+      screen.getByText(`${origin}/dav/addressbooks/user-123/`),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`${origin}/dav/calendars/user-123/`),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(`${origin}/dav/addressbooks/test@example.com/`),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/test@example\.com/)).toBeInTheDocument();
   });
 });
