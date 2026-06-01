@@ -111,12 +111,26 @@ test.describe('Contact List Pagination', () => {
 
     await page.locator('.ant-pagination-item').filter({ hasText: '2' }).click();
     await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/contacts\?page=2&per_page=20/);
 
     const secondPageRows = page.locator('.ant-table-tbody .ant-table-row');
     await expect(secondPageRows).toHaveCount(5, { timeout: 10000 });
 
     const secondPageFirstRowText = await secondPageRows.first().innerText();
     expect(firstPageNames).not.toContain(secondPageFirstRowText);
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/contacts\?page=2&per_page=20/);
+    await expect(page.locator('.ant-table-tbody .ant-table-row')).toHaveCount(5, { timeout: 10000 });
+
+    await page.locator('.ant-table-tbody .ant-table-row').first().click();
+    await expect(page).toHaveURL(/\/contacts\/[a-f0-9-]+\?page=2&per_page=20/, { timeout: 10000 });
+
+    await page.goBack();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/contacts\?page=2&per_page=20/);
+    await expect(page.locator('.ant-table-tbody .ant-table-row')).toHaveCount(5, { timeout: 10000 });
   });
 
   test('should sort contacts by name', async ({ page }) => {
