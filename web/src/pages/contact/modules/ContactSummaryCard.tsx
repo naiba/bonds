@@ -23,6 +23,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const dateFormats = useDateFormat();
 
   // --- Data fetching: reuse same query keys as existing modules for deduplication ---
 
@@ -123,6 +124,22 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
     },
   });
 
+  const { data: importantDateTypes = [] } = useQuery<ImportantDateTypeResponse[]>({
+    queryKey: ["vaults", vaultId, "settings", "date-types"],
+    queryFn: async () => {
+      const res = await api.vaultSettings.settingsDateTypesList(String(vaultId));
+      return res.data ?? [];
+    },
+  });
+
+  const { data: importantDates = [] } = useQuery<ImportantDate[]>({
+    queryKey: ["vaults", vaultId, "contacts", contactId, "important-dates"],
+    queryFn: async () => {
+      const res = await api.importantDates.contactsDatesList(String(vaultId), String(contactId));
+      return res.data ?? [];
+    },
+  });
+
   // --- Derived data ---
 
   const contactMap = new Map<string, Contact>();
@@ -188,7 +205,18 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
   const hasGenderOrPronoun = !!genderLabel || !!pronounLabel;
   const hasReligion = !!religionLabel;
   const hasAddress = !!primaryAddress;
-  const hasSummaryData = hasRelationships || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress;
+  const getImportantDateByInternalType = (internalType: string): ImportantDate | undefined => (
+    importantDates.find((date) => {
+      const dateType = importantDateTypes.find((type) => type.id === date.contact_important_date_type_id);
+      return dateType?.internal_type === internalType;
+    })
+  );
+  const birthDate = getImportantDateByInternalType("birthdate");
+  const deceasedDate = getImportantDateByInternalType("deceased_date");
+  const birthDateAge = birthDate && !deceasedDate ? computeImportantDateAge(birthDate) : null;
+  const deceasedDateAge = computeAgeAtImportantDate(birthDate, deceasedDate);
+  const hasImportantSummaryDates = !!birthDate || !!deceasedDate;
+  const hasSummaryData = hasRelationships || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress || hasImportantSummaryDates;
 
   if (readOnly && !hasSummaryData) return null;
 
@@ -257,6 +285,35 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
         </div>
       </div>}
 
+      {hasImportantSummaryDates && (
+        <div style={sectionStyle}>
+          <div style={{ display: "flex", gap: 32 }}>
+            {birthDate && (
+              <div style={{ flex: 1 }}>
+                <Text type="secondary" style={sectionLabelStyle}>
+                  {birthDate.label || t("modules.important_dates.type_birthday")}
+                </Text>
+                <Space size={[6, 4]} wrap>
+                  <Text style={{ fontSize: 13 }}>{formatImportantDateDisplay(birthDate, dateFormats)}</Text>
+                  {birthDateAge !== null && <Tag>{t("modules.important_dates.age_years", { count: birthDateAge })}</Tag>}
+                </Space>
+              </div>
+            )}
+            {deceasedDate && (
+              <div style={{ flex: 1 }}>
+                <Text type="secondary" style={sectionLabelStyle}>
+                  {deceasedDate.label || t("modules.important_dates.type_death")}
+                </Text>
+                <Space size={[6, 4]} wrap>
+                  <Text style={{ fontSize: 13 }}>{formatImportantDateDisplay(deceasedDate, dateFormats)}</Text>
+                  {deceasedDateAge !== null && <Tag>{t("modules.important_dates.age_years", { count: deceasedDateAge })}</Tag>}
+                </Space>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 3. Labels */}
       {(!readOnly || hasLabels) && <div style={sectionStyle}>
         <Text type="secondary" style={sectionLabelStyle}>
@@ -265,21 +322,24 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
         {hasLabels ? (
           <Space size={[6, 6]} wrap>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(labels as any[]).map((label) => (
-              <Tag
-                key={label.id}
-                color={label.bg_color || "default"}
-                style={{
-                  margin: 0,
-                  color: label.text_color,
-                  fontSize: 12,
-                  padding: "2px 8px",
-                  borderRadius: 12,
-                }}
-              >
-                {label.name}
-              </Tag>
-            ))}
+            {(labels as any[]).map((label) => {
+              const labelTagColors = getReadableLabelTagColors(label.bg_color, label.text_color);
+              return (
+                <Tag
+                  key={label.id}
+                  color={labelTagColors.color}
+                  style={{
+                    ...labelTagColors.style,
+                    margin: 0,
+                    fontSize: 12,
+                    padding: "2px 8px",
+                    borderRadius: 12,
+                  }}
+                >
+                  {label.name}
+                </Tag>
+              );
+            })}
           </Space>
         ) : (
           <Text type="secondary" style={{ fontSize: 13 }}>

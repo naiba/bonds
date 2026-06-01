@@ -16,7 +16,6 @@ import {
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
 import { api } from "@/api";
 import type { ImportantDate, CreateImportantDateRequest, APIError, UserPreferences, ImportantDateTypeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
@@ -25,37 +24,7 @@ import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import type { CalendarType } from "@/utils/calendar";
-
-function computeAge(d: ImportantDate, reference: dayjs.Dayjs = dayjs()): number | null {
-  if (!d.year || !d.month || !d.day) return null;
-  const birth = dayjs(new Date(d.year, d.month - 1, d.day));
-  if (!birth.isValid() || birth.isAfter(reference)) return null;
-  let age = reference.year() - birth.year();
-  if (reference.month() < birth.month() || (reference.month() === birth.month() && reference.date() < birth.date())) {
-    age -= 1;
-  }
-  return age >= 0 ? age : null;
-}
-
-function formatDateDisplay(d: ImportantDate, fullFormat: string, shortFormat: string): string {
-  if (d.calendar_type && d.calendar_type !== "gregorian" && d.original_month != null && d.original_day != null) {
-    const sys = getCalendarSystem(d.calendar_type as CalendarType);
-    const formatted = sys.formatDate({
-      day: d.original_day,
-      month: d.original_month,
-      year: d.original_year ?? 0,
-    });
-    const gd = d.year && d.month && d.day ? dayjs(new Date(d.year, d.month - 1, d.day)).format(fullFormat) : "";
-    return gd ? `${formatted} (${gd})` : formatted;
-  }
-  if (d.year && d.month && d.day) {
-    return dayjs(new Date(d.year, d.month - 1, d.day)).format(fullFormat);
-  }
-  if (!d.year && d.month && d.day) {
-    return dayjs(new Date(2000, d.month - 1, d.day)).format(shortFormat);
-  }
-  return "";
-}
+import { computeAgeAtImportantDate, computeImportantDateAge, formatImportantDateDisplay } from "@/utils/importantDateDisplay";
 
 export default function ImportantDatesModule({
   vaultId,
@@ -204,16 +173,9 @@ export default function ImportantDatesModule({
           const isDeceased = !!deceasedDate;
           let age: number | null = null;
           if (isBirthday && !isDeceased) {
-            age = computeAge(d);
-          } else if (
-            isDeceasedItem &&
-            birthDate &&
-            deceasedDate?.year &&
-            deceasedDate.month &&
-            deceasedDate.day
-          ) {
-            const ref = dayjs(new Date(deceasedDate.year, deceasedDate.month - 1, deceasedDate.day));
-            age = computeAge(birthDate, ref);
+            age = computeImportantDateAge(d);
+          } else if (isDeceasedItem) {
+            age = computeAgeAtImportantDate(birthDate, deceasedDate);
           }
           return (
             <List.Item
@@ -243,7 +205,7 @@ export default function ImportantDatesModule({
                 }
                  description={
                    <>
-                      <span style={{ color: token.colorTextSecondary }}>{formatDateDisplay(d, dateFormats.full, dateFormats.short)}</span>{" "}
+                      <span style={{ color: token.colorTextSecondary }}>{formatImportantDateDisplay(d, dateFormats)}</span>{" "}
                      {altCalendar && d.calendar_type && d.calendar_type !== "gregorian" && (
                        <Tag color="volcano">{d.calendar_type}</Tag>
                      )}

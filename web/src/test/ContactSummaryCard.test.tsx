@@ -23,6 +23,8 @@ let mockCompanies: unknown[] = [];
 let mockGenders: unknown[] = [];
 let mockPronouns: unknown[] = [];
 let mockReligions: unknown[] = [];
+let mockImportantDates: unknown[] = [];
+let mockImportantDateTypes: unknown[] = [];
 let mockPreferences: unknown = { name_order: "%first_name% %last_name%" };
 
 vi.mock("@tanstack/react-query", () => ({
@@ -37,6 +39,8 @@ vi.mock("@tanstack/react-query", () => ({
     if (key.includes("genders")) return { data: mockGenders, isLoading: false };
     if (key.includes("pronouns")) return { data: mockPronouns, isLoading: false };
     if (key.includes("religions")) return { data: mockReligions, isLoading: false };
+    if (key.includes("important-dates")) return { data: mockImportantDates, isLoading: false };
+    if (key.includes("date-types")) return { data: mockImportantDateTypes, isLoading: false };
     if (key.includes("preferences")) return { data: mockPreferences, isLoading: false };
     if (key.includes("contacts")) return { data: mockContacts, isLoading: false };
     return { data: [], isLoading: false };
@@ -56,6 +60,8 @@ function resetMocks() {
   mockGenders = [];
   mockPronouns = [];
   mockReligions = [];
+  mockImportantDates = [];
+  mockImportantDateTypes = [];
   mockPreferences = { name_order: "%first_name% %last_name%" };
 }
 
@@ -157,5 +163,66 @@ describe("ContactSummaryCard — Family Summary (Issue #77)", () => {
     expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
     expect(screen.getByText("Running club")).toBeInTheDocument();
     expect(screen.queryByText("Not set")).not.toBeInTheDocument();
+  });
+
+  it("shows birthdate with age in summary mode", () => {
+    resetMocks();
+    mockImportantDateTypes = [
+      { id: 10, label: "Birthdate", internal_type: "birthdate", can_be_deleted: false },
+      { id: 11, label: "Deceased date", internal_type: "deceased_date", can_be_deleted: false },
+    ];
+    mockImportantDates = [
+      {
+        id: 1,
+        label: "Birthdate",
+        day: 15,
+        month: 3,
+        year: 1990,
+        calendar_type: "gregorian",
+        contact_important_date_type_id: 10,
+      },
+    ];
+
+    renderCard({ readOnly: true });
+
+    expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
+    expect(screen.getByText("Birthdate")).toBeInTheDocument();
+    expect(screen.getByText("Mar 15, 1990")).toBeInTheDocument();
+    expect(screen.getByText(/years old|year old/)).toBeInTheDocument();
+  });
+
+  it("shows age-at-death beside deceased date and not beside birthdate", () => {
+    resetMocks();
+    mockImportantDateTypes = [
+      { id: 10, label: "Birthdate", internal_type: "birthdate", can_be_deleted: false },
+      { id: 11, label: "Deceased date", internal_type: "deceased_date", can_be_deleted: false },
+    ];
+    mockImportantDates = [
+      {
+        id: 1,
+        label: "Birthdate",
+        day: 15,
+        month: 3,
+        year: 1950,
+        calendar_type: "gregorian",
+        contact_important_date_type_id: 10,
+      },
+      {
+        id: 2,
+        label: "Deceased date",
+        day: 14,
+        month: 3,
+        year: 2020,
+        calendar_type: "gregorian",
+        contact_important_date_type_id: 11,
+      },
+    ];
+
+    renderCard({ readOnly: true });
+
+    expect(screen.getByText("Birthdate")).toBeInTheDocument();
+    expect(screen.getByText("Deceased date")).toBeInTheDocument();
+    expect(screen.getByText("69 years old")).toBeInTheDocument();
+    expect(screen.getAllByText(/years old|year old/).length).toBe(1);
   });
 });
