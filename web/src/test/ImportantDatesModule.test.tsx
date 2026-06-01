@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import ImportantDatesModule from "@/pages/contact/modules/ImportantDatesModule";
@@ -25,6 +26,10 @@ vi.mock("@/components/CalendarDatePicker", () => ({
   default: () => <div data-testid="calendar-date-picker" />,
 }));
 
+const mutationMock = vi.hoisted(() => ({
+  mutate: vi.fn(),
+}));
+
 let mockDatesReturn: unknown = { data: [], isLoading: false };
 let mockPrefsReturn: unknown = { data: undefined };
 let mockDateTypesReturn: unknown = { data: [], isLoading: false };
@@ -35,7 +40,7 @@ vi.mock("@tanstack/react-query", () => ({
     if (key.includes("date-types")) return mockDateTypesReturn;
     return mockDatesReturn;
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useMutation: () => ({ mutate: mutationMock.mutate, isPending: false }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -85,6 +90,13 @@ const mockDates = [
 ];
 
 describe("ImportantDatesModule", () => {
+  beforeEach(() => {
+    mockDatesReturn = { data: [], isLoading: false };
+    mockPrefsReturn = { data: undefined };
+    mockDateTypesReturn = { data: [], isLoading: false };
+    mutationMock.mutate.mockClear();
+  });
+
   it("renders title and add button", () => {
     mockDatesReturn = { data: [], isLoading: false };
     renderModule();
@@ -206,5 +218,29 @@ describe("ImportantDatesModule", () => {
     renderModule();
     expect(screen.getByText("Nameday")).toBeInTheDocument();
     expect(screen.getByText(/Jun 15/)).toBeInTheDocument();
+  });
+
+  it("submits a new date with the default calendar date when date fields are unchanged", async () => {
+    const user = userEvent.setup();
+
+    renderModule();
+
+    await user.click(screen.getByRole("button", { name: /add/i }));
+    await user.type(screen.getByRole("textbox", { name: /label/i }), "Graduation Day");
+    await user.click(screen.getByRole("button", { name: /ok/i }));
+
+    await waitFor(() => {
+      expect(mutationMock.mutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          label: "Graduation Day",
+          calendarDate: expect.objectContaining({
+            calendarType: "gregorian",
+            day: expect.any(Number),
+            month: expect.any(Number),
+            year: expect.any(Number),
+          }),
+        }),
+      );
+    });
   });
 });

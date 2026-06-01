@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { ImportantDate, CreateImportantDateRequest, APIError, UserPreferences, ImportantDateTypeResponse } from "@/api";
 import { useTranslation } from "react-i18next";
+import dayjs from "dayjs";
 import { useDateFormat } from "@/utils/dateFormat";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
@@ -135,6 +136,20 @@ export default function ImportantDatesModule({
     setOpen(true);
   }
 
+  function openAdd() {
+    const today = dayjs();
+    const defaultCalendarDate: CalendarDatePickerValue = {
+      calendarType: "gregorian",
+      day: today.date(),
+      month: today.month() + 1,
+      year: today.year(),
+    };
+
+    // CalendarDatePicker renders today's date by default without emitting onChange.
+    form.setFieldsValue({ calendarDate: defaultCalendarDate, remind_me: false });
+    setOpen(true);
+  }
+
   function closeModal() {
     setOpen(false);
     setEditingId(null);
@@ -149,7 +164,7 @@ export default function ImportantDatesModule({
         body: { padding: '16px 24px' },
       }}
       extra={
-        <Button type="text" icon={<PlusOutlined />} onClick={() => setOpen(true)} style={{ color: token.colorPrimary }}>
+        <Button type="text" icon={<PlusOutlined />} onClick={openAdd} style={{ color: token.colorPrimary }}>
           {t("modules.important_dates.add")}
         </Button>
       }
