@@ -34,14 +34,17 @@ type Gift struct {
 	Description    *string    `json:"description" gorm:"type:text"`
 	EstimatedPrice *int       `json:"estimated_price"`
 	CurrencyID     *uint      `json:"currency_id" gorm:"index"`
+	GiftStateID    *uint      `json:"gift_state_id" gorm:"index"`
+	StatusDate     *time.Time `json:"status_date"`
 	ReceivedAt     *time.Time `json:"received_at"`
 	GivenAt        *time.Time `json:"given_at"`
 	BoughtAt       *time.Time `json:"bought_at"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 
-	Contact  Contact   `json:"contact,omitempty" gorm:"foreignKey:ContactID"`
-	Currency *Currency `json:"currency,omitempty" gorm:"foreignKey:CurrencyID"`
+	Contact   Contact    `json:"contact,omitempty" gorm:"foreignKey:ContactID"`
+	Currency  *Currency  `json:"currency,omitempty" gorm:"foreignKey:CurrencyID"`
+	GiftState *GiftState `json:"gift_state,omitempty" gorm:"foreignKey:GiftStateID"`
 }
 
 type ContactGift struct {
