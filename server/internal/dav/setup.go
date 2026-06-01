@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/caldav"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/labstack/echo/v4"
@@ -27,8 +28,7 @@ func SetupDAVRoutes(e *echo.Echo, db *gorm.DB) {
 		} else if strings.Contains(path, "/calendars/") {
 			calHandler.ServeHTTP(w, r)
 		} else if strings.Contains(path, "/principals/") {
-			// Principals can be served by either handler — they share the same logic
-			cardHandler.ServeHTTP(w, r)
+			serveDAVPrincipal(w, r, cardBackend, calBackend)
 		} else {
 			// Default: serve CardDAV for discovery
 			cardHandler.ServeHTTP(w, r)
@@ -46,5 +46,42 @@ func SetupDAVRoutes(e *echo.Echo, db *gorm.DB) {
 	})
 	e.Any("/.well-known/caldav", func(c echo.Context) error {
 		return c.Redirect(http.StatusMovedPermanently, "/dav/")
+	})
+}
+
+func serveDAVPrincipal(w http.ResponseWriter, r *http.Request, cardBackend *CardDAVBackend, calBackend *CalDAVBackend) {
+	if r.Method == http.MethodOptions {
+		w.Header().Add("DAV", "1, 3, addressbook, calendar-access")
+		w.Header().Add("Allow", "OPTIONS, PROPFIND, REPORT, DELETE, MKCOL")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	principalPath, err := cardBackend.CurrentUserPrincipal(r.Context())
+	if err != nil {
+		http.Error(w, "dav: failed to determine current user principal", http.StatusInternalServerError)
+		return
+	}
+	addressBookHomeSetPath, err := cardBackend.AddressBookHomeSetPath(r.Context())
+	if err != nil {
+		http.Error(w, "dav: failed to determine address book home set", http.StatusInternalServerError)
+		return
+	}
+	calendarHomeSetPath, err := calBackend.CalendarHomeSetPath(r.Context())
+	if err != nil {
+		http.Error(w, "dav: failed to determine calendar home set", http.StatusInternalServerError)
+		return
+	}
+
+	webdav.ServePrincipal(w, r, &webdav.ServePrincipalOptions{
+		CurrentUserPrincipalPath: principalPath,
+		HomeSets: []webdav.BackendSuppliedHomeSet{
+			carddav.NewAddressBookHomeSet(addressBookHomeSetPath),
+			caldav.NewCalendarHomeSet(calendarHomeSetPath),
+		},
+		Capabilities: []webdav.Capability{
+			carddav.CapabilityAddressBook,
+			caldav.CapabilityCalendar,
+		},
 	})
 }

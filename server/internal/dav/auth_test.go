@@ -124,6 +124,36 @@ func TestBasicAuth_NoCredentials(t *testing.T) {
 	}
 }
 
+func TestBasicAuth_OptionsBypassesChallenge(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+
+	mw := BasicAuthMiddleware(db)
+	called := false
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.Header().Set("DAV", "1, 3, addressbook")
+		w.Header().Set("Allow", "OPTIONS, PROPFIND, REPORT")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodOptions, "/dav/addressbooks/test-user/", nil)
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", rec.Code)
+	}
+	if !called {
+		t.Error("expected OPTIONS to reach DAV handler")
+	}
+	if got := rec.Header().Get("WWW-Authenticate"); got != "" {
+		t.Errorf("expected no Basic Auth challenge for OPTIONS, got %q", got)
+	}
+	assertHeaderContains(t, rec.Header(), "DAV", "addressbook")
+	assertHeaderContains(t, rec.Header(), "Allow", "PROPFIND")
+}
+
 func TestBasicAuth_NilPassword(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 
