@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Card,
   Typography,
@@ -64,6 +64,19 @@ import ContactSummaryCard from "./modules/ContactSummaryCard";
 
 const { Title, Text } = Typography;
 
+function buildContactListUrl(vaultId: string, search: string): string {
+  const incomingParams = new URLSearchParams(search);
+  const listParams = new URLSearchParams();
+  const page = incomingParams.get("page");
+  const perPage = incomingParams.get("per_page");
+
+  if (page) listParams.set("page", page);
+  if (perPage) listParams.set("per_page", perPage);
+
+  const query = listParams.toString();
+  return `/vaults/${vaultId}/contacts${query ? `?${query}` : ""}`;
+}
+
 // Module type → component mapping for dynamic tab rendering.
 // Modules like avatar, contact_names, family_summary, gender_pronoun, company,
 // religions are handled by the contact header card and ExtraInfoModule, not here.
@@ -96,6 +109,7 @@ export default function ContactDetail() {
   const vaultId = id!;
   const cId = contactId!;
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
   const { t } = useTranslation();
@@ -110,6 +124,7 @@ export default function ContactDetail() {
   const [editForm] = Form.useForm();
   const [moveForm] = Form.useForm();
   const [templateForm] = Form.useForm();
+  const contactListUrl = buildContactListUrl(vaultId, location.search);
 
   const { data: contact, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "contacts", cId],
@@ -185,7 +200,7 @@ export default function ContactDetail() {
         queryKey: ["vaults", vaultId, "contacts"],
       });
       message.success(t("contact.detail.deleted_success"));
-      navigate(`/vaults/${vaultId}/contacts`);
+      navigate(contactListUrl);
     },
     onError: (err: APIError) => {
       message.error(err.message || t("contact.detail.delete_failed"));
@@ -461,7 +476,7 @@ export default function ContactDetail() {
       <Button
         type="text"
         icon={<ArrowLeftOutlined />}
-        onClick={() => navigate(`/vaults/${vaultId}/contacts`)}
+        onClick={() => navigate(contactListUrl)}
         style={{ marginBottom: 16 }}
       >
         {t("contact.detail.back")}
@@ -862,8 +877,7 @@ function AvatarImageLoader({
   url: string; 
   updatedAt: string;
   initials: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  token: any;
+  token: ReturnType<typeof theme.useToken>["token"];
   onUpload: (file: File) => void;
   onDelete: () => void;
   isUploading: boolean;
@@ -985,7 +999,7 @@ function GenderPronounSelect({ entity, vaultId, placeholder, ...props }: {
   value?: number;
   onChange?: (value: number | undefined) => void;
 }) {
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading } = useQuery<PersonalizeItem[]>({
     queryKey: ["vaults", vaultId, "personalize", entity],
     queryFn: async () => {
       const res = await api.personalize.personalizeDetail(entity);
@@ -999,8 +1013,7 @@ function GenderPronounSelect({ entity, vaultId, placeholder, ...props }: {
       loading={isLoading}
       allowClear
       placeholder={placeholder}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      options={(items as any[]).map((item) => ({ label: item.label, value: item.id }))}
+      options={items.map((item) => ({ label: item.label, value: item.id }))}
     />
   );
 }

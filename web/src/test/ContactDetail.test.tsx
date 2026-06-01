@@ -133,14 +133,10 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual("react-router-dom");
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
   return {
     ...actual,
     useParams: () => ({ id: "1", contactId: "2" }),
-    useNavigate: () => {
-      const { useNavigate } = actual as any;
-      return useNavigate();
-    },
   };
 });
 
@@ -223,9 +219,7 @@ describe("ContactDetail", () => {
     
     renderContactDetail("/vaults/1/contacts/2?page=3&per_page=50");
     
-    // There are actually multiple back buttons, so we target the first one or the one with specific icon
-    const backButtons = await screen.findAllByRole("button", { name: /left/i });
-    await user.click(backButtons[0]);
+    await user.click(screen.getByRole("button", { name: /back/i }));
     
     await waitFor(() => {
       expect(screen.getByTestId("location-probe")).toHaveTextContent("/vaults/1/contacts?page=3&per_page=50");
