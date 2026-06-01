@@ -237,6 +237,7 @@
                     "updated_at": "2024-01-05T14:00:00Z",
                     "properties": {
                       "happened_at": "2024-01-05T14:00:00Z",
+                      "contact_field_type": "550e8400-e29b-41d4-a716-446655440031",
                       "messages": [
                         {
                           "uuid": "550e8400-e29b-41d4-a716-446655440061",
