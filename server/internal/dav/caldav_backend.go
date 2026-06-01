@@ -284,8 +284,12 @@ func (b *CalDAVBackend) putEvent(_ context.Context, path string, comp *ical.Comp
 
 	// Try to find existing
 	var existing models.ContactImportantDate
-	err := b.db.Where("uuid = ?", uid).First(&existing).Error
+	err := b.db.Preload("Contact").Where("uuid = ?", uid).First(&existing).Error
 	if err == nil {
+		// A globally unique event UID still has to belong to the requested DAV collection vault.
+		if existing.Contact.VaultID != vaultID {
+			return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("calendar object not found"))
+		}
 		// Update
 		existing.Label = summary
 		existing.Day = day
@@ -345,6 +349,10 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 	var existing models.ContactTask
 	err := b.db.Where("uuid = ?", uid).First(&existing).Error
 	if err == nil {
+		// A globally unique todo UID still has to belong to the requested DAV collection vault.
+		if existing.VaultID != vaultID {
+			return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("calendar object not found"))
+		}
 		// Update
 		existing.Label = summary
 		if description != "" {

@@ -212,6 +212,52 @@ func TestPutAddressObject(t *testing.T) {
 	}
 }
 
+func TestPutAddressObjectRejectsExistingContactFromDifferentVault(t *testing.T) {
+	backend, db, ctx, sourceVaultID, userID := setupCardDAVTest(t)
+	vaultSvc := services.NewVaultService(db)
+	targetVault, err := vaultSvc.CreateVault(AccountIDFromContext(ctx), userID, dto.CreateVaultRequest{Name: "Target Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create target vault failed: %v", err)
+	}
+
+	contact := createTestContact(t, db, sourceVaultID, userID, "Alice", "Original")
+
+	card := make(vcard.Card)
+	card.SetValue(vcard.FieldVersion, "3.0")
+	card.SetValue(vcard.FieldFormattedName, "Mallory Overwrite")
+	card.SetName(&vcard.Name{
+		GivenName:  "Mallory",
+		FamilyName: "Overwrite",
+	})
+
+	path := "/dav/addressbooks/" + userID + "/" + targetVault.ID + "/" + contact.ID + ".vcf"
+	_, err = backend.PutAddressObject(ctx, path, card, nil)
+	if err == nil {
+		t.Error("expected cross-vault contact update to be rejected")
+	}
+
+	var stored models.Contact
+	if err := db.First(&stored, "id = ?", contact.ID).Error; err != nil {
+		t.Fatalf("reload source contact: %v", err)
+	}
+	if stored.FirstName == nil || *stored.FirstName != "Alice" {
+		t.Fatalf("expected source contact first name to remain Alice, got %v", stored.FirstName)
+	}
+	if stored.LastName == nil || *stored.LastName != "Original" {
+		t.Fatalf("expected source contact last name to remain Original, got %v", stored.LastName)
+	}
+
+	var targetContactCount int64
+	if err := db.Model(&models.Contact{}).
+		Where("vault_id = ? AND first_name = ?", targetVault.ID, "Mallory").
+		Count(&targetContactCount).Error; err != nil {
+		t.Fatalf("count target contacts: %v", err)
+	}
+	if targetContactCount != 0 {
+		t.Fatalf("expected no Mallory contact in target vault, got %d", targetContactCount)
+	}
+}
+
 func TestDeleteAddressObject(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
 

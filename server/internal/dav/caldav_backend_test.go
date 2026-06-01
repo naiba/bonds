@@ -316,6 +316,116 @@ func TestGetCalendarObjectTask(t *testing.T) {
 	}
 }
 
+func TestPutCalendarObjectRejectsEventUIDFromDifferentVault(t *testing.T) {
+	backend, db, ctx, sourceVaultID, userID := setupCalDAVTest(t)
+	vaultSvc := services.NewVaultService(db)
+	targetVault, err := vaultSvc.CreateVault(AccountIDFromContext(ctx), userID, dto.CreateVaultRequest{Name: "Target Cal Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create target vault failed: %v", err)
+	}
+
+	contact := createTestContact(t, db, sourceVaultID, userID, "Event", "Owner")
+	uid := uuid.New().String()
+	day := 2
+	month := 1
+	year := 2000
+	importantDate := models.ContactImportantDate{
+		ContactID: contact.ID,
+		UUID:      &uid,
+		Label:     "Original event",
+		Day:       &day,
+		Month:     &month,
+		Year:      &year,
+	}
+	if err := db.Create(&importantDate).Error; err != nil {
+		t.Fatalf("create important date: %v", err)
+	}
+
+	calendar := ical.NewCalendar()
+	calendar.Props.SetText(ical.PropProductID, "-//Bonds Test//EN")
+	calendar.Props.SetText(ical.PropVersion, "2.0")
+	event := ical.NewComponent(ical.CompEvent)
+	event.Props.SetText(ical.PropUID, uid)
+	event.Props.SetText(ical.PropSummary, "Hijacked event")
+	calendar.Children = append(calendar.Children, event)
+
+	path := "/dav/calendars/" + userID + "/" + targetVault.ID + "/" + uid + ".ics"
+	_, err = backend.PutCalendarObject(ctx, path, calendar, nil)
+	if err == nil {
+		t.Error("expected cross-vault event UID update to be rejected")
+	}
+
+	var stored models.ContactImportantDate
+	if err := db.First(&stored, importantDate.ID).Error; err != nil {
+		t.Fatalf("reload important date: %v", err)
+	}
+	if stored.Label != "Original event" {
+		t.Fatalf("expected important date label to remain unchanged, got %q", stored.Label)
+	}
+	if stored.Day == nil || *stored.Day != day || stored.Month == nil || *stored.Month != month || stored.Year == nil || *stored.Year != year {
+		t.Fatalf("expected important date date fields to remain unchanged: day=%v month=%v year=%v", stored.Day, stored.Month, stored.Year)
+	}
+}
+
+func TestPutCalendarObjectRejectsTodoUIDFromDifferentVault(t *testing.T) {
+	backend, db, ctx, sourceVaultID, userID := setupCalDAVTest(t)
+	vaultSvc := services.NewVaultService(db)
+	targetVault, err := vaultSvc.CreateVault(AccountIDFromContext(ctx), userID, dto.CreateVaultRequest{Name: "Target Task Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create target vault failed: %v", err)
+	}
+
+	uid := uuid.New().String()
+	description := "Original description"
+	task := models.ContactTask{
+		VaultID:     sourceVaultID,
+		AuthorID:    &userID,
+		UUID:        &uid,
+		AuthorName:  "Test",
+		Label:       "Original task",
+		Description: &description,
+	}
+	if err := db.Create(&task).Error; err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+
+	calendar := ical.NewCalendar()
+	calendar.Props.SetText(ical.PropProductID, "-//Bonds Test//EN")
+	calendar.Props.SetText(ical.PropVersion, "2.0")
+	todo := ical.NewComponent(ical.CompToDo)
+	todo.Props.SetText(ical.PropUID, uid)
+	todo.Props.SetText(ical.PropSummary, "Hijacked task")
+	todo.Props.SetText(ical.PropDescription, "Hijacked description")
+	calendar.Children = append(calendar.Children, todo)
+
+	path := "/dav/calendars/" + userID + "/" + targetVault.ID + "/" + uid + ".ics"
+	_, err = backend.PutCalendarObject(ctx, path, calendar, nil)
+	if err == nil {
+		t.Error("expected cross-vault todo UID update to be rejected")
+	}
+
+	var stored models.ContactTask
+	if err := db.First(&stored, task.ID).Error; err != nil {
+		t.Fatalf("reload task: %v", err)
+	}
+	if stored.Label != "Original task" {
+		t.Fatalf("expected task label to remain unchanged, got %q", stored.Label)
+	}
+	if stored.Description == nil || *stored.Description != description {
+		t.Fatalf("expected task description to remain unchanged, got %v", stored.Description)
+	}
+
+	var targetTaskCount int64
+	if err := db.Model(&models.ContactTask{}).
+		Where("vault_id = ? AND uuid = ?", targetVault.ID, uid).
+		Count(&targetTaskCount).Error; err != nil {
+		t.Fatalf("count target tasks: %v", err)
+	}
+	if targetTaskCount != 0 {
+		t.Fatalf("expected no task with reused UID in target vault, got %d", targetTaskCount)
+	}
+}
+
 func TestCalendarHomeSetPath(t *testing.T) {
 	backend, _, ctx, _, userID := setupCalDAVTest(t)
 
