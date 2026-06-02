@@ -32,6 +32,7 @@ func NewContactMoveHandler(contactMoveService *services.ContactMoveService) *Con
 //	@Success		200			{object}	response.APIResponse
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
+//	@Failure		403			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
@@ -56,6 +57,12 @@ func (h *ContactMoveHandler) Move(c echo.Context) error {
 		}
 		if errors.Is(err, services.ErrTargetVaultNotFound) {
 			return response.NotFound(c, "err.target_vault_not_found")
+		}
+		if errors.Is(err, services.ErrVaultForbidden) {
+			return response.Forbidden(c, "err.no_vault_access_short")
+		}
+		if errors.Is(err, services.ErrInsufficientPerm) {
+			return response.Forbidden(c, "err.insufficient_permissions_short")
 		}
 		return response.InternalError(c, "err.failed_to_move_contact")
 	}

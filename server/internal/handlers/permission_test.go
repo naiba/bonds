@@ -70,6 +70,26 @@ func addUserToVault(t *testing.T, ts *testServer, userID, vaultID string, permis
 	}
 }
 
+func getHandlerUserVault(t *testing.T, ts *testServer, userID, vaultID string) models.UserVault {
+	t.Helper()
+	var userVault models.UserVault
+	if err := ts.db.First(&userVault, "user_id = ? AND vault_id = ?", userID, vaultID).Error; err != nil {
+		t.Fatalf("failed to load user_vault: %v", err)
+	}
+	return userVault
+}
+
+func assertHandlerContactVault(t *testing.T, ts *testServer, contactID, vaultID string) {
+	t.Helper()
+	var contact models.Contact
+	if err := ts.db.First(&contact, "id = ?", contactID).Error; err != nil {
+		t.Fatalf("failed to load contact: %v", err)
+	}
+	if contact.VaultID != vaultID {
+		t.Fatalf("expected contact %s to remain in vault %s, got %s", contactID, vaultID, contact.VaultID)
+	}
+}
+
 func TestTwoFactorPendingTokenBlocked(t *testing.T) {
 	ts := setupTestServer(t)
 
@@ -2151,6 +2171,105 @@ func TestViewerCannotMoveContact(t *testing.T) {
 	rec := ts.doRequest(http.MethodPost, path, `{"target_vault_id":"fake"}`, viewerToken)
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("expected 403 for Viewer moving contact, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestContactMoveTargetVaultForbiddenReturns403(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "move-target-source-manager@example.com")
+	sourceVault := ts.createTestVault(t, token, "Move Source Vault")
+	targetVault := ts.createTestVault(t, token, "Move Target Vault")
+	contact := ts.createTestContact(t, token, sourceVault.ID, "MoveTargetForbidden")
+
+	editor := createSecondUser(t, ts, auth.User.AccountID, "move-target-source-editor@example.com", false)
+	addUserToVault(t, ts, editor.ID, sourceVault.ID, models.PermissionEditor)
+	editorToken := generateJWT(editor.ID, editor.AccountID, editor.Email, false, false)
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/move", sourceVault.ID, contact.ID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"target_vault_id":%q}`, targetVault.ID), editorToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for move to inaccessible target vault, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "FORBIDDEN" {
+		t.Fatalf("expected FORBIDDEN error, got %+v", resp.Error)
+	}
+}
+
+func TestContactMoveTargetVaultInsufficientPermissionReturns403(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "move-target-viewer-manager@example.com")
+	sourceVault := ts.createTestVault(t, token, "Move Source Vault")
+	targetVault := ts.createTestVault(t, token, "Move Target Vault")
+	contact := ts.createTestContact(t, token, sourceVault.ID, "MoveTargetViewer")
+
+	editor := createSecondUser(t, ts, auth.User.AccountID, "move-target-viewer-editor@example.com", false)
+	addUserToVault(t, ts, editor.ID, sourceVault.ID, models.PermissionEditor)
+	addUserToVault(t, ts, editor.ID, targetVault.ID, models.PermissionViewer)
+	editorToken := generateJWT(editor.ID, editor.AccountID, editor.Email, false, false)
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/move", sourceVault.ID, contact.ID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"target_vault_id":%q}`, targetVault.ID), editorToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for move to viewer-only target vault, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "FORBIDDEN" {
+		t.Fatalf("expected FORBIDDEN error, got %+v", resp.Error)
+	}
+}
+
+func TestContactMoveCrossAccountTargetReturns403(t *testing.T) {
+	ts := setupTestServer(t)
+	sourceToken, sourceAuth := ts.registerTestUser(t, "move-cross-account-source@example.com")
+	sourceVault := ts.createTestVault(t, sourceToken, "Cross Account Source Vault")
+	contact := ts.createTestContact(t, sourceToken, sourceVault.ID, "CrossAccountMove")
+
+	targetToken, _ := ts.registerTestUser(t, "move-cross-account-target@example.com")
+	targetVault := ts.createTestVault(t, targetToken, "Cross Account Target Vault")
+	addUserToVault(t, ts, sourceAuth.User.ID, targetVault.ID, models.PermissionEditor)
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/move", sourceVault.ID, contact.ID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"target_vault_id":%q}`, targetVault.ID), sourceToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for cross-account target vault move, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "FORBIDDEN" {
+		t.Fatalf("expected FORBIDDEN error, got %+v", resp.Error)
+	}
+	assertHandlerContactVault(t, ts, contact.ID, sourceVault.ID)
+}
+
+func TestContactMoveShadowSelfContactReturnsNotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "move-shadow-self@example.com")
+	sourceVault := ts.createTestVault(t, token, "Shadow Source Vault")
+	targetVault := ts.createTestVault(t, token, "Shadow Target Vault")
+	sourceUserVault := getHandlerUserVault(t, ts, auth.User.ID, sourceVault.ID)
+	targetUserVault := getHandlerUserVault(t, ts, auth.User.ID, targetVault.ID)
+	shadowContactID := sourceUserVault.ContactID
+	if shadowContactID == "" {
+		t.Fatal("expected source UserVault.ContactID to be populated")
+	}
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/move", sourceVault.ID, shadowContactID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"target_vault_id":%q}`, targetVault.ID), token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for shadow self-contact move, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "NOT_FOUND" {
+		t.Fatalf("expected NOT_FOUND error, got %+v", resp.Error)
+	}
+	assertHandlerContactVault(t, ts, shadowContactID, sourceVault.ID)
+	reloadedSourceUserVault := getHandlerUserVault(t, ts, auth.User.ID, sourceVault.ID)
+	reloadedTargetUserVault := getHandlerUserVault(t, ts, auth.User.ID, targetVault.ID)
+	if reloadedSourceUserVault.ContactID != sourceUserVault.ContactID {
+		t.Fatalf("expected source UserVault.ContactID to remain %s, got %s", sourceUserVault.ContactID, reloadedSourceUserVault.ContactID)
+	}
+	if reloadedTargetUserVault.ContactID != targetUserVault.ContactID {
+		t.Fatalf("expected target UserVault.ContactID to remain %s, got %s", targetUserVault.ContactID, reloadedTargetUserVault.ContactID)
 	}
 }
 
