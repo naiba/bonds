@@ -29,7 +29,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **Contacts**: Full lifecycle management with notes, tasks, reminders, gifts, debts, activities, life events, pets, and more. Includes a needs-verification flag to keep your data fresh.
 - **Vault Dashboard**: Responsive 3-column layout with activity feed, life events, life metrics tracking (+1 counter), mood recording, upcoming reminders, and due tasks.
 - **Vaults**: Multi-vault data isolation with role-based access (Manager, Editor, Viewer).
-- **Reminders**: One-time and recurring (weekly, monthly, yearly), with email and Telegram notifications.
+- **Reminders**: One-time and recurring (weekly, monthly, yearly), with email and Shoutrrr-compatible notifications.
 - **Full-text Search**: Bleve-powered CJK-aware search across contacts and notes.
 - **CardDAV / CalDAV**: Sync contacts and calendars with Apple, Thunderbird, and other DAV clients. Supports Personal Access Tokens.
 - **DAV Sync Subscriptions**: Subscribe to and sync from external CardDAV address books directly into a vault.
@@ -45,7 +45,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **User Invitations**: Invite others to your account via email with permission levels.
 - **Audit Log**: Feed of all changes across contacts.
 - **Geocoding**: Address coordinates via Nominatim (free) or LocationIQ.
-- **Telegram Notifications**: Reminder delivery via Telegram bot.
+- **Shoutrrr Notifications**: Reminder delivery via Telegram and other Shoutrrr-compatible channels.
 - **i18n**: English and Chinese, frontend and backend.
 
 ## Quick Start
