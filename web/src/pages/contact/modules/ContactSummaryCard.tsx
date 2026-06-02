@@ -8,6 +8,7 @@ import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { getReadableLabelTagColors } from "@/utils/labelColor";
 import type { ImportantDate, ImportantDateTypeResponse } from "@/api";
 import { useDateFormat } from "@/utils/dateFormat";
+import { formatDateOnly } from "@/utils/dateOnlyInput";
 import { computeAgeAtImportantDate, computeImportantDateAge, formatImportantDateDisplay } from "@/utils/importantDateDisplay";
 
 const { Text } = Typography;
@@ -205,6 +206,8 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
   const hasGenderOrPronoun = !!genderLabel || !!pronounLabel;
   const hasReligion = !!religionLabel;
   const hasAddress = !!primaryAddress;
+  const metThroughContact = contact.first_met_through_contact;
+  const hasMeetingMetadata = !!contact.first_met_at || !!metThroughContact?.id;
   const getImportantDateByInternalType = (internalType: string): ImportantDate | undefined => (
     importantDates.find((date) => {
       const dateType = importantDateTypes.find((type) => type.id === date.contact_important_date_type_id);
@@ -216,7 +219,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
   const birthDateAge = birthDate && !deceasedDate ? computeImportantDateAge(birthDate) : null;
   const deceasedDateAge = computeAgeAtImportantDate(birthDate, deceasedDate);
   const hasImportantSummaryDates = !!birthDate || !!deceasedDate;
-  const hasSummaryData = hasRelationships || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress || hasImportantSummaryDates;
+  const hasSummaryData = hasRelationships || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress || hasImportantSummaryDates || hasMeetingMetadata;
 
   if (readOnly && !hasSummaryData) return null;
 
@@ -260,6 +263,29 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
                 </span>
               );
             })}
+          </Space>
+        </div>
+      )}
+
+      {hasMeetingMetadata && (
+        <div style={sectionStyle}>
+          <Text type="secondary" style={sectionLabelStyle}>
+            {t("contact.meeting.title")}
+          </Text>
+          <Space direction="vertical" size={2}>
+            {contact.first_met_at && (
+              <Text style={{ fontSize: 13 }}>
+                {t("contact.meeting.first_met_at")}: {formatDateOnly(contact.first_met_at, dateFormats)}
+              </Text>
+            )}
+            {metThroughContact?.id && metThroughContact.name && (
+              <Text style={{ fontSize: 13 }}>
+                {t("contact.meeting.first_met_through")}: {" "}
+                <Link to={`/vaults/${vaultId}/contacts/${metThroughContact.id}`} style={{ color: token.colorPrimary }}>
+                  {metThroughContact.name}
+                </Link>
+              </Text>
+            )}
           </Space>
         </div>
       )}

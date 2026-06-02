@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import ContactSummaryCard from "@/pages/contact/modules/ContactSummaryCard";
+import type { Contact } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -65,12 +66,12 @@ function resetMocks() {
   mockPreferences = { name_order: "%first_name% %last_name%" };
 }
 
-function renderCard({ readOnly = false }: { readOnly?: boolean } = {}) {
+function renderCard({ readOnly = false, contact = { id: "c1" } }: { readOnly?: boolean; contact?: Contact } = {}) {
   return render(
     <ConfigProvider>
       <AntApp>
         <MemoryRouter>
-          <ContactSummaryCard vaultId="v1" contactId="c1" contact={{ id: "c1" }} readOnly={readOnly} />
+          <ContactSummaryCard vaultId="v1" contactId="c1" contact={contact} readOnly={readOnly} />
         </MemoryRouter>
       </AntApp>
     </ConfigProvider>,
@@ -163,6 +164,24 @@ describe("ContactSummaryCard — Family Summary (Issue #77)", () => {
     expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
     expect(screen.getByText("Running club")).toBeInTheDocument();
     expect(screen.queryByText("Not set")).not.toBeInTheDocument();
+  });
+
+  it("shows first-met metadata in read mode", () => {
+    resetMocks();
+
+    renderCard({
+      readOnly: true,
+      contact: {
+        id: "c1",
+        first_met_at: "2026-01-15T00:00:00Z",
+        first_met_through_contact: { id: "c2", name: "Mary Host" },
+      },
+    });
+
+    expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
+    expect(screen.getByText("How you met")).toBeInTheDocument();
+    expect(screen.getByText("First met: Jan 15, 2026")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Mary Host" })).toHaveAttribute("href", "/vaults/v1/contacts/c2");
   });
 
   it("shows birthdate with age in summary mode", () => {
