@@ -41,6 +41,15 @@ func (s *ContactService) SetDavPushService(ps *DavPushService) {
 	s.davPushService = ps
 }
 
+func reloadContactWithSameVaultFirstMetThrough(db *gorm.DB, contact *models.Contact, vaultID string) error {
+	if contact.FirstMetThroughContactID == nil {
+		return nil
+	}
+	// Reload the optional introducer inside the same vault before serializing so
+	// single-contact responses keep first_met_through metadata without leaking cross-vault data.
+	return db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(contact, "id = ?", contact.ID).Error
+}
+
 func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort, filter string) ([]dto.ContactResponse, response.Meta, error) {
 	// Exclude UserVault shadow contacts (can_be_deleted=false AND listed=false)
 	query := s.db.Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false)
@@ -81,7 +90,7 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 	orderClause := contactSortOrder(sort)
 	finalOrder := favoriteOrderClause(userID) + ", " + orderClause
 	var contacts []models.Contact
-	if err := query.Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
+	if err := query.Preload("FirstMetThrough", "vault_id = ?", vaultID).Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 	contactIDs := make([]string, len(contacts))
@@ -114,6 +123,12 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 }
 
 func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
+	if req.FirstMetThroughContactID != nil {
+		if err := validateContactBelongsToVault(s.db, *req.FirstMetThroughContactID, vaultID); err != nil {
+			return nil, err
+		}
+	}
+
 	now := time.Now()
 	contact := models.Contact{
 		VaultID:                  vaultID,
@@ -128,6 +143,8 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		PronounID:                req.PronounID,
 		TemplateID:               req.TemplateID,
 		LastTalkedTo:             req.LastTalkedTo,
+		FirstMetAt:               req.FirstMetAt,
+		FirstMetThroughContactID: req.FirstMetThroughContactID,
 		StayInTouchFrequencyDays: req.StayInTouchFrequencyDays,
 		StayInTouchTriggerDate:   calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays),
 		LastUpdatedAt:            &now,
@@ -157,6 +174,9 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		s.db.Model(&contact).Update("listed", false)
 		contact.Listed = false
 	}
+	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
+		return nil, err
+	}
 
 	if s.feedRecorder != nil {
 		desc := "Created contact " + req.FirstName
@@ -177,7 +197,7 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 
 func (s *ContactService) GetContact(contactID, userID, vaultID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
-	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrContactNotFound
 		}
@@ -203,6 +223,11 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 		}
 		return nil, err
 	}
+	if req.FirstMetThroughContactID != nil {
+		if err := validateContactBelongsToVault(s.db, *req.FirstMetThroughContactID, vaultID); err != nil {
+			return nil, err
+		}
+	}
 
 	now := time.Now()
 	contact.FirstName = &req.FirstName
@@ -216,6 +241,8 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 	contact.PronounID = req.PronounID
 	contact.TemplateID = req.TemplateID
 	contact.LastTalkedTo = req.LastTalkedTo
+	contact.FirstMetAt = req.FirstMetAt
+	contact.FirstMetThroughContactID = req.FirstMetThroughContactID
 	contact.StayInTouchFrequencyDays = req.StayInTouchFrequencyDays
 	contact.StayInTouchTriggerDate = calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays)
 	contact.LastUpdatedAt = &now
@@ -224,6 +251,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 	}
 
 	if err := s.db.Save(&contact).Error; err != nil {
+		return nil, err
+	}
+	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
 
@@ -285,6 +315,9 @@ func (s *ContactService) ToggleArchive(contactID, vaultID string) (*dto.ContactR
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
 	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
+	}
 
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
@@ -318,6 +351,10 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 		if err := s.db.Save(&cvu).Error; err != nil {
 			return nil, err
 		}
+	}
+
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
 	}
 
 	resp := toContactResponse(&contact, cvu.IsFavorite)
@@ -380,6 +417,9 @@ func (s *ContactService) MarkCaughtUp(contactID, vaultID string) (*dto.ContactRe
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
 	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
+	}
 
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
@@ -417,7 +457,7 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	orderClause := contactSortOrder(sort)
 	finalOrder := favoriteOrderClause(userID) + ", " + orderClause
 	var contacts []models.Contact
-	if err := query.Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
+	if err := query.Preload("FirstMetThrough", "vault_id = ?", vaultID).Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 	contactIDs := make([]string, len(contacts))
@@ -528,13 +568,25 @@ func contactSortOrder(sort string) string {
 	case "last_name":
 		return "last_name ASC, first_name ASC"
 	case "created_at":
-		return "created_at DESC"
+		return "created_at DESC, first_name ASC, last_name ASC"
+	case "first_met_at":
+		return "CASE WHEN first_met_at IS NULL THEN 1 ELSE 0 END ASC, first_met_at DESC, first_name ASC, last_name ASC"
 	default:
-		return "updated_at DESC"
+		return "updated_at DESC, first_name ASC, last_name ASC"
 	}
 }
 
 func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
+	var firstMetThroughContact *dto.ContactSearchItem
+	var firstMetThroughContactID *string
+	if c.FirstMetThrough != nil && c.FirstMetThrough.VaultID == c.VaultID {
+		firstMetThroughContactID = c.FirstMetThroughContactID
+		firstMetThroughContact = &dto.ContactSearchItem{
+			ID:   c.FirstMetThrough.ID,
+			Name: buildContactDisplayName(c.FirstMetThrough),
+		}
+	}
+
 	return dto.ContactResponse{
 		ID:                       c.ID,
 		VaultID:                  c.VaultID,
@@ -553,6 +605,9 @@ func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
 		FileID:                   c.FileID,
 		JobPosition:              ptrToStr(c.JobPosition),
 		LastTalkedTo:             c.LastTalkedTo,
+		FirstMetAt:               c.FirstMetAt,
+		FirstMetThroughContactID: firstMetThroughContactID,
+		FirstMetThroughContact:   firstMetThroughContact,
 		StayInTouchFrequencyDays: c.StayInTouchFrequencyDays,
 		StayInTouchTriggerDate:   c.StayInTouchTriggerDate,
 		Listed:                   c.Listed,

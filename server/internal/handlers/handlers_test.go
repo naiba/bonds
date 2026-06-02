@@ -738,6 +738,26 @@ func TestContactCreate_Success(t *testing.T) {
 	}
 }
 
+func TestContactCreate_FirstMetThroughMissingReturnsNotFound(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "ccreate-missing-first-met@example.com")
+	vault := ts.createTestVault(t, token, "Create Contact Vault")
+
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
+		`{"first_name":"Alice","first_met_through_contact_id":"00000000-0000-0000-0000-000000000000"}`, token)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+	if resp.Error == nil || resp.Error.Code != "NOT_FOUND" {
+		t.Fatalf("expected NOT_FOUND error, got %+v", resp.Error)
+	}
+}
+
 func TestContactStayInTouchFields_CreateUpdateAndCatchUp(t *testing.T) {
 	ts := setupTestServer(t)
 	token, auth := ts.registerTestUser(t, "contact-stay-in-touch@example.com")

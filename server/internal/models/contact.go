@@ -49,7 +49,7 @@ type Contact struct {
 	Pronoun  *Pronoun  `json:"pronoun,omitempty" gorm:"foreignKey:PronounID"`
 	Template *Template `json:"template,omitempty" gorm:"foreignKey:TemplateID"`
 	Company  *Company  `json:"company,omitempty" gorm:"foreignKey:CompanyID"`
-	// Optional self-reference is cleaned in BeforeDelete to avoid SQLite table rebuild failures.
+	// Optional self-reference is cleaned on soft and hard deletes to avoid stale meeting metadata.
 	FirstMetThrough     *Contact               `json:"first_met_through,omitempty" gorm:"foreignKey:FirstMetThroughContactID;references:ID;constraint:-"`
 	File                *File                  `json:"file,omitempty" gorm:"foreignKey:FileID"`
 	Religion            *Religion              `json:"religion,omitempty" gorm:"foreignKey:ReligionID"`
@@ -81,7 +81,7 @@ func (c *Contact) BeforeCreate(tx *gorm.DB) error {
 }
 
 func (c *Contact) BeforeDelete(tx *gorm.DB) error {
-	if c.ID == "" || !tx.Statement.Unscoped {
+	if c.ID == "" {
 		return nil
 	}
 	return tx.Model(&Contact{}).

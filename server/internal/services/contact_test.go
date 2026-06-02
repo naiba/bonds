@@ -34,6 +34,28 @@ func setupContactTest(t *testing.T) (*ContactService, string, string, string) {
 	return NewContactService(db), vault.ID, resp.User.ID, resp.User.AccountID
 }
 
+func setupContactWithFirstMetThrough(t *testing.T) (*ContactService, string, string, *dto.ContactResponse, *dto.ContactResponse) {
+	t.Helper()
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	introducer, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Introducer"})
+	if err != nil {
+		t.Fatalf("Create introducer failed: %v", err)
+	}
+
+	firstMetAt := time.Date(2026, 3, 12, 9, 15, 0, 0, time.UTC)
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "Met",
+		FirstMetAt:               &firstMetAt,
+		FirstMetThroughContactID: &introducer.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	return svc, vaultID, userID, introducer, contact
+}
+
 func TestCreateContact(t *testing.T) {
 	svc, vaultID, userID, _ := setupContactTest(t)
 
@@ -88,6 +110,99 @@ func TestCreateContactStayInTouchFields(t *testing.T) {
 	}
 }
 
+func TestCreateContactFirstMetFields(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	introducedBy, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "Bob",
+		LastName:  "Introducer",
+	})
+	if err != nil {
+		t.Fatalf("Create introducer contact failed: %v", err)
+	}
+	firstMetAt := time.Date(2026, 3, 12, 9, 15, 0, 0, time.UTC)
+
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "Alice",
+		FirstMetAt:               &firstMetAt,
+		FirstMetThroughContactID: &introducedBy.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	if contact.FirstMetAt == nil || !contact.FirstMetAt.Equal(firstMetAt) {
+		t.Fatalf("expected first_met_at %v, got %v", firstMetAt, contact.FirstMetAt)
+	}
+	if contact.FirstMetThroughContactID == nil || *contact.FirstMetThroughContactID != introducedBy.ID {
+		t.Fatalf("expected first_met_through_contact_id %s, got %v", introducedBy.ID, contact.FirstMetThroughContactID)
+	}
+	if contact.FirstMetThroughContact == nil {
+		t.Fatal("expected first_met_through_contact brief response")
+	}
+	if contact.FirstMetThroughContact.ID != introducedBy.ID {
+		t.Fatalf("expected first_met_through_contact id %s, got %s", introducedBy.ID, contact.FirstMetThroughContact.ID)
+	}
+	if contact.FirstMetThroughContact.Name != "Bob Introducer" {
+		t.Fatalf("expected first_met_through_contact name 'Bob Introducer', got %q", contact.FirstMetThroughContact.Name)
+	}
+
+	got, err := svc.GetContact(contact.ID, userID, vaultID)
+	if err != nil {
+		t.Fatalf("GetContact failed: %v", err)
+	}
+	if got.FirstMetThroughContact == nil || got.FirstMetThroughContact.ID != introducedBy.ID {
+		t.Fatalf("expected GetContact to return met-through brief contact, got %+v", got.FirstMetThroughContact)
+	}
+}
+
+func TestCreateContactFirstMetThroughRejectsDifferentVault(t *testing.T) {
+	svc, vaultID, userID, accountID := setupContactTest(t)
+	otherVault, err := NewVaultService(svc.db).CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Other Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create other vault failed: %v", err)
+	}
+	otherVaultContact, err := svc.CreateContact(otherVault.ID, userID, dto.CreateContactRequest{FirstName: "Other", LastName: "Vault"})
+	if err != nil {
+		t.Fatalf("Create other vault contact failed: %v", err)
+	}
+
+	_, err = svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "BlockedCreate",
+		FirstMetThroughContactID: &otherVaultContact.ID,
+	})
+	if err != ErrContactNotFound {
+		t.Fatalf("expected ErrContactNotFound for cross-vault met-through contact, got %v", err)
+	}
+
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "BlockedCreate", "first_name", "")
+	if err != nil {
+		t.Fatalf("ListContacts failed: %v", err)
+	}
+	if len(contacts) != 0 {
+		t.Fatalf("expected rejected contact not to persist, got %+v", contacts)
+	}
+}
+
+func TestCreateContactFirstMetThroughRejectsNonexistentContact(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	nonexistentContactID := "00000000-0000-0000-0000-000000000000"
+
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "MissingIntroducer",
+		FirstMetThroughContactID: &nonexistentContactID,
+	})
+	if err != ErrContactNotFound {
+		t.Fatalf("expected ErrContactNotFound for nonexistent met-through contact, got %v", err)
+	}
+
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "MissingIntroducer", "first_name", "")
+	if err != nil {
+		t.Fatalf("ListContacts failed: %v", err)
+	}
+	if len(contacts) != 0 {
+		t.Fatalf("expected rejected contact not to persist, got %+v", contacts)
+	}
+}
+
 func TestUpdateContactStayInTouchFields(t *testing.T) {
 	svc, vaultID, userID, _ := setupContactTest(t)
 	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
@@ -128,6 +243,134 @@ func TestUpdateContactStayInTouchFields(t *testing.T) {
 	}
 }
 
+func TestUpdateContactFirstMetFieldsChangesAndClears(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	firstIntroducer, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "First", LastName: "Introducer"})
+	if err != nil {
+		t.Fatalf("Create first introducer failed: %v", err)
+	}
+	secondIntroducer, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Second", LastName: "Introducer"})
+	if err != nil {
+		t.Fatalf("Create second introducer failed: %v", err)
+	}
+
+	firstMetAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:                "Updated",
+		FirstMetAt:               &firstMetAt,
+		FirstMetThroughContactID: &firstIntroducer.ID,
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact failed: %v", err)
+	}
+	if updated.FirstMetAt == nil || !updated.FirstMetAt.Equal(firstMetAt) {
+		t.Fatalf("expected first_met_at %v, got %v", firstMetAt, updated.FirstMetAt)
+	}
+	if updated.FirstMetThroughContact == nil || updated.FirstMetThroughContact.Name != "First Introducer" {
+		t.Fatalf("expected first introducer brief contact, got %+v", updated.FirstMetThroughContact)
+	}
+
+	changedFirstMetAt := time.Date(2026, 5, 2, 13, 30, 0, 0, time.UTC)
+	changed, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:                "Changed",
+		FirstMetAt:               &changedFirstMetAt,
+		FirstMetThroughContactID: &secondIntroducer.ID,
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact change failed: %v", err)
+	}
+	if changed.FirstMetAt == nil || !changed.FirstMetAt.Equal(changedFirstMetAt) {
+		t.Fatalf("expected changed first_met_at %v, got %v", changedFirstMetAt, changed.FirstMetAt)
+	}
+	if changed.FirstMetThroughContactID == nil || *changed.FirstMetThroughContactID != secondIntroducer.ID {
+		t.Fatalf("expected changed met-through id %s, got %v", secondIntroducer.ID, changed.FirstMetThroughContactID)
+	}
+	if changed.FirstMetThroughContact == nil || changed.FirstMetThroughContact.Name != "Second Introducer" {
+		t.Fatalf("expected second introducer brief contact, got %+v", changed.FirstMetThroughContact)
+	}
+
+	cleared, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{FirstName: "Cleared"})
+	if err != nil {
+		t.Fatalf("UpdateContact clear failed: %v", err)
+	}
+	if cleared.FirstMetAt != nil {
+		t.Fatalf("expected first_met_at to clear on full update, got %v", cleared.FirstMetAt)
+	}
+	if cleared.FirstMetThroughContactID != nil {
+		t.Fatalf("expected first_met_through_contact_id to clear on full update, got %v", *cleared.FirstMetThroughContactID)
+	}
+	if cleared.FirstMetThroughContact != nil {
+		t.Fatalf("expected first_met_through_contact to clear on full update, got %+v", cleared.FirstMetThroughContact)
+	}
+}
+
+func TestUpdateContactFirstMetThroughRejectsDifferentVault(t *testing.T) {
+	svc, vaultID, userID, accountID := setupContactTest(t)
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	otherVault, err := NewVaultService(svc.db).CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Other Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create other vault failed: %v", err)
+	}
+	otherVaultContact, err := svc.CreateContact(otherVault.ID, userID, dto.CreateContactRequest{FirstName: "Other", LastName: "Vault"})
+	if err != nil {
+		t.Fatalf("Create other vault contact failed: %v", err)
+	}
+
+	_, err = svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:                "BlockedUpdate",
+		FirstMetThroughContactID: &otherVaultContact.ID,
+	})
+	if err != ErrContactNotFound {
+		t.Fatalf("expected ErrContactNotFound for cross-vault met-through contact, got %v", err)
+	}
+
+	reloaded, err := svc.GetContact(created.ID, userID, vaultID)
+	if err != nil {
+		t.Fatalf("GetContact failed: %v", err)
+	}
+	if reloaded.FirstName != "Original" {
+		t.Fatalf("expected rejected update not to modify first_name, got %q", reloaded.FirstName)
+	}
+	if reloaded.FirstMetThroughContactID != nil || reloaded.FirstMetThroughContact != nil {
+		t.Fatalf("expected rejected update not to persist met-through data, got id=%v brief=%+v", reloaded.FirstMetThroughContactID, reloaded.FirstMetThroughContact)
+	}
+}
+
+func TestUpdateContactFirstMetThroughRejectsNonexistentContact(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	nonexistentContactID := "00000000-0000-0000-0000-000000000000"
+
+	_, err = svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:                "MissingIntroducerUpdate",
+		FirstMetThroughContactID: &nonexistentContactID,
+	})
+	if err != ErrContactNotFound {
+		t.Fatalf("expected ErrContactNotFound for nonexistent met-through contact, got %v", err)
+	}
+
+	reloaded, err := svc.GetContact(created.ID, userID, vaultID)
+	if err != nil {
+		t.Fatalf("GetContact failed: %v", err)
+	}
+	if reloaded.FirstName != "Original" {
+		t.Fatalf("expected rejected update not to modify first_name, got %q", reloaded.FirstName)
+	}
+	if reloaded.FirstMetThroughContactID != nil || reloaded.FirstMetThroughContact != nil {
+		t.Fatalf("expected rejected update not to persist met-through data, got id=%v brief=%+v", reloaded.FirstMetThroughContactID, reloaded.FirstMetThroughContact)
+	}
+}
+
 func TestListContacts(t *testing.T) {
 	svc, vaultID, userID, _ := setupContactTest(t)
 
@@ -149,6 +392,43 @@ func TestListContacts(t *testing.T) {
 	}
 	if meta.Total != 2 {
 		t.Errorf("Expected total 2, got %d", meta.Total)
+	}
+}
+
+func TestListContactsReturnsFirstMetThroughBriefContact(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	introducedBy, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Casey", LastName: "Connector"})
+	if err != nil {
+		t.Fatalf("Create introducer contact failed: %v", err)
+	}
+	firstMetAt := time.Date(2026, 6, 3, 18, 45, 0, 0, time.UTC)
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "Dana",
+		FirstMetAt:               &firstMetAt,
+		FirstMetThroughContactID: &introducedBy.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "Dana", "first_name", "")
+	if err != nil {
+		t.Fatalf("ListContacts failed: %v", err)
+	}
+	if len(contacts) != 1 {
+		t.Fatalf("expected 1 filtered contact, got %d", len(contacts))
+	}
+	if contacts[0].ID != created.ID {
+		t.Fatalf("expected contact %s, got %s", created.ID, contacts[0].ID)
+	}
+	if contacts[0].FirstMetAt == nil || !contacts[0].FirstMetAt.Equal(firstMetAt) {
+		t.Fatalf("expected first_met_at %v, got %v", firstMetAt, contacts[0].FirstMetAt)
+	}
+	if contacts[0].FirstMetThroughContact == nil {
+		t.Fatal("expected list response to include met-through brief contact")
+	}
+	if contacts[0].FirstMetThroughContact.ID != introducedBy.ID || contacts[0].FirstMetThroughContact.Name != "Casey Connector" {
+		t.Fatalf("expected met-through brief Casey Connector, got %+v", contacts[0].FirstMetThroughContact)
 	}
 }
 
@@ -174,6 +454,104 @@ func TestListContactsSortByFirstName(t *testing.T) {
 	}
 	if contacts[2].FirstName != "Charlie" {
 		t.Errorf("Expected third contact 'Charlie', got '%s'", contacts[2].FirstName)
+	}
+}
+
+func TestListContactsSortByFirstMetAtPutsDatedContactsBeforeNil(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	olderMetAt := time.Date(2025, 1, 10, 10, 0, 0, 0, time.UTC)
+	newerMetAt := time.Date(2026, 1, 10, 10, 0, 0, 0, time.UTC)
+
+	if _, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "NoDate"}); err != nil {
+		t.Fatalf("Create no-date contact failed: %v", err)
+	}
+	if _, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Older", FirstMetAt: &olderMetAt}); err != nil {
+		t.Fatalf("Create older contact failed: %v", err)
+	}
+	if _, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Newer", FirstMetAt: &newerMetAt}); err != nil {
+		t.Fatalf("Create newer contact failed: %v", err)
+	}
+	if _, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "AlsoNoDate"}); err != nil {
+		t.Fatalf("Create second no-date contact failed: %v", err)
+	}
+
+	contacts, _, err := svc.ListContacts(vaultID, userID, 1, 15, "", "first_met_at", "")
+	if err != nil {
+		t.Fatalf("ListContacts failed: %v", err)
+	}
+	if len(contacts) != 4 {
+		t.Fatalf("expected 4 contacts, got %d", len(contacts))
+	}
+	wantNames := []string{"Newer", "Older", "AlsoNoDate", "NoDate"}
+	for i, wantName := range wantNames {
+		if contacts[i].FirstName != wantName {
+			t.Fatalf("expected contact %d to be %s, got %s", i, wantName, contacts[i].FirstName)
+		}
+	}
+	if contacts[0].FirstMetAt == nil || contacts[1].FirstMetAt == nil {
+		t.Fatalf("expected dated contacts first, got %+v", contacts[:2])
+	}
+	if contacts[2].FirstMetAt != nil || contacts[3].FirstMetAt != nil {
+		t.Fatalf("expected nil first_met_at contacts last, got %+v", contacts[2:])
+	}
+}
+
+func TestListContactsByLabelFirstMetResponseAndSort(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	label := models.Label{VaultID: vaultID, Name: "MetAtConference", Slug: "met-at-conference"}
+	if err := svc.db.Create(&label).Error; err != nil {
+		t.Fatalf("Create label failed: %v", err)
+	}
+	introducedBy, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Evan", LastName: "Host"})
+	if err != nil {
+		t.Fatalf("Create introducer contact failed: %v", err)
+	}
+	olderMetAt := time.Date(2025, 7, 4, 10, 0, 0, 0, time.UTC)
+	newerMetAt := time.Date(2026, 7, 4, 10, 0, 0, 0, time.UTC)
+	older, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "OlderLabel", FirstMetAt: &olderMetAt})
+	if err != nil {
+		t.Fatalf("Create older label contact failed: %v", err)
+	}
+	newer, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "NewerLabel",
+		FirstMetAt:               &newerMetAt,
+		FirstMetThroughContactID: &introducedBy.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create newer label contact failed: %v", err)
+	}
+	withoutDate, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "NoDateLabel"})
+	if err != nil {
+		t.Fatalf("Create no-date label contact failed: %v", err)
+	}
+	for _, contactID := range []string{older.ID, newer.ID, withoutDate.ID} {
+		contactLabel := models.ContactLabel{LabelID: label.ID, ContactID: contactID}
+		if err := svc.db.Create(&contactLabel).Error; err != nil {
+			t.Fatalf("Create contact label for %s failed: %v", contactID, err)
+		}
+	}
+
+	contacts, meta, err := svc.ListContactsByLabel(vaultID, userID, label.ID, 1, 15, "first_met_at", "")
+	if err != nil {
+		t.Fatalf("ListContactsByLabel failed: %v", err)
+	}
+	if meta.Total != 3 || len(contacts) != 3 {
+		t.Fatalf("expected 3 labeled contacts, got len=%d total=%d", len(contacts), meta.Total)
+	}
+	wantNames := []string{"NewerLabel", "OlderLabel", "NoDateLabel"}
+	for i, wantName := range wantNames {
+		if contacts[i].FirstName != wantName {
+			t.Fatalf("expected labeled contact %d to be %s, got %s", i, wantName, contacts[i].FirstName)
+		}
+	}
+	if contacts[0].FirstMetThroughContact == nil {
+		t.Fatal("expected labeled list response to include met-through brief contact")
+	}
+	if contacts[0].FirstMetThroughContact.ID != introducedBy.ID || contacts[0].FirstMetThroughContact.Name != "Evan Host" {
+		t.Fatalf("expected met-through brief Evan Host, got %+v", contacts[0].FirstMetThroughContact)
+	}
+	if contacts[2].FirstMetAt != nil {
+		t.Fatalf("expected nil first_met_at labeled contact last, got %+v", contacts[2])
 	}
 }
 
@@ -218,6 +596,41 @@ func TestDeleteContact(t *testing.T) {
 	}
 	if len(contacts) != 0 {
 		t.Errorf("Expected 0 contacts after delete, got %d", len(contacts))
+	}
+}
+
+func TestDeleteContact_FirstMetThroughSoftDeleteSetsNull(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	introducer, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Soft", LastName: "Introducer"})
+	if err != nil {
+		t.Fatalf("Create introducer failed: %v", err)
+	}
+	introduced, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "Introduced",
+		FirstMetThroughContactID: &introducer.ID,
+	})
+	if err != nil {
+		t.Fatalf("Create introduced contact failed: %v", err)
+	}
+
+	if err := svc.DeleteContact(introducer.ID, vaultID); err != nil {
+		t.Fatalf("DeleteContact failed: %v", err)
+	}
+
+	var reloaded models.Contact
+	if err := svc.db.First(&reloaded, "id = ?", introduced.ID).Error; err != nil {
+		t.Fatalf("Reload introduced contact failed: %v", err)
+	}
+	if reloaded.FirstMetThroughContactID != nil {
+		t.Fatalf("expected soft delete to clear first_met_through_contact_id, got %v", *reloaded.FirstMetThroughContactID)
+	}
+
+	resp, err := svc.GetContact(introduced.ID, userID, vaultID)
+	if err != nil {
+		t.Fatalf("GetContact failed: %v", err)
+	}
+	if resp.FirstMetThroughContactID != nil || resp.FirstMetThroughContact != nil {
+		t.Fatalf("expected response to omit deleted introducer, got id=%v contact=%+v", resp.FirstMetThroughContactID, resp.FirstMetThroughContact)
 	}
 }
 
@@ -276,12 +689,7 @@ func TestDeleteContact_FirstMetThroughHardDeleteSetsNull(t *testing.T) {
 }
 
 func TestToggleArchive(t *testing.T) {
-	svc, vaultID, userID, _ := setupContactTest(t)
-
-	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Archive"})
-	if err != nil {
-		t.Fatalf("CreateContact failed: %v", err)
-	}
+	svc, vaultID, _, introducer, created := setupContactWithFirstMetThrough(t)
 
 	toggled, err := svc.ToggleArchive(created.ID, vaultID)
 	if err != nil {
@@ -289,6 +697,12 @@ func TestToggleArchive(t *testing.T) {
 	}
 	if !toggled.IsArchived {
 		t.Error("Expected contact to be archived after toggle")
+	}
+	if toggled.FirstMetThroughContactID == nil || *toggled.FirstMetThroughContactID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact_id %s, got %v", introducer.ID, toggled.FirstMetThroughContactID)
+	}
+	if toggled.FirstMetThroughContact == nil || toggled.FirstMetThroughContact.ID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact to be preserved, got %+v", toggled.FirstMetThroughContact)
 	}
 
 	toggledBack, err := svc.ToggleArchive(created.ID, vaultID)
@@ -298,61 +712,61 @@ func TestToggleArchive(t *testing.T) {
 	if toggledBack.IsArchived {
 		t.Error("Expected contact to not be archived after second toggle")
 	}
+	if toggledBack.FirstMetThroughContactID == nil || *toggledBack.FirstMetThroughContactID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact_id %s after second toggle, got %v", introducer.ID, toggledBack.FirstMetThroughContactID)
+	}
+	if toggledBack.FirstMetThroughContact == nil || toggledBack.FirstMetThroughContact.ID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact after second toggle, got %+v", toggledBack.FirstMetThroughContact)
+	}
 }
 
 func TestToggleFavorite(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	cfg := testutil.TestJWTConfig()
-	authSvc := NewAuthService(db, cfg)
-	vaultSvc := NewVaultService(db)
+	svc, vaultID, userID, introducer, created := setupContactWithFirstMetThrough(t)
 
-	resp, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Test",
-		LastName:  "User",
-		Email:     "toggle-fav@example.com",
-		Password:  "password123",
-	}, "en")
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	resp2, err := authSvc.Register(dto.RegisterRequest{
-		FirstName: "Other",
-		LastName:  "User",
-		Email:     "toggle-fav2@example.com",
-		Password:  "password123",
-	}, "en")
-	if err != nil {
-		t.Fatalf("Register failed: %v", err)
-	}
-
-	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
-	if err != nil {
-		t.Fatalf("CreateVault failed: %v", err)
-	}
-
-	svc := NewContactService(db)
-	created, err := svc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Favorite"})
-	if err != nil {
-		t.Fatalf("CreateContact failed: %v", err)
-	}
-
-	// Use a different user who has no CVU yet — this exercises the Create path
-	toggled, err := svc.ToggleFavorite(created.ID, resp2.User.ID, vault.ID)
+	toggled, err := svc.ToggleFavorite(created.ID, userID, vaultID)
 	if err != nil {
 		t.Fatalf("ToggleFavorite failed: %v", err)
 	}
 	if !toggled.IsFavorite {
 		t.Error("Expected contact to be favorite after toggle")
 	}
+	if toggled.FirstMetThroughContactID == nil || *toggled.FirstMetThroughContactID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact_id %s, got %v", introducer.ID, toggled.FirstMetThroughContactID)
+	}
+	if toggled.FirstMetThroughContact == nil || toggled.FirstMetThroughContact.ID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact to be preserved, got %+v", toggled.FirstMetThroughContact)
+	}
 
-	// Toggle back — exercises the Save/update path
-	toggledBack, err := svc.ToggleFavorite(created.ID, resp2.User.ID, vault.ID)
+	toggledBack, err := svc.ToggleFavorite(created.ID, userID, vaultID)
 	if err != nil {
 		t.Fatalf("ToggleFavorite back failed: %v", err)
 	}
 	if toggledBack.IsFavorite {
 		t.Error("Expected contact to not be favorite after second toggle")
+	}
+	if toggledBack.FirstMetThroughContactID == nil || *toggledBack.FirstMetThroughContactID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact_id %s after second toggle, got %v", introducer.ID, toggledBack.FirstMetThroughContactID)
+	}
+	if toggledBack.FirstMetThroughContact == nil || toggledBack.FirstMetThroughContact.ID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact after second toggle, got %+v", toggledBack.FirstMetThroughContact)
+	}
+}
+
+func TestMarkCaughtUpPreservesFirstMetThroughMetadata(t *testing.T) {
+	svc, vaultID, _, introducer, created := setupContactWithFirstMetThrough(t)
+
+	marked, err := svc.MarkCaughtUp(created.ID, vaultID)
+	if err != nil {
+		t.Fatalf("MarkCaughtUp failed: %v", err)
+	}
+	if marked.LastTalkedTo == nil {
+		t.Fatal("expected last_talked_to to be set after marking caught up")
+	}
+	if marked.FirstMetThroughContactID == nil || *marked.FirstMetThroughContactID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact_id %s, got %v", introducer.ID, marked.FirstMetThroughContactID)
+	}
+	if marked.FirstMetThroughContact == nil || marked.FirstMetThroughContact.ID != introducer.ID {
+		t.Fatalf("expected first_met_through_contact to be preserved, got %+v", marked.FirstMetThroughContact)
 	}
 }
 

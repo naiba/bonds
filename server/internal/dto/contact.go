@@ -15,6 +15,8 @@ type CreateContactRequest struct {
 	TemplateID               *uint      `json:"template_id" example:"1"`
 	Listed                   *bool      `json:"listed" example:"true"`
 	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	FirstMetAt               *time.Time `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetThroughContactID *string    `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
 	// NeedsVerification flags a contact as needing later review (e.g. captured quickly
 	// or created by an automated agent). When nil, defaults to false.
@@ -33,6 +35,8 @@ type UpdateContactRequest struct {
 	PronounID                *uint      `json:"pronoun_id" example:"1"`
 	TemplateID               *uint      `json:"template_id" example:"1"`
 	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	FirstMetAt               *time.Time `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetThroughContactID *string    `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
 	NeedsVerification        *bool      `json:"needs_verification" example:"false"`
 }
@@ -55,6 +59,9 @@ type ContactResponse struct {
 	FileID                   *uint               `json:"file_id" example:"1"`
 	JobPosition              string              `json:"job_position" example:"Software Engineer"`
 	LastTalkedTo             *time.Time          `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	FirstMetAt               *time.Time          `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetThroughContactID *string             `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstMetThroughContact   *ContactSearchItem  `json:"first_met_through_contact,omitempty"`
 	StayInTouchFrequencyDays *int                `json:"stay_in_touch_frequency_days" example:"30"`
 	StayInTouchTriggerDate   *time.Time          `json:"stay_in_touch_trigger_date" example:"2026-02-14T10:30:00Z"`
 	Listed                   bool                `json:"listed" example:"true"`
