@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import ContactList from "@/pages/contact/ContactList";
+import { api } from "@/api";
 import type { Contact, PaginationMeta } from "@/api";
 
 beforeAll(() => {
@@ -12,6 +13,19 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   };
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      matches: query.includes("min-width"),
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
 });
 
 function LocationProbe() {
@@ -48,11 +62,13 @@ vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
+let mockLabels: { id: number; name: string }[] = [];
+
 function mockContactListQuery(contacts: Contact[] = [], meta: PaginationMeta = { total: contacts.length }) {
   mockUseQuery.mockImplementation((opts) => {
     const key = Array.isArray(opts?.queryKey) ? opts.queryKey : [];
     if (key.includes("labels")) {
-      return { data: [], isLoading: false };
+      return { data: mockLabels, isLoading: false };
     }
     if (key[0] === "vaults" && key[2] === "contacts") {
       return { data: { contacts, meta }, isLoading: false };
@@ -67,6 +83,16 @@ function getContactsQueryKey() {
     return key[0] === "vaults" && key[2] === "contacts";
   });
   return call?.[0]?.queryKey as unknown[] | undefined;
+}
+
+type QueryOptions = { queryKey?: unknown[]; queryFn?: () => Promise<unknown> };
+
+function getLatestContactsQueryOptions() {
+  const calls = mockUseQuery.mock.calls.filter(([opts]) => {
+    const key = Array.isArray(opts?.queryKey) ? opts.queryKey : [];
+    return key[0] === "vaults" && key[2] === "contacts";
+  });
+  return calls.at(-1)?.[0] as QueryOptions | undefined;
 }
 
 function renderContactList(initialUrl = "/vaults/1/contacts") {
@@ -93,9 +119,23 @@ function renderContactList(initialUrl = "/vaults/1/contacts") {
   );
 }
 
+async function chooseSelectOption(selectTestId: string, optionText: string) {
+  const select = screen.getByTestId(selectTestId);
+  const control = select.querySelector<HTMLElement>("input") ?? select;
+  fireEvent.mouseDown(control);
+  fireEvent.click(control);
+
+  const optionByTitle = await screen.findByTitle(optionText);
+  fireEvent.click(optionByTitle);
+}
+
 describe("ContactList", () => {
   beforeEach(() => {
+    localStorage.removeItem("bonds_contact_list_columns");
+    mockLabels = [];
     mockUseQuery.mockReset();
+    vi.mocked(api.contacts.contactsList).mockReset();
+    vi.mocked(api.contacts.contactsLabelsDetail).mockReset();
     mockContactListQuery();
   });
 
@@ -194,6 +234,70 @@ describe("ContactList", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("location-probe")).toHaveTextContent("/vaults/1/contacts/42?page=3&per_page=50");
+    });
+  });
+
+  it("renders first-met dates in the default visible columns", () => {
+    mockContactListQuery(
+      [{
+        id: "42",
+        first_name: "Ada",
+        last_name: "Lovelace",
+        first_met_at: "2026-01-15T00:00:00Z",
+        updated_at: "2026-01-20T00:00:00Z",
+      }],
+      { total: 1 },
+    );
+
+    renderContactList();
+
+    expect(screen.getByText("First met")).toBeInTheDocument();
+    expect(screen.getByText("Jan 15, 2026")).toBeInTheDocument();
+  });
+
+  it("uses first_met_at when the first-met sort option is selected", async () => {
+    mockContactListQuery();
+
+    renderContactList();
+
+    await chooseSelectOption("contact-sort-select", "First met");
+
+    await waitFor(() => {
+      expect(getLatestContactsQueryOptions()?.queryKey).toEqual([
+        "vaults",
+        "1",
+        "contacts",
+        null,
+        1,
+        20,
+        "first_met_at",
+        "",
+        "active",
+      ]);
+    });
+  });
+
+  it("passes the selected first-met sort through label-filtered contact queries", async () => {
+    mockLabels = [{ id: 7, name: "Friends" }];
+    mockContactListQuery();
+    vi.mocked(api.contacts.contactsLabelsDetail).mockResolvedValue({
+      data: [],
+      meta: { total: 0 },
+    });
+
+    renderContactList();
+
+    await chooseSelectOption("contact-sort-select", "First met");
+    await chooseSelectOption("contact-label-filter", "Friends");
+
+    const queryOptions = getLatestContactsQueryOptions();
+    await queryOptions?.queryFn?.();
+
+    expect(api.contacts.contactsLabelsDetail).toHaveBeenCalledWith("1", 7, {
+      page: 1,
+      per_page: 20,
+      sort: "first_met_at",
+      filter: "active",
     });
   });
 });

@@ -15,6 +15,7 @@ import { api } from "@/api";
 import type { Contact, PaginationMeta, LabelResponse } from "@/api";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import { formatDateOnly } from "@/utils/dateOnlyInput";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
@@ -26,11 +27,12 @@ const { Option } = Select;
 
 const SORT_MAP: Record<string, string> = {
   name: "first_name",
+  first_met_at: "first_met_at",
   updated_at: "updated_at",
 };
 
 const COLUMNS_STORAGE_KEY = "bonds_contact_list_columns";
-const DEFAULT_VISIBLE_COLUMNS = ["name", "nickname", "status", "updated_at"];
+const DEFAULT_VISIBLE_COLUMNS = ["name", "nickname", "first_met_at", "status", "updated_at"];
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100"];
@@ -98,10 +100,11 @@ export default function ContactList() {
         const res = await api.contacts.contactsLabelsDetail(String(vaultId), labelFilter, {
           page: currentPage,
           per_page: pageSize,
+          sort: SORT_MAP[sortBy] ?? "updated_at",
           filter: statusFilter,
         });
         return {
-          contacts: (res.data as { contacts?: Contact[] })?.contacts ?? [],
+          contacts: res.data ?? [],
           meta: res.meta as PaginationMeta | undefined,
         };
       }
@@ -265,6 +268,17 @@ export default function ContactList() {
         ),
     },
     {
+      title: t("contact.list.col_first_met"),
+      dataIndex: "first_met_at",
+      key: "first_met_at",
+      responsive: ["md"] as Breakpoint[],
+      render: (val: string | undefined) => (
+        val ? <Text type="secondary">{formatDateOnly(val, dateFormats)}</Text> : <Text type="secondary">—</Text>
+      ),
+      sorter: (a, b) =>
+        dayjs(a.first_met_at ?? 0).unix() - dayjs(b.first_met_at ?? 0).unix(),
+    },
+    {
       title: t("contact.list.col_updated"),
       dataIndex: "updated_at",
       key: "updated_at",
@@ -382,12 +396,14 @@ export default function ContactList() {
           style={{ maxWidth: 300 }}
         />
         <Select
+            data-testid="contact-sort-select"
             placeholder={t("contact.list.sort_by")}
             value={sortBy}
             onChange={handleSortChange}
             style={{ width: 160 }}
         >
             <Option value="name">{t("contact.list.sort_name")}</Option>
+            <Option value="first_met_at">{t("contact.list.sort_first_met")}</Option>
             <Option value="updated_at">{t("contact.list.sort_updated")}</Option>
         </Select>
         <Popover
@@ -410,6 +426,7 @@ export default function ContactList() {
           <Button icon={<SettingOutlined />}>{t("contact.list.columns")}</Button>
         </Popover>
         <Select
+            data-testid="contact-label-filter"
             placeholder={t("contact.list.filter_label")}
             value={labelFilter}
             onChange={(v) => { setLabelFilter(v ?? null); resetToFirstPage(); }}
