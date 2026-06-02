@@ -29,6 +29,9 @@ func (s *ContactAvatarService) UpdateAvatar(contactID, vaultID string, fileID ui
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
 	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
+	}
 
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
@@ -45,6 +48,9 @@ func (s *ContactAvatarService) DeleteAvatar(contactID, vaultID string) (*dto.Con
 
 	contact.FileID = nil
 	if err := s.db.Save(&contact).Error; err != nil {
+		return nil, err
+	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
 
