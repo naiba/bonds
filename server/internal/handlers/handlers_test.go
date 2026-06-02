@@ -76,26 +76,41 @@ type vaultData struct {
 }
 
 type contactData struct {
-	ID             string `json:"id"`
-	VaultID        string `json:"vault_id"`
-	FirstName      string `json:"first_name"`
-	LastName       string `json:"last_name"`
-	MiddleName     string `json:"middle_name"`
-	Nickname       string `json:"nickname"`
-	MaidenName     string `json:"maiden_name"`
-	Prefix         string `json:"prefix"`
-	Suffix         string `json:"suffix"`
-	GenderID       *uint  `json:"gender_id"`
-	PronounID      *uint  `json:"pronoun_id"`
-	TemplateID     *uint  `json:"template_id"`
-	CompanyID      *uint  `json:"company_id"`
-	ReligionID     *uint  `json:"religion_id"`
-	FileID         *uint  `json:"file_id"`
-	JobPosition    string `json:"job_position"`
-	Listed         bool   `json:"listed"`
-	ShowQuickFacts bool   `json:"show_quick_facts"`
-	IsArchived     bool   `json:"is_archived"`
-	IsFavorite     bool   `json:"is_favorite"`
+	ID                       string     `json:"id"`
+	VaultID                  string     `json:"vault_id"`
+	FirstName                string     `json:"first_name"`
+	LastName                 string     `json:"last_name"`
+	MiddleName               string     `json:"middle_name"`
+	Nickname                 string     `json:"nickname"`
+	MaidenName               string     `json:"maiden_name"`
+	Prefix                   string     `json:"prefix"`
+	Suffix                   string     `json:"suffix"`
+	GenderID                 *uint      `json:"gender_id"`
+	PronounID                *uint      `json:"pronoun_id"`
+	TemplateID               *uint      `json:"template_id"`
+	CompanyID                *uint      `json:"company_id"`
+	ReligionID               *uint      `json:"religion_id"`
+	FileID                   *uint      `json:"file_id"`
+	JobPosition              string     `json:"job_position"`
+	LastTalkedTo             *time.Time `json:"last_talked_to"`
+	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days"`
+	StayInTouchTriggerDate   *time.Time `json:"stay_in_touch_trigger_date"`
+	Listed                   bool       `json:"listed"`
+	ShowQuickFacts           bool       `json:"show_quick_facts"`
+	IsArchived               bool       `json:"is_archived"`
+	IsFavorite               bool       `json:"is_favorite"`
+}
+
+type catchUpPromptData struct {
+	ContactID                string    `json:"contact_id"`
+	FirstName                string    `json:"first_name"`
+	LastName                 string    `json:"last_name"`
+	LastTalkedTo             time.Time `json:"last_talked_to"`
+	StayInTouchFrequencyDays int       `json:"stay_in_touch_frequency_days"`
+	StayInTouchTriggerDate   time.Time `json:"stay_in_touch_trigger_date"`
+	DaysSinceLastContact     int       `json:"days_since_last_contact"`
+	DaysOverdue              int       `json:"days_overdue"`
+	PriorityScore            float64   `json:"priority_score"`
 }
 
 func setupTestServer(t *testing.T) *testServer {
@@ -723,6 +738,76 @@ func TestContactCreate_Success(t *testing.T) {
 	}
 }
 
+func TestContactStayInTouchFields_CreateUpdateAndCatchUp(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "contact-stay-in-touch@example.com")
+	vault := ts.createTestVault(t, token, "Stay In Touch Vault")
+
+	createLastTalkedTo := "2026-01-15T10:30:00Z"
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
+		`{"first_name":"Stay","last_talked_to":"`+createLastTalkedTo+`","stay_in_touch_frequency_days":30}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create contact: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var created contactData
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created contact: %v", err)
+	}
+	if created.LastTalkedTo == nil || created.LastTalkedTo.Format(time.RFC3339) != createLastTalkedTo {
+		t.Fatalf("expected last_talked_to %s, got %v", createLastTalkedTo, created.LastTalkedTo)
+	}
+	if created.StayInTouchFrequencyDays == nil || *created.StayInTouchFrequencyDays != 30 {
+		t.Fatalf("expected stay_in_touch_frequency_days 30, got %v", created.StayInTouchFrequencyDays)
+	}
+	if created.StayInTouchTriggerDate == nil || created.StayInTouchTriggerDate.Format(time.RFC3339) != "2026-02-14T10:30:00Z" {
+		t.Fatalf("expected trigger date 2026-02-14T10:30:00Z, got %v", created.StayInTouchTriggerDate)
+	}
+
+	updateLastTalkedTo := "2026-02-01T08:00:00Z"
+	rec = ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+created.ID,
+		`{"first_name":"StayUpdated","last_talked_to":"`+updateLastTalkedTo+`","stay_in_touch_frequency_days":7}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update contact: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updated contactData
+	if err := json.Unmarshal(resp.Data, &updated); err != nil {
+		t.Fatalf("failed to parse updated contact: %v", err)
+	}
+	if updated.StayInTouchTriggerDate == nil || updated.StayInTouchTriggerDate.Format(time.RFC3339) != "2026-02-08T08:00:00Z" {
+		t.Fatalf("expected updated trigger date 2026-02-08T08:00:00Z, got %v", updated.StayInTouchTriggerDate)
+	}
+
+	viewer := createSecondUser(t, ts, auth.User.AccountID, "contact-stay-in-touch-viewer@example.com", false)
+	addUserToVault(t, ts, viewer.ID, vault.ID, models.PermissionViewer)
+	viewerToken := generateJWT(viewer.ID, viewer.AccountID, viewer.Email, false, false)
+	rec = ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+created.ID+"/catchUp", "", viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("viewer mark caught up: expected 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	editor := createSecondUser(t, ts, auth.User.AccountID, "contact-stay-in-touch-editor@example.com", false)
+	addUserToVault(t, ts, editor.ID, vault.ID, models.PermissionEditor)
+	editorToken := generateJWT(editor.ID, editor.AccountID, editor.Email, false, false)
+	rec = ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+created.ID+"/catchUp", "", editorToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("mark caught up: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var caughtUp contactData
+	if err := json.Unmarshal(resp.Data, &caughtUp); err != nil {
+		t.Fatalf("failed to parse caught-up contact: %v", err)
+	}
+	if caughtUp.LastTalkedTo == nil || time.Since(*caughtUp.LastTalkedTo) > time.Minute {
+		t.Fatalf("expected last_talked_to near now, got %v", caughtUp.LastTalkedTo)
+	}
+	wantTriggerDate := caughtUp.LastTalkedTo.AddDate(0, 0, 7)
+	if caughtUp.StayInTouchTriggerDate == nil || !caughtUp.StayInTouchTriggerDate.Equal(wantTriggerDate) {
+		t.Fatalf("expected caught-up trigger date %v, got %v", wantTriggerDate, caughtUp.StayInTouchTriggerDate)
+	}
+}
+
 func TestContactCreate_ValidationError(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "cval@example.com")
@@ -1004,6 +1089,77 @@ func TestContactList_FilterArchived(t *testing.T) {
 	}
 	if resp.Meta.Total != 3 {
 		t.Errorf("expected total=3, got %d", resp.Meta.Total)
+	}
+}
+
+func TestDashboardCatchUp_ReturnsDuePrompts(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "dashboard-catch-up@example.com")
+	vault := ts.createTestVault(t, token, "Dashboard Catch Up Vault")
+	now := time.Now().UTC()
+
+	createCatchUpContact := func(firstName string, daysAgo int, frequencyDays int) contactData {
+		lastTalkedTo := now.AddDate(0, 0, -daysAgo).Format(time.RFC3339)
+		rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
+			fmt.Sprintf(`{"first_name":"%s","last_talked_to":"%s","stay_in_touch_frequency_days":%d}`, firstName, lastTalkedTo, frequencyDays), token)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create %s: expected 201, got %d: %s", firstName, rec.Code, rec.Body.String())
+		}
+		resp := parseResponse(t, rec)
+		var contact contactData
+		if err := json.Unmarshal(resp.Data, &contact); err != nil {
+			t.Fatalf("parse %s contact: %v", firstName, err)
+		}
+		return contact
+	}
+
+	veryOverdue := createCatchUpContact("VeryOverdue", 90, 30)
+	lessOverdue := createCatchUpContact("LessOverdue", 40, 20)
+	createCatchUpContact("NotDue", 5, 30)
+	archived := createCatchUpContact("Archived", 100, 10)
+	rec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+archived.ID+"/archive", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("archive contact: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts", `{"first_name":"NoLastTalkedTo"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create no-last-talked-to contact: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/dashboard/catchUp", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("catch-up dashboard: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var prompts []catchUpPromptData
+	if err := json.Unmarshal(resp.Data, &prompts); err != nil {
+		t.Fatalf("failed to parse catch-up prompts: %v", err)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("expected 2 catch-up prompts, got %d: %+v", len(prompts), prompts)
+	}
+	if prompts[0].ContactID != veryOverdue.ID || prompts[1].ContactID != lessOverdue.ID {
+		t.Fatalf("expected prompts sorted by priority VeryOverdue then LessOverdue, got %+v", prompts)
+	}
+	if prompts[0].DaysSinceLastContact < 89 || prompts[0].DaysSinceLastContact > 90 {
+		t.Fatalf("expected days_since_last_contact near 90, got %d", prompts[0].DaysSinceLastContact)
+	}
+	if prompts[0].DaysOverdue < 59 || prompts[0].DaysOverdue > 60 {
+		t.Fatalf("expected days_overdue near 60, got %d", prompts[0].DaysOverdue)
+	}
+	if prompts[0].PriorityScore < 1.96 || prompts[0].PriorityScore > 2.01 {
+		t.Fatalf("expected priority_score near 2.0, got %f", prompts[0].PriorityScore)
+	}
+
+	viewer := createSecondUser(t, ts, auth.User.AccountID, "dashboard-catch-up-viewer@example.com", false)
+	addUserToVault(t, ts, viewer.ID, vault.ID, models.PermissionViewer)
+	viewerToken := generateJWT(viewer.ID, viewer.AccountID, viewer.Email, false, false)
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/dashboard/catchUp", "", viewerToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("viewer catch-up dashboard: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

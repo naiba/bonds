@@ -374,6 +374,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	jobRoutes.PUT("/:job_id", contactJobHandler.UpdateJob, requireEditor)
 	jobRoutes.DELETE("/:job_id", contactJobHandler.DeleteJob, requireEditor)
 	contactSub.GET("/feed", feedHandler.GetContactFeed)
+	contactSub.POST("/catchUp", contactHandler.MarkCaughtUp, requireEditor)
 	contactSub.POST("/move", contactMoveHandler.Move, requireEditor)
 	contactSub.PUT("/template", contactTemplateHandler.Update, requireEditor)
 	contactSub.GET("/tabs", contactTabHandler.GetTabs)
@@ -589,6 +590,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.GET("/lifeMetrics/:id/detail", lifeMetricHandler.GetDetail)
 
 	vaultScoped.GET("/dashboard/lifeEvents", lifeEventHandler.ListVaultTimelineEvents)
+	vaultScoped.GET("/dashboard/catchUp", contactHandler.ListCatchUpPrompts)
 
 	vaultScoped.PUT("/defaultTab", vaultHandler.UpdateDefaultTab, requireEditor)
 

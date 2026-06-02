@@ -52,6 +52,28 @@ func (h *ContactHandler) List(c echo.Context) error {
 	return response.Paginated(c, contacts, meta)
 }
 
+// ListCatchUpPrompts godoc
+//
+//	@Summary		List due catch-up prompts
+//	@Description	Return due stay-in-touch prompts for listed contacts in a vault
+//	@Tags			dashboard
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.CatchUpPromptResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/dashboard/catchUp [get]
+func (h *ContactHandler) ListCatchUpPrompts(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+
+	prompts, err := h.contactService.ListCatchUpPrompts(vaultID)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_list_catch_up_prompts")
+	}
+	return response.OK(c, prompts)
+}
+
 // ListByLabel godoc
 //
 //	@Summary		List contacts by label
@@ -189,6 +211,34 @@ func (h *ContactHandler) Update(c echo.Context) error {
 			return response.NotFound(c, "err.contact_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_update_contact")
+	}
+	return response.OK(c, contact)
+}
+
+// MarkCaughtUp godoc
+//
+//	@Summary		Mark a contact as caught up
+//	@Description	Set last_talked_to to now and recompute the stay-in-touch trigger date
+//	@Tags			contacts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Success		200			{object}	response.APIResponse{data=dto.ContactResponse}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/catchUp [post]
+func (h *ContactHandler) MarkCaughtUp(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+
+	contact, err := h.contactService.MarkCaughtUp(contactID, vaultID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_mark_contact_caught_up")
 	}
 	return response.OK(c, contact)
 }
