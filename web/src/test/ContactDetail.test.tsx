@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import ContactDetail from "@/pages/contact/ContactDetail";
+import type { Contact } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -103,6 +104,7 @@ vi.mock("@/api", () => ({
       contactsTemplateUpdate: vi.fn(),
       contactsTabsList: vi.fn(),
       contactsCatchUpCreate: vi.fn(),
+      contactsList: vi.fn(),
     },
     vaults: { vaultsList: vi.fn() },
     personalize: { personalizeDetail: vi.fn() },
@@ -121,10 +123,14 @@ vi.mock("@/api", () => ({
 
 const mockContactQuery = vi.fn();
 const mockMutate = vi.fn();
+let mockMeetingContacts: Contact[] = [];
 const defaultQuery = { data: undefined, isLoading: false };
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: Record<string, unknown>) => {
     const key = Array.isArray(opts?.queryKey) ? opts.queryKey : [];
+    if (key[0] === "vaults" && key[2] === "contacts" && key[3] === "meeting-select") {
+      return { data: mockMeetingContacts, isLoading: false };
+    }
     if (key.includes("contacts") && !key.includes("tabs")) {
       return mockContactQuery(opts);
     }
@@ -171,6 +177,7 @@ describe("ContactDetail", () => {
   beforeEach(() => {
     mockContactQuery.mockReset();
     mockMutate.mockReset();
+    mockMeetingContacts = [];
   });
 
   it("renders loading spinner when loading", () => {
@@ -253,7 +260,6 @@ describe("ContactDetail", () => {
   });
 
   it("prefills stay-in-touch edit dates without local timezone drift", async () => {
-    const user = userEvent.setup();
     mockContactQuery.mockReturnValue({
       data: {
         ...mockContact,
@@ -264,11 +270,43 @@ describe("ContactDetail", () => {
     });
 
     renderContactDetail();
-    await user.click(screen.getByRole("button", { name: /edit/i }));
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
 
     await waitFor(() => {
-      const dateInput = document.querySelector<HTMLInputElement>('input[type="date"]');
+      const dateInput = document.querySelector<HTMLInputElement>("#last_talked_to");
       expect(dateInput?.value).toBe("2026-01-02");
+    });
+  });
+
+  it("prefills and submits first-met edit fields without local timezone drift", async () => {
+    mockMeetingContacts = [{ id: "3", first_name: "Mary", last_name: "Host" }];
+    mockContactQuery.mockReturnValue({
+      data: {
+        ...mockContact,
+        first_met_at: "2026-01-15T00:00:00Z",
+        first_met_through_contact_id: "3",
+      },
+      isLoading: false,
+    });
+
+    renderContactDetail();
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      const dateInput = document.querySelector<HTMLInputElement>("#first_met_at");
+      expect(dateInput?.value).toBe("2026-01-15");
+    });
+
+    const editForm = document.querySelector<HTMLFormElement>(".ant-modal form");
+    expect(editForm).toBeInTheDocument();
+    if (!editForm) throw new Error("Edit form was not rendered");
+    fireEvent.submit(editForm);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
+        first_met_at: "2026-01-15T00:00:00Z",
+        first_met_through_contact_id: "3",
+      }));
     });
   });
 });

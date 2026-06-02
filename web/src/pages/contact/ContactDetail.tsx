@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { dateInputToTimestamp, formatDateOnly, timestampToDateInput } from "@/utils/dateOnlyInput";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Card,
   Typography,
@@ -40,7 +40,7 @@ import {
 } from "@ant-design/icons";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { api, httpClient } from "@/api";
-import type { APIError, UpdateContactRequest, Vault, PersonalizeItem, ContactTabsResponse, ContactTabPage } from "@/api";
+import type { APIError, Contact, UpdateContactRequest, Vault, PersonalizeItem, ContactTabsResponse, ContactTabPage } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 
@@ -80,16 +80,20 @@ function buildContactListUrl(vaultId: string, search: string): string {
   return `/vaults/${vaultId}/contacts${query ? `?${query}` : ""}`;
 }
 
-type ContactEditFormValues = Omit<UpdateContactRequest, "last_talked_to"> & {
+type ContactEditFormValues = Omit<UpdateContactRequest, "last_talked_to" | "first_met_at"> & {
   last_talked_to?: string;
+  first_met_at?: string;
 };
 
 function buildUpdateContactRequest(values: ContactEditFormValues): UpdateContactRequest {
   const request: UpdateContactRequest = {
     ...values,
     last_talked_to: dateInputToTimestamp(values.last_talked_to),
+    first_met_at: dateInputToTimestamp(values.first_met_at),
   };
   if (!request.last_talked_to) delete request.last_talked_to;
+  if (!request.first_met_at) delete request.first_met_at;
+  if (!request.first_met_through_contact_id) delete request.first_met_through_contact_id;
   if (request.stay_in_touch_frequency_days == null) delete request.stay_in_touch_frequency_days;
   return request;
 }
@@ -178,6 +182,15 @@ export default function ContactDetail() {
       return res.data!;
     },
     enabled: !!vaultId && !!cId && !!contact,
+  });
+
+  const { data: metThroughContacts = [], isLoading: isMetThroughContactsLoading } = useQuery<Contact[]>({
+    queryKey: ["vaults", vaultId, "contacts", "meeting-select"],
+    queryFn: async () => {
+      const res = await api.contacts.contactsList(String(vaultId), { per_page: 9999, filter: "all" });
+      return res.data ?? [];
+    },
+    enabled: isEditModalOpen,
   });
 
   const updateContactMutation = useMutation({
@@ -348,7 +361,10 @@ export default function ContactDetail() {
     contact.suffix && { label: t("contact.detail.suffix"), value: contact.suffix },
     contact.nickname && { label: t("contact.detail.nickname"), value: `\u201C${contact.nickname}\u201D` },
     contact.maiden_name && { label: t("contact.detail.maiden_name"), value: contact.maiden_name },
+    contact.first_met_at && { label: t("contact.meeting.first_met_at"), value: formatDateOnly(contact.first_met_at, dateFormats) },
   ].filter(Boolean) as { label: string; value: string }[];
+
+  const metThroughContact = contact.first_met_through_contact;
 
   const stayInTouchSummary = [
     contact.last_talked_to && t("contact.catch_up.last_contact_summary", {
@@ -413,6 +429,14 @@ export default function ContactDetail() {
           <Tag color="warning" style={{ margin: 0 }}>
             {t("contact.needs_verification.badge")}
           </Tag>
+        )}
+        {metThroughContact?.id && metThroughContact.name && (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            {t("contact.meeting.first_met_through")}{" "}
+            <Link to={`/vaults/${vaultId}/contacts/${metThroughContact.id}`}>
+              {metThroughContact.name}
+            </Link>
+          </Text>
         )}
         <Text type="secondary" style={{ fontSize: 12 }}>
           {t("common.created")} {formatDate(contact.created_at, dateFormats)}
@@ -654,6 +678,8 @@ export default function ContactDetail() {
                 maiden_name: contact.maiden_name,
                 gender_id: contact.gender_id,
                 pronoun_id: contact.pronoun_id,
+                first_met_at: timestampToDateInput(contact.first_met_at),
+                first_met_through_contact_id: contact.first_met_through_contact_id,
                 last_talked_to: timestampToDateInput(contact.last_talked_to),
                 stay_in_touch_frequency_days: contact.stay_in_touch_frequency_days,
                 needs_verification: contact.needs_verification,
@@ -863,6 +889,51 @@ export default function ContactDetail() {
           <Form.Item name="needs_verification" valuePropName="checked" style={{ marginBottom: 16 }}>
             <Checkbox>{t("contact.needs_verification.field_label")}</Checkbox>
           </Form.Item>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: 16,
+              border: `1px solid ${token.colorBorderSecondary}`,
+              borderRadius: token.borderRadiusLG,
+              background: token.colorFillQuaternary,
+            }}
+          >
+            <Text strong style={{ display: "block", marginBottom: 4 }}>
+              {t("contact.meeting.title")}
+            </Text>
+            <Text type="secondary" style={{ display: "block", fontSize: 13, marginBottom: 12 }}>
+              {t("contact.meeting.description")}
+            </Text>
+            <div style={{ display: "flex", gap: 16 }}>
+              <Form.Item
+                name="first_met_at"
+                label={t("contact.meeting.first_met_at")}
+                extra={t("contact.meeting.first_met_at_help")}
+                style={{ flex: 1 }}
+              >
+                <Input type="date" />
+              </Form.Item>
+              <Form.Item
+                name="first_met_through_contact_id"
+                label={t("contact.meeting.first_met_through")}
+                style={{ flex: 1 }}
+              >
+                <Select
+                  loading={isMetThroughContactsLoading}
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder={t("contact.meeting.first_met_through_placeholder")}
+                  options={metThroughContacts
+                    .filter((option) => option.id && option.id !== cId)
+                    .map((option) => ({
+                      label: formatContactName(nameOrder, option),
+                      value: option.id,
+                    }))}
+                />
+              </Form.Item>
+            </div>
+          </div>
           <div
             style={{
               marginBottom: 16,
