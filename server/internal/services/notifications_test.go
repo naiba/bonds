@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -25,6 +26,57 @@ func setupNotificationTest(t *testing.T) (*NotificationService, string) {
 	}
 
 	return NewNotificationService(db), resp.User.ID
+}
+
+func setupNotificationReminderScenario(t *testing.T, email string) (*NotificationService, string, uint) {
+	t.Helper()
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Reminder",
+		LastName:  "Owner",
+		Email:     email,
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Reminder Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Reminder"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	reminderSvc := NewReminderService(db)
+	day, month := 1, 1
+	reminder, err := reminderSvc.Create(contact.ID, vault.ID, dto.CreateReminderRequest{
+		Label: "Annual reminder",
+		Day:   &day,
+		Month: &month,
+		Type:  "recurring_year",
+	})
+	if err != nil {
+		t.Fatalf("Create reminder failed: %v", err)
+	}
+
+	return NewNotificationService(db), resp.User.ID, reminder.ID
+}
+
+func assertScheduledPreferredTime(t *testing.T, scheduledAt time.Time, expectedHour, expectedMinute int) {
+	t.Helper()
+	scheduledUTC := scheduledAt.UTC()
+	if scheduledUTC.Hour() != expectedHour || scheduledUTC.Minute() != expectedMinute {
+		t.Fatalf("Expected scheduled_at time %02d:%02d UTC, got %s", expectedHour, expectedMinute, scheduledUTC.Format(time.RFC3339))
+	}
 }
 
 func TestNotificationCreate(t *testing.T) {
@@ -271,6 +323,143 @@ func TestNotificationUpdateShoutrrrKeepsVerified(t *testing.T) {
 	if updated.Label != "Telegram Bot Updated" {
 		t.Errorf("Expected label 'Telegram Bot Updated', got '%s'", updated.Label)
 	}
+}
+
+func TestNotificationCreateShoutrrrSchedulesExistingReminderWithPreferredTime(t *testing.T) {
+	svc, userID, reminderID := setupNotificationReminderScenario(t, "shoutrrr-schedule@example.com")
+
+	created, err := svc.Create(userID, dto.CreateNotificationChannelRequest{
+		Type:          "shoutrrr",
+		Label:         "Telegram Bot",
+		Content:       "telegram://token@telegram?channels=123",
+		PreferredTime: "17:45",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if !created.Active {
+		t.Fatal("Expected shoutrrr channel to be auto-active")
+	}
+	if created.VerifiedAt == nil {
+		t.Fatal("Expected shoutrrr channel to be auto-verified")
+	}
+
+	var scheduled []models.ContactReminderScheduled
+	if err := svc.db.Where("user_notification_channel_id = ? AND contact_reminder_id = ?", created.ID, reminderID).
+		Find(&scheduled).Error; err != nil {
+		t.Fatalf("Load scheduled reminders failed: %v", err)
+	}
+	if len(scheduled) != 1 {
+		t.Fatalf("Expected 1 scheduled reminder for shoutrrr channel, got %d", len(scheduled))
+	}
+	assertScheduledPreferredTime(t, scheduled[0].ScheduledAt, 17, 45)
+}
+
+func TestNotificationCreateTelegramNoVaultSchedulesNothing(t *testing.T) {
+	svc, userID := setupNotificationTest(t)
+
+	created, err := svc.Create(userID, dto.CreateNotificationChannelRequest{
+		Type:          "telegram",
+		Label:         "Telegram Bot",
+		Content:       "telegram://token@telegram?channels=123",
+		PreferredTime: "07:30",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if !created.Active {
+		t.Fatal("Expected telegram channel to be auto-active")
+	}
+	if created.VerifiedAt == nil {
+		t.Fatal("Expected telegram channel to be auto-verified")
+	}
+	if err := svc.ScheduleAllContactReminders(created.ID, userID); err != nil {
+		t.Fatalf("ScheduleAllContactReminders for user without vaults failed: %v", err)
+	}
+
+	var scheduledCount int64
+	if err := svc.db.Model(&models.ContactReminderScheduled{}).
+		Where("user_notification_channel_id = ?", created.ID).
+		Count(&scheduledCount).Error; err != nil {
+		t.Fatalf("Count scheduled reminders failed: %v", err)
+	}
+	if scheduledCount != 0 {
+		t.Fatalf("Expected no scheduled reminders for user with no vaults, got %d", scheduledCount)
+	}
+}
+
+func TestNotificationUpdatePreferredTimeReschedulesPendingReminder(t *testing.T) {
+	svc, userID, reminderID := setupNotificationReminderScenario(t, "preferred-time-reschedule@example.com")
+
+	created, err := svc.Create(userID, dto.CreateNotificationChannelRequest{
+		Type:          "shoutrrr",
+		Label:         "Telegram Bot",
+		Content:       "telegram://token@telegram?channels=123",
+		PreferredTime: "08:15",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if err := svc.ScheduleAllContactReminders(created.ID, userID); err != nil {
+		t.Fatalf("Initial ScheduleAllContactReminders failed: %v", err)
+	}
+
+	var original models.ContactReminderScheduled
+	if err := svc.db.Where("user_notification_channel_id = ? AND contact_reminder_id = ? AND triggered_at IS NULL", created.ID, reminderID).
+		First(&original).Error; err != nil {
+		t.Fatalf("Load original scheduled reminder failed: %v", err)
+	}
+	assertScheduledPreferredTime(t, original.ScheduledAt, 8, 15)
+
+	updated, err := svc.Update(created.ID, userID, dto.UpdateNotificationChannelRequest{
+		Label:         "Telegram Bot",
+		Content:       "telegram://token@telegram?channels=123",
+		PreferredTime: "18:30",
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.PreferredTime != "18:30" {
+		t.Fatalf("Expected preferred_time '18:30', got '%s'", updated.PreferredTime)
+	}
+
+	var scheduled []models.ContactReminderScheduled
+	if err := svc.db.Where("user_notification_channel_id = ? AND contact_reminder_id = ? AND triggered_at IS NULL", created.ID, reminderID).
+		Order("id ASC").
+		Find(&scheduled).Error; err != nil {
+		t.Fatalf("Load rescheduled reminders failed: %v", err)
+	}
+	if len(scheduled) != 1 {
+		t.Fatalf("Expected 1 pending schedule after preferred_time update, got %d", len(scheduled))
+	}
+	if scheduled[0].ID == original.ID {
+		t.Fatal("Expected preferred_time update to replace the pending scheduled reminder")
+	}
+	assertScheduledPreferredTime(t, scheduled[0].ScheduledAt, 18, 30)
+}
+
+func TestNotificationPreferredTimeInvalidDefaultsToNine(t *testing.T) {
+	svc, userID, reminderID := setupNotificationReminderScenario(t, "invalid-preferred-time@example.com")
+
+	created, err := svc.Create(userID, dto.CreateNotificationChannelRequest{
+		Type:          "shoutrrr",
+		Label:         "Telegram Bot",
+		Content:       "telegram://token@telegram?channels=123",
+		PreferredTime: "25:99",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if err := svc.ScheduleAllContactReminders(created.ID, userID); err != nil {
+		t.Fatalf("ScheduleAllContactReminders failed: %v", err)
+	}
+
+	var scheduled models.ContactReminderScheduled
+	if err := svc.db.Where("user_notification_channel_id = ? AND contact_reminder_id = ? AND triggered_at IS NULL", created.ID, reminderID).
+		First(&scheduled).Error; err != nil {
+		t.Fatalf("Load scheduled reminder failed: %v", err)
+	}
+	assertScheduledPreferredTime(t, scheduled.ScheduledAt, 9, 0)
 }
 
 func TestNotificationUpdateNotFound(t *testing.T) {

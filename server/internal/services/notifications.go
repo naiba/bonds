@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,6 +112,9 @@ func (s *NotificationService) Create(userID string, req dto.CreateNotificationCh
 		}).Error; err != nil {
 			return nil, err
 		}
+		if err := s.ScheduleAllContactReminders(ch.ID, userID); err != nil {
+			return nil, err
+		}
 	}
 
 	resp := toNotificationChannelResponse(&ch)
@@ -126,6 +131,7 @@ func (s *NotificationService) Update(id uint, userID string, req dto.UpdateNotif
 	}
 
 	contentChanged := ch.Content != req.Content
+	preferredTimeChanged := ptrToStr(ch.PreferredTime) != req.PreferredTime
 
 	ch.Label = strPtrOrNil(req.Label)
 	ch.Content = req.Content
@@ -150,6 +156,15 @@ func (s *NotificationService) Update(id uint, userID string, req dto.UpdateNotif
 			subject := i18n.T(locale, "notification.channel.verify.subject")
 			body := i18n.Tt(locale, "notification.channel.verify.body", map[string]string{"link": link})
 			_ = s.mailer.Send(req.Content, subject, body)
+		}
+	}
+	if ch.Active && preferredTimeChanged {
+		if err := s.db.Where("user_notification_channel_id = ? AND triggered_at IS NULL", ch.ID).
+			Delete(&models.ContactReminderScheduled{}).Error; err != nil {
+			return nil, err
+		}
+		if err := s.ScheduleAllContactReminders(ch.ID, userID); err != nil {
+			return nil, err
 		}
 	}
 
@@ -293,7 +308,7 @@ func (s *NotificationService) ScheduleAllContactReminders(channelID uint, userID
 		return fmt.Errorf("vault pluck: %w", err)
 	}
 	if len(vaultIDs) == 0 {
-		return fmt.Errorf("no vaultIDs for user %s", userID)
+		return nil
 	}
 
 	var contactIDs []string
@@ -360,10 +375,7 @@ func (s *NotificationService) ScheduleAllContactReminders(channelID uint, userID
 			}
 		}
 
-		hour, minute := 9, 0
-		if channel.PreferredTime != nil {
-			fmt.Sscanf(*channel.PreferredTime, "%d:%d", &hour, &minute)
-		}
+		hour, minute := parsePreferredNotificationTime(channel.PreferredTime)
 		upcomingDate = time.Date(upcomingDate.Year(), upcomingDate.Month(), upcomingDate.Day(), hour, minute, 0, 0, loc)
 
 		scheduled := models.ContactReminderScheduled{
@@ -377,6 +389,23 @@ func (s *NotificationService) ScheduleAllContactReminders(channelID uint, userID
 	}
 
 	return nil
+}
+
+func parsePreferredNotificationTime(preferredTime *string) (int, int) {
+	if preferredTime == nil {
+		return 9, 0
+	}
+	raw := strings.TrimSpace(*preferredTime)
+	if len(raw) != 5 || raw[2] != ':' {
+		return 9, 0
+	}
+	hour, hourErr := strconv.Atoi(raw[:2])
+	minute, minuteErr := strconv.Atoi(raw[3:])
+	// Avoid fmt.Sscanf partial parses: invalid HH:MM must never overflow time.Date.
+	if hourErr != nil || minuteErr != nil || hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+		return 9, 0
+	}
+	return hour, minute
 }
 
 // nextLunarOccurrence resolves the next Gregorian fire date for a lunar
