@@ -501,12 +501,14 @@
       "col_nickname": "Nickname",
       "col_status": "Status",
       "col_updated": "Updated",
+      "col_first_met": "First met",
       "total": "{{count}} contacts",
       "no_match": "No contacts match your search",
       "no_contacts": "No contacts yet",
       "load_failed": "Failed to load contacts",
       "sort_by": "Sort by",
       "sort_name": "Name",
+      "sort_first_met": "First met",
       "sort_updated": "Last updated",
       "filter_label": "Filter by label",
       "all_labels": "All labels",
@@ -525,6 +527,15 @@
     "needs_verification": {
       "badge": "To verify",
       "field_label": "Needs verification (flag for later review)"
+    },
+    "meeting": {
+      "title": "How you met",
+      "description": "Record when you first met and who introduced you.",
+      "first_met_at": "First met",
+      "first_met_at_help": "The date you first met this person.",
+      "first_met_through": "Met through",
+      "first_met_through_help": "Optional contact who introduced you.",
+      "first_met_through_placeholder": "Select a contact"
     },
     "catch_up": {
       "title": "Stay in touch",

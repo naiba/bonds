@@ -501,12 +501,14 @@
       "col_nickname": "昵称",
       "col_status": "状态",
       "col_updated": "更新时间",
+      "col_first_met": "初次见面",
       "total": "共 {{count}} 位联系人",
       "no_match": "没有匹配的联系人",
       "no_contacts": "暂无联系人",
       "load_failed": "加载联系人失败",
       "sort_by": "排序",
       "sort_name": "姓名",
+      "sort_first_met": "初次见面",
       "sort_updated": "最后更新",
       "filter_label": "标签筛选",
       "all_labels": "所有标签",
@@ -525,6 +527,15 @@
     "needs_verification": {
       "badge": "待核实",
       "field_label": "标记为待核实（稍后再确认）"
+    },
+    "meeting": {
+      "title": "相识信息",
+      "description": "记录你们第一次见面的时间，以及是谁介绍认识的。",
+      "first_met_at": "初次见面",
+      "first_met_at_help": "你第一次见到这位联系人的日期。",
+      "first_met_through": "经由联系人",
+      "first_met_through_help": "可选：介绍你们认识的联系人。",
+      "first_met_through_placeholder": "选择联系人"
     },
     "catch_up": {
       "title": "保持联系",

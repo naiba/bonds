@@ -501,12 +501,14 @@
       "col_nickname": "Apodo",
       "col_status": "Estado",
       "col_updated": "Actualizado",
+      "col_first_met": "Primer encuentro",
       "total": "{{count}} contactos",
       "no_match": "Nigún contacto coincide con tu búsqueda",
       "no_contacts": "No hay contactos aún",
       "load_failed": "Error al cargar los contactos",
       "sort_by": "Ordenar por",
       "sort_name": "Nombre",
+      "sort_first_met": "Primer encuentro",
       "sort_updated": "Última actualización",
       "filter_label": "Filtrar por etiqueta",
       "all_labels": "Todas las etiquetas",
@@ -525,6 +527,15 @@
     "needs_verification": {
       "badge": "Por verificar",
       "field_label": "Necesita verificación (revisar más tarde)"
+    },
+    "meeting": {
+      "title": "Cómo se conocieron",
+      "description": "Registra cuándo se conocieron y quién les presentó.",
+      "first_met_at": "Primer encuentro",
+      "first_met_at_help": "La fecha en que conociste a esta persona por primera vez.",
+      "first_met_through": "Presentado por",
+      "first_met_through_help": "Contacto opcional que les presentó.",
+      "first_met_through_placeholder": "Selecciona un contacto"
     },
     "catch_up": {
       "title": "Mantener el contacto",

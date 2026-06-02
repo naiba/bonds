@@ -501,12 +501,14 @@
       "col_nickname": "Surnom",
       "col_status": "Statut",
       "col_updated": "Mis à jour",
+      "col_first_met": "Première rencontre",
       "total": "{{count}}contacts",
       "no_match": "Aucun contact ne correspond à votre recherche",
       "no_contacts": "Aucun contact pour l'instant",
       "load_failed": "Échec du chargement des contacts",
       "sort_by": "Trier par",
       "sort_name": "Nom",
+      "sort_first_met": "Première rencontre",
       "sort_updated": "Dernière mise à jour",
       "filter_label": "Filtrer par étiquette",
       "all_labels": "Toutes les étiquettes",
@@ -525,6 +527,15 @@
     "needs_verification": {
       "badge": "A vérifier",
       "field_label": "Vérification nécessaire (indicateur pour examen ultérieur)"
+    },
+    "meeting": {
+      "title": "Comment vous vous êtes rencontrés",
+      "description": "Notez quand vous vous êtes rencontrés et qui vous a présentés.",
+      "first_met_at": "Première rencontre",
+      "first_met_at_help": "La date de votre première rencontre avec cette personne.",
+      "first_met_through": "Présenté par",
+      "first_met_through_help": "Contact facultatif qui vous a présentés.",
+      "first_met_through_placeholder": "Sélectionnez un contact"
     },
     "catch_up": {
       "title": "Garder le contact",
