@@ -56,12 +56,14 @@ func TestRescheduleRecurringReminderRespectsUserTimezone(t *testing.T) {
 		t.Fatalf("reminder: %v", err)
 	}
 	now := time.Now()
+	preferredTime := "16:30"
 	channel := models.UserNotificationChannel{
-		UserID:     &resp.User.ID,
-		Type:       "email",
-		Content:    "tokyo-user@example.com",
-		Active:     true,
-		VerifiedAt: &now,
+		UserID:        &resp.User.ID,
+		Type:          "email",
+		Content:       "tokyo-user@example.com",
+		PreferredTime: &preferredTime,
+		Active:        true,
+		VerifiedAt:    &now,
 	}
 	if err := db.Create(&channel).Error; err != nil {
 		t.Fatalf("channel: %v", err)
@@ -78,8 +80,6 @@ func TestRescheduleRecurringReminderRespectsUserTimezone(t *testing.T) {
 	mailer := &recordingMailer{}
 	NewReminderSchedulerService(db, mailer, nil).ProcessDueReminders()
 
-	// After firing, the scheduler should have inserted the next year's
-	// occurrence. It must be at 09:00 Asia/Tokyo, NOT 09:00 server-local.
 	var rescheduled models.ContactReminderScheduled
 	if err := db.Where("contact_reminder_id = ? AND triggered_at IS NULL", reminder.ID).
 		Order("scheduled_at ASC").First(&rescheduled).Error; err != nil {
@@ -91,8 +91,8 @@ func TestRescheduleRecurringReminderRespectsUserTimezone(t *testing.T) {
 		t.Fatalf("load Asia/Tokyo: %v", err)
 	}
 	local := rescheduled.ScheduledAt.In(tokyo)
-	if local.Hour() != 9 || local.Minute() != 0 {
-		t.Errorf("rescheduled fire time = %s; expected 09:00 in Asia/Tokyo (got %02d:%02d local)",
+	if local.Hour() != 16 || local.Minute() != 30 {
+		t.Errorf("rescheduled fire time = %s; expected 16:30 in Asia/Tokyo (got %02d:%02d local)",
 			rescheduled.ScheduledAt.Format(time.RFC3339), local.Hour(), local.Minute())
 	}
 }

@@ -171,14 +171,14 @@ func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder
 	}
 
 	var channels []models.UserNotificationChannel
-	if err := db.Where("user_id IN ? AND active = ?", userIDs, true).Find(&channels).Error; err != nil {
+	if err := db.Preload("User").Where("user_id IN ? AND active = ?", userIDs, true).Find(&channels).Error; err != nil {
 		log.Printf("[reminder] Failed to load notification channels: %v", err)
 		return
 	}
 
-	scheduledAt := calcInitialSchedule(reminder)
-
 	for _, ch := range channels {
+		loc := userLocation(ch.User)
+		scheduledAt := calcInitialSchedule(reminder, ch.PreferredTime, loc)
 		db.Create(&models.ContactReminderScheduled{
 			UserNotificationChannelID: ch.ID,
 			ContactReminderID:         reminder.ID,
@@ -187,8 +187,9 @@ func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder
 	}
 }
 
-func calcInitialSchedule(reminder *models.ContactReminder) time.Time {
-	now := time.Now()
+func calcInitialSchedule(reminder *models.ContactReminder, preferredTime *string, loc *time.Location) time.Time {
+	now := time.Now().In(loc)
+	hour, minute := parsePreferredNotificationTime(preferredTime)
 
 	ct := calendarPkg.CalendarType(reminder.CalendarType)
 	if ct != "" && ct != calendarPkg.Gregorian && reminder.OriginalMonth != nil && reminder.OriginalDay != nil {
@@ -208,7 +209,7 @@ func calcInitialSchedule(reminder *models.ContactReminder) time.Time {
 			}
 			gd, err := converter.NextOccurrence(origDate, now.AddDate(0, 0, -1))
 			if err == nil {
-				return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 9, 0, 0, 0, now.Location())
+				return time.Date(gd.Year, time.Month(gd.Month), gd.Day, hour, minute, 0, 0, loc)
 			}
 		}
 	}
@@ -227,7 +228,7 @@ func calcInitialSchedule(reminder *models.ContactReminder) time.Time {
 		day = *reminder.Day
 	}
 
-	scheduled := time.Date(year, month, day, 9, 0, 0, 0, now.Location())
+	scheduled := time.Date(year, month, day, hour, minute, 0, 0, loc)
 
 	if reminder.Year == nil && scheduled.Before(now) {
 		scheduled = scheduled.AddDate(1, 0, 0)

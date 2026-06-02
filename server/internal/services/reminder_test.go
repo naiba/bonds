@@ -2,8 +2,10 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -66,6 +68,80 @@ func TestCreateReminder(t *testing.T) {
 	}
 	if reminder.ID == 0 {
 		t.Error("Expected reminder ID to be non-zero")
+	}
+}
+
+func TestCreateReminderSchedulesActiveChannelsAtPreferredTime(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+	db := svc.db
+
+	var contact models.Contact
+	if err := db.First(&contact, "id = ?", contactID).Error; err != nil {
+		t.Fatalf("Load contact failed: %v", err)
+	}
+	var userVault models.UserVault
+	if err := db.Where("vault_id = ?", contact.VaultID).First(&userVault).Error; err != nil {
+		t.Fatalf("Load user vault failed: %v", err)
+	}
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatalf("Load Asia/Tokyo failed: %v", err)
+	}
+	timezone := "Asia/Tokyo"
+	if err := db.Model(&models.User{}).Where("id = ?", userVault.UserID).
+		Update("timezone", &timezone).Error; err != nil {
+		t.Fatalf("Update user timezone failed: %v", err)
+	}
+	if err := db.Model(&models.UserNotificationChannel{}).Where("user_id = ?", userVault.UserID).
+		Update("active", false).Error; err != nil {
+		t.Fatalf("Deactivate seeded channels failed: %v", err)
+	}
+
+	morning := "07:30"
+	evening := "18:45"
+	channels := []models.UserNotificationChannel{
+		{UserID: &userVault.UserID, Type: "email", Content: "morning@example.com", PreferredTime: &morning, Active: true},
+		{UserID: &userVault.UserID, Type: "shoutrrr", Content: "telegram://token@telegram?channels=123", PreferredTime: &evening, Active: true},
+	}
+	for i := range channels {
+		if err := db.Create(&channels[i]).Error; err != nil {
+			t.Fatalf("Create channel %d failed: %v", i, err)
+		}
+	}
+
+	nextYear := time.Now().Year() + 1
+	reminder, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Preferred time reminder",
+		Day:   intPtr(2),
+		Month: intPtr(1),
+		Year:  intPtr(nextYear),
+		Type:  "one_time",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	for _, expectation := range []struct {
+		channelID uint
+		hour      int
+		minute    int
+	}{
+		{channelID: channels[0].ID, hour: 7, minute: 30},
+		{channelID: channels[1].ID, hour: 18, minute: 45},
+	} {
+		var scheduled models.ContactReminderScheduled
+		if err := db.Where("contact_reminder_id = ? AND user_notification_channel_id = ?", reminder.ID, expectation.channelID).
+			First(&scheduled).Error; err != nil {
+			t.Fatalf("Load scheduled reminder for channel %d failed: %v", expectation.channelID, err)
+		}
+		local := scheduled.ScheduledAt.In(tokyo)
+		if local.Hour() != expectation.hour || local.Minute() != expectation.minute {
+			t.Fatalf("Expected channel %d scheduled_at %02d:%02d Asia/Tokyo, got %s",
+				expectation.channelID, expectation.hour, expectation.minute, local.Format(time.RFC3339))
+		}
+		if scheduled.TriggeredAt != nil {
+			t.Fatalf("Expected channel %d scheduled reminder to be pending", expectation.channelID)
+		}
 	}
 }
 

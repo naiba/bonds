@@ -111,6 +111,23 @@ func (ctx *reminderSchedulerTestContext) createEmailChannel(t *testing.T) *model
 	return &ch
 }
 
+func (ctx *reminderSchedulerTestContext) createEmailChannelWithPreferredTime(t *testing.T, preferredTime string) *models.UserNotificationChannel {
+	t.Helper()
+	ch := models.UserNotificationChannel{
+		UserID:        &ctx.userID,
+		Type:          "email",
+		Content:       "scheduler-test@example.com",
+		PreferredTime: &preferredTime,
+	}
+	if err := ctx.db.Create(&ch).Error; err != nil {
+		t.Fatalf("create channel failed: %v", err)
+	}
+	if err := ctx.db.Model(&ch).Update("active", true).Error; err != nil {
+		t.Fatalf("update channel active failed: %v", err)
+	}
+	return &ch
+}
+
 // createReminder creates a ContactReminder with the given type and optional frequency.
 func (ctx *reminderSchedulerTestContext) createReminder(t *testing.T, reminderType string, freqNum *int) *models.ContactReminder {
 	t.Helper()
@@ -378,6 +395,23 @@ func TestRescheduleRecurringWeek(t *testing.T) {
 	if !found {
 		t.Error("expected to find a new future scheduled entry for weekly recurrence")
 	}
+}
+
+func TestRescheduleRecurringWeekUsesChannelPreferredTime(t *testing.T) {
+	ctx := setupReminderSchedulerTest(t)
+	ch := ctx.createEmailChannelWithPreferredTime(t, "16:20")
+	reminder := ctx.createReminder(t, "recurring_week", freqPtr(1))
+	due := time.Now().Add(-10 * time.Minute).Truncate(time.Minute)
+	ctx.createScheduled(t, reminder.ID, ch.ID, due, nil)
+
+	ctx.svc.ProcessDueReminders()
+
+	var rescheduled models.ContactReminderScheduled
+	if err := ctx.db.Where("contact_reminder_id = ? AND triggered_at IS NULL", reminder.ID).
+		First(&rescheduled).Error; err != nil {
+		t.Fatalf("Load rescheduled reminder failed: %v", err)
+	}
+	assertScheduledPreferredTime(t, rescheduled.ScheduledAt, 16, 20)
 }
 
 // --- Test 8: Recurring month → new scheduled entry 1 month later ---
