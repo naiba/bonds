@@ -173,6 +173,9 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 			if err := importVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
 				return err
 			}
+			if err := tx.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
+				return err
+			}
 
 			imported = append(imported, toContactResponse(&contact, false))
 		}

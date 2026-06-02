@@ -29,6 +29,9 @@ func (s *ContactTemplateService) UpdateTemplate(contactID, vaultID string, req d
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
 	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
+	}
 
 	resp := toContactResponse(&contact, false)
 	return &resp, nil

@@ -29,6 +29,9 @@ func (s *ContactReligionService) Update(contactID, vaultID string, req dto.Updat
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
 	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
+	}
 
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
