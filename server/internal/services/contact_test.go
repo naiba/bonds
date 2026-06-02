@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -58,6 +59,72 @@ func TestCreateContact(t *testing.T) {
 	}
 	if contact.VaultID != vaultID {
 		t.Errorf("Expected vault_id '%s', got '%s'", vaultID, contact.VaultID)
+	}
+}
+
+func TestCreateContactStayInTouchFields(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	lastTalkedTo := time.Date(2026, 1, 15, 10, 30, 0, 0, time.UTC)
+	frequencyDays := 30
+
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "Stay",
+		LastTalkedTo:             &lastTalkedTo,
+		StayInTouchFrequencyDays: &frequencyDays,
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	if contact.LastTalkedTo == nil || !contact.LastTalkedTo.Equal(lastTalkedTo) {
+		t.Fatalf("expected last_talked_to %v, got %v", lastTalkedTo, contact.LastTalkedTo)
+	}
+	if contact.StayInTouchFrequencyDays == nil || *contact.StayInTouchFrequencyDays != frequencyDays {
+		t.Fatalf("expected stay_in_touch_frequency_days %d, got %v", frequencyDays, contact.StayInTouchFrequencyDays)
+	}
+	wantTriggerDate := lastTalkedTo.AddDate(0, 0, frequencyDays)
+	if contact.StayInTouchTriggerDate == nil || !contact.StayInTouchTriggerDate.Equal(wantTriggerDate) {
+		t.Fatalf("expected stay_in_touch_trigger_date %v, got %v", wantTriggerDate, contact.StayInTouchTriggerDate)
+	}
+}
+
+func TestUpdateContactStayInTouchFields(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	lastTalkedTo := time.Date(2026, 2, 1, 8, 0, 0, 0, time.UTC)
+	frequencyDays := 14
+	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:                "Updated",
+		LastTalkedTo:             &lastTalkedTo,
+		StayInTouchFrequencyDays: &frequencyDays,
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact failed: %v", err)
+	}
+	wantTriggerDate := lastTalkedTo.AddDate(0, 0, frequencyDays)
+	if updated.StayInTouchTriggerDate == nil || !updated.StayInTouchTriggerDate.Equal(wantTriggerDate) {
+		t.Fatalf("expected stay_in_touch_trigger_date %v, got %v", wantTriggerDate, updated.StayInTouchTriggerDate)
+	}
+
+	clearedFrequency, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName:    "OnlyLastTalkedTo",
+		LastTalkedTo: &lastTalkedTo,
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact without frequency failed: %v", err)
+	}
+	if clearedFrequency.LastTalkedTo == nil || !clearedFrequency.LastTalkedTo.Equal(lastTalkedTo) {
+		t.Fatalf("expected last_talked_to %v after partial stay-in-touch update, got %v", lastTalkedTo, clearedFrequency.LastTalkedTo)
+	}
+	if clearedFrequency.StayInTouchFrequencyDays != nil {
+		t.Fatalf("expected frequency to be nil when omitted, got %v", clearedFrequency.StayInTouchFrequencyDays)
+	}
+	if clearedFrequency.StayInTouchTriggerDate != nil {
+		t.Fatalf("expected trigger date to be nil when frequency is omitted, got %v", clearedFrequency.StayInTouchTriggerDate)
 	}
 }
 
@@ -289,6 +356,109 @@ func TestToggleFavorite(t *testing.T) {
 	}
 }
 
+func TestListCatchUpPromptsFiltersAndSortsByPriority(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	now := time.Now()
+
+	createPromptContact := func(firstName string, lastTalkedTo time.Time, frequencyDays int) *dto.ContactResponse {
+		contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+			FirstName:                firstName,
+			LastTalkedTo:             &lastTalkedTo,
+			StayInTouchFrequencyDays: &frequencyDays,
+		})
+		if err != nil {
+			t.Fatalf("CreateContact %s failed: %v", firstName, err)
+		}
+		return contact
+	}
+
+	veryOverdue := createPromptContact("VeryOverdue", now.AddDate(0, 0, -90), 30)
+	lessOverdue := createPromptContact("LessOverdue", now.AddDate(0, 0, -40), 20)
+	createPromptContact("NotDue", now.AddDate(0, 0, -5), 30)
+	createPromptContact("NoFrequency", now.AddDate(0, 0, -100), 0)
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "NoLastTalkedTo"})
+	if err != nil {
+		t.Fatalf("CreateContact without last_talked_to failed: %v", err)
+	}
+	archived := createPromptContact("Archived", now.AddDate(0, 0, -100), 10)
+	if _, err := svc.ToggleArchive(archived.ID, vaultID); err != nil {
+		t.Fatalf("ToggleArchive failed: %v", err)
+	}
+
+	shadow := models.Contact{
+		VaultID:                  vaultID,
+		FirstName:                strPtrOrNil("Shadow"),
+		LastTalkedTo:             ptrTime(now.AddDate(0, 0, -100)),
+		StayInTouchFrequencyDays: ptrInt(10),
+		StayInTouchTriggerDate:   ptrTime(now.AddDate(0, 0, -90)),
+	}
+	if err := svc.db.Create(&shadow).Error; err != nil {
+		t.Fatalf("Create shadow contact failed: %v", err)
+	}
+	if err := svc.db.Model(&shadow).Updates(map[string]interface{}{"can_be_deleted": false, "listed": false}).Error; err != nil {
+		t.Fatalf("Update shadow contact failed: %v", err)
+	}
+
+	prompts, err := svc.ListCatchUpPrompts(vaultID)
+	if err != nil {
+		t.Fatalf("ListCatchUpPrompts failed: %v", err)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("expected 2 catch-up prompts, got %d: %+v", len(prompts), prompts)
+	}
+	if prompts[0].ContactID != veryOverdue.ID || prompts[1].ContactID != lessOverdue.ID {
+		t.Fatalf("expected prompts sorted by priority VeryOverdue then LessOverdue, got %+v", prompts)
+	}
+	if prompts[0].DaysOverdue < 59 || prompts[0].DaysOverdue > 60 {
+		t.Fatalf("expected VeryOverdue days_overdue near 60, got %d", prompts[0].DaysOverdue)
+	}
+	if prompts[0].PriorityScore < 1.96 || prompts[0].PriorityScore > 2.01 {
+		t.Fatalf("expected VeryOverdue priority score near 2.0, got %f", prompts[0].PriorityScore)
+	}
+	if prompts[1].PriorityScore >= prompts[0].PriorityScore {
+		t.Fatalf("expected second prompt priority lower than first, got %f >= %f", prompts[1].PriorityScore, prompts[0].PriorityScore)
+	}
+}
+
+func TestMarkCaughtUpRecomputesStayInTouchTrigger(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	lastTalkedTo := time.Now().AddDate(0, 0, -45)
+	frequencyDays := 30
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:                "CatchUp",
+		LastTalkedTo:             &lastTalkedTo,
+		StayInTouchFrequencyDays: &frequencyDays,
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	before := time.Now().Add(-time.Second)
+	updated, err := svc.MarkCaughtUp(created.ID, vaultID)
+	if err != nil {
+		t.Fatalf("MarkCaughtUp failed: %v", err)
+	}
+	after := time.Now().Add(time.Second)
+
+	if updated.LastTalkedTo == nil || updated.LastTalkedTo.Before(before) || updated.LastTalkedTo.After(after) {
+		t.Fatalf("expected last_talked_to to be near now, got %v", updated.LastTalkedTo)
+	}
+	wantTriggerDate := updated.LastTalkedTo.AddDate(0, 0, frequencyDays)
+	if updated.StayInTouchTriggerDate == nil || !updated.StayInTouchTriggerDate.Equal(wantTriggerDate) {
+		t.Fatalf("expected recomputed trigger date %v, got %v", wantTriggerDate, updated.StayInTouchTriggerDate)
+	}
+
+	prompts, err := svc.ListCatchUpPrompts(vaultID)
+	if err != nil {
+		t.Fatalf("ListCatchUpPrompts failed: %v", err)
+	}
+	for _, prompt := range prompts {
+		if prompt.ContactID == created.ID {
+			t.Fatalf("expected caught-up contact to no longer be due, got %+v", prompt)
+		}
+	}
+}
+
 func TestContactNotFound(t *testing.T) {
 	svc, _, _, _ := setupContactTest(t)
 
@@ -318,8 +488,10 @@ func TestContactNotFound(t *testing.T) {
 	}
 }
 
-func ptrBool(b bool) *bool { return &b }
-func ptrUint(u uint) *uint { return &u }
+func ptrBool(b bool) *bool           { return &b }
+func ptrUint(u uint) *uint           { return &u }
+func ptrInt(i int) *int              { return &i }
+func ptrTime(t time.Time) *time.Time { return &t }
 
 func TestCreateContact_WithAllFields(t *testing.T) {
 	svc, vaultID, userID, accountID := setupContactTest(t)

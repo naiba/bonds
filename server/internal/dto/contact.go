@@ -3,63 +3,70 @@ package dto
 import "time"
 
 type CreateContactRequest struct {
-	FirstName  string `json:"first_name" validate:"required,min=1,max=255" example:"John"`
-	LastName   string `json:"last_name" validate:"max=255" example:"Doe"`
-	MiddleName string `json:"middle_name" validate:"max=255" example:"Michael"`
-	Nickname   string `json:"nickname" validate:"max=255" example:"Johnny"`
-	MaidenName string `json:"maiden_name" validate:"max=255" example:"Smith"`
-	Prefix     string `json:"prefix" validate:"max=255" example:"Mr."`
-	Suffix     string `json:"suffix" validate:"max=255" example:"Jr."`
-	GenderID   *uint  `json:"gender_id" example:"1"`
-	PronounID  *uint  `json:"pronoun_id" example:"1"`
-	TemplateID *uint  `json:"template_id" example:"1"`
-	Listed     *bool  `json:"listed" example:"true"`
+	FirstName                string     `json:"first_name" validate:"required,min=1,max=255" example:"John"`
+	LastName                 string     `json:"last_name" validate:"max=255" example:"Doe"`
+	MiddleName               string     `json:"middle_name" validate:"max=255" example:"Michael"`
+	Nickname                 string     `json:"nickname" validate:"max=255" example:"Johnny"`
+	MaidenName               string     `json:"maiden_name" validate:"max=255" example:"Smith"`
+	Prefix                   string     `json:"prefix" validate:"max=255" example:"Mr."`
+	Suffix                   string     `json:"suffix" validate:"max=255" example:"Jr."`
+	GenderID                 *uint      `json:"gender_id" example:"1"`
+	PronounID                *uint      `json:"pronoun_id" example:"1"`
+	TemplateID               *uint      `json:"template_id" example:"1"`
+	Listed                   *bool      `json:"listed" example:"true"`
+	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
 	// NeedsVerification flags a contact as needing later review (e.g. captured quickly
 	// or created by an automated agent). When nil, defaults to false.
 	NeedsVerification *bool `json:"needs_verification" example:"false"`
 }
 
 type UpdateContactRequest struct {
-	FirstName  string `json:"first_name" validate:"required,min=1,max=255" example:"John"`
-	LastName   string `json:"last_name" validate:"max=255" example:"Doe"`
-	MiddleName string `json:"middle_name" validate:"max=255" example:"Michael"`
-	Nickname   string `json:"nickname" validate:"max=255" example:"Johnny"`
-	MaidenName string `json:"maiden_name" validate:"max=255" example:"Smith"`
-	Prefix     string `json:"prefix" validate:"max=255" example:"Mr."`
-	Suffix     string `json:"suffix" validate:"max=255" example:"Jr."`
-	GenderID   *uint  `json:"gender_id" example:"1"`
-	PronounID  *uint  `json:"pronoun_id" example:"1"`
-	TemplateID *uint  `json:"template_id" example:"1"`
-	NeedsVerification *bool `json:"needs_verification" example:"false"`
+	FirstName                string     `json:"first_name" validate:"required,min=1,max=255" example:"John"`
+	LastName                 string     `json:"last_name" validate:"max=255" example:"Doe"`
+	MiddleName               string     `json:"middle_name" validate:"max=255" example:"Michael"`
+	Nickname                 string     `json:"nickname" validate:"max=255" example:"Johnny"`
+	MaidenName               string     `json:"maiden_name" validate:"max=255" example:"Smith"`
+	Prefix                   string     `json:"prefix" validate:"max=255" example:"Mr."`
+	Suffix                   string     `json:"suffix" validate:"max=255" example:"Jr."`
+	GenderID                 *uint      `json:"gender_id" example:"1"`
+	PronounID                *uint      `json:"pronoun_id" example:"1"`
+	TemplateID               *uint      `json:"template_id" example:"1"`
+	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
+	NeedsVerification        *bool      `json:"needs_verification" example:"false"`
 }
 
 type ContactResponse struct {
-	ID             string              `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	VaultID        string              `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	FirstName      string              `json:"first_name" example:"John"`
-	LastName       string              `json:"last_name" example:"Doe"`
-	MiddleName     string              `json:"middle_name" example:"Michael"`
-	Nickname       string              `json:"nickname" example:"Johnny"`
-	MaidenName     string              `json:"maiden_name" example:"Smith"`
-	Prefix         string              `json:"prefix" example:"Mr."`
-	Suffix         string              `json:"suffix" example:"Jr."`
-	GenderID       *uint               `json:"gender_id" example:"1"`
-	PronounID      *uint               `json:"pronoun_id" example:"1"`
-	TemplateID     *uint               `json:"template_id" example:"1"`
-	CompanyID      *uint               `json:"company_id" example:"1"`
-	ReligionID     *uint               `json:"religion_id" example:"1"`
-	FileID         *uint               `json:"file_id" example:"1"`
-	JobPosition    string              `json:"job_position" example:"Software Engineer"`
-	Listed         bool                `json:"listed" example:"true"`
-	ShowQuickFacts bool                `json:"show_quick_facts" example:"false"`
-	IsArchived     bool                `json:"is_archived" example:"false"`
-	IsFavorite     bool                `json:"is_favorite" example:"true"`
-	NeedsVerification bool             `json:"needs_verification" example:"false"`
-	CreatedAt      time.Time           `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt      time.Time           `json:"updated_at" example:"2026-01-15T10:30:00Z"`
-	Birthday       *string             `json:"birthday,omitempty" example:"1990-06-15"`
-	Age            *int                `json:"age,omitempty" example:"35"`
-	Groups         []ContactGroupBrief `json:"groups,omitempty"`
+	ID                       string              `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	VaultID                  string              `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstName                string              `json:"first_name" example:"John"`
+	LastName                 string              `json:"last_name" example:"Doe"`
+	MiddleName               string              `json:"middle_name" example:"Michael"`
+	Nickname                 string              `json:"nickname" example:"Johnny"`
+	MaidenName               string              `json:"maiden_name" example:"Smith"`
+	Prefix                   string              `json:"prefix" example:"Mr."`
+	Suffix                   string              `json:"suffix" example:"Jr."`
+	GenderID                 *uint               `json:"gender_id" example:"1"`
+	PronounID                *uint               `json:"pronoun_id" example:"1"`
+	TemplateID               *uint               `json:"template_id" example:"1"`
+	CompanyID                *uint               `json:"company_id" example:"1"`
+	ReligionID               *uint               `json:"religion_id" example:"1"`
+	FileID                   *uint               `json:"file_id" example:"1"`
+	JobPosition              string              `json:"job_position" example:"Software Engineer"`
+	LastTalkedTo             *time.Time          `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	StayInTouchFrequencyDays *int                `json:"stay_in_touch_frequency_days" example:"30"`
+	StayInTouchTriggerDate   *time.Time          `json:"stay_in_touch_trigger_date" example:"2026-02-14T10:30:00Z"`
+	Listed                   bool                `json:"listed" example:"true"`
+	ShowQuickFacts           bool                `json:"show_quick_facts" example:"false"`
+	IsArchived               bool                `json:"is_archived" example:"false"`
+	IsFavorite               bool                `json:"is_favorite" example:"true"`
+	NeedsVerification        bool                `json:"needs_verification" example:"false"`
+	CreatedAt                time.Time           `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt                time.Time           `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	Birthday                 *string             `json:"birthday,omitempty" example:"1990-06-15"`
+	Age                      *int                `json:"age,omitempty" example:"35"`
+	Groups                   []ContactGroupBrief `json:"groups,omitempty"`
 }
 
 type ContactListResponse struct {
@@ -111,6 +118,18 @@ type ContactSearchRequest struct {
 type ContactSearchItem struct {
 	ID   string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name string `json:"name" example:"John Doe"`
+}
+
+type CatchUpPromptResponse struct {
+	ContactID                string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstName                string    `json:"first_name" example:"John"`
+	LastName                 string    `json:"last_name" example:"Doe"`
+	LastTalkedTo             time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	StayInTouchFrequencyDays int       `json:"stay_in_touch_frequency_days" example:"30"`
+	StayInTouchTriggerDate   time.Time `json:"stay_in_touch_trigger_date" example:"2026-02-14T10:30:00Z"`
+	DaysSinceLastContact     int       `json:"days_since_last_contact" example:"45"`
+	DaysOverdue              int       `json:"days_overdue" example:"15"`
+	PriorityScore            float64   `json:"priority_score" example:"0.5"`
 }
 
 type ContactGroupBrief struct {

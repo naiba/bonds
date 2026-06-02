@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -115,18 +116,21 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
 	now := time.Now()
 	contact := models.Contact{
-		VaultID:       vaultID,
-		FirstName:     &req.FirstName,
-		LastName:      strPtrOrNil(req.LastName),
-		MiddleName:    strPtrOrNil(req.MiddleName),
-		Nickname:      strPtrOrNil(req.Nickname),
-		MaidenName:    strPtrOrNil(req.MaidenName),
-		Prefix:        strPtrOrNil(req.Prefix),
-		Suffix:        strPtrOrNil(req.Suffix),
-		GenderID:      req.GenderID,
-		PronounID:     req.PronounID,
-		TemplateID:    req.TemplateID,
-		LastUpdatedAt: &now,
+		VaultID:                  vaultID,
+		FirstName:                &req.FirstName,
+		LastName:                 strPtrOrNil(req.LastName),
+		MiddleName:               strPtrOrNil(req.MiddleName),
+		Nickname:                 strPtrOrNil(req.Nickname),
+		MaidenName:               strPtrOrNil(req.MaidenName),
+		Prefix:                   strPtrOrNil(req.Prefix),
+		Suffix:                   strPtrOrNil(req.Suffix),
+		GenderID:                 req.GenderID,
+		PronounID:                req.PronounID,
+		TemplateID:               req.TemplateID,
+		LastTalkedTo:             req.LastTalkedTo,
+		StayInTouchFrequencyDays: req.StayInTouchFrequencyDays,
+		StayInTouchTriggerDate:   calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays),
+		LastUpdatedAt:            &now,
 	}
 	if req.NeedsVerification != nil {
 		contact.NeedsVerification = *req.NeedsVerification
@@ -211,6 +215,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 	contact.GenderID = req.GenderID
 	contact.PronounID = req.PronounID
 	contact.TemplateID = req.TemplateID
+	contact.LastTalkedTo = req.LastTalkedTo
+	contact.StayInTouchFrequencyDays = req.StayInTouchFrequencyDays
+	contact.StayInTouchTriggerDate = calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays)
 	contact.LastUpdatedAt = &now
 	if req.NeedsVerification != nil {
 		contact.NeedsVerification = *req.NeedsVerification
@@ -314,6 +321,67 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 	}
 
 	resp := toContactResponse(&contact, cvu.IsFavorite)
+	return &resp, nil
+}
+
+func (s *ContactService) ListCatchUpPrompts(vaultID string) ([]dto.CatchUpPromptResponse, error) {
+	now := time.Now()
+	var contacts []models.Contact
+	if err := s.db.Where("vault_id = ?", vaultID).
+		Where("listed = ?", true).
+		Where("NOT (can_be_deleted = ? AND listed = ?)", false, false).
+		Where("last_talked_to IS NOT NULL").
+		Where("stay_in_touch_frequency_days IS NOT NULL AND stay_in_touch_frequency_days > ?", 0).
+		Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+
+	prompts := make([]dto.CatchUpPromptResponse, 0, len(contacts))
+	for _, contact := range contacts {
+		triggerDate := resolveStayInTouchTriggerDate(&contact)
+		if triggerDate == nil || triggerDate.After(now) {
+			continue
+		}
+		daysSinceLastContact := daysBetween(*contact.LastTalkedTo, now)
+		daysOverdue := daysBetween(*triggerDate, now)
+		frequencyDays := *contact.StayInTouchFrequencyDays
+		prompts = append(prompts, dto.CatchUpPromptResponse{
+			ContactID:                contact.ID,
+			FirstName:                ptrToStr(contact.FirstName),
+			LastName:                 ptrToStr(contact.LastName),
+			LastTalkedTo:             *contact.LastTalkedTo,
+			StayInTouchFrequencyDays: frequencyDays,
+			StayInTouchTriggerDate:   *triggerDate,
+			DaysSinceLastContact:     daysSinceLastContact,
+			DaysOverdue:              daysOverdue,
+			PriorityScore:            float64(daysOverdue) / float64(frequencyDays),
+		})
+	}
+
+	sort.SliceStable(prompts, func(i, j int) bool {
+		return prompts[i].PriorityScore > prompts[j].PriorityScore
+	})
+	return prompts, nil
+}
+
+func (s *ContactService) MarkCaughtUp(contactID, vaultID string) (*dto.ContactResponse, error) {
+	var contact models.Contact
+	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrContactNotFound
+		}
+		return nil, err
+	}
+
+	now := time.Now()
+	contact.LastTalkedTo = &now
+	contact.StayInTouchTriggerDate = calculateStayInTouchTriggerDate(contact.LastTalkedTo, contact.StayInTouchFrequencyDays)
+	contact.LastUpdatedAt = &now
+	if err := s.db.Save(&contact).Error; err != nil {
+		return nil, err
+	}
+
+	resp := toContactResponse(&contact, false)
 	return &resp, nil
 }
 
@@ -468,30 +536,55 @@ func contactSortOrder(sort string) string {
 
 func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
 	return dto.ContactResponse{
-		ID:             c.ID,
-		VaultID:        c.VaultID,
-		FirstName:      ptrToStr(c.FirstName),
-		LastName:       ptrToStr(c.LastName),
-		MiddleName:     ptrToStr(c.MiddleName),
-		Nickname:       ptrToStr(c.Nickname),
-		MaidenName:     ptrToStr(c.MaidenName),
-		Prefix:         ptrToStr(c.Prefix),
-		Suffix:         ptrToStr(c.Suffix),
-		GenderID:       c.GenderID,
-		PronounID:      c.PronounID,
-		TemplateID:     c.TemplateID,
-		CompanyID:      c.CompanyID,
-		ReligionID:     c.ReligionID,
-		FileID:         c.FileID,
-		JobPosition:    ptrToStr(c.JobPosition),
-		Listed:         c.Listed,
-		ShowQuickFacts: c.ShowQuickFacts,
-		IsArchived:     !c.Listed,
-		IsFavorite:     isFavorite,
-		NeedsVerification: c.NeedsVerification,
-		CreatedAt:      c.CreatedAt,
-		UpdatedAt:      c.UpdatedAt,
+		ID:                       c.ID,
+		VaultID:                  c.VaultID,
+		FirstName:                ptrToStr(c.FirstName),
+		LastName:                 ptrToStr(c.LastName),
+		MiddleName:               ptrToStr(c.MiddleName),
+		Nickname:                 ptrToStr(c.Nickname),
+		MaidenName:               ptrToStr(c.MaidenName),
+		Prefix:                   ptrToStr(c.Prefix),
+		Suffix:                   ptrToStr(c.Suffix),
+		GenderID:                 c.GenderID,
+		PronounID:                c.PronounID,
+		TemplateID:               c.TemplateID,
+		CompanyID:                c.CompanyID,
+		ReligionID:               c.ReligionID,
+		FileID:                   c.FileID,
+		JobPosition:              ptrToStr(c.JobPosition),
+		LastTalkedTo:             c.LastTalkedTo,
+		StayInTouchFrequencyDays: c.StayInTouchFrequencyDays,
+		StayInTouchTriggerDate:   c.StayInTouchTriggerDate,
+		Listed:                   c.Listed,
+		ShowQuickFacts:           c.ShowQuickFacts,
+		IsArchived:               !c.Listed,
+		IsFavorite:               isFavorite,
+		NeedsVerification:        c.NeedsVerification,
+		CreatedAt:                c.CreatedAt,
+		UpdatedAt:                c.UpdatedAt,
 	}
+}
+
+func calculateStayInTouchTriggerDate(lastTalkedTo *time.Time, frequencyDays *int) *time.Time {
+	if lastTalkedTo == nil || frequencyDays == nil {
+		return nil
+	}
+	triggerDate := lastTalkedTo.AddDate(0, 0, *frequencyDays)
+	return &triggerDate
+}
+
+func resolveStayInTouchTriggerDate(contact *models.Contact) *time.Time {
+	if contact.StayInTouchTriggerDate != nil {
+		return contact.StayInTouchTriggerDate
+	}
+	return calculateStayInTouchTriggerDate(contact.LastTalkedTo, contact.StayInTouchFrequencyDays)
+}
+
+func daysBetween(from, to time.Time) int {
+	if to.Before(from) {
+		return 0
+	}
+	return int(to.Sub(from).Hours() / 24)
 }
 
 func (s *ContactService) fetchBirthdayAndGroupMaps(contactIDs []string) (map[string]*models.ContactImportantDate, map[string][]dto.ContactGroupBrief) {
