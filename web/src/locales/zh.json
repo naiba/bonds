@@ -1009,7 +1009,10 @@
       "edit_channel": "编辑渠道",
       "edit_modal_title": "编辑通知渠道",
       "updated": "渠道已更新",
-      "content_changed_reverify": "目标地址已更改——邮件渠道需要重新验证。"
+      "content_changed_reverify": "目标地址已更改——邮件渠道需要重新验证。",
+      "preferred_time": "首选发送时间",
+      "preferred_time_help": "每日提醒通知会按这个本地时间发送。",
+      "preferred_time_display": "每日提醒时间 {{time}}"
     },
     "personalize": {
       "title": "个性化",

@@ -1009,7 +1009,10 @@
       "edit_channel": "Modifier la chaîne",
       "edit_modal_title": "Modifier le canal de notification",
       "updated": "Chaîne mise à jour",
-      "content_changed_reverify": "Destination modifiée : les canaux de messagerie nécessitent une nouvelle vérification."
+      "content_changed_reverify": "Destination modifiée : les canaux de messagerie nécessitent une nouvelle vérification.",
+      "preferred_time": "Heure d'envoi préférée",
+      "preferred_time_help": "Les rappels quotidiens sont planifiés à cette heure locale.",
+      "preferred_time_display": "Rappels quotidiens à {{time}}"
     },
     "personalize": {
       "title": "Personnaliser",

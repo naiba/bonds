@@ -1009,7 +1009,10 @@
       "edit_channel": "Edit Channel",
       "edit_modal_title": "Edit Notification Channel",
       "updated": "Channel updated",
-      "content_changed_reverify": "Destination changed — email channels require re-verification."
+      "content_changed_reverify": "Destination changed — email channels require re-verification.",
+      "preferred_time": "Preferred send time",
+      "preferred_time_help": "Daily reminder notifications are scheduled at this local time.",
+      "preferred_time_display": "Daily reminders at {{time}}"
     },
     "personalize": {
       "title": "Personalize",

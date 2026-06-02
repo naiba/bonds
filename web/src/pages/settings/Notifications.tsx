@@ -90,7 +90,7 @@ export default function Notifications() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: { type: "email" | "shoutrrr"; label: string; content: string }) =>
+    mutationFn: (values: { type: "email" | "shoutrrr"; label: string; content: string; preferred_time?: string }) =>
       api.notifications.notificationsCreate(values),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
@@ -157,6 +157,7 @@ export default function Notifications() {
   function openCreateModal() {
     setEditingChannel(null);
     form.resetFields();
+    form.setFieldsValue({ type: "email", preferred_time: "09:00" });
     setModalOpen(true);
   }
 
@@ -184,7 +185,7 @@ export default function Notifications() {
         values: { label: values.label, content: values.content, preferred_time: values.preferred_time },
       });
     } else {
-      createMutation.mutate(values as { type: "email" | "shoutrrr"; label: string; content: string });
+      createMutation.mutate(values as { type: "email" | "shoutrrr"; label: string; content: string; preferred_time?: string });
     }
   }
 
@@ -339,7 +340,14 @@ export default function Notifications() {
                       )}
                     </span>
                   }
-                  description={ch.content}
+                  description={
+                    <Space direction="vertical" size={2}>
+                      <Text type="secondary">{ch.content}</Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {t("settings.notifications.preferred_time_display", { time: ch.preferred_time ?? "09:00" })}
+                      </Text>
+                    </Space>
+                  }
                 />
               </List.Item>
             );
@@ -358,7 +366,7 @@ export default function Notifications() {
           form={form}
           layout="vertical"
           onFinish={handleFormSubmit}
-          initialValues={{ type: "email" }}
+          initialValues={{ type: "email", preferred_time: "09:00" }}
         >
           <Form.Item
             name="type"
@@ -397,6 +405,14 @@ export default function Notifications() {
                   : "telegram://token@telegram?channels=chatid"
               }
             />
+          </Form.Item>
+          <Form.Item
+            name="preferred_time"
+            label={t("settings.notifications.preferred_time")}
+            extra={t("settings.notifications.preferred_time_help")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input type="time" />
           </Form.Item>
         </Form>
       </Modal>

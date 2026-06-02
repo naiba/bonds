@@ -1009,7 +1009,10 @@
       "edit_channel": "Editar canal",
       "edit_modal_title": "Editar canal de notificación",
       "updated": "Canal actualizado",
-      "content_changed_reverify": "Destino cambiado — los canales de correo requieren volver a verificar."
+      "content_changed_reverify": "Destino cambiado — los canales de correo requieren volver a verificar.",
+      "preferred_time": "Hora preferida de envío",
+      "preferred_time_help": "Los recordatorios diarios se programan a esta hora local.",
+      "preferred_time_display": "Recordatorios diarios a las {{time}}"
     },
     "personalize": {
       "title": "Personalizar",

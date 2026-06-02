@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import Notifications from "@/pages/settings/Notifications";
@@ -80,5 +81,42 @@ describe("Notifications", () => {
     renderNotifications();
     const editButton = document.querySelector('[title="Edit Channel"]');
     expect(editButton).toBeInTheDocument();
+  });
+
+  it("shows preferred send time for channels", () => {
+    mockUseQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+      if (queryKey[0] === "settings" && queryKey[1] === "notifications") {
+        return {
+          data: [
+            {
+              id: 1,
+              type: "shoutrrr",
+              label: "Telegram",
+              content: "telegram://token@telegram?channels=123",
+              active: true,
+              verified_at: "2026-01-01",
+              preferred_time: "18:30",
+            },
+          ],
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+
+    renderNotifications();
+
+    expect(screen.getByText("Daily reminders at 18:30")).toBeInTheDocument();
+  });
+
+  it("exposes preferred send time when creating a channel", async () => {
+    const user = userEvent.setup();
+    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
+    renderNotifications();
+
+    await user.click(screen.getByRole("button", { name: /add channel/i }));
+
+    expect(screen.getByLabelText("Preferred send time")).toHaveValue("09:00");
+    expect(screen.getByText("Daily reminder notifications are scheduled at this local time.")).toBeInTheDocument();
   });
 });
