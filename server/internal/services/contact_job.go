@@ -227,6 +227,9 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID string, req dto.Upda
 	if err := s.db.Save(&contact).Error; err != nil {
 		return nil, err
 	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
+		return nil, err
+	}
 
 	resp := toContactResponse(&contact, false)
 	return &resp, nil
@@ -251,6 +254,9 @@ func (s *ContactJobService) LegacyDelete(contactID, vaultID string) (*dto.Contac
 	contact.CompanyID = nil
 	contact.JobPosition = nil
 	if err := s.db.Save(&contact).Error; err != nil {
+		return nil, err
+	}
+	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
 
