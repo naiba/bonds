@@ -197,7 +197,13 @@
       "life_event_summary": "Résumé",
       "life_event_description": "Description",
       "life_event_added": "Événement de la vie ajouté",
-      "life_event_date": "Date"
+      "life_event_date": "Date",
+      "catch_up_title": "Prendre des nouvelles",
+      "no_catch_up": "Personne n'est à relancer",
+      "catch_up_due": "{{days}} jours de retard",
+      "catch_up_last_talked": "Dernier échange {{date}}",
+      "catch_up_mark": "Fait",
+      "catch_up_marked": "Prise de nouvelles enregistrée"
     },
     "calendar": {
       "title": "Calendrier",

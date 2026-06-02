@@ -197,7 +197,13 @@
       "life_event_summary": "Resumen",
       "life_event_description": "Descripción",
       "life_event_added": "Evento de vida añadido",
-      "life_event_date": "Fecha"
+      "life_event_date": "Fecha",
+      "catch_up_title": "Ponerse al día",
+      "no_catch_up": "Nadie necesita ponerse al día",
+      "catch_up_due": "{{days}} días de retraso",
+      "catch_up_last_talked": "Última charla {{date}}",
+      "catch_up_mark": "Hecho",
+      "catch_up_marked": "Puesta al día registrada"
     },
     "calendar": {
       "title": "Calendario",

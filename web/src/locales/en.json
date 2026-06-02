@@ -197,7 +197,13 @@
       "life_event_summary": "Summary",
       "life_event_description": "Description",
       "life_event_added": "Life event added",
-      "life_event_date": "Date"
+      "life_event_date": "Date",
+      "catch_up_title": "Catch-Up",
+      "no_catch_up": "No one is due for a catch-up",
+      "catch_up_due": "{{days}} days overdue",
+      "catch_up_last_talked": "Last talked {{date}}",
+      "catch_up_mark": "Done",
+      "catch_up_marked": "Catch-up recorded"
     },
     "calendar": {
       "title": "Calendar",

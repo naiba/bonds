@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate, formatMonthYear, formatShortDate } from "@/utils/dateFormat";
+import { formatShortDateOnly } from "@/utils/dateOnlyInput";
 import {
   Typography,
   Spin,
@@ -33,6 +34,7 @@ import {
   BellOutlined,
   CheckSquareOutlined,
   SmileOutlined,
+  CheckCircleOutlined,
 } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -47,6 +49,7 @@ import type {
   MoodTrackingParameterResponse,
   LifeEventCategoryResponse,
   UserPreferences,
+  CatchUpPrompt,
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -343,6 +346,7 @@ export default function VaultDetail() {
         {/* ─── Right Sidebar ──────────────────────────────────── */}
         <div className="vault-dashboard-right" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <MoodRecordingWidget vaultId={vaultId} userContactId={vault.user_contact_id} />
+          <CatchUpWidget vaultId={vaultId} />
           <UpcomingRemindersWidget vaultId={vaultId} />
           <DueTasksWidget vaultId={vaultId} />
         </div>
@@ -1273,6 +1277,123 @@ function MoodRecordingWidget({ vaultId, userContactId }: { vaultId: string; user
           >
             {t("vault.dashboard.mood_record")}
           </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CatchUpWidget({ vaultId }: { vaultId: string }) {
+  const { t } = useTranslation();
+  const { token } = theme.useToken();
+  const navigate = useNavigate();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const dateFormats = useDateFormat();
+  const nameOrder = useNameOrder();
+
+  const { data: prompts = [], isLoading } = useQuery<CatchUpPrompt[]>({
+    queryKey: ["vaults", vaultId, "catchUp"],
+    queryFn: async () => {
+      const res = await api.dashboard.dashboardCatchUpList(String(vaultId));
+      return res.data ?? [];
+    },
+    enabled: !!vaultId,
+  });
+
+  const markCaughtUpMutation = useMutation({
+    mutationFn: (contactId: string) => api.contacts.contactsCatchUpCreate(String(vaultId), contactId),
+    onSuccess: (_, contactId) => {
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "catchUp"] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "contacts", contactId] });
+      message.success(t("vault.dashboard.catch_up_marked"));
+    },
+  });
+
+  return (
+    <div
+      style={{
+        background: token.colorBgContainer,
+        borderRadius: token.borderRadiusLG,
+        boxShadow: token.boxShadowTertiary,
+        padding: "14px 16px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+        <CheckCircleOutlined style={{ color: token.colorPrimary, fontSize: 15 }} />
+        <Text strong style={{ fontSize: 13, color: token.colorTextSecondary }}>
+          {t("vault.dashboard.catch_up_title")}
+        </Text>
+      </div>
+
+      {isLoading ? (
+        <div style={{ textAlign: "center", padding: "8px 0" }}>
+          <Spin size="small" />
+        </div>
+      ) : prompts.length === 0 ? (
+        <Text type="secondary" style={{ fontSize: 13 }}>
+          {t("vault.dashboard.no_catch_up")}
+        </Text>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {prompts.slice(0, 5).map((prompt) => {
+            const contactId = prompt.contact_id;
+            if (!contactId) return null;
+            const contactName = formatContactName(nameOrder, {
+              first_name: prompt.first_name,
+              last_name: prompt.last_name,
+            });
+            return (
+              <div
+                key={contactId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "28px 1fr auto",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                <ContactAvatar
+                  vaultId={vaultId}
+                  contactId={contactId}
+                  firstName={prompt.first_name}
+                  lastName={prompt.last_name}
+                  size={28}
+                />
+                <div style={{ minWidth: 0 }}>
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, height: "auto", fontWeight: 600, maxWidth: "100%" }}
+                    onClick={() => navigate(`/vaults/${vaultId}/contacts/${contactId}`)}
+                  >
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
+                      {contactName}
+                    </span>
+                  </Button>
+                  <Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                    {t("vault.dashboard.catch_up_due", { days: prompt.days_overdue ?? 0 })}
+                  </Text>
+                  {prompt.last_talked_to && (
+                    <Text type="secondary" style={{ display: "block", fontSize: 12 }}>
+                      {t("vault.dashboard.catch_up_last_talked", {
+                        date: formatShortDateOnly(prompt.last_talked_to, dateFormats),
+                      })}
+                    </Text>
+                  )}
+                </div>
+                <Button
+                  size="small"
+                  icon={<CheckCircleOutlined />}
+                  loading={markCaughtUpMutation.isPending && markCaughtUpMutation.variables === contactId}
+                  onClick={() => markCaughtUpMutation.mutate(contactId)}
+                >
+                  {t("vault.dashboard.catch_up_mark")}
+                </Button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

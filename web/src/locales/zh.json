@@ -197,7 +197,13 @@
       "life_event_summary": "摘要",
       "life_event_description": "描述",
       "life_event_added": "生活事件已添加",
-      "life_event_date": "日期"
+      "life_event_date": "日期",
+      "catch_up_title": "保持联系",
+      "no_catch_up": "暂无需要联系的人",
+      "catch_up_due": "已逾期 {{days}} 天",
+      "catch_up_last_talked": "上次联系 {{date}}",
+      "catch_up_mark": "完成",
+      "catch_up_marked": "已记录本次联系"
     },
     "calendar": {
       "title": "日历",

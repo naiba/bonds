@@ -19,8 +19,21 @@ vi.mock("@/api", () => ({
       vaultsUpdate: vi.fn(),
       vaultsDelete: vi.fn(),
     },
-    contacts: { contactsList: vi.fn() },
+    contacts: { contactsList: vi.fn(), contactsCatchUpCreate: vi.fn() },
+    dashboard: { dashboardCatchUpList: vi.fn() },
     reminders: { remindersList: vi.fn() },
+    search: { searchMostConsultedList: vi.fn() },
+    vaultTasks: { tasksList: vi.fn() },
+  },
+  httpClient: {
+    instance: {
+      get: vi.fn().mockRejectedValue(new Error("mocked")),
+      put: vi.fn().mockResolvedValue({}),
+      interceptors: {
+        request: { use: vi.fn() },
+        response: { use: vi.fn() },
+      },
+    },
   },
 }));
 
@@ -150,6 +163,77 @@ describe("VaultDetail", () => {
     renderVaultDetail();
     expect(screen.getByText(/John Doe/)).toBeInTheDocument();
     expect(screen.getByText(/Birthday/)).toBeInTheDocument();
+  });
+
+  it("renders catch-up prompts on the dashboard", () => {
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      if (
+        Array.isArray(opts.queryKey) &&
+        opts.queryKey.length === 2 &&
+        opts.queryKey[0] === "vaults"
+      ) {
+        return {
+          data: {
+            id: 1,
+            name: "My Vault",
+            description: null,
+            created_at: "2024-06-01T00:00:00Z",
+            updated_at: "2024-06-02T00:00:00Z",
+          },
+          isLoading: false,
+        };
+      }
+      if (
+        Array.isArray(opts.queryKey) &&
+        opts.queryKey.includes("catchUp")
+      ) {
+        return {
+          data: [
+            {
+              contact_id: "contact-1",
+              first_name: "Jane",
+              last_name: "Doe",
+              days_overdue: 12,
+              last_talked_to: "2026-01-02T00:00:00Z",
+            },
+          ],
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+
+    renderVaultDetail();
+
+    expect(screen.getByText("Catch-Up")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Jane Doe/i })).toBeInTheDocument();
+    expect(screen.getByText("12 days overdue")).toBeInTheDocument();
+  });
+
+  it("renders catch-up empty state", () => {
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      if (
+        Array.isArray(opts.queryKey) &&
+        opts.queryKey.length === 2 &&
+        opts.queryKey[0] === "vaults"
+      ) {
+        return {
+          data: {
+            id: 1,
+            name: "My Vault",
+            description: null,
+            created_at: "2024-06-01T00:00:00Z",
+            updated_at: "2024-06-02T00:00:00Z",
+          },
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+
+    renderVaultDetail();
+
+    expect(screen.getByText("No one is due for a catch-up")).toBeInTheDocument();
   });
 
   it("renders No contacts yet when empty contacts", () => {
