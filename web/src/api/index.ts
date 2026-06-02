@@ -26,6 +26,7 @@ import { ContactLabels } from "./generated/ContactLabels";
 import { ContactPhotos } from "./generated/ContactPhotos";
 import { Contacts } from "./generated/Contacts";
 import { Currencies } from "./generated/Currencies";
+import { Dashboard } from "./generated/Dashboard";
 import { Feed } from "./generated/Feed";
 import { Files } from "./generated/Files";
 import { Goals } from "./generated/Goals";
@@ -194,6 +195,7 @@ export const api = {
   contactPhotos: new ContactPhotos(httpClient),
   contacts: new Contacts(httpClient),
   currencies: new Currencies(httpClient),
+  dashboard: new Dashboard(httpClient),
   davSubscriptions: new DavSubscriptions(httpClient),
   feed: new Feed(httpClient),
   files: new Files(httpClient),
@@ -268,6 +270,7 @@ export type { GithubComNaibaBondsInternalDtoContactSearchItem as SearchResult } 
 export type { GithubComNaibaBondsInternalDtoContactTabsResponse as ContactTabsResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactTabPage as ContactTabPage } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactTabModule as ContactTabModule } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCatchUpPromptResponse as CatchUpPrompt } from "./generated/data-contracts";
 
 // Vault
 export type { GithubComNaibaBondsInternalDtoVaultResponse as Vault } from "./generated/data-contracts";
