@@ -216,7 +216,7 @@ describe("ContactDetail", () => {
     expect(screen.getByText("NotesModule:read")).toBeInTheDocument();
     expect(screen.queryByText("Overview")).not.toBeInTheDocument();
 
-    await user.click(screen.getByText("Edit", { selector: ".ant-segmented-item-label" }));
+    await user.click(screen.getByText("Full view", { selector: ".ant-segmented-item-label" }));
 
     expect(screen.getByText("Overview")).toBeInTheDocument();
     expect(screen.getByText("Relationships")).toBeInTheDocument();

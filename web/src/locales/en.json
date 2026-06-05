@@ -512,6 +512,8 @@
       "sort_updated": "Last updated",
       "filter_label": "Filter by label",
       "all_labels": "All labels",
+      "filter_group": "Filter by group",
+      "all_groups": "All groups",
       "quick_search": "Quick search",
       "col_birthday": "Birthday",
       "col_age": "Age",
@@ -588,7 +590,7 @@
       "change_template": "Change Template",
       "template_updated": "Template updated",
       "view_mode": "Summary",
-      "edit_mode": "Edit",
+      "edit_mode": "Full view",
       "tabs": {
         "overview": "Overview",
         "relationships": "Relationships",
@@ -655,6 +657,10 @@
       },
       "summary": {
         "family": "Family summary",
+        "family_group": "Family",
+        "relationships": "Relationships",
+        "groups": "Groups",
+        "network": "Relationship network",
         "gender": "Gender",
         "pronoun": "Pronoun",
         "labels": "Labels",

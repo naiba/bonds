@@ -512,6 +512,8 @@
       "sort_updated": "Última actualización",
       "filter_label": "Filtrar por etiqueta",
       "all_labels": "Todas las etiquetas",
+      "filter_group": "Filtrar por grupo",
+      "all_groups": "Todos los grupos",
       "quick_search": "Búsqueda rápida",
       "col_birthday": "Cumpleaños",
       "col_age": "Edad",
@@ -588,7 +590,7 @@
       "change_template": "Cambiar plantilla",
       "template_updated": "Plantilla actualizada",
       "view_mode": "Resumen",
-      "edit_mode": "Editar",
+      "edit_mode": "Vista completa",
       "tabs": {
         "overview": "Resumen",
         "relationships": "Relaciones",
@@ -655,6 +657,10 @@
       },
       "summary": {
         "family": "Resumen familiar",
+        "family_group": "Familia",
+        "relationships": "Relaciones",
+        "groups": "Grupos",
+        "network": "Red de relaciones",
         "gender": "Género",
         "pronoun": "Pronombre",
         "labels": "Etiquetas",

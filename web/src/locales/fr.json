@@ -512,6 +512,8 @@
       "sort_updated": "Dernière mise à jour",
       "filter_label": "Filtrer par étiquette",
       "all_labels": "Toutes les étiquettes",
+      "filter_group": "Filtrer par groupe",
+      "all_groups": "Tous les groupes",
       "quick_search": "Recherche rapide",
       "col_birthday": "Anniversaire",
       "col_age": "Âge",
@@ -588,7 +590,7 @@
       "change_template": "Changer de modèle",
       "template_updated": "Modèle mis à jour",
       "view_mode": "Résumé",
-      "edit_mode": "Modifier",
+      "edit_mode": "Vue complète",
       "tabs": {
         "overview": "Aperçu",
         "relationships": "Relations",
@@ -655,6 +657,10 @@
       },
       "summary": {
         "family": "Résumé familial",
+        "family_group": "Famille",
+        "relationships": "Relations",
+        "groups": "Groupes",
+        "network": "Réseau de relations",
         "gender": "Genre",
         "pronoun": "Pronom",
         "labels": "Étiquettes",

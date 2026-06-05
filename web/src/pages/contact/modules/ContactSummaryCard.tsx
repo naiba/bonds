@@ -6,6 +6,7 @@ import type { Contact } from "@/api";
 import { useTranslation } from "react-i18next";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { getReadableLabelTagColors } from "@/utils/labelColor";
+import NetworkGraph from "@/components/NetworkGraph";
 import type { ImportantDate, ImportantDateTypeResponse } from "@/api";
 import { useDateFormat } from "@/utils/dateFormat";
 import { formatDateOnly } from "@/utils/dateOnlyInput";
@@ -69,6 +70,24 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
     queryKey: ["vaults", vaultId, "contacts"],
     queryFn: async () => {
       const res = await api.contacts.contactsList(String(vaultId), { per_page: 9999 });
+      return res.data ?? [];
+    },
+    enabled: relationships.length > 0,
+  });
+
+  // Groups — same key as GroupsModule
+  const { data: groups = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", contactId, "groups"],
+    queryFn: async () => {
+      const res = await api.groups.contactsGroupsList(String(vaultId), String(contactId));
+      return res.data ?? [];
+    },
+  });
+
+  const { data: relationshipTypesWithGroup = [] } = useQuery({
+    queryKey: ["personalize", "relationship-types", "all"],
+    queryFn: async () => {
+      const res = await api.relationshipTypes.personalizeRelationshipTypesAllList();
       return res.data ?? [];
     },
     enabled: relationships.length > 0,
@@ -200,7 +219,23 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
     marginBottom: 4,
   };
 
+  const relationshipGroupByTypeId = new Map<number, string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const rt of relationshipTypesWithGroup as any[]) {
+    if (rt.id != null && rt.group_name) relationshipGroupByTypeId.set(rt.id, rt.group_name);
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const relationshipsByGroup = new Map<string, any[]>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const rel of relationships as any[]) {
+    const groupName = relationshipGroupByTypeId.get(rel.relationship_type_id) ?? "";
+    if (!relationshipsByGroup.has(groupName)) relationshipsByGroup.set(groupName, []);
+    relationshipsByGroup.get(groupName)!.push(rel);
+  }
+  const familyGroupNames = new Set([t("contact.detail.summary.family_group"), "Family", "家庭"]);
+
   const hasRelationships = relationships.length > 0;
+  const hasGroups = groups.length > 0;
   const hasLabels = labels.length > 0;
   const hasJobs = jobs.length > 0;
   const hasGenderOrPronoun = !!genderLabel || !!pronounLabel;
@@ -219,7 +254,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
   const birthDateAge = birthDate && !deceasedDate ? computeImportantDateAge(birthDate) : null;
   const deceasedDateAge = computeAgeAtImportantDate(birthDate, deceasedDate);
   const hasImportantSummaryDates = !!birthDate || !!deceasedDate;
-  const hasSummaryData = hasRelationships || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress || hasImportantSummaryDates || hasMeetingMetadata;
+  const hasSummaryData = hasRelationships || hasGroups || hasGenderOrPronoun || hasLabels || hasJobs || hasReligion || hasContactInfo || hasAddress || hasImportantSummaryDates || hasMeetingMetadata;
 
   if (readOnly && !hasSummaryData) return null;
 
@@ -233,37 +268,56 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
         padding: "4px 16px 8px",
       }}
     >
-      {/* 1. Family summary — relationships */}
-      {hasRelationships && (
+      {/* 1. Primary contact info — email/phone */}
+      {hasContactInfo && (
+        <div style={sectionStyle} data-testid="summary-contact-info">
+          <Text type="secondary" style={sectionLabelStyle}>
+            {t("contact.detail.summary.contact_info")}
+          </Text>
+          <Space direction="vertical" size={2}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {emails.map((item: any) => (
+              <Text key={item.id} style={{ fontSize: 13 }}>
+                📧{" "}
+                {item.data ? (
+                  <a
+                    href={`mailto:${item.data}`}
+                    rel="noopener noreferrer nofollow"
+                    style={{ color: token.colorPrimary, wordBreak: "break-word" }}
+                  >
+                    {item.data}
+                  </a>
+                ) : null}
+              </Text>
+            ))}
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {phones.map((item: any) => (
+              <Text key={item.id} style={{ fontSize: 13 }}>
+                📱{" "}
+                {item.data ? (
+                  <a
+                    href={`tel:${String(item.data).replace(/\s+/g, "")}`}
+                    rel="noopener noreferrer nofollow"
+                    style={{ color: token.colorPrimary, wordBreak: "break-word" }}
+                  >
+                    {item.data}
+                  </a>
+                ) : null}
+              </Text>
+            ))}
+          </Space>
+        </div>
+      )}
+
+      {/* 2. Primary address */}
+      {hasAddress && (
         <div style={sectionStyle}>
           <Text type="secondary" style={sectionLabelStyle}>
-            {t("contact.detail.summary.family")}
+            {t("contact.detail.summary.address")}
           </Text>
-          <Space size={[8, 4]} wrap>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(relationships as any[]).map((rel) => {
-              const relatedContact = contactMap.get(rel.related_contact_id ?? "");
-              // Priority: backend-provided name > contactMap lookup > UUID fallback
-              const displayName = rel.related_contact_name
-                || (relatedContact ? formatContactName(nameOrder, relatedContact) : "")
-                || rel.related_contact_id;
-              return (
-                <span key={rel.id} style={{ fontSize: 13 }}>
-                  <Link
-                    to={`/vaults/${rel.related_vault_id || vaultId}/contacts/${rel.related_contact_id}`}
-                    style={{ color: token.colorPrimary }}
-                  >
-                    {displayName}
-                  </Link>
-                  {rel.relationship_type_name && (
-                    <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
-                      ({rel.relationship_type_name})
-                    </Text>
-                  )}
-                </span>
-              );
-            })}
-          </Space>
+          <Text style={{ fontSize: 13 }}>
+            {formatAddressLine(primaryAddress)}
+          </Text>
         </div>
       )}
 
@@ -341,7 +395,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
       )}
 
       {/* 3. Labels */}
-      {(!readOnly || hasLabels) && <div style={sectionStyle}>
+      {(!readOnly || hasLabels) && <div style={sectionStyle} data-testid="summary-labels">
         <Text type="secondary" style={sectionLabelStyle}>
           {t("contact.detail.summary.labels")}
         </Text>
@@ -351,19 +405,21 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
             {(labels as any[]).map((label) => {
               const labelTagColors = getReadableLabelTagColors(label.bg_color, label.text_color);
               return (
-                <Tag
-                  key={label.id}
-                  color={labelTagColors.color}
-                  style={{
-                    ...labelTagColors.style,
-                    margin: 0,
-                    fontSize: 12,
-                    padding: "2px 8px",
-                    borderRadius: 12,
-                  }}
-                >
-                  {label.name}
-                </Tag>
+                <Link key={label.id} to={`/vaults/${vaultId}/contacts?label=${label.id}`}>
+                  <Tag
+                    color={labelTagColors.color}
+                    style={{
+                      ...labelTagColors.style,
+                      margin: 0,
+                      fontSize: 12,
+                      padding: "2px 8px",
+                      borderRadius: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {label.name}
+                  </Tag>
+                </Link>
               );
             })}
           </Space>
@@ -408,58 +464,77 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
         </div>
       )}
 
-      {/* 6. Primary contact info — email/phone */}
-      {hasContactInfo && (
-        <div style={sectionStyle}>
+      {/* 8. Relationships grouped by type (Family separated from Work/social) */}
+      {hasRelationships && [...relationshipsByGroup.entries()].map(([groupName, rels]) => {
+        const isFamily = groupName !== "" && familyGroupNames.has(groupName);
+        const heading = isFamily
+          ? t("contact.detail.summary.family")
+          : (groupName || t("contact.detail.summary.relationships"));
+        return (
+          <div
+            key={groupName || "ungrouped"}
+            style={sectionStyle}
+            data-testid={isFamily ? "summary-family" : "summary-relationships"}
+          >
+            <Text type="secondary" style={sectionLabelStyle}>
+              {heading}
+            </Text>
+            <Space size={[8, 4]} wrap>
+              {rels.map((rel) => {
+                const relatedContact = contactMap.get(rel.related_contact_id ?? "");
+                const displayName = rel.related_contact_name
+                  || (relatedContact ? formatContactName(nameOrder, relatedContact) : "")
+                  || rel.related_contact_id;
+                return (
+                  <span key={rel.id} style={{ fontSize: 13 }}>
+                    <Link
+                      to={`/vaults/${rel.related_vault_id || vaultId}/contacts/${rel.related_contact_id}`}
+                      style={{ color: token.colorPrimary }}
+                    >
+                      {displayName}
+                    </Link>
+                    {rel.relationship_type_name && (
+                      <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                        ({rel.relationship_type_name})
+                      </Text>
+                    )}
+                  </span>
+                );
+              })}
+            </Space>
+          </div>
+        );
+      })}
+
+      {/* 9. Groups — clickable, filter the contacts list */}
+      {hasGroups && (
+        <div style={sectionStyle} data-testid="summary-groups">
           <Text type="secondary" style={sectionLabelStyle}>
-            {t("contact.detail.summary.contact_info")}
+            {t("contact.detail.summary.groups")}
           </Text>
-          <Space direction="vertical" size={2}>
+          <Space size={[6, 6]} wrap>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {emails.map((item: any) => (
-              <Text key={item.id} style={{ fontSize: 13 }}>
-                📧{" "}
-                {item.data ? (
-                  <a
-                    href={`mailto:${item.data}`}
-                    rel="noopener noreferrer nofollow"
-                    style={{ color: token.colorPrimary, wordBreak: "break-word" }}
-                  >
-                    {item.data}
-                  </a>
-                ) : null}
-              </Text>
-            ))}
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {phones.map((item: any) => (
-              <Text key={item.id} style={{ fontSize: 13 }}>
-                📱{" "}
-                {item.data ? (
-                  <a
-                    href={`tel:${String(item.data).replace(/\s+/g, "")}`}
-                    rel="noopener noreferrer nofollow"
-                    style={{ color: token.colorPrimary, wordBreak: "break-word" }}
-                  >
-                    {item.data}
-                  </a>
-                ) : null}
-              </Text>
+            {(groups as any[]).map((group) => (
+              <Link key={group.id} to={`/vaults/${vaultId}/contacts?group=${group.id}`}>
+                <Tag
+                  color="blue"
+                  style={{ margin: 0, fontSize: 12, padding: "2px 8px", borderRadius: 12, cursor: "pointer" }}
+                >
+                  {group.name}
+                </Tag>
+              </Link>
             ))}
           </Space>
         </div>
       )}
 
-      {/* 7. Primary address */}
-      {hasAddress && (
-        <div style={{ padding: "10px 0" }}>
-          <Text type="secondary" style={sectionLabelStyle}>
-            {t("contact.detail.summary.address")}
-          </Text>
-          <Text style={{ fontSize: 13 }}>
-            {formatAddressLine(primaryAddress)}
-          </Text>
-        </div>
-      )}
+      {/* 10. Relationship network */}
+      <div style={{ padding: "10px 0" }} data-testid="summary-network">
+        <Text type="secondary" style={sectionLabelStyle}>
+          {t("contact.detail.summary.network")}
+        </Text>
+        <NetworkGraph vaultId={String(vaultId)} contactId={String(contactId)} />
+      </div>
     </div>
   );
 }

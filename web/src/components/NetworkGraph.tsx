@@ -96,7 +96,7 @@ export default function NetworkGraph({ vaultId, contactId }: NetworkGraphProps) 
 
   useEffect(() => {
     if (!graphData || !svgRef.current || !containerRef.current) return;
-    if (graphData.nodes.length === 0) return;
+    if (!graphData.nodes?.length) return;
 
     const container = containerRef.current;
     const width = container.clientWidth;
@@ -374,7 +374,7 @@ export default function NetworkGraph({ vaultId, contactId }: NetworkGraphProps) 
     );
   }
 
-  if (error || !graphData || graphData.nodes.length === 0) {
+  if (error || !graphData || !graphData.nodes?.length) {
     return <Empty description={t("modules.relationships.graph_empty")} />;
   }
 

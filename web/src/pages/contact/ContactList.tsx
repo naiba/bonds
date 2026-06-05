@@ -77,7 +77,8 @@ export default function ContactList() {
   const vaultId = id!;
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<string>("name");
-  const [labelFilter, setLabelFilter] = useState<number | null>(null);
+  const [labelFilter, setLabelFilter] = useState<number | null>(parsePositiveInteger(searchParams.get("label")));
+  const [groupFilter, setGroupFilter] = useState<number | null>(parsePositiveInteger(searchParams.get("group")));
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadVisibleColumns);
   const currentPage = parsePage(searchParams.get("page"));
@@ -93,8 +94,13 @@ export default function ContactList() {
     queryFn: async () => (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
   });
 
+  const { data: groups = [] } = useQuery({
+    queryKey: ["vault", vaultId, "groups"],
+    queryFn: async () => (await api.groups.groupsList(String(vaultId))).data ?? [],
+  });
+
   const { data: contactsResponse, isLoading } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", labelFilter, currentPage, pageSize, sortBy, search, statusFilter],
+    queryKey: ["vaults", vaultId, "contacts", labelFilter, groupFilter, currentPage, pageSize, sortBy, search, statusFilter],
     queryFn: async () => {
       if (labelFilter) {
         const res = await api.contacts.contactsLabelsDetail(String(vaultId), labelFilter, {
@@ -106,6 +112,21 @@ export default function ContactList() {
         return {
           contacts: res.data ?? [],
           meta: res.meta as PaginationMeta | undefined,
+        };
+      }
+      if (groupFilter) {
+        const res = await api.contacts.contactsList(String(vaultId), {
+          per_page: 9999,
+          sort: SORT_MAP[sortBy] ?? "updated_at",
+          filter: statusFilter,
+          ...(search.length > 2 ? { search } : {}),
+        });
+        const filtered = ((res.data ?? []) as (Contact & { groups?: { id: number; name: string }[] })[])
+          .filter((c) => c.groups?.some((g) => g.id === groupFilter));
+        const start = (currentPage - 1) * pageSize;
+        return {
+          contacts: filtered.slice(start, start + pageSize),
+          meta: { ...(res.meta as PaginationMeta), total: filtered.length } as PaginationMeta,
         };
       }
       const res = await api.contacts.contactsList(String(vaultId), {
@@ -139,6 +160,24 @@ export default function ContactList() {
   };
 
   const resetToFirstPage = () => updatePaginationParams(DEFAULT_PAGE, pageSize, true);
+
+  const applyTagFilter = (kind: "label" | "group", value: number | null) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("label");
+    nextParams.delete("group");
+    if (kind === "label") {
+      setLabelFilter(value);
+      setGroupFilter(null);
+      if (value) nextParams.set("label", String(value));
+    } else {
+      setGroupFilter(value);
+      setLabelFilter(null);
+      if (value) nextParams.set("group", String(value));
+    }
+    nextParams.set("page", String(DEFAULT_PAGE));
+    nextParams.set("per_page", String(pageSize));
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const sortMutation = useMutation({
       mutationFn: (data: { sort_by: string; sort_order: "asc" | "desc" }) => 
@@ -429,13 +468,27 @@ export default function ContactList() {
             data-testid="contact-label-filter"
             placeholder={t("contact.list.filter_label")}
             value={labelFilter}
-            onChange={(v) => { setLabelFilter(v ?? null); resetToFirstPage(); }}
+            onChange={(v) => applyTagFilter("label", v ?? null)}
             style={{ width: 200 }}
             allowClear
         >
             <Option value={null}>{t("contact.list.all_labels")}</Option>
             {labels.map((l: LabelResponse) => (
                 <Option key={l.id} value={l.id}>{l.name}</Option>
+            ))}
+        </Select>
+        <Select
+            data-testid="contact-group-filter"
+            placeholder={t("contact.list.filter_group")}
+            value={groupFilter}
+            onChange={(v) => applyTagFilter("group", v ?? null)}
+            style={{ width: 200 }}
+            allowClear
+        >
+            <Option value={null}>{t("contact.list.all_groups")}</Option>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {(groups as any[]).map((g) => (
+                <Option key={g.id} value={g.id}>{g.name}</Option>
             ))}
         </Select>
         <Select

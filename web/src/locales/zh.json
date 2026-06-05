@@ -512,6 +512,8 @@
       "sort_updated": "最后更新",
       "filter_label": "标签筛选",
       "all_labels": "所有标签",
+      "filter_group": "群组筛选",
+      "all_groups": "所有群组",
       "quick_search": "快速搜索",
       "col_birthday": "生日",
       "col_age": "年龄",
@@ -588,7 +590,7 @@
       "change_template": "更换模板",
       "template_updated": "模板已更新",
       "view_mode": "摘要",
-      "edit_mode": "编辑",
+      "edit_mode": "完整视图",
       "tabs": {
         "overview": "概览",
         "relationships": "关系",
@@ -655,6 +657,10 @@
       },
       "summary": {
         "family": "家庭概况",
+        "family_group": "家庭",
+        "relationships": "关系",
+        "groups": "群组",
+        "network": "关系网络",
         "gender": "性别",
         "pronoun": "代词",
         "labels": "标签",
