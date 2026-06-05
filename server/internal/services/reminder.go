@@ -218,7 +218,12 @@ func calcInitialSchedule(reminder *models.ContactReminder, preferredTime *string
 	month := time.January
 	day := 1
 
-	if reminder.Year != nil {
+	// For recurring reminders the stored Year is the original event year (e.g. a
+	// birthday's birth year); anchoring the schedule to it puts the first
+	// occurrence in the past, which the scheduler treats as overdue and replays
+	// once per year since (#153). Only one-time reminders honor an explicit Year.
+	recurring := reminder.Type != "one_time"
+	if reminder.Year != nil && !recurring {
 		year = *reminder.Year
 	}
 	if reminder.Month != nil {
@@ -230,7 +235,7 @@ func calcInitialSchedule(reminder *models.ContactReminder, preferredTime *string
 
 	scheduled := time.Date(year, month, day, hour, minute, 0, 0, loc)
 
-	if reminder.Year == nil && scheduled.Before(now) {
+	if (recurring || reminder.Year == nil) && scheduled.Before(now) {
 		scheduled = scheduled.AddDate(1, 0, 0)
 	}
 

@@ -652,6 +652,37 @@ func TestImportantDate_RemindMe_FirstScheduledAt_NoYear_RollsToFuture(t *testing
 	}
 }
 
+func TestImportantDate_RemindMe_PastBirthYear_SchedulesFuture(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	now := time.Now()
+	day, month, year := 1, 12, 2000
+	remindTrue := true
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:    "Birthday",
+		Day:      &day,
+		Month:    &month,
+		Year:     &year,
+		RemindMe: &remindTrue,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var scheduled models.ContactReminderScheduled
+	if err := ctx.db.Joins("JOIN contact_reminders ON contact_reminders.id = contact_reminder_scheduled.contact_reminder_id").
+		Where("contact_reminders.important_date_id = ?", date.ID).
+		First(&scheduled).Error; err != nil {
+		t.Fatalf("load scheduled: %v", err)
+	}
+	if !scheduled.ScheduledAt.After(now) {
+		t.Fatalf("Birth year must not anchor schedule; expected future occurrence, got %v (now=%v) (#153)", scheduled.ScheduledAt, now)
+	}
+	if scheduled.ScheduledAt.Month() != time.December || scheduled.ScheduledAt.Day() != 1 {
+		t.Errorf("Expected schedule on 12/01, got %02d/%02d", scheduled.ScheduledAt.Month(), scheduled.ScheduledAt.Day())
+	}
+}
+
 func TestBackfillImportantDateReminderSchedules(t *testing.T) {
 	ctx := setupImportantDateTest(t)
 
