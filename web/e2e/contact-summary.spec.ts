@@ -114,7 +114,7 @@ test.describe('Contact Summary Card', () => {
     // Clicking the label deep-links into the contacts list filtered by it
     await labelTag.click();
     await expect(page).toHaveURL(/label=\d+/, { timeout: 10000 });
-    await expect(page.getByText('LabelSum User')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('LabelSum User').first()).toBeVisible({ timeout: 10000 });
   });
 
   test('summary card should show contact info (email/phone) after adding', async ({ page }) => {
@@ -368,18 +368,21 @@ test.describe('Contact Summary Card', () => {
 
     const summaryCard = page.locator('[data-testid="contact-summary-card"]');
     await expect(summaryCard).toBeVisible({ timeout: 10000 });
-    // Should show the relationship (ChildSum User)
-    await expect(summaryCard.getByText(/ChildSum/)).toBeVisible({ timeout: 10000 });
+    // Should show the relationship (ChildSum User) in the relationships section.
+    // Scope to the family/relationships block since the embedded network graph
+    // also renders the related contact's name as a node label.
+    const relationshipSection = summaryCard.locator(
+      '[data-testid="summary-family"], [data-testid="summary-relationships"]',
+    );
+    await expect(relationshipSection.getByText(/ChildSum/).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('summary shows clickable groups, the network graph, and contact info before groups', async ({ page }) => {
+  test('summary shows clickable groups and the relationship network graph', async ({ page }) => {
     await setupVault(page, 'summary-groups');
     const vaultUrl = page.url();
 
-    // Create a group in vault settings
-    await page.goto(vaultUrl + '/settings');
-    await expect(page.locator('.ant-tabs')).toBeVisible({ timeout: 10000 });
-    await page.getByRole('tab', { name: 'Groups', exact: true }).click();
+    // Create a group on the dedicated groups page
+    await page.goto(vaultUrl + '/groups');
     await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: /new group/i }).first().click();
     const groupModal = page.locator('.ant-modal').filter({ hasText: /new group/i });
@@ -390,19 +393,20 @@ test.describe('Contact Summary Card', () => {
     );
     await groupModal.getByRole('button', { name: /ok/i }).click();
     await groupResp;
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.ant-list').getByText('summary-group')).toBeVisible({ timeout: 15000 });
 
-    // Create a contact, add an email and the group
+    // Create a contact and add it to the group
     await page.goto(vaultUrl);
     await page.waitForLoadState('networkidle');
     await goToContacts(page);
     await createContact(page, 'GroupSum', 'User');
 
-    await navigateToTab(page, 'Information', true);
+    await navigateToTab(page, 'Social');
+    await page.waitForTimeout(1000);
     const groupsCard = page.locator('.ant-card').filter({ has: page.locator('h5', { hasText: 'Groups' }) });
-    await expect(groupsCard).toBeVisible({ timeout: 10000 });
+    await expect(groupsCard).toBeVisible({ timeout: 15000 });
     await groupsCard.getByRole('button', { name: /add/i }).click();
-    const addGroupModal = page.locator('.ant-modal').filter({ hasText: /add to group/i });
+    const addGroupModal = page.locator('.ant-modal:visible');
     await expect(addGroupModal).toBeVisible({ timeout: 5000 });
     await addGroupModal.locator('.ant-select').click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'summary-group' }).click();
@@ -424,6 +428,6 @@ test.describe('Contact Summary Card', () => {
     await expect(groupTag).toBeVisible({ timeout: 10000 });
     await groupTag.click();
     await expect(page).toHaveURL(/group=\d+/, { timeout: 10000 });
-    await expect(page.getByText('GroupSum User')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('GroupSum User').first()).toBeVisible({ timeout: 10000 });
   });
 });
