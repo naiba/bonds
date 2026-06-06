@@ -95,7 +95,7 @@ func TestExportVaultICS(t *testing.T) {
 		"END:VCALENDAR",
 		"BEGIN:VEVENT",
 		"BEGIN:VTODO",
-		"SUMMARY:Birthday",
+		"SUMMARY:Jane - Birthday",
 		"SUMMARY:Call Jane",
 		"SUMMARY:Standalone Task",
 		"SUMMARY:Graduation",
@@ -103,6 +103,59 @@ func TestExportVaultICS(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected ICS output to contain %q\n---\n%s", want, out)
 		}
+	}
+}
+
+func TestExportVaultICSImportantDateSummaryIncludesContactName(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Ical",
+		LastName:  "Summary",
+		Email:     "ical-summary@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Summary Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Jane", LastName: "Doe"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	day, month, year := 15, 3, 2025
+	if err := db.Create(&models.ContactImportantDate{
+		ContactID: contact.ID,
+		Label:     "Birthdate",
+		Day:       &day,
+		Month:     &month,
+		Year:      &year,
+	}).Error; err != nil {
+		t.Fatalf("create important date failed: %v", err)
+	}
+
+	svc := NewCalendarICSService(db)
+	data, err := svc.ExportVault(vault.ID)
+	if err != nil {
+		t.Fatalf("ExportVault failed: %v", err)
+	}
+	out := string(data)
+
+	if !strings.Contains(out, "SUMMARY:Jane Doe - Birthdate") {
+		t.Fatalf("expected important date summary to include contact name\n---\n%s", out)
+	}
+	if strings.Contains(out, "SUMMARY:Birthdate\r\n") {
+		t.Fatalf("expected no standalone important date summary\n---\n%s", out)
 	}
 }
 

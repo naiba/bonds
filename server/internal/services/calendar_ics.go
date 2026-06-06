@@ -10,6 +10,7 @@ import (
 
 	calendarPkg "github.com/naiba/bonds/internal/calendar"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -35,8 +36,10 @@ func (s *CalendarICSService) ExportVault(vaultID string) ([]byte, error) {
 		return nil, err
 	}
 	contactIDs := make([]string, len(contacts))
+	contactNames := make(map[string]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
+		contactNames[c.ID] = utils.BuildContactName(&contacts[i])
 	}
 
 	if len(contactIDs) > 0 {
@@ -45,7 +48,7 @@ func (s *CalendarICSService) ExportVault(vaultID string) ([]byte, error) {
 			return nil, err
 		}
 		for i := range dates {
-			cal.Children = append(cal.Children, icsImportantDateEvent(&dates[i]))
+			cal.Children = append(cal.Children, icsImportantDateEvent(&dates[i], contactNames[dates[i].ContactID]))
 		}
 
 		var reminders []models.ContactReminder
@@ -121,10 +124,10 @@ func (s *CalendarICSService) listVaultLifeEvents(vaultID string) ([]models.LifeE
 	return events, nil
 }
 
-func icsImportantDateEvent(d *models.ContactImportantDate) *ical.Component {
+func icsImportantDateEvent(d *models.ContactImportantDate, contactName string) *ical.Component {
 	event := ical.NewComponent(ical.CompEvent)
 	event.Props.SetText(ical.PropUID, icsUID(d.UUID, "important-date", d.ID))
-	event.Props.SetText(ical.PropSummary, d.Label)
+	event.Props.SetText(ical.PropSummary, icsImportantDateSummary(d, contactName))
 	event.Props.SetDateTime(ical.PropDateTimeStamp, d.UpdatedAt)
 
 	year, month, day := dateParts(d.Year, d.Month, d.Day)
@@ -146,6 +149,15 @@ func icsImportantDateEvent(d *models.ContactImportantDate) *ical.Component {
 	}
 
 	return event
+}
+
+func icsImportantDateSummary(d *models.ContactImportantDate, contactName string) string {
+	// Calendar subscribers only see SUMMARY, so important dates need the contact
+	// name there rather than relying on app-only context from the web calendar.
+	if contactName == "" {
+		return d.Label
+	}
+	return fmt.Sprintf("%s - %s", contactName, d.Label)
 }
 
 func icsReminderEvent(r *models.ContactReminder) *ical.Component {
