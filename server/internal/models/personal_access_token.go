@@ -7,6 +7,10 @@ type PersonalAccessToken struct {
 	UserID     string     `json:"user_id" gorm:"type:text;not null;index"`
 	AccountID  string     `json:"account_id" gorm:"type:text;not null;index"`
 	Name       string     `json:"name" gorm:"type:text;not null"`
+	// Scopes: comma-separated permission scopes. Empty = full access (legacy
+	// default, no backfill needed). Non-empty = least-privilege: reachable
+	// only on endpoints declaring a matching scope, denied everywhere else.
+	Scopes     string     `json:"scopes" gorm:"type:text"`
 	TokenHash  string     `json:"-" gorm:"type:text;uniqueIndex;not null"`
 	TokenHint  string     `json:"token_hint" gorm:"type:text;not null"`
 	ExpiresAt  *time.Time `json:"expires_at"`

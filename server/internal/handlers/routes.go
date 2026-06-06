@@ -55,6 +55,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultFileService := services.NewVaultFileService(db, cfg.Storage.UploadDir)
 	companyService := services.NewCompanyService(db)
 	calendarService := services.NewCalendarService(db)
+	calendarICSService := services.NewCalendarICSService(db)
 	reportService := services.NewReportService(db)
 	feedService := services.NewFeedService(db)
 	preferenceService := services.NewPreferenceService(db)
@@ -201,7 +202,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultFileHandler := NewVaultFileHandler(vaultFileService, storageInfoService, systemSettingService)
 	avatarHandler := NewAvatarHandler(db, vaultFileService)
 	companyHandler := NewCompanyHandler(companyService, contactJobService)
-	calendarHandler := NewCalendarHandler(calendarService)
+	calendarHandler := NewCalendarHandler(calendarService, calendarICSService)
 	reportHandler := NewReportHandler(reportService)
 	feedHandler := NewFeedHandler(feedService)
 	preferenceHandler := NewPreferenceHandler(preferenceService)
@@ -303,7 +304,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		return systemSettingService.GetWithDefault("smtp.host", "") != ""
 	}
 
-	adminGroup := api.Group("/admin", authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired), authMiddleware.RequireInstanceAdmin)
+	adminGroup := api.Group("/admin", authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired), middleware.DenyScopedPAT, authMiddleware.RequireInstanceAdmin)
 	adminGroup.GET("/users", adminHandler.ListUsers)
 	adminGroup.PUT("/users/:id/toggle", adminHandler.ToggleUser)
 	adminGroup.PUT("/users/:id/admin", adminHandler.SetAdmin)
@@ -325,7 +326,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	backupGroup.DELETE("/:filename", backupHandler.Delete)
 	backupGroup.POST("/:filename/restore", backupHandler.Restore)
 
-	protected := api.Group("", authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired))
+	protected := api.Group("", authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired), middleware.DenyScopedPAT)
 
 	protected.GET("/account", accountHandler.GetAccount)
 
@@ -571,6 +572,16 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.GET("/calendar", calendarHandler.Get)
 	vaultScoped.GET("/calendar/years/:year/months/:month", calendarHandler.GetMonth)
 	vaultScoped.GET("/calendar/years/:year/months/:month/days/:day", calendarHandler.GetDay)
+
+	// Registered on api, not protected: protected's DenyScopedPAT would reject
+	// scoped tokens, but this feed must be reachable by a calendar:read PAT.
+	icsCalendar := api.Group("/vaults/:vault_id/calendar.ics",
+		authMiddleware.Authenticate,
+		middleware.RequireEmailVerification(emailVerificationRequired),
+		middleware.RequireScope(middleware.ScopeCalendarRead),
+		VaultPermissionMiddleware(vaultService, models.PermissionViewer),
+	)
+	icsCalendar.GET("", calendarHandler.GetICS)
 
 	vaultScoped.GET("/reports", reportHandler.Index)
 	vaultScoped.GET("/reports/overview", reportHandler.Overview)

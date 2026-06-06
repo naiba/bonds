@@ -6,6 +6,8 @@
   "err.invalid_email_or_password": "Correo electrónico o contraseña inválidos",
   "err.failed_to_login": "Error al iniciar sesión",
   "err.invalid_token": "Token inválido",
+  "err.insufficient_token_scope": "Este token no tiene permiso para acceder a este recurso",
+  "err.invalid_token_scope": "Ámbito de token no válido",
   "err.user_not_found": "Usuario no encontrado",
   "err.failed_to_refresh_token": "Error al refrescar el token",
   "err.invalid_user": "Usuario inválido",

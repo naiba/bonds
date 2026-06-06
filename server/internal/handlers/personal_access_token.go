@@ -71,6 +71,9 @@ func (h *PersonalAccessTokenHandler) Create(c echo.Context) error {
 		if errors.Is(err, services.ErrTokenNameDuplicate) {
 			return response.Conflict(c, "err.token_name_duplicate")
 		}
+		if errors.Is(err, services.ErrInvalidScope) {
+			return response.BadRequest(c, "err.invalid_token_scope", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_token")
 	}
 	return response.Created(c, result)

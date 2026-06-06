@@ -208,14 +208,6 @@ func (s *PersonalizeService) getNameCol(cfg entityConfig) string {
 	return "label"
 }
 
-func (s *PersonalizeService) ListTemplates(accountID string) ([]map[string]interface{}, error) {
-	var results []map[string]interface{}
-	if err := s.db.Table("templates").Where("account_id = ?", accountID).Order("id ASC").Find(&results).Error; err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
 type syncableEntity struct {
 	table         string
 	displayCol    string

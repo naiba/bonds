@@ -7,6 +7,8 @@
   "err.invalid_email_or_password": "邮箱或密码无效",
   "err.failed_to_login": "登录失败",
   "err.invalid_token": "无效的令牌",
+  "err.insufficient_token_scope": "此令牌没有访问该资源的权限",
+  "err.invalid_token_scope": "无效的令牌权限范围",
   "err.user_not_found": "用户未找到",
   "err.failed_to_refresh_token": "刷新令牌失败",
   "err.invalid_user": "无效的用户",

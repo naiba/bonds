@@ -12,6 +12,8 @@ import {
   Spin,
   App,
   Alert,
+  Select,
+  Tag,
 } from "antd";
 import { DeleteOutlined, PlusOutlined, CopyOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -27,10 +29,13 @@ interface ApiToken {
   id: number;
   name: string;
   token_hint: string;
+  scopes: string[];
   expires_at: string | null;
   last_used_at: string | null;
   created_at: string;
 }
+
+const SCOPE_FULL = "full";
 
 export default function ApiTokens() {
   const [open, setOpen] = useState(false);
@@ -53,9 +58,14 @@ export default function ApiTokens() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (values: { name: string; expires_at?: string }) => {
-      const payload: { name: string; expires_at?: string } = {
+    mutationFn: async (values: {
+      name: string;
+      expires_at?: string;
+      scopes: string[];
+    }) => {
+      const payload: { name: string; expires_at?: string; scopes: string[] } = {
         name: values.name,
+        scopes: values.scopes,
       };
       if (values.expires_at) {
         payload.expires_at = values.expires_at;
@@ -106,6 +116,21 @@ export default function ApiTokens() {
           {hint}
         </Text>
       ),
+    },
+    {
+      title: t("api_tokens.scopes"),
+      dataIndex: "scopes",
+      key: "scopes",
+      render: (scopes: string[]) =>
+        scopes && scopes.length > 0 ? (
+          scopes.map((s) => (
+            <Tag key={s} color="blue">
+              {s}
+            </Tag>
+          ))
+        ) : (
+          <Tag>{t("api_tokens.scope_full")}</Tag>
+        ),
     },
     {
       title: t("api_tokens.expires_at"),
@@ -199,6 +224,29 @@ export default function ApiTokens() {
         />
       </Card>
 
+      <Card
+        title={t("api_tokens.calendar_feed_title")}
+        size="small"
+        style={{ marginTop: 24 }}
+      >
+        <Text type="secondary" style={{ display: "block", marginBottom: 8 }}>
+          {t("api_tokens.calendar_feed_help")}
+        </Text>
+        <Typography.Paragraph
+          copyable={{ tooltips: [t("common.copy"), t("api_tokens.copied")] }}
+          style={{
+            margin: 0,
+            background: "rgba(0,0,0,0.04)",
+            padding: "6px 12px",
+            borderRadius: 6,
+            fontFamily: "monospace",
+            fontSize: 13,
+          }}
+        >
+          {`${window.location.origin}/api/vaults/{vault_id}/calendar.ics?token={token}`}
+        </Typography.Paragraph>
+      </Card>
+
       <Modal
         title={t("api_tokens.create")}
         open={open}
@@ -212,9 +260,12 @@ export default function ApiTokens() {
         <Form
           form={form}
           layout="vertical"
+          initialValues={{ scope: SCOPE_FULL }}
           onFinish={(v) => {
+            const scope = (v.scope as string) ?? SCOPE_FULL;
             const values = {
               name: v.name as string,
+              scopes: scope === SCOPE_FULL ? [] : [scope],
               expires_at: v.expires_at
                 ? (v.expires_at as dayjs.Dayjs).toISOString()
                 : undefined,
@@ -228,6 +279,21 @@ export default function ApiTokens() {
             rules={[{ required: true }]}
           >
             <Input placeholder={t("api_tokens.name_placeholder")} />
+          </Form.Item>
+          <Form.Item
+            name="scope"
+            label={t("api_tokens.scopes")}
+            extra={t("api_tokens.scope_help")}
+          >
+            <Select
+              options={[
+                { value: SCOPE_FULL, label: t("api_tokens.scope_full") },
+                {
+                  value: "calendar:read",
+                  label: t("api_tokens.scope_calendar_read"),
+                },
+              ]}
+            />
           </Form.Item>
           <Form.Item name="expires_at" label={t("api_tokens.expires_at")}>
             <DatePicker

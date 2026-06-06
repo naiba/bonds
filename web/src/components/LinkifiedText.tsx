@@ -83,7 +83,7 @@ export default function LinkifiedText({
 
 function renderSafeLink({ tagName, attributes, content }: IntermediateRepresentation) {
   const href = typeof attributes.href === "string" ? attributes.href : "";
-  let safe = false;
+  let safe: boolean;
   try {
     const url = new URL(href);
     safe = SAFE_PROTOCOLS.has(url.protocol);

@@ -1154,7 +1154,14 @@
     "created_warning": "请立即复制此令牌，之后将无法再查看。",
     "copied": "已复制！",
     "delete_confirm": "删除此令牌？使用该令牌的应用将无法访问。",
-    "token_name_duplicate": "令牌名称已存在"
+    "token_name_duplicate": "令牌名称已存在",
+    "scopes": "权限范围",
+    "scope_help": "完全访问可使用所有 API 端点；受限令牌只能访问对应的端点。",
+    "scope_full": "完全访问",
+    "scope_calendar_read": "日历（只读）",
+    "calendar_feed_title": "日历订阅 (iCal)",
+    "calendar_feed_help": "请先在上方创建一个「日历（只读）」令牌，然后在任意日历应用中订阅此链接。将 {vault_id} 替换为你的 vault ID，将 {token} 替换为令牌值。",
+    "invalid_token_scope": "无效的令牌权限范围"
   },
   "twoFactor": {
     "title": "双因素认证",

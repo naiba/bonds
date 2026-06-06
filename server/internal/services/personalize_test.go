@@ -67,6 +67,36 @@ func TestListGenders(t *testing.T) {
 	}
 }
 
+func TestListTemplatesReturnsLabel(t *testing.T) {
+	svc, accountID := setupPersonalizeTest(t)
+
+	created, err := svc.Create(accountID, "templates", dto.PersonalizeEntityRequest{Label: "My Template"})
+	if err != nil {
+		t.Fatalf("create template failed: %v", err)
+	}
+	if created.Label != "My Template" {
+		t.Fatalf("created template label = %q, want %q", created.Label, "My Template")
+	}
+
+	templates, err := svc.List(accountID, "templates")
+	if err != nil {
+		t.Fatalf("List templates failed: %v", err)
+	}
+
+	found := false
+	for _, tpl := range templates {
+		if tpl.ID == created.ID {
+			found = true
+			if tpl.Label != "My Template" {
+				t.Errorf("listed template label = %q, want %q", tpl.Label, "My Template")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("created template id %d not found in list", created.ID)
+	}
+}
+
 func TestListUnknownEntity(t *testing.T) {
 	svc, accountID := setupPersonalizeTest(t)
 

@@ -34,6 +34,13 @@ func NewAuthMiddleware(secret string, db *gorm.DB) *AuthMiddleware {
 
 const patPrefix = "bonds_"
 
+const ScopeCalendarRead = "calendar:read"
+
+const (
+	ctxPATScopes  = "pat_scopes"
+	ctxIsScopedPAT = "is_scoped_pat"
+)
+
 func (m *AuthMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var tokenString string
@@ -137,8 +144,25 @@ func (m *AuthMiddleware) authenticateWithPAT(c echo.Context, next echo.HandlerFu
 	c.Set("is_instance_admin", user.IsInstanceAdministrator)
 	c.Set("email_verified", user.EmailVerifiedAt != nil)
 	c.Set("auth_type", "pat")
+	c.Set(ctxPATScopes, pat.Scopes)
+	c.Set(ctxIsScopedPAT, strings.TrimSpace(pat.Scopes) != "")
 
 	return next(c)
+}
+
+func patHasScope(c echo.Context, scope string) bool {
+	raw, _ := c.Get(ctxPATScopes).(string)
+	for _, s := range strings.Split(raw, ",") {
+		if strings.TrimSpace(s) == scope {
+			return true
+		}
+	}
+	return false
+}
+
+func isScopedPAT(c echo.Context) bool {
+	v, _ := c.Get(ctxIsScopedPAT).(bool)
+	return v
 }
 
 func sha256Hash(s string) string {
@@ -209,6 +233,36 @@ func RequireEmailVerification(isRequired func() bool) echo.MiddlewareFunc {
 				return response.Forbidden(c, "err.email_not_verified")
 			}
 			return next(c)
+		}
+	}
+}
+
+// DenyScopedPAT blocks scope-limited PATs from reaching endpoints that do not
+// declare a scope. Full-access tokens (JWT or unscoped PAT) pass through. This
+// is the default-deny half of the scope model: an endpoint must opt in via
+// RequireScope, otherwise scoped tokens are rejected.
+func DenyScopedPAT(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if isScopedPAT(c) {
+			return response.Forbidden(c, "err.insufficient_token_scope")
+		}
+		return next(c)
+	}
+}
+
+// RequireScope allows an endpoint to be reached by a scope-limited PAT only if
+// the token carries the given scope. Full-access tokens (JWT or unscoped PAT)
+// always pass.
+func RequireScope(scope string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if !isScopedPAT(c) {
+				return next(c)
+			}
+			if patHasScope(c, scope) {
+				return next(c)
+			}
+			return response.Forbidden(c, "err.insufficient_token_scope")
 		}
 	}
 }

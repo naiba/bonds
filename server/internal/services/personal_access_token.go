@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
@@ -18,11 +20,51 @@ const (
 	tokenLength = 40
 )
 
+var validScopes = map[string]bool{
+	middleware.ScopeCalendarRead: true,
+}
+
 var (
 	ErrTokenNotFound = errors.New("personal access token not found")
 	ErrTokenExpired  = errors.New("personal access token expired")
 	ErrTokenNameDuplicate = errors.New("token name already exists")
+	ErrInvalidScope       = errors.New("invalid token scope")
 )
+
+func normalizeScopes(scopes []string) (string, error) {
+	seen := map[string]bool{}
+	cleaned := make([]string, 0, len(scopes))
+	for _, s := range scopes {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if !validScopes[s] {
+			return "", ErrInvalidScope
+		}
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		cleaned = append(cleaned, s)
+	}
+	return strings.Join(cleaned, ","), nil
+}
+
+func splitTokenScopes(scopes string) []string {
+	scopes = strings.TrimSpace(scopes)
+	if scopes == "" {
+		return []string{}
+	}
+	parts := strings.Split(scopes, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
 
 type PersonalAccessTokenService struct {
 	db *gorm.DB
@@ -38,6 +80,11 @@ func (s *PersonalAccessTokenService) Create(userID, accountID string, req dto.Cr
 	s.db.Model(&models.PersonalAccessToken{}).Where("user_id = ? AND name = ?", userID, req.Name).Count(&count)
 	if count > 0 {
 		return nil, ErrTokenNameDuplicate
+	}
+
+	scopes, err := normalizeScopes(req.Scopes)
+	if err != nil {
+		return nil, err
 	}
 
 	// Generate random token
@@ -56,6 +103,7 @@ func (s *PersonalAccessTokenService) Create(userID, accountID string, req dto.Cr
 		UserID:    userID,
 		AccountID: accountID,
 		Name:      req.Name,
+		Scopes:    scopes,
 		TokenHash: hash,
 		TokenHint: hint,
 		ExpiresAt: req.ExpiresAt,
@@ -70,6 +118,7 @@ func (s *PersonalAccessTokenService) Create(userID, accountID string, req dto.Cr
 		Name:      token.Name,
 		Token:     rawToken,
 		TokenHint: hint,
+		Scopes:    splitTokenScopes(token.Scopes),
 		ExpiresAt: token.ExpiresAt,
 		CreatedAt: token.CreatedAt,
 	}, nil
@@ -127,6 +176,7 @@ func toPersonalAccessTokenResponse(t *models.PersonalAccessToken) dto.PersonalAc
 		ID:         t.ID,
 		Name:       t.Name,
 		TokenHint:  t.TokenHint,
+		Scopes:     splitTokenScopes(t.Scopes),
 		ExpiresAt:  t.ExpiresAt,
 		LastUsedAt: t.LastUsedAt,
 		CreatedAt:  t.CreatedAt,

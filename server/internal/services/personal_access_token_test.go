@@ -73,6 +73,71 @@ func TestPersonalAccessTokenService_Create(t *testing.T) {
 	}
 }
 
+func TestPersonalAccessTokenService_CreateWithScopes(t *testing.T) {
+	svc, userID, accountID := setupPATTest(t)
+
+	resp, err := svc.Create(userID, accountID, dto.CreatePersonalAccessTokenRequest{
+		Name:   "Calendar Token",
+		Scopes: []string{"calendar:read"},
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if len(resp.Scopes) != 1 || resp.Scopes[0] != "calendar:read" {
+		t.Errorf("Expected scopes [calendar:read], got %v", resp.Scopes)
+	}
+
+	var stored models.PersonalAccessToken
+	if err := svc.db.First(&stored, resp.ID).Error; err != nil {
+		t.Fatalf("Failed to load token: %v", err)
+	}
+	if stored.Scopes != "calendar:read" {
+		t.Errorf("Expected stored scopes 'calendar:read', got '%s'", stored.Scopes)
+	}
+
+	list, err := svc.List(userID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(list) != 1 || len(list[0].Scopes) != 1 || list[0].Scopes[0] != "calendar:read" {
+		t.Errorf("Expected listed scopes [calendar:read], got %v", list[0].Scopes)
+	}
+}
+
+func TestPersonalAccessTokenService_CreateNoScopesIsFullAccess(t *testing.T) {
+	svc, userID, accountID := setupPATTest(t)
+
+	resp, err := svc.Create(userID, accountID, dto.CreatePersonalAccessTokenRequest{
+		Name: "Full Access",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if len(resp.Scopes) != 0 {
+		t.Errorf("Expected no scopes (full access), got %v", resp.Scopes)
+	}
+
+	var stored models.PersonalAccessToken
+	if err := svc.db.First(&stored, resp.ID).Error; err != nil {
+		t.Fatalf("Failed to load token: %v", err)
+	}
+	if stored.Scopes != "" {
+		t.Errorf("Expected empty stored scopes, got '%s'", stored.Scopes)
+	}
+}
+
+func TestPersonalAccessTokenService_CreateInvalidScope(t *testing.T) {
+	svc, userID, accountID := setupPATTest(t)
+
+	_, err := svc.Create(userID, accountID, dto.CreatePersonalAccessTokenRequest{
+		Name:   "Bad Scope",
+		Scopes: []string{"contacts:write"},
+	})
+	if err != ErrInvalidScope {
+		t.Errorf("Expected ErrInvalidScope, got: %v", err)
+	}
+}
+
 func TestPersonalAccessTokenService_CreateDuplicateName(t *testing.T) {
 	svc, userID, accountID := setupPATTest(t)
 

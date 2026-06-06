@@ -36,13 +36,6 @@ func (h *PersonalizeHandler) List(c echo.Context) error {
 	accountID := middleware.GetAccountID(c)
 	entity := c.Param("entity")
 
-	if entity == "templates" {
-		data, err := h.personalizeService.ListTemplates(accountID)
-		if err != nil {
-			return response.InternalError(c, "err.failed_to_list_templates")
-		}
-		return response.OK(c, data)
-	}
 	items, err := h.personalizeService.List(accountID, entity)
 	if err != nil {
 		if errors.Is(err, services.ErrUnknownEntityType) {

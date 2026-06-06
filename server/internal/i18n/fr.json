@@ -6,6 +6,8 @@
   "err.invalid_email_or_password": "Email ou mot de passe invalide",
   "err.failed_to_login": "Échec de la connexion",
   "err.invalid_token": "Jeton invalide",
+  "err.insufficient_token_scope": "Ce jeton n'a pas la permission d'accéder à cette ressource",
+  "err.invalid_token_scope": "Portée de jeton non valide",
   "err.user_not_found": "Utilisateur introuvable",
   "err.failed_to_refresh_token": "Échec de l'actualisation du jeton",
   "err.invalid_user": "Utilisateur invalide",

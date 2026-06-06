@@ -1154,7 +1154,14 @@
     "created_warning": "Copia este token ahora. No podrás volver a verlo.",
     "copied": "¡Copiado!",
     "delete_confirm": "¿Eliminar este token? Cualquier aplicación que lo use perderá el acceso.",
-    "token_name_duplicate": "El nombre del token ya existe"
+    "token_name_duplicate": "El nombre del token ya existe",
+    "scopes": "Ámbitos",
+    "scope_help": "El acceso completo puede usar todos los endpoints de la API. Un token con ámbito solo puede acceder a los endpoints correspondientes.",
+    "scope_full": "Acceso completo",
+    "scope_calendar_read": "Calendario (solo lectura)",
+    "calendar_feed_title": "Suscripción de calendario (iCal)",
+    "calendar_feed_help": "Crea un token de Calendario (solo lectura) arriba y luego suscríbete a esta URL en cualquier aplicación de calendario. Reemplaza {vault_id} con el ID de tu vault y {token} con el valor del token.",
+    "invalid_token_scope": "Ámbito de token no válido"
   },
   "twoFactor": {
     "title": "Autenticación de dos factores",

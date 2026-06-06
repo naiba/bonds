@@ -7,6 +7,8 @@
   "err.invalid_email_or_password": "Invalid email or password",
   "err.failed_to_login": "Failed to login",
   "err.invalid_token": "Invalid token",
+  "err.insufficient_token_scope": "This token does not have permission to access this resource",
+  "err.invalid_token_scope": "Invalid token scope",
   "err.user_not_found": "User not found",
   "err.failed_to_refresh_token": "Failed to refresh token",
   "err.invalid_user": "Invalid user",
