@@ -1,6 +1,7 @@
 import { Modal, Form, Input, Select, App, Button, Space, Popconfirm, Tag, theme } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { VaultTask, Contact, UserPreferences } from "@/api";
@@ -144,13 +145,39 @@ function TaskEditModalContent({
         due_at: null,
       };
 
-  const { data: contacts = [] } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", "for-task-modal"],
+  const [contactSearch, setContactSearch] = useState("");
+
+  const { data: contactsData = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", "for-task-modal", contactSearch],
     queryFn: async () => {
-      const res = await api.contacts.contactsList(String(vaultId), { per_page: 200 });
+      // The dropdown only preloads 200 contacts, so when users search for a contact
+      // by prefix we must call the API instead of relying on local option filtering.
+      const params: Parameters<typeof api.contacts.contactsList>[1] = { per_page: 200 };
+      if (contactSearch.length > 2) {
+        params.search = contactSearch;
+      }
+      const res = await api.contacts.contactsList(String(vaultId), params);
       return (res.data ?? []) as Contact[];
     },
   });
+
+  const contactOptions = contactsData.flatMap((c) => {
+    if (!c.id) return [];
+    return [{
+      value: c.id,
+      label: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.id,
+    }];
+  });
+  const contactOptionIds = new Set(contactOptions.map((option) => option.value));
+  for (const selectedContact of task?.contacts ?? []) {
+    if (selectedContact.id && !contactOptionIds.has(selectedContact.id)) {
+      contactOptions.push({
+        value: selectedContact.id,
+        label: selectedContact.name || selectedContact.id,
+      });
+      contactOptionIds.add(selectedContact.id);
+    }
+  }
 
   const { data: allTasks = [] } = useQuery({
     queryKey: TASK_QUERY_KEY(vaultId),
@@ -303,11 +330,9 @@ function TaskEditModalContent({
           allowClear
           placeholder={t("vault.tasks.no_contacts_placeholder")}
           showSearch
-          optionFilterProp="label"
-          options={contacts.map((c) => ({
-            value: c.id,
-            label: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.id,
-          }))}
+          onSearch={setContactSearch}
+          filterOption={false}
+          options={contactOptions}
         />
       </Form.Item>
       <Form.Item name="parent_task_id" label={t("vault.tasks.parent_label")}>
