@@ -847,6 +847,27 @@
       "amount": "金额",
       "currency": "货币"
     },
+    "gifts": {
+      "title": "礼物",
+      "add": "添加",
+      "name": "名称",
+      "name_placeholder": "礼物名称",
+      "occasion": "场合",
+      "occasion_placeholder": "选择场合",
+      "state": "状态",
+      "state_placeholder": "选择状态",
+      "type": "类型",
+      "type_given": "送出",
+      "type_received": "收到",
+      "description_placeholder": "添加详情（可选）…",
+      "no_gifts": "暂无礼物",
+      "delete": "删除礼物",
+      "delete_confirm": "确定删除此礼物？",
+      "edit": "编辑礼物",
+      "added": "礼物已添加",
+      "updated": "礼物已更新",
+      "deleted": "礼物已删除"
+    },
     "quick_facts": {
       "title": "速览",
       "add": "添加",

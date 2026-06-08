@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import ContactDetail from "@/pages/contact/ContactDetail";
-import type { Contact } from "@/api";
+import type { Contact, ContactTabsResponse } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -39,6 +39,9 @@ vi.mock("@/pages/contact/modules/AddressesModule", () => ({
 }));
 vi.mock("@/pages/contact/modules/ContactInfoModule", () => ({
   default: () => <div>ContactInfoModule</div>,
+}));
+vi.mock("@/pages/contact/modules/GiftsModule", () => ({
+  default: () => <div>GiftsModule</div>,
 }));
 vi.mock("@/pages/contact/modules/LoansModule", () => ({
   default: () => <div>LoansModule</div>,
@@ -124,6 +127,7 @@ vi.mock("@/api", () => ({
 const mockContactQuery = vi.fn();
 const mockMutate = vi.fn();
 let mockMeetingContacts: Contact[] = [];
+let mockTabsData: ContactTabsResponse | undefined;
 const defaultQuery = { data: undefined, isLoading: false };
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: Record<string, unknown>) => {
@@ -133,6 +137,9 @@ vi.mock("@tanstack/react-query", () => ({
     }
     if (key.includes("contacts") && !key.includes("tabs")) {
       return mockContactQuery(opts);
+    }
+    if (key.includes("tabs")) {
+      return { data: mockTabsData, isLoading: false };
     }
     return defaultQuery;
   },
@@ -178,6 +185,7 @@ describe("ContactDetail", () => {
     mockContactQuery.mockReset();
     mockMutate.mockReset();
     mockMeetingContacts = [];
+    mockTabsData = undefined;
   });
 
   it("renders loading spinner when loading", () => {
@@ -221,6 +229,27 @@ describe("ContactDetail", () => {
     expect(screen.getByText("Overview")).toBeInTheDocument();
     expect(screen.getByText("Relationships")).toBeInTheDocument();
     expect(screen.getByText("Information")).toBeInTheDocument();
+  });
+
+  it("renders gifts from dynamic contact tabs", async () => {
+    const user = userEvent.setup();
+    mockContactQuery.mockReturnValue({ data: mockContact, isLoading: false });
+    mockTabsData = {
+      pages: [
+        {
+          id: 1,
+          name: "Information",
+          slug: "information",
+          modules: [{ id: 10, name: "Gifts", type: "gifts", position: 1 }],
+        },
+      ],
+    };
+
+    renderContactDetail();
+    await user.click(screen.getByText("Full view", { selector: ".ant-segmented-item-label" }));
+
+    expect(screen.getByText("Information")).toBeInTheDocument();
+    expect(screen.getByText("GiftsModule")).toBeInTheDocument();
   });
 
   it("preserves pagination parameters when clicking the back button", async () => {

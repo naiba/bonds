@@ -30,6 +30,9 @@ vi.mock("@/pages/contact/modules/AddressesModule", () => ({
 vi.mock("@/pages/contact/modules/ContactInfoModule", () => ({
   default: () => <div>ContactInfoModule</div>,
 }));
+vi.mock("@/pages/contact/modules/GiftsModule", () => ({
+  default: () => <div>GiftsModule</div>,
+}));
 vi.mock("@/pages/contact/modules/LoansModule", () => ({
   default: () => <div>LoansModule</div>,
 }));

@@ -1640,6 +1640,194 @@ func TestLoanToggle_Success(t *testing.T) {
 	}
 }
 
+// ==================== Gifts ====================
+
+func TestGiftCRUDLifecycle_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "gift-crud@example.com")
+	vault := ts.createTestVault(t, token, "Gift Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+	occasionIDs, stateIDs := ts.loadGiftSeedIDs(t, auth.User.AccountID)
+	basePath := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/gifts"
+
+	createBody := fmt.Sprintf(`{"name":"Birthday book","type":"given","description":"Signed edition","estimated_price":2500,"gift_occasion_id":%d,"gift_state_id":%d}`, occasionIDs[0], stateIDs[0])
+	createRec := ts.doRequest(http.MethodPost, basePath, createBody, token)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+	createResp := parseResponse(t, createRec)
+	if !createResp.Success {
+		t.Fatal("expected success=true")
+	}
+	var created dto.GiftResponse
+	if err := json.Unmarshal(createResp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created gift: %v", err)
+	}
+	if created.Name != "Birthday book" || created.Type != "given" || created.Description != "Signed edition" {
+		t.Fatalf("unexpected created gift: %+v", created)
+	}
+	if created.GiftOccasionID == nil || *created.GiftOccasionID != occasionIDs[0] {
+		t.Fatalf("expected occasion %d, got %v", occasionIDs[0], created.GiftOccasionID)
+	}
+	if created.GiftStateID == nil || *created.GiftStateID != stateIDs[0] {
+		t.Fatalf("expected state %d, got %v", stateIDs[0], created.GiftStateID)
+	}
+	if created.GiftOccasionLabel == "" || created.GiftStateLabel == "" {
+		t.Fatalf("expected occasion/state labels, got occasion=%q state=%q", created.GiftOccasionLabel, created.GiftStateLabel)
+	}
+
+	listRec := ts.doRequest(http.MethodGet, basePath, "", token)
+	if listRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", listRec.Code, listRec.Body.String())
+	}
+	listResp := parseResponse(t, listRec)
+	var gifts []dto.GiftResponse
+	if err := json.Unmarshal(listResp.Data, &gifts); err != nil {
+		t.Fatalf("failed to parse gift list: %v", err)
+	}
+	if len(gifts) != 1 || gifts[0].ID != created.ID || gifts[0].Name != "Birthday book" {
+		t.Fatalf("expected listed created gift, got %+v", gifts)
+	}
+
+	updateBody := fmt.Sprintf(`{"name":"Anniversary dinner","type":"received","description":"Restaurant voucher","estimated_price":5000,"gift_occasion_id":%d,"gift_state_id":%d}`, occasionIDs[1], stateIDs[1])
+	updateRec := ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d", basePath, created.ID), updateBody, token)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	updateResp := parseResponse(t, updateRec)
+	var updated dto.GiftResponse
+	if err := json.Unmarshal(updateResp.Data, &updated); err != nil {
+		t.Fatalf("failed to parse updated gift: %v", err)
+	}
+	if updated.Name != "Anniversary dinner" || updated.Type != "received" {
+		t.Fatalf("unexpected updated gift: %+v", updated)
+	}
+	if updated.GiftOccasionID == nil || *updated.GiftOccasionID != occasionIDs[1] {
+		t.Fatalf("expected updated occasion %d, got %v", occasionIDs[1], updated.GiftOccasionID)
+	}
+	if updated.GiftStateID == nil || *updated.GiftStateID != stateIDs[1] {
+		t.Fatalf("expected updated state %d, got %v", stateIDs[1], updated.GiftStateID)
+	}
+
+	deleteRec := ts.doRequest(http.MethodDelete, fmt.Sprintf("%s/%d", basePath, created.ID), "", token)
+	if deleteRec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", deleteRec.Code, deleteRec.Body.String())
+	}
+
+	afterDeleteRec := ts.doRequest(http.MethodGet, basePath, "", token)
+	if afterDeleteRec.Code != http.StatusOK {
+		t.Fatalf("expected 200 after delete, got %d: %s", afterDeleteRec.Code, afterDeleteRec.Body.String())
+	}
+	afterDeleteResp := parseResponse(t, afterDeleteRec)
+	var remaining []dto.GiftResponse
+	if err := json.Unmarshal(afterDeleteResp.Data, &remaining); err != nil {
+		t.Fatalf("failed to parse post-delete gift list: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("expected no gifts after delete, got %+v", remaining)
+	}
+}
+
+func TestGiftCreate_ValidationError(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "gift-validation@example.com")
+	vault := ts.createTestVault(t, token, "Gift Validation Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+	occasionIDs, stateIDs := ts.loadGiftSeedIDs(t, auth.User.AccountID)
+	path := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/gifts"
+
+	body := fmt.Sprintf(`{"type":"given","gift_occasion_id":%d,"gift_state_id":%d}`, occasionIDs[0], stateIDs[0])
+	rec := ts.doRequest(http.MethodPost, path, body, token)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected validation error response, got %+v", resp.Error)
+	}
+	if resp.Error.Details["validation"] == "" {
+		t.Fatalf("expected validation details, got %+v", resp.Error.Details)
+	}
+}
+
+func TestGiftHandlers_NotFoundErrors(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "gift-not-found@example.com")
+	vault := ts.createTestVault(t, token, "Gift Not Found Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+	occasionIDs, stateIDs := ts.loadGiftSeedIDs(t, auth.User.AccountID)
+	basePath := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/gifts"
+
+	notFoundCases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "missing occasion",
+			body: fmt.Sprintf(`{"name":"Birthday book","type":"given","gift_occasion_id":999999,"gift_state_id":%d}`, stateIDs[0]),
+		},
+		{
+			name: "missing state",
+			body: fmt.Sprintf(`{"name":"Birthday book","type":"given","gift_occasion_id":%d,"gift_state_id":999999}`, occasionIDs[0]),
+		},
+	}
+	for _, tc := range notFoundCases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := ts.doRequest(http.MethodPost, basePath, tc.body, token)
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+			}
+			resp := parseResponse(t, rec)
+			if resp.Error == nil || resp.Error.Code != "NOT_FOUND" {
+				t.Fatalf("expected not found response, got %+v", resp.Error)
+			}
+		})
+	}
+
+	validBody := fmt.Sprintf(`{"name":"Birthday book","type":"given","gift_occasion_id":%d,"gift_state_id":%d}`, occasionIDs[0], stateIDs[0])
+	createRec := ts.doRequest(http.MethodPost, basePath, validBody, token)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+
+	missingGiftPath := basePath + "/999999"
+	updateRec := ts.doRequest(http.MethodPut, missingGiftPath, validBody, token)
+	if updateRec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing gift update, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	deleteRec := ts.doRequest(http.MethodDelete, missingGiftPath, "", token)
+	if deleteRec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing gift delete, got %d: %s", deleteRec.Code, deleteRec.Body.String())
+	}
+}
+
+func (ts *testServer) loadGiftSeedIDs(t *testing.T, accountID string) ([]uint, []uint) {
+	t.Helper()
+	var occasions []models.GiftOccasion
+	if err := ts.db.Where("account_id = ?", accountID).Order("id ASC").Find(&occasions).Error; err != nil {
+		t.Fatalf("failed to load gift occasions: %v", err)
+	}
+	if len(occasions) < 2 {
+		t.Fatalf("expected at least 2 seeded gift occasions, got %d", len(occasions))
+	}
+	var states []models.GiftState
+	if err := ts.db.Where("account_id = ?", accountID).Order("id ASC").Find(&states).Error; err != nil {
+		t.Fatalf("failed to load gift states: %v", err)
+	}
+	if len(states) < 2 {
+		t.Fatalf("expected at least 2 seeded gift states, got %d", len(states))
+	}
+	occasionIDs := make([]uint, len(occasions))
+	for idx, occasion := range occasions {
+		occasionIDs[idx] = occasion.ID
+	}
+	stateIDs := make([]uint, len(states))
+	for idx, state := range states {
+		stateIDs[idx] = state.ID
+	}
+	return occasionIDs, stateIDs
+}
+
 // ==================== Pets ====================
 
 func TestPetCreate_Success(t *testing.T) {

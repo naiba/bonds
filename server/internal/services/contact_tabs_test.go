@@ -100,8 +100,17 @@ func TestGetTabs_WithTemplate(t *testing.T) {
 	if infoPage.Slug != "information" {
 		t.Errorf("Expected fifth page slug 'information', got '%s'", infoPage.Slug)
 	}
-	if len(infoPage.Modules) != 8 {
-		t.Errorf("Expected 8 modules on information page, got %d", len(infoPage.Modules))
+	expectedInformationTypes := []string{"documents", "photos", "notes", "reminders", "loans", "gifts", "tasks", "calls", "posts"}
+	if len(infoPage.Modules) != len(expectedInformationTypes) {
+		t.Fatalf("Expected %d modules on information page, got %d", len(expectedInformationTypes), len(infoPage.Modules))
+	}
+	for i, mod := range infoPage.Modules {
+		if mod.Type != expectedInformationTypes[i] {
+			t.Errorf("Information module %d: expected type '%s', got '%s'", i, expectedInformationTypes[i], mod.Type)
+		}
+		if mod.Position != i+1 {
+			t.Errorf("Information module %d: expected position %d, got %d", i, i+1, mod.Position)
+		}
 	}
 }
 

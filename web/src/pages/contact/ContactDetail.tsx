@@ -51,6 +51,7 @@ import TasksModule from "./modules/TasksModule";
 import CallsModule from "./modules/CallsModule";
 import AddressesModule from "./modules/AddressesModule";
 import ContactInfoModule from "./modules/ContactInfoModule";
+import GiftsModule from "./modules/GiftsModule";
 import LoansModule from "./modules/LoansModule";
 import PetsModule from "./modules/PetsModule";
 import RelationshipsModule from "./modules/RelationshipsModule";
@@ -117,6 +118,7 @@ const MODULE_COMPONENT_MAP: Record<
   calls: CallsModule,
   reminders: RemindersModule,
   loans: LoansModule,
+  gifts: GiftsModule,
   goals: GoalsModule,
   life_events: LifeEventsModule,
   groups: GroupsModule,

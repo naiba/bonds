@@ -85,6 +85,7 @@ export default function Layout() {
         { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
         { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
         { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
+        { key: `/vaults/${vaultId}/settings`, icon: <SettingOutlined />, label: t("nav.settings") },
       ]
     : [];
 
@@ -113,6 +114,7 @@ export default function Layout() {
         [
           { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
           { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
+          { key: `/vaults/${vaultId}/settings`, icon: <SettingOutlined />, label: t("nav.settings") },
         ],
       ]
     : [];

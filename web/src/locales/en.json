@@ -847,6 +847,27 @@
       "amount": "Amount",
       "currency": "Currency"
     },
+    "gifts": {
+      "title": "Gifts",
+      "add": "Add",
+      "name": "Name",
+      "name_placeholder": "Gift name",
+      "occasion": "Occasion",
+      "occasion_placeholder": "Select an occasion",
+      "state": "State",
+      "state_placeholder": "Select a state",
+      "type": "Type",
+      "type_given": "Given",
+      "type_received": "Received",
+      "description_placeholder": "Add details (optional)…",
+      "no_gifts": "No gifts",
+      "delete": "Delete gift",
+      "delete_confirm": "Delete this gift?",
+      "edit": "Edit gift",
+      "added": "Gift added",
+      "updated": "Gift updated",
+      "deleted": "Gift deleted"
+    },
     "quick_facts": {
       "title": "Quick Facts",
       "add": "Add",

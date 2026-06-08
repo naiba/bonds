@@ -847,6 +847,27 @@
       "amount": "Montant",
       "currency": "Devise"
     },
+    "gifts": {
+      "title": "Cadeaux",
+      "add": "Ajouter",
+      "name": "Nom",
+      "name_placeholder": "Nom du cadeau",
+      "occasion": "Occasion",
+      "occasion_placeholder": "Sélectionnez une occasion",
+      "state": "État",
+      "state_placeholder": "Sélectionnez un état",
+      "type": "Type",
+      "type_given": "Offert",
+      "type_received": "Reçu",
+      "description_placeholder": "Ajouter des détails (facultatif)…",
+      "no_gifts": "Aucun cadeau",
+      "delete": "Supprimer le cadeau",
+      "delete_confirm": "Supprimer ce cadeau ?",
+      "edit": "Modifier le cadeau",
+      "added": "Cadeau ajouté",
+      "updated": "Cadeau mis à jour",
+      "deleted": "Cadeau supprimé"
+    },
     "quick_facts": {
       "title": "Faits rapides",
       "add": "Ajouter",

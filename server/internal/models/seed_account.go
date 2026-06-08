@@ -616,6 +616,7 @@ func seedDefaultModules(tx *gorm.DB, accountID, locale string) error {
 			{"seed.modules.notes", "notes", false},
 			{"seed.modules.reminders", "reminders", false},
 			{"seed.modules.loans", "loans", false},
+			{"seed.modules.gifts", "gifts", false},
 			{"seed.modules.tasks", "tasks", false},
 			{"seed.modules.calls", "calls", false},
 			{"seed.modules.posts", "posts", false},

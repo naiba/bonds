@@ -43,6 +43,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactInformationService := services.NewContactInformationService(db)
 	loanService := services.NewLoanService(db)
 	petService := services.NewPetService(db)
+	giftService := services.NewGiftService(db)
 	relationshipService := services.NewRelationshipService(db)
 	goalService := services.NewGoalService(db)
 	lifeEventService := services.NewLifeEventService(db)
@@ -190,6 +191,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contactInformationHandler := NewContactInformationHandler(contactInformationService)
 	loanHandler := NewLoanHandler(loanService)
 	petHandler := NewPetHandler(petService)
+	giftHandler := NewGiftHandler(giftService)
 	relationshipHandler := NewRelationshipHandler(relationshipService)
 	goalHandler := NewGoalHandler(goalService)
 	lifeEventHandler := NewLifeEventHandler(lifeEventService)
@@ -442,6 +444,12 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	petRoutes.POST("", petHandler.Create, requireEditor)
 	petRoutes.PUT("/:id", petHandler.Update, requireEditor)
 	petRoutes.DELETE("/:id", petHandler.Delete, requireEditor)
+
+	giftRoutes := contactSub.Group("/gifts")
+	giftRoutes.GET("", giftHandler.List)
+	giftRoutes.POST("", giftHandler.Create, requireEditor)
+	giftRoutes.PUT("/:id", giftHandler.Update, requireEditor)
+	giftRoutes.DELETE("/:id", giftHandler.Delete, requireEditor)
 
 	relationshipRoutes := contactSub.Group("/relationships")
 	relationshipRoutes.GET("", relationshipHandler.List)

@@ -847,6 +847,27 @@
       "amount": "Cantidad",
       "currency": "Moneda"
     },
+    "gifts": {
+      "title": "Regalos",
+      "add": "Añadir",
+      "name": "Nombre",
+      "name_placeholder": "Nombre del regalo",
+      "occasion": "Ocasión",
+      "occasion_placeholder": "Selecciona una ocasión",
+      "state": "Estado",
+      "state_placeholder": "Selecciona un estado",
+      "type": "Tipo",
+      "type_given": "Entregado",
+      "type_received": "Recibido",
+      "description_placeholder": "Añadir detalles (opcional)…",
+      "no_gifts": "No hay regalos",
+      "delete": "Eliminar regalo",
+      "delete_confirm": "¿Eliminar este regalo?",
+      "edit": "Editar regalo",
+      "added": "Regalo añadido",
+      "updated": "Regalo actualizado",
+      "deleted": "Regalo eliminado"
+    },
     "quick_facts": {
       "title": "Datos rápidos",
       "add": "Añadir",
