@@ -738,6 +738,47 @@ func TestContactCreate_Success(t *testing.T) {
 	}
 }
 
+func TestContactCreate_NicknameOnlySuccess(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "ccreate-nickname-only@example.com")
+	vault := ts.createTestVault(t, token, "Nickname Contact Vault")
+
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
+		`{"first_name":"","nickname":"Handle"}`, token)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data contactData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse contact data: %v", err)
+	}
+	if data.FirstName != "" {
+		t.Fatalf("expected empty first_name, got %q", data.FirstName)
+	}
+	if data.Nickname != "Handle" {
+		t.Fatalf("expected nickname Handle, got %q", data.Nickname)
+	}
+}
+
+func TestContactCreate_BlankFirstNameAndNicknameValidationError(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "ccreate-blank-name@example.com")
+	vault := ts.createTestVault(t, token, "Blank Contact Vault")
+
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
+		`{"first_name":"   ","nickname":"\t"}`, token)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
 func TestContactCreate_FirstMetThroughMissingReturnsNotFound(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "ccreate-missing-first-met@example.com")
@@ -938,6 +979,49 @@ func TestContactUpdate_Success(t *testing.T) {
 	}
 	if data.Suffix != "Sr." {
 		t.Errorf("expected suffix=Sr., got %s", data.Suffix)
+	}
+}
+
+func TestContactUpdate_NicknameOnlySuccess(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "cupdate-nickname-only@example.com")
+	vault := ts.createTestVault(t, token, "Update Nickname Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "OldName")
+
+	rec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID,
+		`{"first_name":"","nickname":"Updated Handle"}`, token)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data contactData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse contact data: %v", err)
+	}
+	if data.FirstName != "" {
+		t.Fatalf("expected empty first_name, got %q", data.FirstName)
+	}
+	if data.Nickname != "Updated Handle" {
+		t.Fatalf("expected nickname Updated Handle, got %q", data.Nickname)
+	}
+}
+
+func TestContactUpdate_BlankFirstNameAndNicknameValidationError(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "cupdate-blank-name@example.com")
+	vault := ts.createTestVault(t, token, "Update Blank Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "OldName")
+
+	rec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID,
+		`{"first_name":"   ","nickname":"\n"}`, token)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
 	}
 }
 

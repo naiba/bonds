@@ -3,7 +3,7 @@ package dto
 import "time"
 
 type CreateContactRequest struct {
-	FirstName                string     `json:"first_name" validate:"required,min=1,max=255" example:"John"`
+	FirstName                string     `json:"first_name" validate:"max=255" example:"John"`
 	LastName                 string     `json:"last_name" validate:"max=255" example:"Doe"`
 	MiddleName               string     `json:"middle_name" validate:"max=255" example:"Michael"`
 	Nickname                 string     `json:"nickname" validate:"max=255" example:"Johnny"`
@@ -24,7 +24,7 @@ type CreateContactRequest struct {
 }
 
 type UpdateContactRequest struct {
-	FirstName                string     `json:"first_name" validate:"required,min=1,max=255" example:"John"`
+	FirstName                string     `json:"first_name" validate:"max=255" example:"John"`
 	LastName                 string     `json:"last_name" validate:"max=255" example:"Doe"`
 	MiddleName               string     `json:"middle_name" validate:"max=255" example:"Michael"`
 	Nickname                 string     `json:"nickname" validate:"max=255" example:"Johnny"`

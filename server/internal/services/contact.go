@@ -15,7 +15,8 @@ import (
 )
 
 var (
-	ErrContactNotFound = errors.New("contact not found")
+	ErrContactNotFound     = errors.New("contact not found")
+	ErrContactNameRequired = errors.New("contact first name or nickname required")
 )
 
 type ContactService struct {
@@ -123,6 +124,9 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 }
 
 func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateContactRequest) (*dto.ContactResponse, error) {
+	if err := validateContactName(req.FirstName, req.Nickname); err != nil {
+		return nil, err
+	}
 	if req.FirstMetThroughContactID != nil {
 		if err := validateContactBelongsToVault(s.db, *req.FirstMetThroughContactID, vaultID); err != nil {
 			return nil, err
@@ -216,6 +220,10 @@ func (s *ContactService) GetContact(contactID, userID, vaultID string) (*dto.Con
 }
 
 func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
+	if err := validateContactName(req.FirstName, req.Nickname); err != nil {
+		return nil, err
+	}
+
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -546,6 +554,13 @@ func validateContactBelongsToVault(db *gorm.DB, contactID, vaultID string) error
 	var contact models.Contact
 	if err := db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		return ErrContactNotFound
+	}
+	return nil
+}
+
+func validateContactName(firstName, nickname string) error {
+	if strings.TrimSpace(firstName) == "" && strings.TrimSpace(nickname) == "" {
+		return ErrContactNameRequired
 	}
 	return nil
 }

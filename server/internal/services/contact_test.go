@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -81,6 +82,35 @@ func TestCreateContact(t *testing.T) {
 	}
 	if contact.VaultID != vaultID {
 		t.Errorf("Expected vault_id '%s', got '%s'", vaultID, contact.VaultID)
+	}
+}
+
+func TestCreateContactWithNicknameOnly(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		Nickname: "Nickname Only",
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	if contact.FirstName != "" {
+		t.Fatalf("expected empty first_name, got %q", contact.FirstName)
+	}
+	if contact.Nickname != "Nickname Only" {
+		t.Fatalf("expected nickname-only contact, got %q", contact.Nickname)
+	}
+}
+
+func TestCreateContactRejectsBlankFirstNameAndNickname(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "  ",
+		Nickname:  "\t",
+	})
+	if !errors.Is(err, ErrContactNameRequired) {
+		t.Fatalf("expected ErrContactNameRequired, got %v", err)
 	}
 }
 
@@ -575,6 +605,53 @@ func TestUpdateContact(t *testing.T) {
 	}
 	if updated.LastName != "Name" {
 		t.Errorf("Expected last_name 'Name', got '%s'", updated.LastName)
+	}
+}
+
+func TestUpdateContactWithNicknameOnly(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		Nickname: "Updated Nickname",
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact failed: %v", err)
+	}
+	if updated.FirstName != "" {
+		t.Fatalf("expected empty first_name, got %q", updated.FirstName)
+	}
+	if updated.Nickname != "Updated Nickname" {
+		t.Fatalf("expected nickname-only update, got %q", updated.Nickname)
+	}
+}
+
+func TestUpdateContactRejectsBlankFirstNameAndNickname(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	_, err = svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+		FirstName: "  ",
+		Nickname:  "\n",
+	})
+	if !errors.Is(err, ErrContactNameRequired) {
+		t.Fatalf("expected ErrContactNameRequired, got %v", err)
+	}
+
+	reloaded, err := svc.GetContact(created.ID, userID, vaultID)
+	if err != nil {
+		t.Fatalf("GetContact failed: %v", err)
+	}
+	if reloaded.FirstName != "Original" {
+		t.Fatalf("expected rejected update not to modify first_name, got %q", reloaded.FirstName)
 	}
 }
 

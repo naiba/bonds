@@ -574,7 +574,8 @@
     },
     "form": {
       "select_gender": "选择性别",
-      "select_pronoun": "选择代词"
+      "select_pronoun": "选择代词",
+      "name_or_nickname_required": "必须填写名字或昵称"
     },
     "detail": {
       "back": "返回联系人列表",

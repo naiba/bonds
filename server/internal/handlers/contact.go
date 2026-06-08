@@ -145,6 +145,9 @@ func (h *ContactHandler) Create(c echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
+		if errors.Is(err, services.ErrContactNameRequired) {
+			return response.ValidationError(c, map[string]string{"validation": err.Error()})
+		}
 		return response.InternalError(c, "err.failed_to_create_contact")
 	}
 	return response.Created(c, contact)
@@ -213,6 +216,9 @@ func (h *ContactHandler) Update(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrContactNameRequired) {
+			return response.ValidationError(c, map[string]string{"validation": err.Error()})
 		}
 		return response.InternalError(c, "err.failed_to_update_contact")
 	}

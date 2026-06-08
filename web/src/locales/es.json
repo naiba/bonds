@@ -574,7 +574,8 @@
     },
     "form": {
       "select_gender": "Selecciona el género",
-      "select_pronoun": "Selecciona el pronombre"
+      "select_pronoun": "Selecciona el pronombre",
+      "name_or_nickname_required": "Se requiere nombre o apodo"
     },
     "detail": {
       "back": "Volver a los contactos",

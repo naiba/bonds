@@ -833,7 +833,16 @@ export default function ContactDetail() {
               name="first_name"
               label={t("contact.detail.first_name")}
               style={{ flex: 2 }}
-              rules={[{ required: true, message: t("common.required") }]}
+              dependencies={["nickname"]}
+              rules={[{
+                validator: (_, value) => {
+                  const nickname = editForm.getFieldValue("nickname");
+                  if (!value?.trim() && !nickname?.trim()) {
+                    return Promise.reject(new Error(t("contact.form.name_or_nickname_required")));
+                  }
+                  return Promise.resolve();
+                },
+              }]}
             >
               <Input />
             </Form.Item>
@@ -866,6 +875,16 @@ export default function ContactDetail() {
               name="nickname"
               label={t("contact.detail.nickname")}
               style={{ flex: 1 }}
+              dependencies={["first_name"]}
+              rules={[{
+                validator: (_, value) => {
+                  const firstName = editForm.getFieldValue("first_name");
+                  if (!value?.trim() && !firstName?.trim()) {
+                    return Promise.reject(new Error(t("contact.form.name_or_nickname_required")));
+                  }
+                  return Promise.resolve();
+                },
+              }]}
             >
               <Input />
             </Form.Item>

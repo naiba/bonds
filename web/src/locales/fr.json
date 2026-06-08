@@ -574,7 +574,8 @@
     },
     "form": {
       "select_gender": "Sélectionnez le sexe",
-      "select_pronoun": "Sélectionnez un pronom"
+      "select_pronoun": "Sélectionnez un pronom",
+      "name_or_nickname_required": "Le prénom ou le surnom est requis"
     },
     "detail": {
       "back": "Retour aux contacts",
@@ -861,7 +862,7 @@
     },
     "relationships": {
       "title": "Relations",
-      "add": "Ajouter", 
+      "add": "Ajouter",
       "no_relationships": "Aucune relation",
       "remove_confirm": "Retirer?",
       "added": "Relation ajoutée",

@@ -574,7 +574,8 @@
     },
     "form": {
       "select_gender": "Select gender",
-      "select_pronoun": "Select pronoun"
+      "select_pronoun": "Select pronoun",
+      "name_or_nickname_required": "First name or nickname is required"
     },
     "detail": {
       "back": "Back to contacts",

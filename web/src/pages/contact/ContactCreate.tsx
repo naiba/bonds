@@ -39,6 +39,7 @@ export default function ContactCreate() {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useNameOrder();
+  const [form] = Form.useForm();
 
   const { data: contactOptions = [], isLoading: isContactOptionsLoading } = useQuery<Contact[]>({
     queryKey: ["vaults", vaultId, "contacts", "meeting-options"],
@@ -122,7 +123,7 @@ export default function ContactCreate() {
       </div>
 
       <Card>
-        <Form layout="vertical" onFinish={onFinish} requiredMark="optional">
+        <Form form={form} layout="vertical" onFinish={onFinish} requiredMark="optional">
           <div style={{ display: "flex", gap: 16 }}>
             <Form.Item
               name="prefix"
@@ -133,9 +134,18 @@ export default function ContactCreate() {
             </Form.Item>
             <Form.Item
               name="first_name"
+              dependencies={["nickname"]}
               label={t("contact.create.first_name_label")}
               style={{ flex: 2 }}
-              rules={[{ required: true, message: t("common.required") }]}
+              rules={[{
+                validator: (_, value) => {
+                  const nickname = form.getFieldValue("nickname");
+                  if (!value?.trim() && !nickname?.trim()) {
+                    return Promise.reject(new Error(t("contact.form.name_or_nickname_required")));
+                  }
+                  return Promise.resolve();
+                },
+              }]}
             >
               <Input placeholder={t("contact.create.first_name_placeholder")} />
             </Form.Item>
@@ -166,7 +176,21 @@ export default function ContactCreate() {
           </div>
 
           <div style={{ display: "flex", gap: 16 }}>
-            <Form.Item name="nickname" label={t("contact.create.nickname_label")} style={{ flex: 1 }}>
+            <Form.Item
+              name="nickname"
+              dependencies={["first_name"]}
+              label={t("contact.create.nickname_label")}
+              style={{ flex: 1 }}
+              rules={[{
+                validator: (_, value) => {
+                  const firstName = form.getFieldValue("first_name");
+                  if (!value?.trim() && !firstName?.trim()) {
+                    return Promise.reject(new Error(t("contact.form.name_or_nickname_required")));
+                  }
+                  return Promise.resolve();
+                },
+              }]}
+            >
               <Input placeholder={t("contact.create.nickname_placeholder")} />
             </Form.Item>
             <Form.Item name="maiden_name" label={t("contact.create.maiden_name_label")} style={{ flex: 1 }}>
