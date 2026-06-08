@@ -108,14 +108,9 @@ func (s *GroupTypeRoleService) UpdatePosition(accountID string, groupTypeID uint
 		}
 		return err
 	}
-	result := s.db.Model(&models.GroupTypeRole{}).Where("id = ? AND group_type_id = ?", roleID, groupTypeID).Update("position", position)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrGroupTypeRoleNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return resequencePositionRows(tx, "group_type_roles", "id", "group_type_id = ?", []interface{}{groupTypeID}, roleID, position, ErrGroupTypeRoleNotFound)
+	})
 }
 
 func toGroupTypeRoleResponse(r *models.GroupTypeRole) dto.GroupTypeRoleResponse {

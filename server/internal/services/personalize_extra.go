@@ -1,11 +1,6 @@
 package services
 
-import (
-	"fmt"
-	"time"
-
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 // UpdatePosition moves entity `id` to index `position` in the account's
 // ordered list for the given entity type. The whole list is re-sequenced
@@ -18,57 +13,11 @@ func (s *PersonalizeService) UpdatePosition(accountID, entity string, id uint, p
 	if !ok {
 		return ErrUnknownEntityType
 	}
-
-	type orderedRow struct {
-		ID       uint
-		Position int
+	if !cfg.hasPosition {
+		return ErrPersonalizeEntityNotSortable
 	}
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		var rows []orderedRow
-		if err := tx.Raw(
-			fmt.Sprintf("SELECT id, position FROM %s WHERE account_id = ? ORDER BY position ASC, id ASC", cfg.table),
-			accountID,
-		).Scan(&rows).Error; err != nil {
-			return err
-		}
-
-		oldIdx := -1
-		for i, r := range rows {
-			if r.ID == id {
-				oldIdx = i
-				break
-			}
-		}
-		if oldIdx == -1 {
-			return ErrPersonalizeEntityNotFound
-		}
-
-		newIdx := position
-		if newIdx < 0 {
-			newIdx = 0
-		}
-		if newIdx >= len(rows) {
-			newIdx = len(rows) - 1
-		}
-		if oldIdx == newIdx {
-			return nil
-		}
-
-		moved := rows[oldIdx]
-		rows = append(rows[:oldIdx], rows[oldIdx+1:]...)
-		rows = append(rows[:newIdx], append([]orderedRow{moved}, rows[newIdx:]...)...)
-
-		now := time.Now()
-		stmt := fmt.Sprintf("UPDATE %s SET position = ?, updated_at = ? WHERE id = ? AND account_id = ?", cfg.table)
-		for i, r := range rows {
-			if r.Position == i {
-				continue
-			}
-			if err := tx.Exec(stmt, i, now, r.ID, accountID).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+		return resequencePositionRows(tx, cfg.table, "id", "account_id = ?", []interface{}{accountID}, id, position, ErrPersonalizeEntityNotFound)
 	})
 }

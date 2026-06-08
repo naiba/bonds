@@ -5626,6 +5626,40 @@ func TestSyncTranslations_Unauthorized(t *testing.T) {
 	}
 }
 
+func TestPersonalizeUpdatePositionUnsupportedEntityReturnsBadRequest(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "personalize-position-handler@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/settings/personalize/genders", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list genders: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var genders []struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(resp.Data, &genders); err != nil {
+		t.Fatalf("failed to parse genders: %v", err)
+	}
+	if len(genders) == 0 {
+		t.Fatal("expected seeded genders")
+	}
+
+	rec = ts.doRequest(
+		http.MethodPost,
+		fmt.Sprintf("/api/settings/personalize/genders/%d/position", genders[0].ID),
+		`{"position":0}`,
+		token,
+	)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for non-sortable entity reorder, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "BAD_REQUEST" {
+		t.Fatalf("expected BAD_REQUEST error, got %#v", resp.Error)
+	}
+}
+
 func (ts *testServer) generateOAuthLinkToken(t *testing.T) string {
 	t.Helper()
 	oauthSvc := services.NewOAuthService(ts.db, &ts.cfg.JWT, ts.cfg.App.URL)

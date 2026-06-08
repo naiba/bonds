@@ -79,3 +79,36 @@ func TestGroupTypeRoleNotFound(t *testing.T) {
 		t.Errorf("Expected ErrGroupTypeRoleNotFound, got %v", err)
 	}
 }
+
+func TestUpdateGroupTypeRolePositionResequencesSiblings(t *testing.T) {
+	svc, accountID, groupTypeID := setupGroupTypeRoleTest(t)
+
+	roles, err := svc.List(accountID, groupTypeID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(roles) < 2 {
+		t.Fatalf("expected seeded group type roles, got %d", len(roles))
+	}
+	moved := roles[1]
+
+	if err := svc.UpdatePosition(accountID, groupTypeID, moved.ID, 0); err != nil {
+		t.Fatalf("UpdatePosition failed: %v", err)
+	}
+
+	reordered, err := svc.List(accountID, groupTypeID)
+	if err != nil {
+		t.Fatalf("List after UpdatePosition failed: %v", err)
+	}
+	if reordered[0].ID != moved.ID {
+		t.Fatalf("first role id = %d, want moved id %d", reordered[0].ID, moved.ID)
+	}
+	for i, role := range reordered {
+		if role.Position == nil {
+			t.Fatalf("role %d position is nil", role.ID)
+		}
+		if *role.Position != i {
+			t.Fatalf("role %d position = %d, want %d", role.ID, *role.Position, i)
+		}
+	}
+}

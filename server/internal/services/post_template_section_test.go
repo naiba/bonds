@@ -82,10 +82,43 @@ func TestPostTemplateSectionNotFound(t *testing.T) {
 func TestUpdatePostTemplateSectionPosition(t *testing.T) {
 	svc, accountID, templateID := setupPostTemplateSectionTest(t)
 
-	created, _ := svc.Create(accountID, templateID, dto.CreatePostTemplateSectionRequest{
-		Label: "Test", Position: 1,
+	sectionA, err := svc.Create(accountID, templateID, dto.CreatePostTemplateSectionRequest{
+		Label: "A", Position: 0,
 	})
-	if err := svc.UpdatePosition(accountID, templateID, created.ID, 5); err != nil {
+	if err != nil {
+		t.Fatalf("Create A failed: %v", err)
+	}
+	sectionB, err := svc.Create(accountID, templateID, dto.CreatePostTemplateSectionRequest{
+		Label: "B", Position: 1,
+	})
+	if err != nil {
+		t.Fatalf("Create B failed: %v", err)
+	}
+	sectionC, err := svc.Create(accountID, templateID, dto.CreatePostTemplateSectionRequest{
+		Label: "C", Position: 2,
+	})
+	if err != nil {
+		t.Fatalf("Create C failed: %v", err)
+	}
+
+	if err := svc.UpdatePosition(accountID, templateID, sectionC.ID, 0); err != nil {
 		t.Fatalf("UpdatePosition failed: %v", err)
+	}
+
+	sections, err := svc.List(accountID, templateID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	wantIDs := []uint{sectionC.ID, sectionA.ID, sectionB.ID}
+	if len(sections) != len(wantIDs) {
+		t.Fatalf("got %d sections, want %d", len(sections), len(wantIDs))
+	}
+	for i, section := range sections {
+		if section.ID != wantIDs[i] {
+			t.Fatalf("section at index %d id = %d, want %d", i, section.ID, wantIDs[i])
+		}
+		if section.Position != i {
+			t.Fatalf("section %d position = %d, want %d", section.ID, section.Position, i)
+		}
 	}
 }

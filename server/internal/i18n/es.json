@@ -191,6 +191,7 @@
   "err.failed_to_create_entity": "Error al crear la entidad",
   "err.invalid_entity_id": "ID de entidad inválido",
   "err.entity_not_found": "Entidad no encontrada",
+  "err.entity_not_sortable": "La entidad no se puede ordenar",
   "err.failed_to_update_entity": "Error al actualizar la entidad",
   "err.failed_to_delete_entity": "Error al eliminar la entidad",
   "err.invalid_csv_mapping": "Mapeo de columnas inválido",

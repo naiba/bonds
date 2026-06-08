@@ -223,6 +223,7 @@
   "err.failed_to_create_entity": "创建实体失败",
   "err.invalid_entity_id": "无效的实体ID",
   "err.entity_not_found": "实体未找到",
+  "err.entity_not_sortable": "实体不支持排序",
   "err.failed_to_update_entity": "更新实体失败",
   "err.failed_to_delete_entity": "删除实体失败",
   "err.invalid_csv_mapping": "列映射无效",

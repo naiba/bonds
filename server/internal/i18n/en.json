@@ -223,6 +223,7 @@
   "err.failed_to_create_entity": "Failed to create entity",
   "err.invalid_entity_id": "Invalid entity ID",
   "err.entity_not_found": "Entity not found",
+  "err.entity_not_sortable": "Entity is not sortable",
   "err.failed_to_update_entity": "Failed to update entity",
   "err.failed_to_delete_entity": "Failed to delete entity",
 

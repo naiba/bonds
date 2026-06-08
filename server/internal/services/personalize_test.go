@@ -67,6 +67,135 @@ func TestListGenders(t *testing.T) {
 	}
 }
 
+func TestUpdatePositionRejectsUnsupportedEntityWithoutSQL(t *testing.T) {
+	svc, accountID := setupPersonalizeTest(t)
+
+	genders, err := svc.List(accountID, "genders")
+	if err != nil {
+		t.Fatalf("List genders failed: %v", err)
+	}
+	if len(genders) == 0 {
+		t.Fatal("expected seeded genders")
+	}
+
+	err = svc.UpdatePosition(accountID, "genders", genders[0].ID, 0)
+	if err != ErrPersonalizeEntityNotSortable {
+		t.Fatalf("UpdatePosition(genders) error = %v, want %v", err, ErrPersonalizeEntityNotSortable)
+	}
+}
+
+func TestUpdatePositionResequencesSortableTopLevelEntity(t *testing.T) {
+	svc, accountID := setupPersonalizeTest(t)
+
+	religions, err := svc.List(accountID, "religions")
+	if err != nil {
+		t.Fatalf("List religions failed: %v", err)
+	}
+	if len(religions) < 3 {
+		t.Fatalf("expected at least 3 seeded religions, got %d", len(religions))
+	}
+	moved := religions[len(religions)-1]
+
+	if err := svc.UpdatePosition(accountID, "religions", moved.ID, 0); err != nil {
+		t.Fatalf("UpdatePosition(religions) failed: %v", err)
+	}
+
+	reordered, err := svc.List(accountID, "religions")
+	if err != nil {
+		t.Fatalf("List religions after reorder failed: %v", err)
+	}
+	if reordered[0].ID != moved.ID {
+		t.Fatalf("first religion id = %d, want moved id %d", reordered[0].ID, moved.ID)
+	}
+	for i, item := range reordered {
+		if item.Position == nil {
+			t.Fatalf("religion %d position is nil", item.ID)
+		}
+		if *item.Position != i {
+			t.Fatalf("religion %d position = %d, want %d", item.ID, *item.Position, i)
+		}
+	}
+}
+
+func TestUpdatePositionNormalizesNullablePositions(t *testing.T) {
+	svc, accountID := setupPersonalizeTest(t)
+
+	religions, err := svc.List(accountID, "religions")
+	if err != nil {
+		t.Fatalf("List religions failed: %v", err)
+	}
+	if len(religions) < 3 {
+		t.Fatalf("expected at least 3 seeded religions, got %d", len(religions))
+	}
+
+	if err := svc.db.Model(&models.Religion{}).Where("id = ?", religions[0].ID).Update("position", nil).Error; err != nil {
+		t.Fatalf("set religion position null failed: %v", err)
+	}
+
+	moved := religions[1]
+	if err := svc.UpdatePosition(accountID, "religions", moved.ID, 0); err != nil {
+		t.Fatalf("UpdatePosition(religions) failed: %v", err)
+	}
+
+	reordered, err := svc.List(accountID, "religions")
+	if err != nil {
+		t.Fatalf("List religions after reorder failed: %v", err)
+	}
+	if reordered[0].ID != moved.ID {
+		t.Fatalf("first religion id = %d, want moved id %d", reordered[0].ID, moved.ID)
+	}
+	for i, item := range reordered {
+		if item.Position == nil {
+			t.Fatalf("religion %d position is nil", item.ID)
+		}
+		if *item.Position != i {
+			t.Fatalf("religion %d position = %d, want %d", item.ID, *item.Position, i)
+		}
+	}
+}
+
+func TestUpdatePositionTaskStatusesKeepsCustomMetadata(t *testing.T) {
+	svc, accountID := setupPersonalizeTest(t)
+
+	statuses, err := svc.List(accountID, "task-statuses")
+	if err != nil {
+		t.Fatalf("List task-statuses failed: %v", err)
+	}
+	if len(statuses) < 3 {
+		t.Fatalf("expected at least 3 seeded task statuses, got %d", len(statuses))
+	}
+	moved := statuses[len(statuses)-1]
+
+	if err := svc.UpdatePosition(accountID, "task-statuses", moved.ID, 0); err != nil {
+		t.Fatalf("UpdatePosition(task-statuses) failed: %v", err)
+	}
+
+	reordered, err := svc.List(accountID, "task-statuses")
+	if err != nil {
+		t.Fatalf("List task-statuses after reorder failed: %v", err)
+	}
+	if reordered[0].ID != moved.ID {
+		t.Fatalf("first status id = %d, want moved id %d", reordered[0].ID, moved.ID)
+	}
+	for i, item := range reordered {
+		if item.Position == nil {
+			t.Fatalf("task status %d position is nil", item.ID)
+		}
+		if *item.Position != i {
+			t.Fatalf("task status %d position = %d, want %d", item.ID, *item.Position, i)
+		}
+		if item.Slug == "" {
+			t.Fatalf("task status %d lost slug metadata", item.ID)
+		}
+		if item.IsDefault == nil {
+			t.Fatalf("task status %d lost is_default metadata", item.ID)
+		}
+		if item.CanBeDeleted == nil {
+			t.Fatalf("task status %d lost can_be_deleted metadata", item.ID)
+		}
+	}
+}
+
 func TestListTemplatesReturnsLabel(t *testing.T) {
 	svc, accountID := setupPersonalizeTest(t)
 

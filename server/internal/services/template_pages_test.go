@@ -190,23 +190,30 @@ func TestTemplatePageDeleteCannotBeDeleted(t *testing.T) {
 func TestTemplatePageUpdatePosition(t *testing.T) {
 	svc, accountID, templateID := setupTemplatePageTest(t)
 
-	created, err := svc.Create(templateID, accountID, dto.CreateTemplatePageRequest{
-		Name: "Reorder", Slug: "reorder", Position: 1,
-	})
+	pages, err := svc.List(templateID, accountID)
 	if err != nil {
-		t.Fatalf("Create failed: %v", err)
+		t.Fatalf("List failed: %v", err)
 	}
+	if len(pages) < 3 {
+		t.Fatalf("expected at least 3 pages, got %d", len(pages))
+	}
+	moved := pages[1]
 
-	if err := svc.UpdatePosition(created.ID, accountID, 42); err != nil {
+	if err := svc.UpdatePosition(moved.ID, accountID, 0); err != nil {
 		t.Fatalf("UpdatePosition failed: %v", err)
 	}
 
-	page, err := svc.Get(created.ID, accountID)
+	reordered, err := svc.List(templateID, accountID)
 	if err != nil {
-		t.Fatalf("Get after UpdatePosition failed: %v", err)
+		t.Fatalf("List after UpdatePosition failed: %v", err)
 	}
-	if page.Position != 42 {
-		t.Errorf("Expected position 42, got %d", page.Position)
+	if reordered[0].ID != moved.ID {
+		t.Fatalf("first page id = %d, want moved id %d", reordered[0].ID, moved.ID)
+	}
+	for i, page := range reordered {
+		if page.Position != i {
+			t.Fatalf("page %d position = %d, want %d", page.ID, page.Position, i)
+		}
 	}
 }
 
@@ -291,12 +298,6 @@ func TestTemplatePageModuleUpdatePosition(t *testing.T) {
 	svc, accountID, templateID := setupTemplatePageTest(t)
 
 	db := svc.db
-	modName := "Reorder Module"
-	mod := models.Module{AccountID: accountID, Name: &modName}
-	if err := db.Create(&mod).Error; err != nil {
-		t.Fatalf("Create module failed: %v", err)
-	}
-
 	freshPage, err := svc.Create(templateID, accountID, dto.CreateTemplatePageRequest{
 		Name: "Position Test Page",
 	})
@@ -305,25 +306,39 @@ func TestTemplatePageModuleUpdatePosition(t *testing.T) {
 	}
 	pageID := freshPage.ID
 
-	if err := svc.AddModule(pageID, accountID, dto.AddModuleToPageRequest{
-		ModuleID: mod.ID, Position: 1,
-	}); err != nil {
-		t.Fatalf("AddModule failed: %v", err)
+	modules := make([]models.Module, 3)
+	for i, name := range []string{"Module A", "Module B", "Module C"} {
+		moduleName := name
+		modules[i] = models.Module{AccountID: accountID, Name: &moduleName}
+		if err := db.Create(&modules[i]).Error; err != nil {
+			t.Fatalf("Create module %s failed: %v", name, err)
+		}
+		if err := svc.AddModule(pageID, accountID, dto.AddModuleToPageRequest{
+			ModuleID: modules[i].ID,
+			Position: i,
+		}); err != nil {
+			t.Fatalf("AddModule %s failed: %v", name, err)
+		}
 	}
 
-	if err := svc.UpdateModulePosition(pageID, mod.ID, accountID, 99); err != nil {
+	if err := svc.UpdateModulePosition(pageID, modules[2].ID, accountID, 0); err != nil {
 		t.Fatalf("UpdateModulePosition failed: %v", err)
 	}
 
-	modules, err := svc.ListModules(pageID, accountID)
+	reordered, err := svc.ListModules(pageID, accountID)
 	if err != nil {
 		t.Fatalf("ListModules failed: %v", err)
 	}
-	if len(modules) != 1 {
-		t.Fatalf("Expected 1 module, got %d", len(modules))
+	if len(reordered) != 3 {
+		t.Fatalf("Expected 3 modules, got %d", len(reordered))
 	}
-	if modules[0].Position != 99 {
-		t.Errorf("Expected position 99, got %d", modules[0].Position)
+	if reordered[0].ModuleID != modules[2].ID {
+		t.Fatalf("first module id = %d, want moved id %d", reordered[0].ModuleID, modules[2].ID)
+	}
+	for i, module := range reordered {
+		if module.Position != i {
+			t.Fatalf("module %d position = %d, want %d", module.ModuleID, module.Position, i)
+		}
 	}
 }
 

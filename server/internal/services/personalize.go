@@ -12,6 +12,7 @@ import (
 
 var ErrPersonalizeEntityNotFound = errors.New("entity not found")
 var ErrUnknownEntityType = errors.New("unknown entity type")
+var ErrPersonalizeEntityNotSortable = errors.New("entity is not sortable")
 
 type PersonalizeService struct {
 	db *gorm.DB
@@ -32,13 +33,13 @@ var entityConfigs = map[string]entityConfig{
 	"genders":            {table: "genders", hasName: true},
 	"pronouns":           {table: "pronouns", hasName: true},
 	"address-types":      {table: "address_types", hasName: true},
-	"task-statuses":      {table: "task_statuses", hasName: true},
+	"task-statuses":      {table: "task_statuses", hasName: true, hasPosition: true},
 	"pet-categories":     {table: "pet_categories", hasName: true},
 	"contact-info-types": {table: "contact_information_types", hasName: true},
 	"call-reasons":       {table: "call_reason_types", hasLabel: true},
-	"religions":          {table: "religions", hasName: true},
-	"gift-occasions":     {table: "gift_occasions", hasLabel: true},
-	"gift-states":        {table: "gift_states", hasLabel: true},
+	"religions":          {table: "religions", hasName: true, hasPosition: true},
+	"gift-occasions":     {table: "gift_occasions", hasLabel: true, hasPosition: true},
+	"gift-states":        {table: "gift_states", hasLabel: true, hasPosition: true},
 	"group-types":        {table: "group_types", hasLabel: true, hasPosition: true},
 	"post-templates":     {table: "post_templates", hasLabel: true, hasPosition: true},
 	"relationship-types": {table: "relationship_group_types", hasName: true},
@@ -60,10 +61,15 @@ func (s *PersonalizeService) List(accountID, entity string) ([]dto.PersonalizeEn
 
 	var results []dto.PersonalizeEntityResponse
 	labelCol := s.getLabelCol(cfg)
+	selectCols := s.getSelectCols(cfg, labelCol)
+	orderBy := "id ASC"
+	if cfg.hasPosition {
+		orderBy = "CASE WHEN position IS NULL THEN 1 ELSE 0 END, position ASC, id ASC"
+	}
 
 	query := fmt.Sprintf(
-		"SELECT id, COALESCE(%s, '') as label, COALESCE(%s, '') as name, created_at, updated_at FROM %s WHERE account_id = ? ORDER BY id ASC",
-		labelCol, s.getNameCol(cfg), cfg.table,
+		"SELECT %s FROM %s WHERE account_id = ? ORDER BY %s",
+		selectCols, cfg.table, orderBy,
 	)
 
 	if entity == "currencies" {
@@ -138,7 +144,7 @@ func (s *PersonalizeService) Create(accountID, entity string, req dto.Personaliz
 	}
 
 	var resp dto.PersonalizeEntityResponse
-	s.db.Raw(fmt.Sprintf("SELECT id, COALESCE(%s, '') as label, COALESCE(%s, '') as name, created_at, updated_at FROM %s WHERE account_id = ? ORDER BY id DESC LIMIT 1", labelCol, nameCol, cfg.table), accountID).Scan(&resp)
+	s.db.Raw(fmt.Sprintf("SELECT %s FROM %s WHERE account_id = ? ORDER BY id DESC LIMIT 1", s.getSelectCols(cfg, labelCol), cfg.table), accountID).Scan(&resp)
 	return &resp, nil
 }
 
@@ -167,7 +173,7 @@ func (s *PersonalizeService) Update(accountID, entity string, id uint, req dto.P
 	}
 
 	var resp dto.PersonalizeEntityResponse
-	s.db.Raw(fmt.Sprintf("SELECT id, COALESCE(%s, '') as label, COALESCE(%s, '') as name, created_at, updated_at FROM %s WHERE id = ?", labelCol, nameCol, cfg.table), id).Scan(&resp)
+	s.db.Raw(fmt.Sprintf("SELECT %s FROM %s WHERE id = ?", s.getSelectCols(cfg, labelCol), cfg.table), id).Scan(&resp)
 	return &resp, nil
 }
 
@@ -206,6 +212,14 @@ func (s *PersonalizeService) getNameCol(cfg entityConfig) string {
 		return "name"
 	}
 	return "label"
+}
+
+func (s *PersonalizeService) getSelectCols(cfg entityConfig, labelCol string) string {
+	cols := fmt.Sprintf("id, COALESCE(%s, '') as label, COALESCE(%s, '') as name, created_at, updated_at", labelCol, s.getNameCol(cfg))
+	if cfg.hasPosition {
+		cols = fmt.Sprintf("id, COALESCE(%s, '') as label, COALESCE(%s, '') as name, position, created_at, updated_at", labelCol, s.getNameCol(cfg))
+	}
+	return cols
 }
 
 type syncableEntity struct {

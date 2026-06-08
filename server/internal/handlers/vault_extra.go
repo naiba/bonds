@@ -321,6 +321,9 @@ func (h *PersonalizeHandler) UpdatePosition(c echo.Context) error {
 		if errors.Is(err, services.ErrUnknownEntityType) {
 			return response.NotFound(c, "err.unknown_entity_type")
 		}
+		if errors.Is(err, services.ErrPersonalizeEntityNotSortable) {
+			return response.BadRequest(c, "err.entity_not_sortable", nil)
+		}
 		if errors.Is(err, services.ErrPersonalizeEntityNotFound) {
 			return response.NotFound(c, "err.entity_not_found")
 		}

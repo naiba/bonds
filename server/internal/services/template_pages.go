@@ -131,7 +131,9 @@ func (s *TemplatePageService) UpdatePosition(pageID uint, accountID string, posi
 	if page.Template.AccountID != accountID {
 		return ErrTemplatePageNotFound
 	}
-	return s.db.Model(&page).Update("position", position).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return resequencePositionRows(tx, "template_pages", "id", "template_id = ?", []interface{}{page.TemplateID}, pageID, position, ErrTemplatePageNotFound)
+	})
 }
 
 func (s *TemplatePageService) ListModules(pageID uint, accountID string) ([]dto.TemplatePageModuleResponse, error) {
@@ -227,16 +229,9 @@ func (s *TemplatePageService) UpdateModulePosition(pageID, moduleID uint, accoun
 		return ErrTemplatePageNotFound
 	}
 
-	result := s.db.Model(&models.ModuleTemplatePage{}).
-		Where("template_page_id = ? AND module_id = ?", pageID, moduleID).
-		Update("position", position)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrTemplatePageNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return resequencePositionRows(tx, "module_template_page", "module_id", "template_page_id = ?", []interface{}{pageID}, moduleID, position, ErrTemplatePageNotFound)
+	})
 }
 
 func toTemplatePageResponse(p *models.TemplatePage) dto.TemplatePageResponse {

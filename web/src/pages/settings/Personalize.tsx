@@ -51,6 +51,15 @@ const sectionI18nMap: Record<string, string> = {
   "task-statuses": "settings.personalize.task_statuses",
 };
 
+const sortableTopLevelSections = new Set([
+  "religions",
+  "gift-occasions",
+  "gift-states",
+  "group-types",
+  "post-templates",
+  "task-statuses",
+]);
+
 interface SubItemConfig {
   labelKey: string;
   addKey: string;
@@ -584,6 +593,8 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
   const qk = ["settings", "personalize", sectionKey];
   const hasSubItems = sectionKey in subItemConfigs;
 
+  const isTopLevelSortable = sortableTopLevelSections.has(sectionKey);
+
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
@@ -683,24 +694,26 @@ function SectionPanel({ sectionKey }: { sectionKey: string }) {
           <div>
             <List.Item
               actions={[
-                <Button
-                  key="up"
-                  type="text"
-                  size="small"
-                  icon={<ArrowUpOutlined />}
-                  title={t("settings.personalize.move_up")}
-                  disabled={index === 0}
-                  onClick={() => positionMutation.mutate({ id: item.id!, position: index - 1 })}
-                />,
-                <Button
-                  key="down"
-                  type="text"
-                  size="small"
-                  icon={<ArrowDownOutlined />}
-                  title={t("settings.personalize.move_down")}
-                  disabled={index === items.length - 1}
-                  onClick={() => positionMutation.mutate({ id: item.id!, position: index + 1 })}
-                />,
+                ...(isTopLevelSortable ? [
+                  <Button
+                    key="up"
+                    type="text"
+                    size="small"
+                    icon={<ArrowUpOutlined />}
+                    title={t("settings.personalize.move_up")}
+                    disabled={index === 0}
+                    onClick={() => positionMutation.mutate({ id: item.id!, position: index - 1 })}
+                  />,
+                  <Button
+                    key="down"
+                    type="text"
+                    size="small"
+                    icon={<ArrowDownOutlined />}
+                    title={t("settings.personalize.move_down")}
+                    disabled={index === items.length - 1}
+                    onClick={() => positionMutation.mutate({ id: item.id!, position: index + 1 })}
+                  />
+                ] : []),
                 <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
                 <Popconfirm key="d" title={t("settings.personalize.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
                   <Button type="text" size="small" danger icon={<DeleteOutlined />} />

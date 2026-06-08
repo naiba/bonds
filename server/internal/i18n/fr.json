@@ -191,6 +191,7 @@
   "err.failed_to_create_entity": "Échec de la création de l'entité",
   "err.invalid_entity_id": "ID d'entité invalide",
   "err.entity_not_found": "Entité introuvable",
+  "err.entity_not_sortable": "L'entité ne peut pas être triée",
   "err.failed_to_update_entity": "Échec de la mise à jour de l'entité",
   "err.failed_to_delete_entity": "Échec de la suppression de l'entité",
   "seed.genders.male": "Homme",

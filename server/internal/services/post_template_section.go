@@ -108,14 +108,9 @@ func (s *PostTemplateSectionService) UpdatePosition(accountID string, templateID
 		}
 		return err
 	}
-	result := s.db.Model(&models.PostTemplateSection{}).Where("id = ? AND post_template_id = ?", sectionID, templateID).Update("position", position)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrPostTemplateSectionNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return resequencePositionRows(tx, "post_template_sections", "id", "post_template_id = ?", []interface{}{templateID}, sectionID, position, ErrPostTemplateSectionNotFound)
+	})
 }
 
 func toPostTemplateSectionResponse(s *models.PostTemplateSection) dto.PostTemplateSectionResponse {
