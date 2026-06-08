@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -199,11 +200,21 @@ func TestValidateNameOrder(t *testing.T) {
 		{"valid: nickname only", "%nickname%", false},
 		{"valid: all fields", "%first_name% %middle_name% %last_name%", false},
 		{"valid: with maiden_name", "%first_name% (%maiden_name%) %last_name%", false},
+		{"valid: nickname conditional", "%first_name% %last_name%{nickname? (%nickname%)}", false},
+		{"valid: middle name conditional", "%first_name%{middle_name? %middle_name%} %last_name%", false},
+		{"valid: conditional literal text", "%first_name%{nickname? aka %nickname%} %last_name%", false},
 		{"invalid: empty", "", true},
 		{"invalid: no variables", "hello world", true},
 		{"invalid: odd percent", "%first_name", true},
 		{"invalid: unknown variable", "%unknown%", true},
 		{"invalid: mixed valid and unknown", "%first_name% %foo%", true},
+		{"invalid: unknown variable in conditional", "%first_name%{nickname? %foo%}", true},
+		{"invalid: unknown conditional field", "%first_name%{display_name? %nickname%}", true},
+		{"invalid: unclosed conditional", "%first_name%{nickname? %nickname%", true},
+		{"invalid: unopened conditional", "%first_name%nickname? %nickname%}", true},
+		{"invalid: missing conditional question", "%first_name%{nickname %nickname%}", true},
+		{"invalid: empty conditional template", "%first_name%{nickname?}", true},
+		{"invalid: nested conditional", "%first_name%{nickname? {maiden_name? %maiden_name%}}", true},
 	}
 
 	for _, tt := range tests {
@@ -211,6 +222,9 @@ func TestValidateNameOrder(t *testing.T) {
 			err := ValidateNameOrder(tt.nameOrder)
 			if tt.wantErr && err == nil {
 				t.Error("Expected error but got nil")
+			}
+			if tt.wantErr && err != nil && !errors.Is(err, ErrInvalidNameOrder) {
+				t.Errorf("Expected ErrInvalidNameOrder, got: %v", err)
 			}
 			if !tt.wantErr && err != nil {
 				t.Errorf("Expected no error but got: %v", err)
@@ -223,13 +237,13 @@ func TestPreferenceUpdateNameOrderRejectsInvalid(t *testing.T) {
 	svc, userID := setupPreferenceTest(t)
 
 	err := svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "no variables here"})
-	if err == nil {
-		t.Error("Expected error for invalid name_order, got nil")
+	if !errors.Is(err, ErrInvalidNameOrder) {
+		t.Errorf("Expected ErrInvalidNameOrder for invalid name_order, got %v", err)
 	}
 
 	err = svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "%unknown_var%"})
-	if err == nil {
-		t.Error("Expected error for unknown variable, got nil")
+	if !errors.Is(err, ErrInvalidNameOrder) {
+		t.Errorf("Expected ErrInvalidNameOrder for unknown variable, got %v", err)
 	}
 
 	err = svc.UpdateNameOrder(userID, dto.UpdateNameOrderRequest{NameOrder: "%nickname%"})
@@ -248,8 +262,8 @@ func TestPreferenceUpdateAllRejectsInvalidNameOrder(t *testing.T) {
 	_, err := svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
 		NameOrder: "invalid no variables",
 	})
-	if err == nil {
-		t.Error("Expected error for invalid name_order in UpdateAll, got nil")
+	if !errors.Is(err, ErrInvalidNameOrder) {
+		t.Errorf("Expected ErrInvalidNameOrder for invalid name_order in UpdateAll, got %v", err)
 	}
 
 	prefs, err := svc.UpdateAll(userID, dto.UpdatePreferencesRequest{

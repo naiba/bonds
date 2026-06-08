@@ -746,6 +746,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultSettings := vaultScoped.Group("/settings", VaultPermissionMiddleware(vaultService, models.PermissionManager))
 	vaultSettings.GET("", vaultSettingsHandler.Get)
 	vaultSettings.PUT("", vaultSettingsHandler.Update)
+	vaultSettings.PUT("/name-order", vaultSettingsHandler.UpdateNameOrder)
 	vaultSettings.PUT("/template", vaultSettingsHandler.UpdateTemplate)
 	vaultSettings.PUT("/visibility", vaultSettingsHandler.UpdateVisibility)
 

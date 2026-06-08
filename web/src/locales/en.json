@@ -1367,7 +1367,15 @@
       "photos": "Photos",
       "skipped": "Skipped",
       "errors": "Errors"
-    }
+    },
+    "name_order_override_title": "Name display order",
+    "name_order_override_description": "By default, this vault uses your global name display preference. You can set a specific order for this vault to keep contact names consistent inside this vault.",
+    "name_order_global": "Use global preference",
+    "name_order_global_help": "Current global template: {{template}}",
+    "name_order_override": "Use a vault-specific order",
+    "name_order_condition_help": "Optional segments can use conditional syntax, for example {nickname? (%nickname%)}.",
+    "name_order_save": "Save override",
+    "name_order_clear": "Use global preference"
   },
   "backups": {
     "title": "Backups",

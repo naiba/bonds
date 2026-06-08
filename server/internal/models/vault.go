@@ -13,6 +13,7 @@ type Vault struct {
 	Type               string    `json:"type" gorm:"not null"`
 	Name               string    `json:"name" gorm:"not null"`
 	Description        *string   `json:"description"`
+	NameOrder          *string   `json:"name_order" gorm:"type:text"`
 	DefaultTemplateID  *uint     `json:"default_template_id" gorm:"index"`
 	DefaultActivityTab string    `json:"default_activity_tab" gorm:"default:'activity'"`
 	ShowGroupTab       bool      `json:"show_group_tab" gorm:"default:true"`

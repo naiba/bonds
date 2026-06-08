@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import {
   Card,
   Typography,
@@ -39,7 +39,7 @@ export default function GroupDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
 
   const { data: group, isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "groups", gId],

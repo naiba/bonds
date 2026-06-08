@@ -359,6 +359,7 @@ export type { GithubComNaibaBondsInternalDtoLifeEventTypeResponse as LifeEventCa
 export type { GithubComNaibaBondsInternalDtoQuickFactTemplateResponse as QuickFactTemplateResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultUserResponse as VaultUserResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateVaultSettingsRequest as UpdateVaultSettingsRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoUpdateVaultNameOrderRequest as UpdateVaultNameOrderRequest } from "./generated/data-contracts";
 
 // Reports
 export type { GithubComNaibaBondsInternalDtoAddressReportItem as AddressReportItem } from "./generated/data-contracts";

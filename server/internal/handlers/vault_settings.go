@@ -59,7 +59,8 @@ func NewVaultSettingsHandler(
 //	@Router			/vaults/{vault_id}/settings [get]
 func (h *VaultSettingsHandler) Get(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	settings, err := h.settingsService.Get(vaultID)
+	userID := middleware.GetUserID(c)
+	settings, err := h.settingsService.Get(vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")
@@ -95,7 +96,8 @@ func (h *VaultSettingsHandler) Update(c echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
-	settings, err := h.settingsService.Update(vaultID, req)
+	userID := middleware.GetUserID(c)
+	settings, err := h.settingsService.Update(vaultID, userID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")
@@ -126,7 +128,8 @@ func (h *VaultSettingsHandler) UpdateVisibility(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	settings, err := h.settingsService.UpdateVisibility(vaultID, req)
+	userID := middleware.GetUserID(c)
+	settings, err := h.settingsService.UpdateVisibility(vaultID, userID, req)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_update_visibility")
 	}
@@ -154,9 +157,47 @@ func (h *VaultSettingsHandler) UpdateTemplate(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	settings, err := h.settingsService.UpdateDefaultTemplate(vaultID, req)
+	userID := middleware.GetUserID(c)
+	settings, err := h.settingsService.UpdateDefaultTemplate(vaultID, userID, req)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_update_template")
+	}
+	return response.OK(c, settings)
+}
+
+// UpdateNameOrder godoc
+//
+//	@Summary		Update vault name order
+//	@Description	Update or clear the vault-level name order override
+//	@Tags			vault-settings
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string							true	"Vault ID"
+//	@Param			request		body		dto.UpdateVaultNameOrderRequest	true	"Name order"
+//	@Success		200			{object}	response.APIResponse{data=dto.VaultSettingsResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/settings/name-order [put]
+func (h *VaultSettingsHandler) UpdateNameOrder(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	var req dto.UpdateVaultNameOrderRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	userID := middleware.GetUserID(c)
+	settings, err := h.settingsService.UpdateNameOrder(vaultID, userID, req)
+	if err != nil {
+		if errors.Is(err, services.ErrVaultNotFound) {
+			return response.NotFound(c, "err.vault_not_found")
+		}
+		if errors.Is(err, services.ErrInvalidNameOrder) {
+			return response.ValidationError(c, map[string]string{"name_order": err.Error()})
+		}
+		return response.InternalError(c, "err.failed_to_update_vault_name_order")
 	}
 	return response.OK(c, settings)
 }

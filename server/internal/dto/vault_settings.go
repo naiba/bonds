@@ -5,19 +5,21 @@ import "time"
 // --- Vault Settings Index + Update ---
 
 type VaultSettingsResponse struct {
-	ID                string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name              string    `json:"name" example:"Family"`
-	Description       string    `json:"description" example:"Vault for family contacts"`
-	DefaultTemplateID *uint     `json:"default_template_id" example:"1"`
-	ShowGroupTab      bool      `json:"show_group_tab" example:"true"`
-	ShowTasksTab      bool      `json:"show_tasks_tab" example:"true"`
-	ShowFilesTab      bool      `json:"show_files_tab" example:"true"`
-	ShowJournalTab    bool      `json:"show_journal_tab" example:"true"`
-	ShowCompaniesTab  bool      `json:"show_companies_tab" example:"true"`
-	ShowReportsTab    bool      `json:"show_reports_tab" example:"true"`
-	ShowCalendarTab   bool      `json:"show_calendar_tab" example:"true"`
-	CreatedAt         time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt         time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	ID                 string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name               string    `json:"name" example:"Family"`
+	Description        string    `json:"description" example:"Vault for family contacts"`
+	NameOrder          *string   `json:"name_order" example:"%first_name% %last_name%"`
+	EffectiveNameOrder string    `json:"effective_name_order" example:"%first_name% %last_name%"`
+	DefaultTemplateID  *uint     `json:"default_template_id" example:"1"`
+	ShowGroupTab       bool      `json:"show_group_tab" example:"true"`
+	ShowTasksTab       bool      `json:"show_tasks_tab" example:"true"`
+	ShowFilesTab       bool      `json:"show_files_tab" example:"true"`
+	ShowJournalTab     bool      `json:"show_journal_tab" example:"true"`
+	ShowCompaniesTab   bool      `json:"show_companies_tab" example:"true"`
+	ShowReportsTab     bool      `json:"show_reports_tab" example:"true"`
+	ShowCalendarTab    bool      `json:"show_calendar_tab" example:"true"`
+	CreatedAt          time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt          time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
 
 type UpdateVaultSettingsRequest struct {
@@ -41,6 +43,10 @@ type UpdateTabVisibilityRequest struct {
 
 type UpdateDefaultTemplateRequest struct {
 	DefaultTemplateID *uint `json:"default_template_id" example:"1"`
+}
+
+type UpdateVaultNameOrderRequest struct {
+	NameOrder *string `json:"name_order" example:"%first_name% %last_name%{nickname? (%nickname%)}"`
 }
 
 // --- Vault Users Management ---

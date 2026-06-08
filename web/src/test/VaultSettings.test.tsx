@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import * as nameFormat from "@/utils/nameFormat";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
@@ -87,6 +88,48 @@ function renderVaultSettings() {
 }
 
 describe("VaultSettings", () => {
+  beforeEach(() => {
+    vi.spyOn(nameFormat, "useNameOrder").mockReturnValue("%first_name% %last_name%");
+    vi.spyOn(nameFormat, "useVaultNameOrder").mockReturnValue("%first_name% %last_name%");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    mockUseQuery.mockReset();
+  });
+
+  it("renders General tab with Name display order card", async () => {
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      if (Array.isArray(opts.queryKey) && opts.queryKey[0] === "vault") {
+        return {
+          data: {
+            name: "My Vault",
+            description: "desc",
+            default_template_id: 1,
+            name_order: "%nickname%",
+            effective_name_order: "%nickname%",
+            show_group_tab: true,
+            show_tasks_tab: true,
+            show_files_tab: true,
+            show_journal_tab: true,
+            show_companies_tab: true,
+            show_reports_tab: true,
+            show_calendar_tab: true,
+          },
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+
+    renderVaultSettings();
+
+    expect(await screen.findByText("Name display order")).toBeInTheDocument();
+    expect(screen.getAllByText("Use global preference").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/\{nickname\? \(%nickname%\)\}/)).toBeInTheDocument();
+    expect(screen.getByText("Save override")).toBeInTheDocument();
+  });
+
   it("renders settings title", () => {
     mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
     renderVaultSettings();

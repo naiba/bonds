@@ -44,10 +44,14 @@ func (s *VaultService) ListVaults(userID string) ([]dto.VaultResponse, error) {
 	if err := s.db.Where("id IN ?", vaultIDs).Find(&vaults).Error; err != nil {
 		return nil, err
 	}
+	userNameOrder, err := getUserNameOrder(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	result := make([]dto.VaultResponse, len(vaults))
 	for i, v := range vaults {
-		result[i] = toVaultResponse(&v, contactIDByVault[v.ID])
+		result[i] = toVaultResponse(&v, contactIDByVault[v.ID], userNameOrder)
 	}
 	return result, nil
 }
@@ -93,7 +97,11 @@ func (s *VaultService) CreateVault(accountID, userID string, req dto.CreateVault
 		return nil, err
 	}
 
-	resp := toVaultResponse(&vault, userContactID)
+	userNameOrder, err := getUserNameOrder(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp := toVaultResponse(&vault, userContactID, userNameOrder)
 	return &resp, nil
 }
 
@@ -106,7 +114,11 @@ func (s *VaultService) GetVault(vaultID, userID string) (*dto.VaultResponse, err
 		return nil, err
 	}
 	userContactID := s.getUserContactID(userID, vaultID)
-	resp := toVaultResponse(&vault, userContactID)
+	userNameOrder, err := getUserNameOrder(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp := toVaultResponse(&vault, userContactID, userNameOrder)
 	return &resp, nil
 }
 
@@ -128,7 +140,11 @@ func (s *VaultService) UpdateVault(vaultID, userID string, req dto.UpdateVaultRe
 	}
 
 	userContactID := s.getUserContactID(userID, vaultID)
-	resp := toVaultResponse(&vault, userContactID)
+	userNameOrder, err := getUserNameOrder(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp := toVaultResponse(&vault, userContactID, userNameOrder)
 	return &resp, nil
 }
 
@@ -536,7 +552,25 @@ func (s *VaultService) getUserContactID(userID, vaultID string) string {
 	return uv.ContactID
 }
 
-func toVaultResponse(v *models.Vault, userContactID string) dto.VaultResponse {
+func getUserNameOrder(db *gorm.DB, userID string) (string, error) {
+	var user models.User
+	if err := db.First(&user, "id = ?", userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", ErrUserNotFound
+		}
+		return "", err
+	}
+	return user.NameOrder, nil
+}
+
+func effectiveVaultNameOrder(v *models.Vault, userNameOrder string) string {
+	if v.NameOrder != nil {
+		return *v.NameOrder
+	}
+	return userNameOrder
+}
+
+func toVaultResponse(v *models.Vault, userContactID, userNameOrder string) dto.VaultResponse {
 	desc := ""
 	if v.Description != nil {
 		desc = *v.Description
@@ -546,6 +580,8 @@ func toVaultResponse(v *models.Vault, userContactID string) dto.VaultResponse {
 		AccountID:          v.AccountID,
 		Name:               v.Name,
 		Description:        desc,
+		NameOrder:          v.NameOrder,
+		EffectiveNameOrder: effectiveVaultNameOrder(v, userNameOrder),
 		DefaultActivityTab: v.DefaultActivityTab,
 		UserContactID:      userContactID,
 		CreatedAt:          v.CreatedAt,

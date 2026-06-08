@@ -81,6 +81,25 @@ describe("formatContactName", () => {
     const noSuffixContact = { ...fullContact, suffix: null };
     expect(formatContactName("%first_name%", noSuffixContact)).toBe("Dr. James");
   });
+
+  it("handles conditional block with truthy field", () => {
+    expect(formatContactName("%first_name% %last_name% {nickname? (%nickname%)}", fullContact)).toBe("Dr. James Bond (007) III");
+  });
+
+  it("omits conditional block content if field is falsy", () => {
+    const noNickname = { ...fullContact, nickname: "" };
+    expect(formatContactName("%first_name% %last_name% {nickname? (%nickname%)}", noNickname)).toBe("Dr. James Bond III");
+  });
+
+  it("omits conditional block content if field is null", () => {
+    const noNickname = { ...fullContact, nickname: null };
+    expect(formatContactName("%first_name% %last_name% {nickname? (%nickname%)}", noNickname)).toBe("Dr. James Bond III");
+  });
+
+  it("omits conditional block content if field is whitespace", () => {
+    const noNickname = { ...fullContact, nickname: "   " };
+    expect(formatContactName("%first_name% %last_name% {nickname? (%nickname%)}", noNickname)).toBe("Dr. James Bond III");
+  });
 });
 
 describe("formatContactInitials", () => {
@@ -110,5 +129,14 @@ describe("formatContactInitials", () => {
 
   it("uppercases initials", () => {
     expect(formatContactInitials("%first_name% %last_name%", { first_name: "alice", last_name: "bob" })).toBe("AB");
+  });
+
+  it("handles initials with conditional blocks when truthy", () => {
+    expect(formatContactInitials("%first_name% {nickname? (%nickname%)} %last_name%", fullContact)).toBe("J0");
+  });
+
+  it("handles initials with conditional blocks when falsy", () => {
+    const noNickname = { ...fullContact, nickname: "" };
+    expect(formatContactInitials("%first_name% {nickname? (%nickname%)} %last_name%", noNickname)).toBe("JB");
   });
 });

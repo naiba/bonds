@@ -7,7 +7,7 @@ import { api } from "@/api";
 import type { CreateContactRequest, APIError, Contact } from "@/api";
 import { useTranslation } from "react-i18next";
 import { dateInputToTimestamp } from "@/utils/dateOnlyInput";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 
 const { Title, Text } = Typography;
 
@@ -38,7 +38,7 @@ export default function ContactCreate() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
   const [form] = Form.useForm();
 
   const { data: contactOptions = [], isLoading: isContactOptionsLoading } = useQuery<Contact[]>({

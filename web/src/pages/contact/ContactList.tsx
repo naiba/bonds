@@ -13,7 +13,7 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { Contact, PaginationMeta, LabelResponse } from "@/api";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { formatDateOnly } from "@/utils/dateOnlyInput";
 import type { ColumnsType } from "antd/es/table";
@@ -87,7 +87,7 @@ export default function ContactList() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
   const dateFormats = useDateFormat();
   const { data: labels = [] } = useQuery({
     queryKey: ["vault", vaultId, "labels"],

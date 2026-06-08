@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useParams, useNavigate, Outlet } from "react-router-dom";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate, formatMonthYear, formatShortDate } from "@/utils/dateFormat";
 import { formatShortDateOnly } from "@/utils/dateOnlyInput";
 import {
@@ -71,7 +71,7 @@ export default function VaultDetail() {
   const vaultId = id!;
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [form] = Form.useForm();
   const { message } = App.useApp();
@@ -1290,7 +1290,7 @@ function CatchUpWidget({ vaultId }: { vaultId: string }) {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const dateFormats = useDateFormat();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
 
   const { data: prompts = [], isLoading } = useQuery<CatchUpPrompt[]>({
     queryKey: ["vaults", vaultId, "catchUp"],

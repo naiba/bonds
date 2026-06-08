@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { formatContactName, formatContactInitials, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, formatContactInitials, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { dateInputToTimestamp, formatDateOnly, timestampToDateInput } from "@/utils/dateOnlyInput";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
@@ -137,7 +137,7 @@ export default function ContactDetail() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
   const dateFormats = useDateFormat();
   const [viewMode, setViewMode] = useState<"read" | "edit">("read");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

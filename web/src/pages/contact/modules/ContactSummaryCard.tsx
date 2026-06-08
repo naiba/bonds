@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/api";
 import type { Contact } from "@/api";
 import { useTranslation } from "react-i18next";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { getReadableLabelTagColors } from "@/utils/labelColor";
 import NetworkGraph from "@/components/NetworkGraph";
 import type { ImportantDate, ImportantDateTypeResponse } from "@/api";
@@ -24,7 +24,7 @@ interface ContactSummaryCardProps {
 export default function ContactSummaryCard({ vaultId, contactId, contact, readOnly = false }: ContactSummaryCardProps) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
   const dateFormats = useDateFormat();
 
   // --- Data fetching: reuse same query keys as existing modules for deduplication ---

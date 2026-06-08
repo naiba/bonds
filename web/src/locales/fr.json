@@ -1367,7 +1367,15 @@
       "photos": "Photos",
       "skipped": "Ignoré",
       "errors": "Erreurs"
-    }
+    },
+    "name_order_override_title": "Ordre d’affichage du nom",
+    "name_order_override_description": "Par défaut, ce coffre utilise votre préférence globale d’affichage des noms. Vous pouvez définir un ordre spécifique pour garder des noms cohérents dans ce coffre.",
+    "name_order_global": "Utiliser la préférence globale",
+    "name_order_global_help": "Modèle global actuel : {{template}}",
+    "name_order_override": "Utiliser un ordre spécifique à ce coffre",
+    "name_order_condition_help": "Les segments facultatifs peuvent utiliser une syntaxe conditionnelle, par exemple {nickname? (%nickname%)}.",
+    "name_order_save": "Enregistrer le remplacement",
+    "name_order_clear": "Utiliser la préférence globale"
   },
   "backups": {
     "title": "Sauvegardes",

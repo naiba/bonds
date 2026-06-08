@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import {
   Card,
   Typography,
@@ -38,7 +38,7 @@ export default function VaultReports() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
 
   // Queries
   const { data: reportOverview } = useQuery({

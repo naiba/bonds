@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -102,30 +103,68 @@ func (s *PreferenceService) UpdateHelpShown(userID string, req dto.UpdateHelpSho
 	return s.db.Model(&models.User{}).Where("id = ?", userID).Update("help_shown", req.HelpShown).Error
 }
 
-// ValidateNameOrder checks that a name_order template string contains at least
-// one valid %variable% and all %...% tokens reference known fields.
 func ValidateNameOrder(nameOrder string) error {
-	if strings.Count(nameOrder, "%") < 2 {
-		return ErrInvalidNameOrder
-	}
-	if strings.Count(nameOrder, "%")%2 != 0 {
-		return ErrInvalidNameOrder
-	}
-	// Extract variables between % pairs
-	foundVar := false
-	parts := strings.Split(nameOrder, "%")
-	// parts[0] is before first %, parts[1] is var name, parts[2] is between, etc.
-	for i := 1; i < len(parts); i += 2 {
-		varName := parts[i]
-		if !validNameOrderVars[varName] {
-			return errors.New("unknown variable in name_order: %" + varName + "%")
-		}
-		foundVar = true
+	foundVar, err := validateNameOrderSegment(nameOrder, false)
+	if err != nil {
+		return err
 	}
 	if !foundVar {
 		return ErrInvalidNameOrder
 	}
 	return nil
+}
+
+func validateNameOrderSegment(segment string, inConditional bool) (bool, error) {
+	foundVar := false
+	for i := 0; i < len(segment); {
+		switch segment[i] {
+		case '%':
+			end := strings.IndexByte(segment[i+1:], '%')
+			if end < 0 {
+				return false, fmt.Errorf("%w: unmatched %% in name_order", ErrInvalidNameOrder)
+			}
+			varName := segment[i+1 : i+1+end]
+			if !validNameOrderVars[varName] {
+				return false, fmt.Errorf("%w: unknown variable in name_order: %%%s%%", ErrInvalidNameOrder, varName)
+			}
+			foundVar = true
+			i += end + 2
+		case '{':
+			if inConditional {
+				return false, fmt.Errorf("%w: nested conditional blocks are not allowed", ErrInvalidNameOrder)
+			}
+			end := strings.IndexByte(segment[i+1:], '}')
+			if end < 0 {
+				return false, fmt.Errorf("%w: unclosed conditional block", ErrInvalidNameOrder)
+			}
+			block := segment[i+1 : i+1+end]
+			blockFoundVar, err := validateNameOrderConditional(block)
+			if err != nil {
+				return false, err
+			}
+			foundVar = foundVar || blockFoundVar
+			i += end + 2
+		case '}':
+			return false, fmt.Errorf("%w: unopened conditional block", ErrInvalidNameOrder)
+		default:
+			i++
+		}
+	}
+	return foundVar, nil
+}
+
+func validateNameOrderConditional(block string) (bool, error) {
+	conditionField, template, ok := strings.Cut(block, "?")
+	if !ok || conditionField == "" || template == "" {
+		return false, fmt.Errorf("%w: malformed conditional block", ErrInvalidNameOrder)
+	}
+	if strings.ContainsAny(conditionField, "{}% ") {
+		return false, fmt.Errorf("%w: malformed conditional condition", ErrInvalidNameOrder)
+	}
+	if !validNameOrderVars[conditionField] {
+		return false, fmt.Errorf("%w: unknown conditional field: %s", ErrInvalidNameOrder, conditionField)
+	}
+	return validateNameOrderSegment(template, true)
 }
 
 func (s *PreferenceService) UpdateAll(userID string, req dto.UpdatePreferencesRequest) (*dto.PreferencesResponse, error) {

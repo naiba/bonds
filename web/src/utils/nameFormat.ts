@@ -14,12 +14,14 @@ export interface ContactNameFields {
   suffix?: string | null;
 }
 
+const CONDITIONAL_BLOCK_REGEX = /\{([a-z_]+)\?\s*(.*?)\}/g;
 const VARIABLE_REGEX = /%([a-z_]+)%/g;
 const EMPTY_PARENS = /\(\s*\)/g;
 
 /**
  * Format a contact name using a Monica-style name_order template.
  * Template variables: %first_name%, %last_name%, %middle_name%, %nickname%, %maiden_name%
+ * Conditional blocks: {nickname? (%nickname%)} - evaluates to the inner string if nickname is truthy (trimmed).
  * prefix is always prepended; suffix is always appended (not part of template).
  * Empty parentheses are removed. Falls back to "Unknown" if result is empty.
  */
@@ -35,7 +37,15 @@ export function formatContactName(
     maiden_name: contact.maiden_name ?? "",
   };
 
-  let result = nameOrder.replace(VARIABLE_REGEX, (_, key: string) => {
+  let result = nameOrder.replace(CONDITIONAL_BLOCK_REGEX, (_, conditionKey: string, innerText: string) => {
+    const val = fieldMap[conditionKey] ?? "";
+    if (val.trim()) {
+      return innerText;
+    }
+    return "";
+  });
+
+  result = result.replace(VARIABLE_REGEX, (_, key: string) => {
     return fieldMap[key] ?? "";
   });
 
@@ -78,10 +88,15 @@ export function formatContactInitials(
   };
 
   const initials: string[] = [];
+  const resolvedTemplate = nameOrder.replace(CONDITIONAL_BLOCK_REGEX, (_, conditionKey: string, innerText: string) => {
+    const val = fieldMap[conditionKey] ?? "";
+    return val.trim() ? innerText : "";
+  });
+
   // Use a fresh regex for each call
   const regex = /%([a-z_]+)%/g;
   let match: RegExpExecArray | null;
-  while ((match = regex.exec(nameOrder)) !== null) {
+  while ((match = regex.exec(resolvedTemplate)) !== null) {
     const value = fieldMap[match[1]] ?? "";
     if (value.trim()) {
       initials.push(value.trim().charAt(0));
@@ -91,7 +106,7 @@ export function formatContactInitials(
   return initials.slice(0, 2).join("").toUpperCase() || "?";
 }
 
-const DEFAULT_NAME_ORDER = "%first_name% %last_name%";
+export const DEFAULT_NAME_ORDER = "%first_name% %last_name%";
 
 /**
  * Hook to get the user's name_order preference.
@@ -109,4 +124,36 @@ export function useNameOrder(): string {
   });
 
   return data?.name_order || DEFAULT_NAME_ORDER;
+}
+
+/**
+ * Hook to get the effective name order for a specific vault.
+ * It returns vault.effective_name_order, or vault.name_order,
+ * or global user preference, or DEFAULT_NAME_ORDER in that order of precedence.
+ */
+export function useVaultNameOrder(vaultId?: string): string {
+  // 1. Fetch vault settings (has name_order override)
+  const { data: vaultData } = useQuery({
+    queryKey: ["vaults", vaultId],
+    queryFn: async () => {
+      if (!vaultId) return null;
+      const res = await api.vaults.vaultsDetail(vaultId);
+      return res.data!;
+    },
+    enabled: !!vaultId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  // 2. Fetch user preferences as fallback
+  const globalNameOrder = useNameOrder();
+
+  if (vaultData?.effective_name_order) {
+    return vaultData.effective_name_order;
+  }
+  if (vaultData?.name_order) {
+    return vaultData.name_order;
+  }
+
+  return globalNameOrder;
 }

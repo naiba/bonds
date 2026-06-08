@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -24,7 +24,7 @@ export default function VaultReminders() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
-  const nameOrder = useNameOrder();
+  const nameOrder = useVaultNameOrder(vaultId);
   const dateFormats = useDateFormat();
 
   const frequencyLabels: Record<string, string> = {

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import type { ContactNameFields } from "@/utils/nameFormat";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -23,6 +24,7 @@ import {
   Spin,
   Alert,
   theme,
+  Radio,
 } from "antd";
 import {
   SaveOutlined,
@@ -55,6 +57,26 @@ import { getReadableLabelTagColors } from "@/utils/labelColor";
 const { Title, Text } = Typography;
 const { Option } = Select;
 
+const NAME_ORDER_PRESETS = [
+  "%first_name% %last_name%",
+  "%last_name% %first_name%",
+  "%first_name% %last_name% {nickname? (%nickname%)}",
+  "%nickname%",
+] as const;
+
+const CUSTOM_SENTINEL = "__custom__";
+
+const SAMPLE_CONTACT: ContactNameFields = {
+  first_name: "James",
+  last_name: "Bond",
+  middle_name: "Herbert",
+  nickname: "007",
+  maiden_name: "",
+  prefix: "",
+  suffix: "",
+};
+
+
 export default function VaultSettings() {
   const { id } = useParams<{ id: string }>();
   const vaultId = id!;
@@ -65,6 +87,9 @@ export default function VaultSettings() {
   const { token } = theme.useToken();
 
   const [activeTab, setActiveTab] = useState("general");
+  const [nameOrderMode, setNameOrderMode] = useState<"global" | "override">("global");
+  const [nameOrderTemplate, setNameOrderTemplate] = useState<string>(NAME_ORDER_PRESETS[0]);
+  const [customNameOrderTemplate, setCustomNameOrderTemplate] = useState("");
 
   const { data: vaultSettings } = useQuery({
     queryKey: ["vault", vaultId, "settings"],
@@ -74,6 +99,18 @@ export default function VaultSettings() {
     },
     enabled: !!vaultId,
   });
+
+  useEffect(() => {
+    if (!vaultSettings) return;
+
+    const vaultNameOrder = vaultSettings.name_order;
+    const hasOverride = vaultNameOrder !== null && vaultNameOrder !== undefined;
+    const isPreset = hasOverride && (NAME_ORDER_PRESETS as readonly string[]).includes(vaultNameOrder);
+
+    setNameOrderMode(hasOverride ? "override" : "global");
+    setNameOrderTemplate(hasOverride ? (isPreset ? vaultNameOrder : CUSTOM_SENTINEL) : NAME_ORDER_PRESETS[0]);
+    setCustomNameOrderTemplate(hasOverride && !isPreset ? vaultNameOrder : "");
+  }, [vaultSettings]);
 
   const { data: personalizeTemplates } = useQuery<PersonalizeItem[]>({
     queryKey: ["settings", "personalize", "templates"],
@@ -89,6 +126,19 @@ export default function VaultSettings() {
     onSuccess: () => {
       message.success(t("common.saved"));
       queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateNameOrderMutation = useMutation({
+    mutationFn: (nextNameOrder: string | undefined) =>
+      api.vaultSettings.settingsNameOrderUpdate(String(vaultId), { name_order: nextNameOrder }),
+    onSuccess: () => {
+      message.success(t("common.saved"));
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId, "settings"] });
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
+      queryClient.invalidateQueries({ queryKey: ["vaults"] });
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -144,10 +194,30 @@ export default function VaultSettings() {
 
   // --- Components for each tab ---
 
+
   const GeneralTab = () => {
     const [form] = Form.useForm();
 
+    const presetLabels: Record<string, string> = {
+      [NAME_ORDER_PRESETS[0]]: t("settings.preferences.name_order_first_last"),
+      [NAME_ORDER_PRESETS[1]]: t("settings.preferences.name_order_last_first"),
+      [NAME_ORDER_PRESETS[2]]: t("settings.preferences.name_order_first_last_nickname"),
+      [NAME_ORDER_PRESETS[3]]: t("settings.preferences.name_order_nickname"),
+    };
+
+    const presetExamples: Record<string, string> = {
+      [NAME_ORDER_PRESETS[0]]: "James Bond",
+      [NAME_ORDER_PRESETS[1]]: "Bond James",
+      [NAME_ORDER_PRESETS[2]]: "James Bond (007)",
+      [NAME_ORDER_PRESETS[3]]: "007",
+    };
+
     if (!vaultSettings) return null;
+
+    const hasNameOrderOverride = vaultSettings.name_order !== null && vaultSettings.name_order !== undefined;
+    const activeNameOrderTemplate = nameOrderTemplate === CUSTOM_SENTINEL ? customNameOrderTemplate : nameOrderTemplate;
+    const canSaveNameOrder = nameOrderMode === "override" && activeNameOrderTemplate.trim().length > 0;
+
 
     return (
       <Space direction="vertical" style={{ width: "100%" }}>
@@ -204,9 +274,108 @@ export default function VaultSettings() {
             ))}
           </Select>
         </Card>
+        <Card title={t("vault_settings.name_order_override_title")}>
+          <Text type="secondary" style={{ display: "block", marginBottom: 24 }}>
+            {t("vault_settings.name_order_override_description")}
+          </Text>
+
+          <Radio.Group
+            value={nameOrderMode}
+            onChange={(e) => setNameOrderMode(e.target.value)}
+            style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}
+          >
+            <Radio value="global">
+              <span style={{ fontWeight: 500 }}>{t("vault_settings.name_order_global")}</span>
+              <div style={{ color: token.colorTextSecondary, fontSize: 13, marginTop: 4 }}>
+                {t("vault_settings.name_order_global_help", { template: nameOrder })}
+              </div>
+            </Radio>
+            <Radio value="override">
+              <span style={{ fontWeight: 500 }}>{t("vault_settings.name_order_override")}</span>
+            </Radio>
+          </Radio.Group>
+
+          {nameOrderMode === "global" && hasNameOrderOverride && (
+            <Button
+              loading={updateNameOrderMutation.isPending}
+              onClick={() => updateNameOrderMutation.mutate(undefined)}
+              style={{ marginBottom: 16 }}
+            >
+              {t("vault_settings.name_order_clear")}
+            </Button>
+          )}
+
+          {nameOrderMode === "override" && (
+            <div style={{ paddingLeft: 24, borderLeft: `2px solid ${token.colorBorder}`, marginLeft: 8 }}>
+              <Radio.Group
+                value={nameOrderTemplate}
+                onChange={(e) => setNameOrderTemplate(e.target.value as string)}
+                style={{ display: "flex", flexDirection: "column", gap: 8 }}
+              >
+                {NAME_ORDER_PRESETS.map((preset) => (
+                  <Radio key={preset} value={preset}>
+                    <span style={{ fontWeight: 500 }}>{presetLabels[preset]}</span>
+                    <Text type="secondary" style={{ marginLeft: 8, fontSize: 13 }}>
+                      — {presetExamples[preset]}
+                    </Text>
+                  </Radio>
+                ))}
+                <Radio value={CUSTOM_SENTINEL}>
+                  <span style={{ fontWeight: 500 }}>
+                    {t("settings.preferences.name_order_custom")}
+                  </span>
+                </Radio>
+              </Radio.Group>
+
+              {nameOrderTemplate === CUSTOM_SENTINEL && (
+                <div style={{ marginTop: 12, paddingLeft: 24 }}>
+                  <Input
+                    value={customNameOrderTemplate}
+                    onChange={(e) => setCustomNameOrderTemplate(e.target.value)}
+                    placeholder="%first_name% %last_name%"
+                    style={{ marginBottom: 8, maxWidth: 400 }}
+                  />
+                  <Text type="secondary" style={{ fontSize: 12, display: "block" }}>
+                    {t("settings.preferences.name_order_custom_help")}
+                  </Text>
+                </div>
+              )}
+
+              <Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 12 }}>
+                {t("vault_settings.name_order_condition_help")}
+              </Text>
+
+              <div style={{ marginTop: 16, padding: "8px 12px", background: token.colorFillQuaternary, borderRadius: token.borderRadius, display: "flex", alignItems: "center", gap: 8, width: "fit-content" }}>
+                <Text type="secondary" style={{ fontSize: 13 }}>{t("settings.preferences.name_order_preview")}:</Text>
+                <Text strong style={{ fontSize: 14 }}>{formatContactName(activeNameOrderTemplate, SAMPLE_CONTACT)}</Text>
+              </div>
+
+              <Space style={{ marginTop: 16 }}>
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  loading={updateNameOrderMutation.isPending}
+                  disabled={!canSaveNameOrder}
+                  onClick={() => updateNameOrderMutation.mutate(activeNameOrderTemplate.trim())}
+                >
+                  {t("vault_settings.name_order_save")}
+                </Button>
+                {hasNameOrderOverride && (
+                  <Button
+                    loading={updateNameOrderMutation.isPending}
+                    onClick={() => updateNameOrderMutation.mutate(undefined)}
+                  >
+                    {t("vault_settings.name_order_clear")}
+                  </Button>
+                )}
+              </Space>
+            </div>
+          )}
+        </Card>
       </Space>
     );
   };
+
 
   const TabsTab = () => {
     if (!vaultSettings) return null;

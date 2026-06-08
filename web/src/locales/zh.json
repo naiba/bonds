@@ -1367,7 +1367,15 @@
       "photos": "照片",
       "skipped": "跳过",
       "errors": "错误"
-    }
+    },
+    "name_order_override_title": "姓名显示顺序",
+    "name_order_override_description": "默认情况下，此保管库使用你的全局姓名显示偏好。你也可以为此保管库设置专用顺序，让联系人姓名在此保管库内保持一致。",
+    "name_order_global": "使用全局偏好",
+    "name_order_global_help": "当前全局模板：{{template}}",
+    "name_order_override": "使用此保管库专用顺序",
+    "name_order_condition_help": "可选片段可以使用条件语法，例如 {nickname? (%nickname%)}。",
+    "name_order_save": "保存覆盖设置",
+    "name_order_clear": "使用全局偏好"
   },
   "backups": {
     "title": "备份管理",

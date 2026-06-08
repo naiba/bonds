@@ -1367,7 +1367,15 @@
       "photos": "Fotos",
       "skipped": "Omitidos",
       "errors": "Errores"
-    }
+    },
+    "name_order_override_title": "Orden de visualización del nombre",
+    "name_order_override_description": "De forma predeterminada, esta bóveda usa tu preferencia global de visualización de nombres. Puedes definir un orden específico para mantener los nombres coherentes dentro de esta bóveda.",
+    "name_order_global": "Usar preferencia global",
+    "name_order_global_help": "Plantilla global actual: {{template}}",
+    "name_order_override": "Usar un orden específico de esta bóveda",
+    "name_order_condition_help": "Los segmentos opcionales pueden usar sintaxis condicional, por ejemplo {nickname? (%nickname%)}.",
+    "name_order_save": "Guardar sobrescritura",
+    "name_order_clear": "Usar preferencia global"
   },
   "backups": {
     "title": "Copias de seguridad",
