@@ -39,7 +39,7 @@ func (h *CalendarHandler) Get(c echo.Context) error {
 	month := services.ParseIntParam(c.QueryParam("month"), 0)
 	year := services.ParseIntParam(c.QueryParam("year"), 0)
 
-	calendar, err := h.calendarService.GetCalendar(vaultID, month, year, middleware.GetLocale(c))
+	calendar, err := h.calendarService.GetCalendar(vaultID, middleware.GetUserID(c), month, year, middleware.GetLocale(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_calendar_data")
 	}
@@ -61,7 +61,7 @@ func (h *CalendarHandler) Get(c echo.Context) error {
 func (h *CalendarHandler) GetICS(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 
-	data, err := h.icsService.ExportVault(vaultID)
+	data, err := h.icsService.ExportVault(vaultID, middleware.GetUserID(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_calendar_data")
 	}

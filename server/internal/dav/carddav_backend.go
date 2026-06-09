@@ -13,6 +13,7 @@ import (
 	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/services"
 	"gorm.io/gorm"
 )
 
@@ -125,9 +126,7 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, _ *c
 	}
 
 	var contact models.Contact
-	if err := b.db.Preload("ContactInformations.ContactInformationType").
-		Preload("Addresses").
-		First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contactID).Error; err != nil {
 		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 	}
 
@@ -155,8 +154,7 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, _ 
 
 	var contacts []models.Contact
 	// Exclude shadow contacts (can_be_deleted=false AND listed=false) — internal UserVault self-contacts
-	if err := b.db.Preload("ContactInformations.ContactInformationType").
-		Preload("Addresses").
+	if err := preloadContactForCardDAV(b.db).
 		Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
@@ -242,7 +240,9 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 				return nil, err
 			}
 
-			b.db.Preload("ContactInformations.ContactInformationType").First(&contact, "id = ?", contact.ID)
+			if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
+				return nil, err
+			}
 			return contactToAddressObject(&contact, userID), nil
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -275,7 +275,9 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 		return nil, err
 	}
 
-	b.db.Preload("ContactInformations.ContactInformationType").First(&contact, "id = ?", contact.ID)
+	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
+		return nil, err
+	}
 	return contactToAddressObject(&contact, userID), nil
 }
 
@@ -316,7 +318,7 @@ func (b *CardDAVBackend) verifyVaultAccess(userID, vaultID string) error {
 
 // contactToAddressObject converts a Contact model to a CardDAV AddressObject.
 func contactToAddressObject(c *models.Contact, userID string) *carddav.AddressObject {
-	card := contactToVCard(c)
+	card := services.BuildContactVCard(c)
 	return &carddav.AddressObject{
 		Path:    "/dav/addressbooks/" + userID + "/" + c.VaultID + "/" + c.ID + ".vcf",
 		ModTime: c.UpdatedAt,
@@ -325,75 +327,11 @@ func contactToAddressObject(c *models.Contact, userID string) *carddav.AddressOb
 	}
 }
 
-// contactToVCard builds a vCard from a Contact model.
-func contactToVCard(c *models.Contact) vcard.Card {
-	card := make(vcard.Card)
-	card.SetValue(vcard.FieldVersion, "3.0")
-
-	firstName := ptrToStr(c.FirstName)
-	lastName := ptrToStr(c.LastName)
-
-	card.SetName(&vcard.Name{
-		FamilyName: lastName,
-		GivenName:  firstName,
-	})
-
-	fn := buildFullName(firstName, lastName)
-	if fn == "" {
-		fn = "Unknown"
-	}
-	card.SetValue(vcard.FieldFormattedName, fn)
-
-	if c.Nickname != nil && *c.Nickname != "" {
-		card.SetValue(vcard.FieldNickname, *c.Nickname)
-	}
-
-	if c.Prefix != nil && *c.Prefix != "" {
-		name := card.Name()
-		if name != nil {
-			name.HonorificPrefix = *c.Prefix
-			card.SetName(name)
-		}
-	}
-
-	if c.Suffix != nil && *c.Suffix != "" {
-		name := card.Name()
-		if name != nil {
-			name.HonorificSuffix = *c.Suffix
-			card.SetName(name)
-		}
-	}
-
-	// Map contact information (email, phone)
-	for _, info := range c.ContactInformations {
-		typeName := ptrToStr(info.ContactInformationType.Type)
-		switch typeName {
-		case "phone":
-			card.Add(vcard.FieldTelephone, &vcard.Field{
-				Value:  info.Data,
-				Params: vcard.Params{vcard.ParamType: {"VOICE"}},
-			})
-		case "email":
-			card.Add(vcard.FieldEmail, &vcard.Field{
-				Value:  info.Data,
-				Params: vcard.Params{vcard.ParamType: {"INTERNET"}},
-			})
-		}
-	}
-
-	for _, addr := range c.Addresses {
-		card.AddAddress(&vcard.Address{
-			StreetAddress: ptrToStr(addr.Line1),
-			Locality:      ptrToStr(addr.City),
-			Region:        ptrToStr(addr.Province),
-			PostalCode:    ptrToStr(addr.PostalCode),
-			Country:       ptrToStr(addr.Country),
-		})
-	}
-
-	card.SetValue("UID", c.ID)
-
-	return card
+func preloadContactForCardDAV(db *gorm.DB) *gorm.DB {
+	return db.Preload("ContactInformations.ContactInformationType").
+		Preload("Addresses").
+		Preload("ImportantDates.ContactImportantDateType").
+		Preload("File")
 }
 
 // extractNameFromCard extracts first name and last name from a vCard.

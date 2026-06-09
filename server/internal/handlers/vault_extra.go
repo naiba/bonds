@@ -64,7 +64,7 @@ func (h *CalendarHandler) GetMonth(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_month", nil)
 	}
-	calendar, err := h.calendarService.GetCalendarMonth(vaultID, year, month)
+	calendar, err := h.calendarService.GetCalendarMonth(vaultID, middleware.GetUserID(c), year, month, middleware.GetLocale(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_calendar_data")
 	}
@@ -100,7 +100,7 @@ func (h *CalendarHandler) GetDay(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_day", nil)
 	}
-	calendar, err := h.calendarService.GetCalendarDay(vaultID, year, month, day)
+	calendar, err := h.calendarService.GetCalendarDay(vaultID, middleware.GetUserID(c), year, month, day, middleware.GetLocale(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_calendar_data")
 	}

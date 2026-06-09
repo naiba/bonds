@@ -20,7 +20,7 @@ func TestGetCalendarMonth(t *testing.T) {
 	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 
 	calSvc := NewCalendarService(db)
-	result, err := calSvc.GetCalendarMonth(vault.ID, 2025, 6)
+	result, err := calSvc.GetCalendarMonth(vault.ID, resp.User.ID, 2025, 6, "en")
 	if err != nil {
 		t.Fatalf("GetCalendarMonth failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestGetCalendarDay(t *testing.T) {
 	vault, _ := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
 
 	calSvc := NewCalendarService(db)
-	result, err := calSvc.GetCalendarDay(vault.ID, 2025, 6, 15)
+	result, err := calSvc.GetCalendarDay(vault.ID, resp.User.ID, 2025, 6, 15, "en")
 	if err != nil {
 		t.Fatalf("GetCalendarDay failed: %v", err)
 	}

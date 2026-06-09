@@ -26,52 +26,19 @@ func NewVCardService(db *gorm.DB) *VCardService {
 }
 
 func (s *VCardService) ExportContactToVCard(contactID, vaultID string) (vcard.Card, error) {
-	var contact models.Contact
-	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
-		return nil, ErrContactNotFound
+	contact, err := s.loadContactForVCard(contactID, vaultID)
+	if err != nil {
+		return nil, err
 	}
-
-	var contactInfos []models.ContactInformation
-	s.db.Preload("ContactInformationType").Where("contact_id = ?", contactID).Find(&contactInfos)
-
-	var addresses []models.Address
-	var pivots []models.ContactAddress
-	s.db.Where("contact_id = ?", contactID).Find(&pivots)
-	if len(pivots) > 0 {
-		addressIDs := make([]uint, len(pivots))
-		for i, p := range pivots {
-			addressIDs[i] = p.AddressID
-		}
-		s.db.Where("id IN ?", addressIDs).Find(&addresses)
-	}
-
-	return buildVCard(&contact, contactInfos, addresses), nil
+	return BuildContactVCard(contact), nil
 }
 
 func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, error) {
-	var contact models.Contact
-	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrContactNotFound
-		}
+	contact, err := s.loadContactForVCard(contactID, vaultID)
+	if err != nil {
 		return nil, err
 	}
-
-	var contactInfos []models.ContactInformation
-	s.db.Preload("ContactInformationType").Where("contact_id = ?", contactID).Find(&contactInfos)
-
-	var addresses []models.Address
-	var pivots []models.ContactAddress
-	s.db.Where("contact_id = ?", contactID).Find(&pivots)
-	if len(pivots) > 0 {
-		addressIDs := make([]uint, len(pivots))
-		for i, p := range pivots {
-			addressIDs[i] = p.AddressID
-		}
-		s.db.Where("id IN ?", addressIDs).Find(&addresses)
-	}
-
-	card := buildVCard(&contact, contactInfos, addresses)
+	card := BuildContactVCard(contact)
 
 	var buf bytes.Buffer
 	enc := vcard.NewEncoder(&buf)
@@ -84,7 +51,7 @@ func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, 
 func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 	var contacts []models.Contact
 	// Exclude shadow contacts (Listed=false) — they are UserVault self-contacts, not real contacts
-	if err := s.db.Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
+	if err := preloadContactVCardRelations(s.db).Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 
@@ -92,27 +59,31 @@ func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 	enc := vcard.NewEncoder(&buf)
 
 	for _, contact := range contacts {
-		var contactInfos []models.ContactInformation
-		s.db.Preload("ContactInformationType").Where("contact_id = ?", contact.ID).Find(&contactInfos)
-
-		var addresses []models.Address
-		var pivots []models.ContactAddress
-		s.db.Where("contact_id = ?", contact.ID).Find(&pivots)
-		if len(pivots) > 0 {
-			addressIDs := make([]uint, len(pivots))
-			for i, p := range pivots {
-				addressIDs[i] = p.AddressID
-			}
-			s.db.Where("id IN ?", addressIDs).Find(&addresses)
-		}
-
-		card := buildVCard(&contact, contactInfos, addresses)
+		card := BuildContactVCard(&contact)
 		if err := enc.Encode(card); err != nil {
 			return nil, fmt.Errorf("failed to encode vcard for contact %s: %w", contact.ID, err)
 		}
 	}
 
 	return buf.Bytes(), nil
+}
+
+func (s *VCardService) loadContactForVCard(contactID, vaultID string) (*models.Contact, error) {
+	var contact models.Contact
+	if err := preloadContactVCardRelations(s.db).Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrContactNotFound
+		}
+		return nil, err
+	}
+	return &contact, nil
+}
+
+func preloadContactVCardRelations(db *gorm.DB) *gorm.DB {
+	return db.Preload("ContactInformations.ContactInformationType").
+		Preload("Addresses").
+		Preload("ImportantDates.ContactImportantDateType").
+		Preload("File")
 }
 
 func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto.VCardImportResponse, error) {
@@ -317,9 +288,11 @@ func parseBirthdayString(bday string) (year, month, day int) {
 	return 0, 0, 0
 }
 
-func buildVCard(contact *models.Contact, infos []models.ContactInformation, addresses []models.Address) vcard.Card {
+// BuildContactVCard builds the canonical vCard 4.0 representation for a contact.
+func BuildContactVCard(contact *models.Contact) vcard.Card {
 	card := make(vcard.Card)
-	card.SetValue(vcard.FieldVersion, "3.0")
+	card.SetValue(vcard.FieldVersion, "4.0")
+	card.SetKind(vcard.KindIndividual)
 
 	firstName := ptrToStr(contact.FirstName)
 	lastName := ptrToStr(contact.LastName)
@@ -334,29 +307,59 @@ func buildVCard(contact *models.Contact, infos []models.ContactInformation, addr
 		HonorificPrefix: prefix,
 		HonorificSuffix: suffix,
 	})
-	card.SetValue(vcard.FieldFormattedName, buildFullName(firstName, lastName))
+	formattedName := buildVCardFormattedName(prefix, firstName, middleName, lastName, suffix)
+	if formattedName == "" {
+		formattedName = "Unknown"
+	}
+	card.SetValue(vcard.FieldFormattedName, formattedName)
 
 	if contact.Nickname != nil && *contact.Nickname != "" {
 		card.SetValue(vcard.FieldNickname, *contact.Nickname)
 	}
+	if contact.JobPosition != nil && *contact.JobPosition != "" {
+		card.SetValue(vcard.FieldTitle, *contact.JobPosition)
+	}
+	if contact.Description != nil && *contact.Description != "" {
+		card.SetValue(vcard.FieldNote, *contact.Description)
+	}
+	if contact.ID != "" {
+		card.SetValue(vcard.FieldUID, contact.ID)
+	}
+	if !contact.UpdatedAt.IsZero() {
+		card.SetRevision(contact.UpdatedAt.UTC())
+	}
+	if birthday := contactBirthdayVCardValue(contact.ImportantDates); birthday != "" {
+		card.SetValue(vcard.FieldBirthday, birthday)
+	}
+	if photoURL, mediaType := contactPhotoVCardValue(contact.File); photoURL != "" {
+		params := vcard.Params{}
+		if mediaType != "" {
+			params.Set(vcard.ParamMediaType, mediaType)
+		}
+		card.Set(vcard.FieldPhoto, &vcard.Field{Value: photoURL, Params: params})
+	}
 
-	for _, info := range infos {
+	for _, info := range contact.ContactInformations {
 		typeName := ptrToStr(info.ContactInformationType.Type)
 		switch typeName {
 		case "phone":
+			params := contactInformationParams(&info)
+			params.Add(vcard.ParamType, vcard.TypeVoice)
 			card.Add(vcard.FieldTelephone, &vcard.Field{
 				Value:  info.Data,
-				Params: vcard.Params{vcard.ParamType: {"VOICE"}},
+				Params: params,
 			})
 		case "email":
 			card.Add(vcard.FieldEmail, &vcard.Field{
 				Value:  info.Data,
-				Params: vcard.Params{vcard.ParamType: {"INTERNET"}},
+				Params: contactInformationParams(&info),
 			})
+		case "social":
+			addSocialVCardFields(card, &info)
 		}
 	}
 
-	for _, addr := range addresses {
+	for _, addr := range contact.Addresses {
 		card.AddAddress(&vcard.Address{
 			StreetAddress: ptrToStr(addr.Line1),
 			Locality:      ptrToStr(addr.City),
@@ -367,6 +370,114 @@ func buildVCard(contact *models.Contact, infos []models.ContactInformation, addr
 	}
 
 	return card
+}
+
+const vcardFieldSocialProfile = "X-SOCIALPROFILE"
+
+func contactInformationParams(info *models.ContactInformation) vcard.Params {
+	params := vcard.Params{}
+	if info.Kind != nil && strings.TrimSpace(*info.Kind) != "" {
+		params.Add(vcard.ParamType, strings.ToLower(strings.TrimSpace(*info.Kind)))
+	}
+	if info.Pref {
+		params.Set(vcard.ParamPreferred, "1")
+	}
+	return params
+}
+
+func addSocialVCardFields(card vcard.Card, info *models.ContactInformation) {
+	if strings.TrimSpace(info.Data) == "" {
+		return
+	}
+	platform := contactInformationPlatform(info.ContactInformationType)
+	params := contactInformationParams(info)
+	if platform != "" {
+		params.Add(vcard.ParamType, platform)
+	}
+
+	card.Add(vcardFieldSocialProfile, &vcard.Field{Value: info.Data, Params: params})
+	if isVCardURI(info.Data) {
+		card.Add(vcard.FieldIMPP, &vcard.Field{Value: info.Data, Params: params})
+	}
+	if isWebURL(info.Data) {
+		card.Add(vcard.FieldURL, &vcard.Field{Value: info.Data, Params: params})
+	}
+}
+
+func contactInformationPlatform(infoType models.ContactInformationType) string {
+	if infoType.NameTranslationKey != nil {
+		parts := strings.Split(*infoType.NameTranslationKey, ".")
+		return normalizeVCardToken(parts[len(parts)-1])
+	}
+	return normalizeVCardToken(ptrToStr(infoType.Name))
+}
+
+func normalizeVCardToken(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	var b strings.Builder
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func isWebURL(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	return strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "https://")
+}
+
+func isVCardURI(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, " \t\r\n") {
+		return false
+	}
+	colon := strings.Index(value, ":")
+	return colon > 0
+}
+
+func contactPhotoVCardValue(file *models.File) (string, string) {
+	if file == nil || file.ID == 0 {
+		return "", ""
+	}
+	for _, candidate := range []string{ptrToStr(file.CdnURL), ptrToStr(file.OriginalURL)} {
+		if isWebURL(candidate) || strings.HasPrefix(strings.ToLower(candidate), "data:") {
+			return candidate, file.MimeType
+		}
+	}
+	return "", ""
+}
+
+func contactBirthdayVCardValue(dates []models.ContactImportantDate) string {
+	for _, date := range dates {
+		if !isBirthdateImportantDate(&date) || date.Month == nil || date.Day == nil {
+			continue
+		}
+		if date.Year != nil {
+			return fmt.Sprintf("%04d-%02d-%02d", *date.Year, *date.Month, *date.Day)
+		}
+		return fmt.Sprintf("--%02d-%02d", *date.Month, *date.Day)
+	}
+	return ""
+}
+
+func isBirthdateImportantDate(date *models.ContactImportantDate) bool {
+	if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil {
+		return *date.ContactImportantDateType.InternalType == "birthdate"
+	}
+	return strings.EqualFold(date.Label, "Birthdate") || strings.EqualFold(date.Label, "Birthday")
+}
+
+func buildVCardFormattedName(prefix, firstName, middleName, lastName, suffix string) string {
+	parts := []string{prefix, firstName, middleName, lastName, suffix}
+	filled := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if strings.TrimSpace(part) != "" {
+			filled = append(filled, strings.TrimSpace(part))
+		}
+	}
+	return strings.Join(filled, " ")
 }
 
 type vcardNameComponents struct {

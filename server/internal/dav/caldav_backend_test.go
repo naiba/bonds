@@ -132,7 +132,7 @@ func TestListCalendarObjects(t *testing.T) {
 		}
 		for _, child := range obj.Data.Children {
 			summary, _ := child.Props.Text(ical.PropSummary)
-			if summary == "Birthday" {
+			if summary == "John Doe - Birthday" {
 				foundBirthday = true
 				// Check RRULE exists (birthday has year set)
 				rrule := child.Props.Get(ical.PropRecurrenceRule)
@@ -183,8 +183,8 @@ func TestGetCalendarObject(t *testing.T) {
 		if child.Name == ical.CompEvent {
 			foundEvent = true
 			summary, _ := child.Props.Text(ical.PropSummary)
-			if summary != "Anniversary" {
-				t.Errorf("Expected summary 'Anniversary', got '%s'", summary)
+			if summary != "Jane Doe - Anniversary" {
+				t.Errorf("Expected summary 'Jane Doe - Anniversary', got '%s'", summary)
 			}
 			gotUID, _ := child.Props.Text(ical.PropUID)
 			if gotUID != uid {
@@ -482,7 +482,7 @@ func TestListCalendarObjectsLunarDate(t *testing.T) {
 		}
 		for _, child := range obj.Data.Children {
 			summary, _ := child.Props.Text(ical.PropSummary)
-			if summary == "Lunar Birthday" {
+			if summary == "Lunar Person - Lunar Birthday" {
 				foundLunar = true
 				desc, _ := child.Props.Text(ical.PropDescription)
 				if desc == "" {
@@ -495,7 +495,7 @@ func TestListCalendarObjectsLunarDate(t *testing.T) {
 		}
 	}
 	if !foundLunar {
-		t.Error("Expected to find 'Lunar Birthday' event")
+		t.Error("Expected to find 'Lunar Person - Lunar Birthday' event")
 	}
 }
 

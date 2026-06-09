@@ -62,14 +62,14 @@ func TestLunarImportantDateEmitsRDateNotRRule(t *testing.T) {
 		}
 		for i, child := range obj.Data.Children {
 			summary, _ := child.Props.Text(ical.PropSummary)
-			if summary == "Lunar Birthday" {
+			if summary == "Mid Autumn - Lunar Birthday" {
 				lunarEvent = obj.Data.Children[i]
 				break
 			}
 		}
 	}
 	if lunarEvent == nil {
-		t.Fatal("did not find Lunar Birthday VEVENT")
+		t.Fatal("did not find Mid Autumn - Lunar Birthday VEVENT")
 	}
 
 	if rrule := lunarEvent.Props.Get(ical.PropRecurrenceRule); rrule != nil {
@@ -177,7 +177,7 @@ func TestGregorianImportantDateKeepsRRule(t *testing.T) {
 		}
 		for i, child := range obj.Data.Children {
 			summary, _ := child.Props.Text(ical.PropSummary)
-			if summary == "Gregorian Birthday" {
+			if summary == "Greg Birthday - Gregorian Birthday" {
 				event = obj.Data.Children[i]
 				break
 			}

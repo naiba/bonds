@@ -84,7 +84,7 @@ func TestExportVaultICS(t *testing.T) {
 	}
 
 	svc := NewCalendarICSService(db)
-	data, err := svc.ExportVault(vault.ID)
+	data, err := svc.ExportVault(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ExportVault failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestExportVaultICSImportantDateSummaryIncludesContactName(t *testing.T) {
 	}
 
 	svc := NewCalendarICSService(db)
-	data, err := svc.ExportVault(vault.ID)
+	data, err := svc.ExportVault(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ExportVault failed: %v", err)
 	}
@@ -156,6 +156,65 @@ func TestExportVaultICSImportantDateSummaryIncludesContactName(t *testing.T) {
 	}
 	if strings.Contains(out, "SUMMARY:Birthdate\r\n") {
 		t.Fatalf("expected no standalone important date summary\n---\n%s", out)
+	}
+}
+
+func TestExportVaultICSUsesVaultNameOrderOverride(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Ical",
+		LastName:  "Override",
+		Email:     "ical-name-order@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Name Order Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	override := "%last_name%, %first_name% {nickname? (%nickname%)}"
+	if err := db.Model(&models.Vault{}).Where("id = ?", vault.ID).Update("name_order", override).Error; err != nil {
+		t.Fatalf("update vault name order failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{
+		FirstName: "Jane",
+		LastName:  "Doe",
+		Nickname:  "JD",
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	day, month, year := 15, 3, 2025
+	if err := db.Create(&models.ContactImportantDate{
+		ContactID: contact.ID,
+		Label:     "Birthdate",
+		Day:       &day,
+		Month:     &month,
+		Year:      &year,
+	}).Error; err != nil {
+		t.Fatalf("create important date failed: %v", err)
+	}
+
+	svc := NewCalendarICSService(db)
+	data, err := svc.ExportVault(vault.ID, resp.User.ID)
+	if err != nil {
+		t.Fatalf("ExportVault failed: %v", err)
+	}
+	out := string(data)
+
+	if !strings.Contains(out, "SUMMARY:Doe\\, Jane (JD) - Birthdate") {
+		t.Fatalf("expected important date summary to use vault name_order override\n---\n%s", out)
 	}
 }
 
@@ -180,7 +239,7 @@ func TestExportVaultICSEmpty(t *testing.T) {
 	}
 
 	svc := NewCalendarICSService(db)
-	data, err := svc.ExportVault(vault.ID)
+	data, err := svc.ExportVault(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ExportVault failed: %v", err)
 	}

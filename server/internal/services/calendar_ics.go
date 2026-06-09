@@ -24,7 +24,12 @@ func NewCalendarICSService(db *gorm.DB) *CalendarICSService {
 
 // ExportVault renders every dated item in a vault — important dates, reminders,
 // tasks and life events — into a single read-only iCalendar feed.
-func (s *CalendarICSService) ExportVault(vaultID string) ([]byte, error) {
+func (s *CalendarICSService) ExportVault(vaultID, userID string) ([]byte, error) {
+	nameOrder, err := GetEffectiveVaultNameOrder(s.db, vaultID, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	cal := ical.NewCalendar()
 	cal.Props.SetText(ical.PropProductID, "-//Bonds//Calendar Feed//EN")
 	cal.Props.SetText(ical.PropVersion, "2.0")
@@ -32,14 +37,16 @@ func (s *CalendarICSService) ExportVault(vaultID string) ([]byte, error) {
 	cal.Props.SetText("X-WR-CALNAME", "Bonds")
 
 	var contacts []models.Contact
-	if err := s.db.Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).
+		Select("id, first_name, middle_name, last_name, nickname, maiden_name, prefix, suffix").
+		Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 	contactIDs := make([]string, len(contacts))
 	contactNames := make(map[string]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
-		contactNames[c.ID] = utils.BuildContactName(&contacts[i])
+		contactNames[c.ID] = utils.FormatContactName(nameOrder, &contacts[i], "")
 	}
 
 	if len(contactIDs) > 0 {

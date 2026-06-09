@@ -80,3 +80,40 @@ func TestBuildContactName(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatContactName(t *testing.T) {
+	contact := &models.Contact{
+		FirstName:  strPtr("James"),
+		MiddleName: strPtr("Herbert"),
+		LastName:   strPtr("Bond"),
+		Nickname:   strPtr("007"),
+		MaidenName: strPtr("Muller"),
+		Prefix:     strPtr("Dr."),
+		Suffix:     strPtr("III"),
+	}
+
+	tests := []struct {
+		name     string
+		template string
+		contact  *models.Contact
+		fallback string
+		expected string
+	}{
+		{"first last", "%first_name% %last_name%", contact, "Unknown", "Dr. James Bond III"},
+		{"last first", "%last_name%, %first_name%", contact, "Unknown", "Dr. Bond, James III"},
+		{"conditional present", "%first_name% %last_name% {nickname? (%nickname%)}", contact, "Unknown", "Dr. James Bond (007) III"},
+		{"conditional absent", "%first_name% %last_name% {nickname? (%nickname%)}", &models.Contact{FirstName: strPtr("Jane"), LastName: strPtr("Doe")}, "Unknown", "Jane Doe"},
+		{"empty parentheses removed", "%first_name% %last_name% (%nickname%)", &models.Contact{FirstName: strPtr("Jane"), LastName: strPtr("Doe")}, "Unknown", "Jane Doe"},
+		{"maiden name", "%first_name% (%maiden_name%) %last_name%", contact, "Unknown", "Dr. James (Muller) Bond III"},
+		{"fallback", "%first_name%", &models.Contact{}, "Unknown", "Unknown"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FormatContactName(tt.template, tt.contact, tt.fallback)
+			if got != tt.expected {
+				t.Errorf("FormatContactName() = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}

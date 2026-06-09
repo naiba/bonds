@@ -70,6 +70,11 @@ func createTestContact(t *testing.T, db *gorm.DB, vaultID, userID, firstName, la
 	return &contact
 }
 
+func mustDecodeAddressObjectCard(t *testing.T, obj carddav.AddressObject) vcard.Card {
+	t.Helper()
+	return obj.Card
+}
+
 // Verify the CardDAVBackend implements the carddav.Backend interface at compile time.
 var _ carddav.Backend = (*CardDAVBackend)(nil)
 
@@ -105,7 +110,57 @@ func TestListAddressObjects(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
 
 	createTestContact(t, db, vaultID, userID, "Alice", "Smith")
-	createTestContact(t, db, vaultID, userID, "Bob", "Jones")
+	bob := createTestContact(t, db, vaultID, userID, "Bob", "Jones")
+
+	var vault models.Vault
+	if err := db.First(&vault, "id = ?", vaultID).Error; err != nil {
+		t.Fatalf("load vault: %v", err)
+	}
+	var phoneType models.ContactInformationType
+	if err := db.Where("account_id = ? AND type = ?", vault.AccountID, "phone").First(&phoneType).Error; err != nil {
+		t.Fatalf("load phone type: %v", err)
+	}
+	var socialType models.ContactInformationType
+	if err := db.Where("account_id = ? AND type = ?", vault.AccountID, "social").First(&socialType).Error; err != nil {
+		t.Fatalf("load social type: %v", err)
+	}
+	var birthdateType models.ContactImportantDateType
+	if err := db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("load birthdate type: %v", err)
+	}
+	phoneValue := "+1-555-2222"
+	socialValue := "https://twitter.com/bob_jones"
+	photoURL := "https://example.com/bob.jpg"
+	if err := db.Create(&models.ContactInformation{ContactID: bob.ID, TypeID: phoneType.ID, Data: phoneValue}).Error; err != nil {
+		t.Fatalf("create phone info: %v", err)
+	}
+	if err := db.Create(&models.ContactInformation{ContactID: bob.ID, TypeID: socialType.ID, Data: socialValue}).Error; err != nil {
+		t.Fatalf("create social info: %v", err)
+	}
+	if err := db.Create(&models.ContactImportantDate{
+		ContactID:                  bob.ID,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		Label:                      "Birthdate",
+		Day:                        intPtr(2),
+		Month:                      intPtr(3),
+		Year:                       intPtr(1988),
+	}).Error; err != nil {
+		t.Fatalf("create birthday: %v", err)
+	}
+	if err := db.Create(&models.File{VaultID: vaultID, UUID: "bob-photo", OriginalURL: &photoURL, MimeType: "image/jpeg", Name: "bob.jpg", Type: "image", Size: 2345}).Error; err != nil {
+		t.Fatalf("create photo: %v", err)
+	}
+	var storedPhoto models.File
+	if err := db.Where("uuid = ?", "bob-photo").First(&storedPhoto).Error; err != nil {
+		t.Fatalf("reload photo: %v", err)
+	}
+	if err := db.Model(&models.Contact{}).Where("id = ?", bob.ID).Updates(map[string]any{
+		"file_id":      storedPhoto.ID,
+		"job_position": "Architect",
+		"description":  "Long-time friend",
+	}).Error; err != nil {
+		t.Fatalf("update bob contact: %v", err)
+	}
 
 	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/"
 	objects, err := backend.ListAddressObjects(ctx, path, &carddav.AddressDataRequest{AllProp: true})
@@ -120,12 +175,46 @@ func TestListAddressObjects(t *testing.T) {
 	foundAlice := false
 	foundBob := false
 	for _, obj := range objects {
-		fn := obj.Card.Value(vcard.FieldFormattedName)
+		card := mustDecodeAddressObjectCard(t, obj)
+		if card.Value(vcard.FieldVersion) != "4.0" {
+			t.Fatalf("expected VERSION 4.0, got %q", card.Value(vcard.FieldVersion))
+		}
+		if card.Kind() != vcard.KindIndividual {
+			t.Fatalf("expected KIND individual, got %q", card.Kind())
+		}
+		if card.Value(vcard.FieldUID) == "" {
+			t.Fatal("expected UID to be set")
+		}
+		fn := card.Value(vcard.FieldFormattedName)
 		if fn == "Alice Smith" {
 			foundAlice = true
 		}
 		if fn == "Bob Jones" {
 			foundBob = true
+			if card.Value(vcard.FieldTitle) != "Architect" {
+				t.Fatalf("expected TITLE Architect, got %q", card.Value(vcard.FieldTitle))
+			}
+			if card.Value(vcard.FieldNote) != "Long-time friend" {
+				t.Fatalf("expected NOTE Long-time friend, got %q", card.Value(vcard.FieldNote))
+			}
+			if card.Value(vcard.FieldBirthday) != "1988-03-02" {
+				t.Fatalf("expected BDAY 1988-03-02, got %q", card.Value(vcard.FieldBirthday))
+			}
+			if card.Value(vcard.FieldTelephone) != phoneValue {
+				t.Fatalf("expected TEL %q, got %q", phoneValue, card.Value(vcard.FieldTelephone))
+			}
+			if card.Value(vcard.FieldIMPP) != socialValue {
+				t.Fatalf("expected IMPP %q, got %q", socialValue, card.Value(vcard.FieldIMPP))
+			}
+			if card.Value(vcard.FieldURL) != socialValue {
+				t.Fatalf("expected URL %q, got %q", socialValue, card.Value(vcard.FieldURL))
+			}
+			if got := card["X-SOCIALPROFILE"]; len(got) != 1 || got[0].Value != socialValue {
+				t.Fatalf("expected X-SOCIALPROFILE %q, got %#v", socialValue, got)
+			}
+			if card.Value(vcard.FieldPhoto) != photoURL {
+				t.Fatalf("expected PHOTO %q, got %q", photoURL, card.Value(vcard.FieldPhoto))
+			}
 		}
 		if obj.ETag == "" {
 			t.Error("Expected non-empty ETag")
@@ -146,18 +235,54 @@ func TestGetAddressObject(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
 
 	contact := createTestContact(t, db, vaultID, userID, "Charlie", "Brown")
+	var vault models.Vault
+	if err := db.First(&vault, "id = ?", vaultID).Error; err != nil {
+		t.Fatalf("load vault: %v", err)
+	}
+	var emailType models.ContactInformationType
+	if err := db.Where("account_id = ? AND type = ?", vault.AccountID, "email").First(&emailType).Error; err != nil {
+		t.Fatalf("load email type: %v", err)
+	}
+	if err := db.Create(&models.ContactInformation{ContactID: contact.ID, TypeID: emailType.ID, Data: "charlie@example.com"}).Error; err != nil {
+		t.Fatalf("create email: %v", err)
+	}
+	if err := db.Model(&models.Contact{}).Where("id = ?", contact.ID).Updates(map[string]any{
+		"job_position": "Engineer",
+		"description":  "Enjoys hiking",
+	}).Error; err != nil {
+		t.Fatalf("update contact: %v", err)
+	}
 
 	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/" + contact.ID + ".vcf"
 	obj, err := backend.GetAddressObject(ctx, path, &carddav.AddressDataRequest{AllProp: true})
 	if err != nil {
 		t.Fatalf("GetAddressObject failed: %v", err)
 	}
-	fn := obj.Card.Value(vcard.FieldFormattedName)
+	card := mustDecodeAddressObjectCard(t, *obj)
+	if got := card.Value(vcard.FieldVersion); got != "4.0" {
+		t.Fatalf("expected VERSION 4.0, got %q", got)
+	}
+	if card.Kind() != vcard.KindIndividual {
+		t.Fatalf("expected KIND individual, got %q", card.Kind())
+	}
+	if got := card.Value(vcard.FieldUID); got != contact.ID {
+		t.Fatalf("expected UID %q, got %q", contact.ID, got)
+	}
+	if got := card.Value(vcard.FieldTitle); got != "Engineer" {
+		t.Fatalf("expected TITLE Engineer, got %q", got)
+	}
+	if got := card.Value(vcard.FieldNote); got != "Enjoys hiking" {
+		t.Fatalf("expected NOTE Enjoys hiking, got %q", got)
+	}
+	if got := card.Value(vcard.FieldEmail); got != "charlie@example.com" {
+		t.Fatalf("expected EMAIL charlie@example.com, got %q", got)
+	}
+	fn := card.Value(vcard.FieldFormattedName)
 	if fn != "Charlie Brown" {
 		t.Errorf("Expected FN 'Charlie Brown', got '%s'", fn)
 	}
 
-	name := obj.Card.Name()
+	name := card.Name()
 	if name == nil {
 		t.Fatal("Expected N field to be set")
 	}
@@ -173,7 +298,7 @@ func TestPutAddressObject(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
 
 	card := make(vcard.Card)
-	card.SetValue(vcard.FieldVersion, "3.0")
+	card.SetValue(vcard.FieldVersion, "4.0")
 	card.SetValue(vcard.FieldFormattedName, "Dave Wilson")
 	card.SetName(&vcard.Name{
 		GivenName:  "Dave",
@@ -223,7 +348,7 @@ func TestPutAddressObjectRejectsExistingContactFromDifferentVault(t *testing.T) 
 	contact := createTestContact(t, db, sourceVaultID, userID, "Alice", "Original")
 
 	card := make(vcard.Card)
-	card.SetValue(vcard.FieldVersion, "3.0")
+	card.SetValue(vcard.FieldVersion, "4.0")
 	card.SetValue(vcard.FieldFormattedName, "Mallory Overwrite")
 	card.SetName(&vcard.Name{
 		GivenName:  "Mallory",
@@ -311,6 +436,10 @@ func TestQueryAddressObjects(t *testing.T) {
 	if len(objects) != 1 {
 		t.Fatalf("Expected 1 filtered object, got %d", len(objects))
 	}
+}
+
+func intPtr(value int) *int {
+	return &value
 }
 
 func TestCurrentUserPrincipal(t *testing.T) {

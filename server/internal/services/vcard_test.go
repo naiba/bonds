@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/emersion/go-vcard"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
@@ -52,21 +53,21 @@ func TestExportContact(t *testing.T) {
 		t.Fatalf("ExportContact failed: %v", err)
 	}
 
-	vcardStr := string(data)
-	if !strings.Contains(vcardStr, "BEGIN:VCARD") {
-		t.Error("Expected vCard to contain BEGIN:VCARD")
+	card := mustDecodeVCard(t, data)
+	if got := card.Value(vcard.FieldVersion); got != "4.0" {
+		t.Fatalf("expected VERSION 4.0, got %q", got)
 	}
-	if !strings.Contains(vcardStr, "END:VCARD") {
-		t.Error("Expected vCard to contain END:VCARD")
+	if got := card.Kind(); got != vcard.KindIndividual {
+		t.Fatalf("expected KIND individual, got %q", got)
 	}
-	if !strings.Contains(vcardStr, "John") {
-		t.Error("Expected vCard to contain first name 'John'")
+	if got := card.Value(vcard.FieldUID); got != contactID {
+		t.Fatalf("expected UID %q, got %q", contactID, got)
 	}
-	if !strings.Contains(vcardStr, "Doe") {
-		t.Error("Expected vCard to contain last name 'Doe'")
+	if got := card.Value(vcard.FieldFormattedName); got != "John Doe" {
+		t.Fatalf("expected FN John Doe, got %q", got)
 	}
-	if !strings.Contains(vcardStr, "JD") {
-		t.Error("Expected vCard to contain nickname 'JD'")
+	if got := card.Value(vcard.FieldNickname); got != "JD" {
+		t.Fatalf("expected nickname JD, got %q", got)
 	}
 }
 
@@ -329,29 +330,129 @@ func TestExportContactWithContactInfo(t *testing.T) {
 	var emailType models.ContactInformationType
 	svc.db.Where("account_id = ? AND type = ?", vault.AccountID, "email").First(&emailType)
 
+	var socialType models.ContactInformationType
+	svc.db.Where("account_id = ? AND type = ?", vault.AccountID, "social").First(&socialType)
+
 	svc.db.Create(&models.ContactInformation{ContactID: contactID, TypeID: phoneType.ID, Data: "+1-555-9999"})
 	svc.db.Create(&models.ContactInformation{ContactID: contactID, TypeID: emailType.ID, Data: "john@example.com"})
+	svc.db.Create(&models.ContactInformation{ContactID: contactID, TypeID: socialType.ID, Data: "https://twitter.com/john_doe"})
+
+	var birthdateType models.ContactImportantDateType
+	svc.db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&birthdateType)
+	svc.db.Create(&models.ContactImportantDate{
+		ContactID:                  contactID,
+		ContactImportantDateTypeID: &birthdateType.ID,
+		Label:                      "Birthdate",
+		Day:                        intPtr(15),
+		Month:                      intPtr(1),
+		Year:                       intPtr(1990),
+	})
 
 	addr := models.Address{VaultID: vaultID, Line1: strPtrOrNil("456 Oak Ave"), City: strPtrOrNil("Chicago"), Province: strPtrOrNil("IL"), PostalCode: strPtrOrNil("60601"), Country: strPtrOrNil("US")}
 	svc.db.Create(&addr)
 	svc.db.Create(&models.ContactAddress{ContactID: contactID, AddressID: addr.ID})
+
+	photoURL := "https://example.com/avatar.jpg"
+	svc.db.Create(&models.File{VaultID: vaultID, UUID: "photo-uuid", OriginalURL: &photoURL, MimeType: "image/jpeg", Name: "avatar.jpg", Type: "image", Size: 1234})
+	var photo models.File
+	svc.db.Where("uuid = ?", "photo-uuid").First(&photo)
+	svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Update("file_id", photo.ID)
+	svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Update("description", "Trusted friend")
+	svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Update("job_position", "Software Engineer")
 
 	data, err := svc.ExportContact(contactID, vaultID)
 	if err != nil {
 		t.Fatalf("ExportContact failed: %v", err)
 	}
 
-	vcardStr := string(data)
-	if !strings.Contains(vcardStr, "+1-555-9999") {
-		t.Error("Expected vCard to contain phone number")
+	card := mustDecodeVCard(t, data)
+	if got := card.Value(vcard.FieldVersion); got != "4.0" {
+		t.Fatalf("expected VERSION 4.0, got %q", got)
 	}
-	if !strings.Contains(vcardStr, "john@example.com") {
-		t.Error("Expected vCard to contain email")
+	if got := card.Kind(); got != vcard.KindIndividual {
+		t.Fatalf("expected KIND individual, got %q", got)
 	}
-	if !strings.Contains(vcardStr, "456 Oak Ave") {
-		t.Error("Expected vCard to contain address street")
+	if got := card.Value(vcard.FieldUID); got != contactID {
+		t.Fatalf("expected UID %q, got %q", contactID, got)
 	}
-	if !strings.Contains(vcardStr, "Chicago") {
-		t.Error("Expected vCard to contain address city")
+	if got := card.Value(vcard.FieldTitle); got != "Software Engineer" {
+		t.Fatalf("expected TITLE Software Engineer, got %q", got)
 	}
+	if got := card.Value(vcard.FieldNote); got != "Trusted friend" {
+		t.Fatalf("expected NOTE Trusted friend, got %q", got)
+	}
+	if got := card.Value(vcard.FieldBirthday); got != "1990-01-15" {
+		t.Fatalf("expected BDAY 1990-01-15, got %q", got)
+	}
+	if got := card.Value(vcard.FieldFormattedName); got != "John Doe" {
+		t.Fatalf("expected FN John Doe, got %q", got)
+	}
+	if got := card.Value(vcard.FieldNickname); got != "JD" {
+		t.Fatalf("expected nickname JD, got %q", got)
+	}
+	if got := card.Value(vcard.FieldTelephone); got != "+1-555-9999" {
+		t.Fatalf("expected phone +1-555-9999, got %q", got)
+	}
+	if got := card.Value(vcard.FieldEmail); got != "john@example.com" {
+		t.Fatalf("expected email john@example.com, got %q", got)
+	}
+	if got := card.Value(vcard.FieldURL); got != "https://twitter.com/john_doe" {
+		t.Fatalf("expected URL https://twitter.com/john_doe, got %q", got)
+	}
+	if got := card.Value(vcard.FieldIMPP); got != "https://twitter.com/john_doe" {
+		t.Fatalf("expected IMPP https://twitter.com/john_doe, got %q", got)
+	}
+	socialFields := card["X-SOCIALPROFILE"]
+	if len(socialFields) != 1 {
+		t.Fatalf("expected one X-SOCIALPROFILE field, got %d", len(socialFields))
+	}
+	if got := socialFields[0].Value; got != "https://twitter.com/john_doe" {
+		t.Fatalf("expected X-SOCIALPROFILE value https://twitter.com/john_doe, got %q", got)
+	}
+	if len(card[vcard.FieldPhoto]) != 1 {
+		t.Fatalf("expected one PHOTO field, got %d", len(card[vcard.FieldPhoto]))
+	}
+	if got := card[vcard.FieldPhoto][0].Value; got != photoURL {
+		t.Fatalf("expected PHOTO %q, got %q", photoURL, got)
+	}
+	if got := card[vcard.FieldPhoto][0].Params.Get(vcard.ParamMediaType); got != "image/jpeg" {
+		t.Fatalf("expected PHOTO media type image/jpeg, got %q", got)
+	}
+	if len(card[vcard.FieldTelephone]) != 1 {
+		t.Fatalf("expected one TEL field, got %d", len(card[vcard.FieldTelephone]))
+	}
+	if len(card[vcard.FieldEmail]) != 1 {
+		t.Fatalf("expected one EMAIL field, got %d", len(card[vcard.FieldEmail]))
+	}
+	if len(card[vcard.FieldAddress]) != 1 {
+		t.Fatalf("expected one ADR field, got %d", len(card[vcard.FieldAddress]))
+	}
+	address := card.Address()
+	if address == nil {
+		t.Fatal("expected preferred ADR field to be present")
+	}
+	if got := address.StreetAddress; got != "456 Oak Ave" {
+		t.Fatalf("expected ADR street 456 Oak Ave, got %q", got)
+	}
+	if got := address.Locality; got != "Chicago" {
+		t.Fatalf("expected ADR city Chicago, got %q", got)
+	}
+	if got := address.Region; got != "IL" {
+		t.Fatalf("expected ADR region IL, got %q", got)
+	}
+	if got := address.PostalCode; got != "60601" {
+		t.Fatalf("expected ADR postal code 60601, got %q", got)
+	}
+	if got := address.Country; got != "US" {
+		t.Fatalf("expected ADR country US, got %q", got)
+	}
+}
+
+func mustDecodeVCard(t *testing.T, data []byte) vcard.Card {
+	t.Helper()
+	card, err := vcard.NewDecoder(strings.NewReader(string(data))).Decode()
+	if err != nil {
+		t.Fatalf("decode vCard: %v", err)
+	}
+	return card
 }

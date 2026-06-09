@@ -4,7 +4,9 @@ import (
 	"strconv"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/i18n"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -16,16 +18,23 @@ func NewCalendarService(db *gorm.DB) *CalendarService {
 	return &CalendarService{db: db}
 }
 
-func (s *CalendarService) GetCalendar(vaultID string, month, year int, locale string) (*dto.CalendarResponse, error) {
+func (s *CalendarService) GetCalendar(vaultID, userID string, month, year int, locale string) (*dto.CalendarResponse, error) {
+	nameOrder, err := GetEffectiveVaultNameOrder(s.db, vaultID, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	var contacts []models.Contact
-	if err := s.db.Where("vault_id = ?", vaultID).Select("id, first_name, last_name").Find(&contacts).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).
+		Select("id, first_name, middle_name, last_name, nickname, maiden_name, prefix, suffix").
+		Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 	contactIDs := make([]string, len(contacts))
 	contactNames := make(map[string]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
-		contactNames[c.ID] = buildContactName(&contacts[i], locale)
+		contactNames[c.ID] = utils.FormatContactName(nameOrder, &contacts[i], i18n.T(locale, "reminder.unknown_contact"))
 	}
 
 	resp := &dto.CalendarResponse{

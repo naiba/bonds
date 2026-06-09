@@ -8,7 +8,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupCalendarTest(t *testing.T) (*CalendarService, string, string) {
+func setupCalendarTest(t *testing.T) (*CalendarService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -36,13 +36,13 @@ func setupCalendarTest(t *testing.T) (*CalendarService, string, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewCalendarService(db), vault.ID, contact.ID
+	return NewCalendarService(db), vault.ID, resp.User.ID, contact.ID
 }
 
 func TestCalendarEmpty(t *testing.T) {
-	svc, vaultID, _ := setupCalendarTest(t)
+	svc, vaultID, userID, _ := setupCalendarTest(t)
 
-	cal, err := svc.GetCalendar(vaultID, 1, 2025, "en")
+	cal, err := svc.GetCalendar(vaultID, userID, 1, 2025, "en")
 	if err != nil {
 		t.Fatalf("GetCalendar failed: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestCalendarWithDates(t *testing.T) {
 	}
 
 	svc := NewCalendarService(db)
-	cal, err := svc.GetCalendar(vault.ID, 3, 2025, "en")
+	cal, err := svc.GetCalendar(vault.ID, resp.User.ID, 3, 2025, "en")
 	if err != nil {
 		t.Fatalf("GetCalendar failed: %v", err)
 	}
@@ -199,7 +199,7 @@ func TestCalendarWithLunarDates(t *testing.T) {
 	}
 
 	svc := NewCalendarService(db)
-	cal, err := svc.GetCalendar(vault.ID, 2, 2025, "en")
+	cal, err := svc.GetCalendar(vault.ID, resp.User.ID, 2, 2025, "en")
 	if err != nil {
 		t.Fatalf("GetCalendar failed: %v", err)
 	}
@@ -259,6 +259,83 @@ func TestCalendarWithLunarDates(t *testing.T) {
 	}
 	if r.Month == nil || *r.Month != 2 {
 		t.Errorf("Expected gregorian Month 2, got %v", r.Month)
+	}
+}
+
+func TestCalendarUsesVaultNameOrderOverride(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test",
+		LastName:  "User",
+		Email:     "calendar-name-order@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Name Order Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	override := "%last_name%, %first_name% {nickname? (%nickname%)}"
+	if err := db.Model(&models.Vault{}).Where("id = ?", vault.ID).Update("name_order", override).Error; err != nil {
+		t.Fatalf("update vault name order failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	contact, err := contactSvc.CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{
+		FirstName: "Jane",
+		LastName:  "Doe",
+		Nickname:  "JD",
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	day := 15
+	month := 3
+	year := 2025
+	if err := db.Create(&models.ContactImportantDate{
+		ContactID: contact.ID,
+		Label:     "Birthday",
+		Day:       &day,
+		Month:     &month,
+		Year:      &year,
+	}).Error; err != nil {
+		t.Fatalf("Create important date failed: %v", err)
+	}
+	if err := db.Create(&models.ContactReminder{
+		ContactID: contact.ID,
+		Label:     "Call Jane",
+		Day:       &day,
+		Month:     &month,
+		Type:      "one_time",
+	}).Error; err != nil {
+		t.Fatalf("Create reminder failed: %v", err)
+	}
+
+	svc := NewCalendarService(db)
+	cal, err := svc.GetCalendar(vault.ID, resp.User.ID, 3, 2025, "en")
+	if err != nil {
+		t.Fatalf("GetCalendar failed: %v", err)
+	}
+	if len(cal.ImportantDates) != 1 {
+		t.Fatalf("Expected 1 important date, got %d", len(cal.ImportantDates))
+	}
+	if cal.ImportantDates[0].ContactName != "Doe, Jane (JD)" {
+		t.Errorf("Expected important date contact_name to use vault name_order override, got %q", cal.ImportantDates[0].ContactName)
+	}
+	if len(cal.Reminders) != 1 {
+		t.Fatalf("Expected 1 reminder, got %d", len(cal.Reminders))
+	}
+	if cal.Reminders[0].ContactName != "Doe, Jane (JD)" {
+		t.Errorf("Expected reminder contact_name to use vault name_order override, got %q", cal.Reminders[0].ContactName)
 	}
 }
 

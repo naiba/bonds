@@ -14,6 +14,8 @@ import (
 
 	calendarPkg "github.com/naiba/bonds/internal/calendar"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -119,7 +121,11 @@ func (b *CalDAVBackend) GetCalendarObject(ctx context.Context, path string, _ *c
 		if err := b.verifyVaultAccess(userID, importantDate.Contact.VaultID); err != nil {
 			return nil, err
 		}
-		return importantDateToCalendarObject(&importantDate, userID), nil
+		nameOrder, err := services.GetEffectiveVaultNameOrder(b.db, importantDate.Contact.VaultID, userID)
+		if err != nil {
+			return nil, err
+		}
+		return importantDateToCalendarObject(&importantDate, userID, nameOrder), nil
 	}
 
 	// Try tasks
@@ -148,10 +154,16 @@ func (b *CalDAVBackend) ListCalendarObjects(ctx context.Context, path string, _ 
 	if err := b.verifyVaultAccess(userID, vaultID); err != nil {
 		return nil, err
 	}
+	nameOrder, err := services.GetEffectiveVaultNameOrder(b.db, vaultID, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Get contacts in this vault
 	var contacts []models.Contact
-	if err := b.db.Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
+	if err := b.db.Where("vault_id = ?", vaultID).
+		Select("id, first_name, middle_name, last_name, nickname, maiden_name, prefix, suffix").
+		Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 
@@ -174,7 +186,7 @@ func (b *CalDAVBackend) ListCalendarObjects(ctx context.Context, path string, _ 
 				dates[i].UUID = &uid
 				b.db.Model(&dates[i]).Update("uuid", uid)
 			}
-			objects = append(objects, *importantDateToCalendarObject(&dates[i], userID))
+			objects = append(objects, *importantDateToCalendarObject(&dates[i], userID, nameOrder))
 		}
 	}
 
@@ -302,7 +314,7 @@ func (b *CalDAVBackend) putEvent(_ context.Context, path string, comp *ical.Comp
 			Path:    path,
 			ModTime: existing.UpdatedAt,
 			ETag:    fmt.Sprintf("%d", existing.UpdatedAt.Unix()),
-			Data:    buildCalendarFromImportantDate(&existing),
+			Data:    buildCalendarFromImportantDate(&existing, ""),
 		}, nil
 	}
 
@@ -330,7 +342,7 @@ func (b *CalDAVBackend) putEvent(_ context.Context, path string, comp *ical.Comp
 		Path:    path,
 		ModTime: importantDate.UpdatedAt,
 		ETag:    fmt.Sprintf("%d", importantDate.UpdatedAt.Unix()),
-		Data:    buildCalendarFromImportantDate(&importantDate),
+		Data:    buildCalendarFromImportantDate(&importantDate, ""),
 	}, nil
 }
 
@@ -449,13 +461,19 @@ func (b *CalDAVBackend) verifyVaultAccess(userID, vaultID string) error {
 }
 
 // importantDateToCalendarObject converts a ContactImportantDate to a CalDAV CalendarObject.
-func importantDateToCalendarObject(d *models.ContactImportantDate, userID string) *caldav.CalendarObject {
+func importantDateToCalendarObject(d *models.ContactImportantDate, userID, nameOrder string) *caldav.CalendarObject {
 	uid := ""
 	if d.UUID != nil {
 		uid = *d.UUID
 	}
 
-	cal := buildCalendarFromImportantDate(d)
+	contactName := utils.FormatContactName(nameOrder, &d.Contact, "")
+	summary := d.Label
+	if contactName != "" {
+		summary = fmt.Sprintf("%s - %s", contactName, d.Label)
+	}
+
+	cal := buildCalendarFromImportantDate(d, summary)
 
 	return &caldav.CalendarObject{
 		Path:    "/dav/calendars/" + userID + "/" + d.Contact.VaultID + "/" + uid + ".ics",
@@ -483,7 +501,7 @@ func taskToCalendarObject(t *models.ContactTask, userID string) *caldav.Calendar
 }
 
 // buildCalendarFromImportantDate creates an iCal VEVENT from a ContactImportantDate.
-func buildCalendarFromImportantDate(d *models.ContactImportantDate) *ical.Calendar {
+func buildCalendarFromImportantDate(d *models.ContactImportantDate, summary string) *ical.Calendar {
 	cal := ical.NewCalendar()
 	cal.Props.SetText(ical.PropProductID, "-//Bonds//EN")
 	cal.Props.SetText(ical.PropVersion, "2.0")
@@ -494,8 +512,11 @@ func buildCalendarFromImportantDate(d *models.ContactImportantDate) *ical.Calend
 	if d.UUID != nil {
 		uid = *d.UUID
 	}
+	if summary == "" {
+		summary = d.Label
+	}
 	event.Props.SetText(ical.PropUID, uid)
-	event.Props.SetText(ical.PropSummary, d.Label)
+	event.Props.SetText(ical.PropSummary, summary)
 	event.Props.SetDateTime(ical.PropDateTimeStamp, d.UpdatedAt)
 
 	// Build DTSTART from day/month/year

@@ -563,6 +563,21 @@ func getUserNameOrder(db *gorm.DB, userID string) (string, error) {
 	return user.NameOrder, nil
 }
 
+func GetEffectiveVaultNameOrder(db *gorm.DB, vaultID, userID string) (string, error) {
+	userNameOrder, err := getUserNameOrder(db, userID)
+	if err != nil {
+		return "", err
+	}
+	var vault models.Vault
+	if err := db.First(&vault, "id = ?", vaultID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", ErrVaultNotFound
+		}
+		return "", err
+	}
+	return effectiveVaultNameOrder(&vault, userNameOrder), nil
+}
+
 func effectiveVaultNameOrder(v *models.Vault, userNameOrder string) string {
 	if v.NameOrder != nil {
 		return *v.NameOrder
