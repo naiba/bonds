@@ -303,6 +303,36 @@ func TestVaultFilesListByTypePagination(t *testing.T) {
 	}
 }
 
+func TestVaultFilesListByTypeExcludesQuickFactOwnedFiles(t *testing.T) {
+	svc, contactID, vaultID := setupQuickFactTest(t)
+	fileSvc := NewVaultFileService(svc.db, t.TempDir())
+	svc.SetFileService(fileSvc)
+	tpl := createQuickFactTemplateForTest(t, svc, vaultID, dto.CreateQuickFactTemplateRequest{Label: "Attachment", FieldType: QuickFactFieldDocument})
+
+	quickFactFile, err := svc.UploadFile(contactID, vaultID, tpl.ID, "", "quick-fact.pdf", "application/pdf", int64(len("pdf")), bytes.NewReader([]byte("pdf")))
+	if err != nil {
+		t.Fatalf("UploadFile failed: %v", err)
+	}
+	if quickFactFile.FileID == nil {
+		t.Fatal("Expected quick fact file id")
+	}
+	normalFile, err := fileSvc.Upload(vaultID, contactID, "", "document", "normal.pdf", "application/pdf", int64(len("normal")), bytes.NewReader([]byte("normal")))
+	if err != nil {
+		t.Fatalf("Upload normal document failed: %v", err)
+	}
+
+	files, meta, err := fileSvc.ListByType(vaultID, "document", 1, 25)
+	if err != nil {
+		t.Fatalf("ListByType failed: %v", err)
+	}
+	if meta.Total != 1 || len(files) != 1 {
+		t.Fatalf("Expected only normal document in vault list, got total=%d files=%+v", meta.Total, files)
+	}
+	if files[0].ID != normalFile.ID || files[0].ID == *quickFactFile.FileID {
+		t.Fatalf("Expected normal file %d only, got %+v", normalFile.ID, files[0])
+	}
+}
+
 func TestUploadFileWithContactCreatesFeedEntry(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()

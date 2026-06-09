@@ -83,6 +83,9 @@ func (h *VaultFileHandler) Delete(c echo.Context) error {
 		if errors.Is(err, services.ErrFileNotFound) {
 			return response.NotFound(c, "err.file_not_found")
 		}
+		if errors.Is(err, services.ErrFileInUse) {
+			return response.BadRequest(c, "err.file_referenced_by_quick_fact", nil)
+		}
 		return response.InternalError(c, "err.failed_to_delete_file")
 	}
 	return response.NoContent(c)

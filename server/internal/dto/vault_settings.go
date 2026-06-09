@@ -201,19 +201,34 @@ type LifeEventTypeResponse struct {
 // --- Quick Fact Templates ---
 
 type CreateQuickFactTemplateRequest struct {
-	Label    string `json:"label" validate:"required,min=1" example:"Birthdate"`
-	Position *int   `json:"position" example:"1"`
+	Label         string   `json:"label" validate:"required,min=1" example:"Birthdate"`
+	FieldType     string   `json:"field_type" example:"text"`
+	SelectOptions []string `json:"select_options" example:"Yes,No"`
+	Required      bool     `json:"required" example:"false"`
+	HelpText      *string  `json:"help_text" example:"Use YYYY-MM-DD for dates"`
+	DefaultValue  *string  `json:"default_value" example:"Unknown"`
+	Position      *int     `json:"position" example:"1"`
 }
 
 type UpdateQuickFactTemplateRequest struct {
-	Label    string `json:"label" validate:"required,min=1" example:"Birthdate"`
-	Position *int   `json:"position" example:"1"`
+	Label         string   `json:"label" validate:"required,min=1" example:"Birthdate"`
+	FieldType     string   `json:"field_type" example:"text"`
+	SelectOptions []string `json:"select_options" example:"Yes,No"`
+	Required      bool     `json:"required" example:"false"`
+	HelpText      *string  `json:"help_text" example:"Use YYYY-MM-DD for dates"`
+	DefaultValue  *string  `json:"default_value" example:"Unknown"`
+	Position      *int     `json:"position" example:"1"`
 }
 
 type QuickFactTemplateResponse struct {
-	ID        uint      `json:"id" example:"1"`
-	Label     string    `json:"label" example:"Birthdate"`
-	Position  int       `json:"position" example:"1"`
-	CreatedAt time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	ID            uint      `json:"id" example:"1"`
+	Label         string    `json:"label" example:"Birthdate"`
+	FieldType     string    `json:"field_type" example:"text"`
+	SelectOptions []string  `json:"select_options,omitempty" example:"Yes,No"`
+	Required      bool      `json:"required" example:"false"`
+	HelpText      *string   `json:"help_text,omitempty" example:"Use YYYY-MM-DD for dates"`
+	DefaultValue  *string   `json:"default_value,omitempty" example:"Unknown"`
+	Position      int       `json:"position" example:"1"`
+	CreatedAt     time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt     time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }

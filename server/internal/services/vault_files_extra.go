@@ -8,9 +8,11 @@ import (
 	"github.com/naiba/bonds/pkg/response"
 )
 
-// ListByType returns files filtered by type (photo, document, avatar)
+// ListByType returns standalone files filtered by type (photo, document, avatar).
+// Quick Fact attachments have their own lifecycle and must not leak into the
+// vault-level Photos/Documents lists where users can manage normal files.
 func (s *VaultFileService) ListByType(vaultID, fileType string, page, perPage int) ([]dto.VaultFileResponse, response.Meta, error) {
-	query := s.db.Where("vault_id = ? AND type = ?", vaultID, fileType)
+	query := s.db.Where("vault_id = ? AND type = ? AND (fileable_type IS NULL OR fileable_type <> ?)", vaultID, fileType, "QuickFact")
 
 	var total int64
 	if err := query.Model(&models.File{}).Count(&total).Error; err != nil {

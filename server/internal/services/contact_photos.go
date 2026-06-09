@@ -13,7 +13,7 @@ import (
 )
 
 func (s *VaultFileService) ListContactPhotos(contactID, vaultID string, page, perPage int) ([]dto.VaultFileResponse, response.Meta, error) {
-	query := s.db.Where("ufileable_id = ? AND type IN (?, ?) AND vault_id = ?", contactID, "photo", "avatar", vaultID)
+	query := s.db.Where("ufileable_id = ? AND type IN (?, ?) AND vault_id = ? AND (fileable_type IS NULL OR fileable_type <> ?)", contactID, "photo", "avatar", vaultID, "QuickFact")
 
 	var total int64
 	if err := query.Model(&models.File{}).Count(&total).Error; err != nil {
@@ -76,6 +76,9 @@ func (s *VaultFileService) DeleteContactPhoto(fileID uint, contactID, vaultID st
 			return err
 		}
 	}
+	if err := s.ensureFileNotUsedByQuickFact(file.ID); err != nil {
+		return err
+	}
 
 	destPath := filepath.Join(s.uploadDir, file.UUID)
 	os.Remove(destPath)
@@ -84,7 +87,7 @@ func (s *VaultFileService) DeleteContactPhoto(fileID uint, contactID, vaultID st
 }
 
 func (s *VaultFileService) ListContactDocuments(contactID, vaultID string, page, perPage int) ([]dto.VaultFileResponse, response.Meta, error) {
-	query := s.db.Where("ufileable_id = ? AND type = ? AND vault_id = ?", contactID, "document", vaultID)
+	query := s.db.Where("ufileable_id = ? AND type = ? AND vault_id = ? AND (fileable_type IS NULL OR fileable_type <> ?)", contactID, "document", vaultID, "QuickFact")
 
 	var total int64
 	if err := query.Model(&models.File{}).Count(&total).Error; err != nil {
@@ -124,6 +127,9 @@ func (s *VaultFileService) DeleteContactDocument(fileID uint, contactID, vaultID
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrFileNotFound
 		}
+		return err
+	}
+	if err := s.ensureFileNotUsedByQuickFact(file.ID); err != nil {
 		return err
 	}
 

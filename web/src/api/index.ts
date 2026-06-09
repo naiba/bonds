@@ -310,6 +310,11 @@ export type { GithubComNaibaBondsInternalDtoMoodTrackingEventResponse as MoodTra
 export type { GithubComNaibaBondsInternalDtoMoodTrackingParameterResponse as MoodTrackingParameter } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoQuickFactResponse as QuickFact } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoQuickFactGroupResponse as QuickFactGroup } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoQuickFactFileResponse as QuickFactFileResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCreateQuickFactRequest as CreateQuickFactRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoUpdateQuickFactRequest as UpdateQuickFactRequest } from "./generated/data-contracts";
+export type { ContactsQuickFactsFileCreatePayload as QuickFactFileCreatePayload } from "./generated/data-contracts";
+export type { ContactsQuickFactsFileUpdatePayload as QuickFactFileUpdatePayload } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultFileResponse as Photo } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultFileResponse as Document } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoJournalResponse as Journal } from "./generated/data-contracts";
@@ -357,6 +362,8 @@ export type { GithubComNaibaBondsInternalDtoMoodTrackingParameterResponse as Moo
 export type { GithubComNaibaBondsInternalDtoLifeEventCategoryResponse as LifeEventCategoryResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoLifeEventTypeResponse as LifeEventCategoryTypeResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoQuickFactTemplateResponse as QuickFactTemplateResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCreateQuickFactTemplateRequest as CreateQuickFactTemplateRequest } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoUpdateQuickFactTemplateRequest as UpdateQuickFactTemplateRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoVaultUserResponse as VaultUserResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateVaultSettingsRequest as UpdateVaultSettingsRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateVaultNameOrderRequest as UpdateVaultNameOrderRequest } from "./generated/data-contracts";

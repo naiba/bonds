@@ -1251,6 +1251,9 @@ func (h *VaultSettingsHandler) CreateQuickFactTemplate(c echo.Context) error {
 	}
 	tpl, err := h.quickFactSvc.Create(vaultID, req)
 	if err != nil {
+		if isQuickFactValidationErr(err) {
+			return response.BadRequest(c, "err.invalid_quick_fact_template", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_quick_fact_template")
 	}
 	return response.Created(c, tpl)
@@ -1292,9 +1295,16 @@ func (h *VaultSettingsHandler) UpdateQuickFactTemplate(c echo.Context) error {
 		if errors.Is(err, services.ErrQuickFactTplNotFound) {
 			return response.NotFound(c, "err.quick_fact_template_not_found")
 		}
+		if isQuickFactValidationErr(err) {
+			return response.BadRequest(c, "err.invalid_quick_fact_template", nil)
+		}
 		return response.InternalError(c, "err.failed_to_update_quick_fact_template")
 	}
 	return response.OK(c, tpl)
+}
+
+func isQuickFactValidationErr(err error) bool {
+	return errors.Is(err, services.ErrQuickFactInvalidField) || errors.Is(err, services.ErrQuickFactInvalidValue) || errors.Is(err, services.ErrQuickFactTemplateInUse)
 }
 
 // UpdateQuickFactTemplateOrder godoc

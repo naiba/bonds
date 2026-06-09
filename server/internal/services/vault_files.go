@@ -13,7 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrFileNotFound = errors.New("file not found")
+var (
+	ErrFileNotFound = errors.New("file not found")
+	ErrFileInUse    = errors.New("file is referenced by a quick fact")
+)
 
 type VaultFileService struct {
 	db           *gorm.DB
@@ -114,10 +117,51 @@ func (s *VaultFileService) Delete(id uint, vaultID string) error {
 		return err
 	}
 
+	if err := s.ensureFileNotUsedByQuickFact(file.ID); err != nil {
+		return err
+	}
+
+	return s.deleteFileRecord(&file)
+}
+
+func (s *VaultFileService) AssignToQuickFact(fileID uint, quickFactID uint, vaultID string) error {
+	return assignFileToQuickFact(s.db, fileID, quickFactID, vaultID)
+}
+
+func assignFileToQuickFact(db *gorm.DB, fileID uint, quickFactID uint, vaultID string) error {
+	quickFactType := "QuickFact"
+	return db.Model(&models.File{}).Where("id = ? AND vault_id = ?", fileID, vaultID).Updates(map[string]interface{}{
+		"fileable_type": quickFactType,
+		"fileable_id":   quickFactID,
+	}).Error
+}
+
+func (s *VaultFileService) ensureFileNotUsedByQuickFact(fileID uint) error {
+	var quickFactCount int64
+	if err := s.db.Model(&models.QuickFact{}).Where("file_id = ?", fileID).Count(&quickFactCount).Error; err != nil {
+		return err
+	}
+	if quickFactCount > 0 {
+		return ErrFileInUse
+	}
+	return nil
+}
+
+func (s *VaultFileService) ForceDeleteFile(id uint, vaultID string) error {
+	var file models.File
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&file).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFileNotFound
+		}
+		return err
+	}
+	return s.deleteFileRecord(&file)
+}
+
+func (s *VaultFileService) deleteFileRecord(file *models.File) error {
 	destPath := filepath.Join(s.uploadDir, file.UUID)
 	os.Remove(destPath)
-
-	return s.db.Delete(&file).Error
+	return s.db.Delete(file).Error
 }
 
 func toVaultFileResponse(f *models.File) dto.VaultFileResponse {

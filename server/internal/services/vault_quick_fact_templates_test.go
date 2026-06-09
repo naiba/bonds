@@ -1,10 +1,13 @@
 package services
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
+	"gorm.io/gorm"
 )
 
 func setupVaultQuickFactTplTest(t *testing.T) (*VaultQuickFactTemplateService, string) {
@@ -80,4 +83,84 @@ func TestVaultQuickFactTemplateNotFound(t *testing.T) {
 	if err != ErrQuickFactTplNotFound {
 		t.Errorf("Expected ErrQuickFactTplNotFound, got %v", err)
 	}
+}
+
+func TestVaultQuickFactTemplateRejectsUnsafeFieldTypeChangeWithFacts(t *testing.T) {
+	tplSvc, vaultID := setupVaultQuickFactTplTest(t)
+	quickFactSvc := NewQuickFactService(tplSvc.db)
+	contactID := createQuickFactTemplateTestContact(t, tplSvc.db, vaultID)
+	tpl, err := tplSvc.Create(vaultID, dto.CreateQuickFactTemplateRequest{Label: "Score", FieldType: QuickFactFieldNumber})
+	if err != nil {
+		t.Fatalf("Create template failed: %v", err)
+	}
+	value := 7.0
+	if _, err := quickFactSvc.Create(contactID, vaultID, tpl.ID, dto.CreateQuickFactRequest{ValueNumber: &value}); err != nil {
+		t.Fatalf("Create quick fact failed: %v", err)
+	}
+	_, err = tplSvc.Update(tpl.ID, vaultID, dto.UpdateQuickFactTemplateRequest{Label: "Score", FieldType: QuickFactFieldText})
+	if !errors.Is(err, ErrQuickFactTemplateInUse) {
+		t.Fatalf("Expected ErrQuickFactTemplateInUse for field type change, got %v", err)
+	}
+	helpText := "Updated help"
+	updated, err := tplSvc.Update(tpl.ID, vaultID, dto.UpdateQuickFactTemplateRequest{Label: "Score updated", FieldType: QuickFactFieldNumber, HelpText: &helpText})
+	if err != nil {
+		t.Fatalf("Expected compatible metadata update, got %v", err)
+	}
+	if updated.Label != "Score updated" || updated.HelpText == nil || *updated.HelpText != helpText {
+		t.Fatalf("Unexpected compatible update response: %+v", updated)
+	}
+}
+
+func TestVaultQuickFactTemplateRejectsSelectOptionRemovalWithFacts(t *testing.T) {
+	tplSvc, vaultID := setupVaultQuickFactTplTest(t)
+	quickFactSvc := NewQuickFactService(tplSvc.db)
+	contactID := createQuickFactTemplateTestContact(t, tplSvc.db, vaultID)
+	tpl, err := tplSvc.Create(vaultID, dto.CreateQuickFactTemplateRequest{Label: "Choice", FieldType: QuickFactFieldSelect, SelectOptions: []string{"A", "B"}})
+	if err != nil {
+		t.Fatalf("Create template failed: %v", err)
+	}
+	option := "B"
+	if _, err := quickFactSvc.Create(contactID, vaultID, tpl.ID, dto.CreateQuickFactRequest{ValueOption: &option}); err != nil {
+		t.Fatalf("Create quick fact failed: %v", err)
+	}
+	_, err = tplSvc.Update(tpl.ID, vaultID, dto.UpdateQuickFactTemplateRequest{Label: "Choice", FieldType: QuickFactFieldSelect, SelectOptions: []string{"A"}})
+	if !errors.Is(err, ErrQuickFactTemplateInUse) {
+		t.Fatalf("Expected ErrQuickFactTemplateInUse for option removal, got %v", err)
+	}
+	updated, err := tplSvc.Update(tpl.ID, vaultID, dto.UpdateQuickFactTemplateRequest{Label: "Choice", FieldType: QuickFactFieldSelect, SelectOptions: []string{"A", "B", "C"}})
+	if err != nil {
+		t.Fatalf("Expected compatible option addition, got %v", err)
+	}
+	if len(updated.SelectOptions) != 3 {
+		t.Fatalf("Expected three select options, got %+v", updated.SelectOptions)
+	}
+}
+
+func TestVaultQuickFactTemplateRejectsRequiredUpgradeWithEmptyFacts(t *testing.T) {
+	tplSvc, vaultID := setupVaultQuickFactTplTest(t)
+	quickFactSvc := NewQuickFactService(tplSvc.db)
+	contactID := createQuickFactTemplateTestContact(t, tplSvc.db, vaultID)
+	tpl, err := tplSvc.Create(vaultID, dto.CreateQuickFactTemplateRequest{Label: "Optional note", FieldType: QuickFactFieldText})
+	if err != nil {
+		t.Fatalf("Create template failed: %v", err)
+	}
+	if _, err := quickFactSvc.Create(contactID, vaultID, tpl.ID, dto.CreateQuickFactRequest{}); err != nil {
+		t.Fatalf("Create empty optional quick fact failed: %v", err)
+	}
+
+	_, err = tplSvc.Update(tpl.ID, vaultID, dto.UpdateQuickFactTemplateRequest{Label: "Optional note", FieldType: QuickFactFieldText, Required: true})
+	if !errors.Is(err, ErrQuickFactTemplateInUse) {
+		t.Fatalf("Expected ErrQuickFactTemplateInUse when required=true would invalidate empty facts, got %v", err)
+	}
+}
+
+func createQuickFactTemplateTestContact(t *testing.T, db *gorm.DB, vaultID string) string {
+	t.Helper()
+	contact := models.Contact{VaultID: vaultID}
+	firstName := "TemplateFact"
+	contact.FirstName = &firstName
+	if err := db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+	return contact.ID
 }

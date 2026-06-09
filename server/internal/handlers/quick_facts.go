@@ -2,20 +2,25 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
 type QuickFactHandler struct {
-	quickFactService *services.QuickFactService
+	quickFactService   *services.QuickFactService
+	storageInfoService *services.StorageInfoService
+	settingsService    *services.SystemSettingService
 }
 
-func NewQuickFactHandler(quickFactService *services.QuickFactService) *QuickFactHandler {
-	return &QuickFactHandler{quickFactService: quickFactService}
+func NewQuickFactHandler(quickFactService *services.QuickFactService, storageInfoService *services.StorageInfoService, settingsService *services.SystemSettingService) *QuickFactHandler {
+	return &QuickFactHandler{quickFactService: quickFactService, storageInfoService: storageInfoService, settingsService: settingsService}
 }
 
 // ListAll godoc
@@ -107,16 +112,10 @@ func (h *QuickFactHandler) Create(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	if err := validateRequest(req); err != nil {
-		return response.ValidationError(c, map[string]string{"validation": err.Error()})
-	}
 	fact, err := h.quickFactService.Create(contactID, vaultID, uint(templateID), req)
 	if err != nil {
-		if errors.Is(err, services.ErrContactNotFound) {
-			return response.NotFound(c, "err.contact_not_found")
-		}
-		if errors.Is(err, services.ErrQuickFactTplNotFound) {
-			return response.NotFound(c, "err.quick_fact_template_not_found")
+		if handled := handleQuickFactServiceError(c, err); handled != nil {
+			return handled
 		}
 		return response.InternalError(c, "err.failed_to_create_quick_fact")
 	}
@@ -148,24 +147,138 @@ func (h *QuickFactHandler) Update(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_quick_fact_id", nil)
 	}
+	templateID, err := strconv.ParseUint(c.Param("templateId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_template_id", nil)
+	}
 	var req dto.UpdateQuickFactRequest
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	if err := validateRequest(req); err != nil {
-		return response.ValidationError(c, map[string]string{"validation": err.Error()})
-	}
-	fact, err := h.quickFactService.Update(uint(id), contactID, vaultID, req)
+	fact, err := h.quickFactService.Update(uint(id), contactID, vaultID, uint(templateID), req)
 	if err != nil {
-		if errors.Is(err, services.ErrContactNotFound) {
-			return response.NotFound(c, "err.contact_not_found")
-		}
-		if errors.Is(err, services.ErrQuickFactNotFound) {
-			return response.NotFound(c, "err.quick_fact_not_found")
+		if handled := handleQuickFactServiceError(c, err); handled != nil {
+			return handled
 		}
 		return response.InternalError(c, "err.failed_to_update_quick_fact")
 	}
 	return response.OK(c, fact)
+}
+
+// UploadFile godoc
+//
+//	@Summary		Upload quick fact file
+//	@Description	Create a photo/document quick fact using multipart upload
+//	@Tags			quick-facts
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			templateId	path		integer	true	"Template ID"
+//	@Param			file		formData	file	true	"File to upload"
+//	@Success		201			{object}	response.APIResponse{data=dto.QuickFactResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts/{templateId}/file [post]
+func (h *QuickFactHandler) UploadFile(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	templateID, err := strconv.ParseUint(c.Param("templateId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_template_id", nil)
+	}
+	return h.handleFileUpload(c, contactID, vaultID, uint(templateID), nil)
+}
+
+// ReplaceFile godoc
+//
+//	@Summary		Replace quick fact file
+//	@Description	Replace a photo/document quick fact file
+//	@Tags			quick-facts
+//	@Accept			mpfd
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			contact_id	path		string	true	"Contact ID"
+//	@Param			templateId	path		integer	true	"Template ID"
+//	@Param			id			path		integer	true	"Quick Fact ID"
+//	@Param			file		formData	file	true	"File to upload"
+//	@Success		200			{object}	response.APIResponse{data=dto.QuickFactResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/{contact_id}/quickFacts/{templateId}/{id}/file [put]
+func (h *QuickFactHandler) ReplaceFile(c echo.Context) error {
+	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	templateID, err := strconv.ParseUint(c.Param("templateId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_template_id", nil)
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_quick_fact_id", nil)
+	}
+	return h.handleFileUpload(c, contactID, vaultID, uint(templateID), uintPtr(uint(id)))
+}
+
+func (h *QuickFactHandler) handleFileUpload(c echo.Context, contactID, vaultID string, templateID uint, factID *uint) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return response.BadRequest(c, "err.file_required", nil)
+	}
+	if err := h.validateUploadSize(c, fileHeader.Size); err != nil {
+		return err
+	}
+	mimeType := fileHeader.Header.Get("Content-Type")
+	if !allowedQuickFactMimeType(mimeType) {
+		return response.BadRequest(c, "err.file_type_not_allowed", nil)
+	}
+	src, err := fileHeader.Open()
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_read_file")
+	}
+	defer src.Close()
+	authorID := middleware.GetUserID(c)
+	var fact *dto.QuickFactResponse
+	if factID == nil {
+		fact, err = h.quickFactService.UploadFile(contactID, vaultID, templateID, authorID, fileHeader.Filename, mimeType, fileHeader.Size, src)
+	} else {
+		fact, err = h.quickFactService.ReplaceFile(*factID, contactID, vaultID, templateID, authorID, fileHeader.Filename, mimeType, fileHeader.Size, src)
+	}
+	if err != nil {
+		if handled := handleQuickFactServiceError(c, err); handled != nil {
+			return handled
+		}
+		return response.InternalError(c, "err.failed_to_upload_quick_fact_file")
+	}
+	if factID == nil {
+		return response.Created(c, fact)
+	}
+	return response.OK(c, fact)
+}
+
+func (h *QuickFactHandler) validateUploadSize(c echo.Context, fileSize int64) error {
+	var maxUploadSize int64 = 10 * 1024 * 1024
+	if h.settingsService != nil {
+		maxSizeMB := h.settingsService.GetInt64("storage.max_size_mb", 0)
+		if maxSizeMB > 0 {
+			maxUploadSize = maxSizeMB * 1024 * 1024
+		}
+	}
+	if fileSize > maxUploadSize {
+		return response.BadRequest(c, "err.file_too_large", map[string]string{"max_size": fmt.Sprintf("%d MB", maxUploadSize/(1024*1024))})
+	}
+	accountID := middleware.GetAccountID(c)
+	if h.storageInfoService != nil {
+		storageInfo, err := h.storageInfoService.Get(accountID)
+		if err == nil && storageInfo.LimitBytes > 0 && storageInfo.UsedBytes+fileSize > storageInfo.LimitBytes {
+			return response.BadRequest(c, "err.storage_quota_exceeded", nil)
+		}
+	}
+	return nil
 }
 
 // Delete godoc
@@ -191,14 +304,60 @@ func (h *QuickFactHandler) Delete(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_quick_fact_id", nil)
 	}
-	if err := h.quickFactService.Delete(uint(id), contactID, vaultID); err != nil {
+	templateID, err := strconv.ParseUint(c.Param("templateId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_template_id", nil)
+	}
+	if err := h.quickFactService.Delete(uint(id), contactID, vaultID, uint(templateID)); err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
 		if errors.Is(err, services.ErrQuickFactNotFound) {
 			return response.NotFound(c, "err.quick_fact_not_found")
 		}
+		if errors.Is(err, services.ErrQuickFactTemplateMismatch) {
+			return response.BadRequest(c, "err.quick_fact_template_mismatch", nil)
+		}
 		return response.InternalError(c, "err.failed_to_delete_quick_fact")
 	}
 	return response.NoContent(c)
+}
+
+func handleQuickFactServiceError(c echo.Context, err error) error {
+	if errors.Is(err, services.ErrContactNotFound) {
+		return response.NotFound(c, "err.contact_not_found")
+	}
+	if errors.Is(err, services.ErrQuickFactTplNotFound) {
+		return response.NotFound(c, "err.quick_fact_template_not_found")
+	}
+	if errors.Is(err, services.ErrQuickFactNotFound) {
+		return response.NotFound(c, "err.quick_fact_not_found")
+	}
+	if errors.Is(err, services.ErrQuickFactInvalidField) {
+		return response.BadRequest(c, "err.invalid_quick_fact_field", nil)
+	}
+	if errors.Is(err, services.ErrQuickFactInvalidValue) {
+		return response.BadRequest(c, "err.invalid_quick_fact_value", nil)
+	}
+	if errors.Is(err, services.ErrQuickFactRequiredValue) {
+		return response.BadRequest(c, "err.quick_fact_value_required", nil)
+	}
+	if errors.Is(err, services.ErrQuickFactFileTypeMismatch) {
+		return response.BadRequest(c, "err.quick_fact_file_type_mismatch", nil)
+	}
+	if errors.Is(err, services.ErrQuickFactTemplateMismatch) {
+		return response.BadRequest(c, "err.quick_fact_template_mismatch", nil)
+	}
+	return nil
+}
+
+func allowedQuickFactMimeType(mimeType string) bool {
+	if strings.HasPrefix(mimeType, "image/") {
+		return mimeType == "image/jpeg" || mimeType == "image/png" || mimeType == "image/gif" || mimeType == "image/webp"
+	}
+	return mimeType == "application/pdf" || mimeType == "text/plain" || mimeType == "application/msword" || mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+}
+
+func uintPtr(value uint) *uint {
+	return &value
 }

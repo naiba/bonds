@@ -157,6 +157,10 @@ func (ts *testServer) doRequest(method, path, body string, token string) *httpte
 }
 
 func (ts *testServer) doMultipartUpload(t *testing.T, path, token, fieldName, fileName, mimeType string, fileData []byte) *httptest.ResponseRecorder {
+	return ts.doMultipartUploadWithMethod(t, http.MethodPost, path, token, fieldName, fileName, mimeType, fileData)
+}
+
+func (ts *testServer) doMultipartUploadWithMethod(t *testing.T, method, path, token, fieldName, fileName, mimeType string, fileData []byte) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
@@ -172,7 +176,7 @@ func (ts *testServer) doMultipartUpload(t *testing.T, path, token, fieldName, fi
 	}
 	writer.Close()
 
-	req := httptest.NewRequest(http.MethodPost, path, &buf)
+	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -2711,6 +2715,95 @@ func TestFileUpload_InvalidType(t *testing.T) {
 	resp := parseResponse(t, rec)
 	if resp.Success {
 		t.Fatal("expected success=false")
+	}
+}
+
+func TestQuickFactFileUploadReplaceAndDelete(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "quick-fact-file-handler@example.com")
+	vault := ts.createTestVault(t, token, "Quick Fact File Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "QuickFactFile")
+
+	templateBody := `{"label":"Favorite photo","field_type":"photo","position":1}`
+	templateRec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/settings/quickFactTemplates", templateBody, token)
+	if templateRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", templateRec.Code, templateRec.Body.String())
+	}
+	var templateResp dto.QuickFactTemplateResponse
+	if err := json.Unmarshal(parseResponse(t, templateRec).Data, &templateResp); err != nil {
+		t.Fatalf("failed to decode template response: %v", err)
+	}
+
+	uploadPath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/file", vault.ID, contact.ID, templateResp.ID)
+	uploadRec := ts.doMultipartUpload(t, uploadPath, token, "file", "first.png", "image/png", []byte("first image"))
+	if uploadRec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", uploadRec.Code, uploadRec.Body.String())
+	}
+	var created dto.QuickFactResponse
+	if err := json.Unmarshal(parseResponse(t, uploadRec).Data, &created); err != nil {
+		t.Fatalf("failed to decode upload response: %v", err)
+	}
+	if created.FileID == nil || created.File == nil || created.File.Name != "first.png" || created.Content != "first.png" {
+		t.Fatalf("unexpected created quick fact: %+v", created)
+	}
+	firstFileID := *created.FileID
+
+	replacePath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/%d/file", vault.ID, contact.ID, templateResp.ID, created.ID)
+	replaceRec := ts.doMultipartUploadWithMethod(t, http.MethodPut, replacePath, token, "file", "second.png", "image/png", []byte("second image"))
+	if replaceRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", replaceRec.Code, replaceRec.Body.String())
+	}
+	var replaced dto.QuickFactResponse
+	if err := json.Unmarshal(parseResponse(t, replaceRec).Data, &replaced); err != nil {
+		t.Fatalf("failed to decode replace response: %v", err)
+	}
+	if replaced.FileID == nil || *replaced.FileID == firstFileID || replaced.File == nil || replaced.File.Name != "second.png" {
+		t.Fatalf("unexpected replaced quick fact: %+v", replaced)
+	}
+	otherTemplateBody := `{"label":"Other photo","field_type":"photo","position":2}`
+	otherTemplateRec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/settings/quickFactTemplates", otherTemplateBody, token)
+	if otherTemplateRec.Code != http.StatusCreated {
+		t.Fatalf("expected other template 201, got %d: %s", otherTemplateRec.Code, otherTemplateRec.Body.String())
+	}
+	var otherTemplate dto.QuickFactTemplateResponse
+	if err := json.Unmarshal(parseResponse(t, otherTemplateRec).Data, &otherTemplate); err != nil {
+		t.Fatalf("failed to decode other template response: %v", err)
+	}
+	mismatchReplacePath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/%d/file", vault.ID, contact.ID, otherTemplate.ID, created.ID)
+	mismatchReplaceRec := ts.doMultipartUploadWithMethod(t, http.MethodPut, mismatchReplacePath, token, "file", "wrong.png", "image/png", []byte("wrong image"))
+	if mismatchReplaceRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected mismatched replace 400, got %d: %s", mismatchReplaceRec.Code, mismatchReplaceRec.Body.String())
+	}
+	mismatchDeletePath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/%d", vault.ID, contact.ID, otherTemplate.ID, replaced.ID)
+	mismatchDeleteRec := ts.doRequest(http.MethodDelete, mismatchDeletePath, "", token)
+	if mismatchDeleteRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected mismatched delete 400, got %d: %s", mismatchDeleteRec.Code, mismatchDeleteRec.Body.String())
+	}
+
+	deleteOldRec := ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/files/%d", vault.ID, firstFileID), "", token)
+	if deleteOldRec.Code != http.StatusNotFound {
+		t.Fatalf("expected old file 404, got %d: %s", deleteOldRec.Code, deleteOldRec.Body.String())
+	}
+	deleteReferencedRec := ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/files/%d", vault.ID, *replaced.FileID), "", token)
+	if deleteReferencedRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected referenced file 400, got %d: %s", deleteReferencedRec.Code, deleteReferencedRec.Body.String())
+	}
+	if resp := parseResponse(t, deleteReferencedRec); resp.Error == nil || resp.Error.Message != "err.file_referenced_by_quick_fact" {
+		t.Fatalf("expected quick fact file reference error, got %+v", resp.Error)
+	}
+	deleteAsContactPhotoRec := ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/contacts/%s/photos/%d", vault.ID, contact.ID, *replaced.FileID), "", token)
+	if deleteAsContactPhotoRec.Code != http.StatusBadRequest {
+		t.Fatalf("expected contact photo delete protection 400, got %d: %s", deleteAsContactPhotoRec.Code, deleteAsContactPhotoRec.Body.String())
+	}
+
+	deleteFactPath := fmt.Sprintf("/api/vaults/%s/contacts/%s/quickFacts/%d/%d", vault.ID, contact.ID, templateResp.ID, replaced.ID)
+	deleteFactRec := ts.doRequest(http.MethodDelete, deleteFactPath, "", token)
+	if deleteFactRec.Code != http.StatusNoContent {
+		t.Fatalf("expected quick fact delete 204, got %d: %s", deleteFactRec.Code, deleteFactRec.Body.String())
+	}
+	deleteFileAfterFactRec := ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/files/%d", vault.ID, *replaced.FileID), "", token)
+	if deleteFileAfterFactRec.Code != http.StatusNotFound {
+		t.Fatalf("expected deleted file 404, got %d: %s", deleteFileAfterFactRec.Code, deleteFileAfterFactRec.Body.String())
 	}
 }
 
