@@ -66,7 +66,7 @@ test.describe('Contact Modules - Quick Facts', () => {
     // --- CREATE: Add a quick fact ---
     await qfCard.getByRole('button', { name: /add/i }).click();
 
-    const input = qfCard.getByPlaceholder(/content/i);
+    const input = qfCard.getByPlaceholder('Add a quick fact');
     await expect(input).toBeVisible({ timeout: 5000 });
     await input.fill('Loves hiking');
 
@@ -83,7 +83,7 @@ test.describe('Contact Modules - Quick Facts', () => {
     // --- UPDATE: Edit the quick fact ---
     await qfCard.getByRole('button', { name: /edit/i }).first().click();
 
-    const editInput = qfCard.getByPlaceholder(/content/i);
+    const editInput = qfCard.getByPlaceholder('Add a quick fact');
     await expect(editInput).toBeVisible({ timeout: 5000 });
     await editInput.clear();
     await editInput.fill('Loves mountain hiking');

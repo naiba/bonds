@@ -301,14 +301,15 @@ test.describe('Vault - Feed, Calendar, Journal and Settings', () => {
     await expect(page.getByText('Hobbies')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Food preferences')).toBeVisible({ timeout: 10000 });
 
-    const nameInput = page.getByPlaceholder('Name');
+    const quickFactTemplateForm = page.locator('.ant-card').filter({ hasText: 'Add quick fact template' });
+    const nameInput = quickFactTemplateForm.getByPlaceholder('e.g. Favorite restaurant');
     await expect(nameInput).toBeVisible({ timeout: 10000 });
     await nameInput.fill('Favorite Movies');
 
     const createResp = page.waitForResponse(
       (resp) => resp.url().includes('/quickFactTemplates') && resp.request().method() === 'POST' && resp.status() < 400
     );
-    await page.getByRole('button', { name: 'Add' }).click();
+    await quickFactTemplateForm.getByRole('button', { name: 'Add' }).click();
     await createResp;
 
     await expect(page.getByText('Favorite Movies')).toBeVisible({ timeout: 10000 });
