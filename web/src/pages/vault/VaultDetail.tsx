@@ -50,6 +50,7 @@ import type {
   LifeEventCategoryResponse,
   UserPreferences,
   CatchUpPrompt,
+  Reminder,
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -63,6 +64,22 @@ dayjs.extend(relativeTime);
 const { Title, Text } = Typography;
 
 type DashboardTab = "activity" | "life_events" | "life_metrics";
+
+type VaultReminderItem = Reminder & {
+  contact_first_name?: string | null;
+  contact_last_name?: string | null;
+  contact_name?: string | null;
+};
+
+function getVaultReminderContactName(reminder: VaultReminderItem): string {
+  const formattedName = reminder.contact_name?.trim();
+  if (formattedName) return formattedName;
+
+  return [reminder.contact_first_name, reminder.contact_last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
 
 // ─── Main Component ──────────────────────────────────────────────
 export default function VaultDetail() {
@@ -1340,7 +1357,8 @@ function CatchUpWidget({ vaultId }: { vaultId: string }) {
           {prompts.slice(0, 5).map((prompt) => {
             const contactId = prompt.contact_id;
             if (!contactId) return null;
-            const contactName = formatContactName(nameOrder, {
+            const backendName = prompt.name?.trim();
+            const contactName = backendName || formatContactName(nameOrder, {
               first_name: prompt.first_name,
               last_name: prompt.last_name,
             });
@@ -1407,7 +1425,7 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
   const navigate = useNavigate();
   const dateFormats = useDateFormat();
 
-  const { data: reminders = [] } = useQuery({
+  const { data: reminders = [] } = useQuery<VaultReminderItem[]>({
     queryKey: ["vaults", vaultId, "reminders"],
     queryFn: async () => {
       const res = await api.reminders.remindersList(String(vaultId));
@@ -1416,8 +1434,7 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
     enabled: !!vaultId,
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const upcoming = (reminders as any[]).slice(0, 5);
+  const upcoming = reminders.slice(0, 5);
 
   return (
     <div
@@ -1441,12 +1458,8 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
         </Text>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {upcoming.map((r: any) => {
-            const contactName = [r.contact_first_name, r.contact_last_name]
-              .filter(Boolean)
-              .join(" ")
-              .trim();
+          {upcoming.map((r) => {
+            const contactName = getVaultReminderContactName(r);
             return (
               <div key={r.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
                 <Text style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

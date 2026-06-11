@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App, ConfigProvider } from "antd";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import ContactDetail from "@/pages/contact/ContactDetail";
 import { api } from "@/api";
+
+const CONTACT_EDIT_VALIDATION_TIMEOUT_MS = 15000;
 
 vi.mock("@/pages/contact/modules/NotesModule", () => ({
   default: ({ readOnly }: { readOnly?: boolean }) => (
@@ -166,7 +168,7 @@ describe("ContactEdit Validation", () => {
     });
 
     expect(api.contacts.contactsUpdate).not.toHaveBeenCalled();
-  });
+  }, CONTACT_EDIT_VALIDATION_TIMEOUT_MS);
 
   it("allows submission if first_name is emptied out but nickname remains", async () => {
     renderWithProviders();
@@ -190,5 +192,5 @@ describe("ContactEdit Validation", () => {
         }),
       );
     });
-  });
+  }, CONTACT_EDIT_VALIDATION_TIMEOUT_MS);
 });

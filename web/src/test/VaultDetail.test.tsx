@@ -191,6 +191,7 @@ describe("VaultDetail", () => {
           data: [
             {
               contact_id: "contact-1",
+              name: "Zephyr, Alice (Ace)",
               first_name: "Jane",
               last_name: "Doe",
               days_overdue: 12,
@@ -206,7 +207,8 @@ describe("VaultDetail", () => {
     renderVaultDetail();
 
     expect(screen.getByText("Catch-Up")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Jane Doe/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Zephyr, Alice \(Ace\)/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Jane Doe/i })).not.toBeInTheDocument();
     expect(screen.getByText("12 days overdue")).toBeInTheDocument();
   });
 

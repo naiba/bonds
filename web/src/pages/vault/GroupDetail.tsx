@@ -206,7 +206,8 @@ export default function GroupDetail() {
           dataSource={group.contacts ?? []}
           locale={{ emptyText: <Empty description={t("vault.group_detail.no_members")} style={{ padding: 32 }} /> }}
           renderItem={(member: GroupContact) => {
-            const contactName = formatContactName(nameOrder, member);
+            const backendName = member.name?.trim();
+            const contactName = backendName || formatContactName(nameOrder, member);
             return (
               <List.Item
                 style={{

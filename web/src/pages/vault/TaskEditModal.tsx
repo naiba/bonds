@@ -9,6 +9,7 @@ import { useTaskStatuses, defaultStatusSlug, type TaskStatus } from "@/utils/tas
 import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
 import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
 import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
+import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 
 const TASK_QUERY_KEY = (vaultId: string) => ["vaults", vaultId, "all-tasks"];
 
@@ -104,6 +105,7 @@ function TaskEditModalContent({
   const { token } = theme.useToken();
   const queryClient = useQueryClient();
   const [form] = Form.useForm<FormValues>();
+  const nameOrder = useVaultNameOrder(vaultId);
 
   const { data: ownStatuses = [] } = useTaskStatuses();
   const statuses = statusesProp && statusesProp.length > 0 ? statusesProp : ownStatuses;
@@ -165,7 +167,7 @@ function TaskEditModalContent({
     if (!c.id) return [];
     return [{
       value: c.id,
-      label: [c.first_name, c.last_name].filter(Boolean).join(" ") || c.id,
+      label: formatContactName(nameOrder, c),
     }];
   });
   const contactOptionIds = new Set(contactOptions.map((option) => option.value));

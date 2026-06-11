@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import VaultCompanies from "@/pages/vault/VaultCompanies";
+import type { Company } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -18,6 +19,10 @@ vi.mock("@/api/companies", () => ({
     get: vi.fn(),
     listForContact: vi.fn(),
   },
+}));
+
+vi.mock("@/components/ContactAvatar", () => ({
+  default: () => <div data-testid="contact-avatar" />,
 }));
 
 const mockUseQuery = vi.fn();
@@ -67,5 +72,59 @@ describe("VaultCompanies", () => {
     renderVaultCompanies();
     // Page heading and empty hero title both say "Companies"
     expect(screen.getAllByText("Companies").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("prefers backend-formatted employee names", async () => {
+    const companies: Company[] = [
+      {
+        id: 1,
+        name: "Acme Corp",
+        contacts: [
+          {
+            id: "contact-1",
+            name: "Zephyr, Alice (Ace)",
+            first_name: "Alice",
+            last_name: "Zephyr",
+            job_id: 10,
+            job_position: "Engineer",
+          },
+        ],
+      },
+    ];
+    const companyDetails: Company = {
+      id: 1,
+      name: "Acme Corp",
+      contacts: [
+        {
+          id: "contact-2",
+          name: "Yellow, Bob (Bee)",
+          first_name: "Bob",
+          last_name: "Yellow",
+          job_id: 11,
+          job_position: "Manager",
+        },
+      ],
+    };
+
+    mockUseQuery.mockImplementation((opts: { queryKey?: unknown[] }) => {
+      const key = Array.isArray(opts.queryKey) ? opts.queryKey : [];
+      if (key[0] === "vaults" && key[2] === "companies" && key.length === 3) {
+        return { data: companies, isLoading: false };
+      }
+      if (key[0] === "vaults" && key[2] === "companies" && key[3] === 1) {
+        return { data: companyDetails, isLoading: false };
+      }
+      return { data: [], isLoading: false };
+    });
+
+    renderVaultCompanies();
+
+    expect(screen.getByText("Zephyr, Alice (Ace)")).toBeInTheDocument();
+    expect(screen.queryByText("Alice Zephyr")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Acme Corp"));
+
+    expect(await screen.findByText("Yellow, Bob (Bee)")).toBeInTheDocument();
+    expect(screen.queryByText("Bob Yellow")).not.toBeInTheDocument();
   });
 });
