@@ -36,7 +36,8 @@ func NewTaskHandler(taskService *services.TaskService) *TaskHandler {
 func (h *TaskHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
-	tasks, err := h.taskService.List(contactID, vaultID)
+	userID := middleware.GetUserID(c)
+	tasks, err := h.taskService.List(contactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -63,7 +64,8 @@ func (h *TaskHandler) List(c echo.Context) error {
 func (h *TaskHandler) ListCompleted(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
-	tasks, err := h.taskService.ListCompleted(contactID, vaultID)
+	userID := middleware.GetUserID(c)
+	tasks, err := h.taskService.ListCompleted(contactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -142,6 +144,7 @@ func (h *TaskHandler) Create(c echo.Context) error {
 func (h *TaskHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
@@ -155,7 +158,7 @@ func (h *TaskHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	task, err := h.taskService.Update(uint(id), contactID, vaultID, req)
+	task, err := h.taskService.Update(uint(id), contactID, vaultID, req, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -193,12 +196,13 @@ func (h *TaskHandler) Update(c echo.Context) error {
 func (h *TaskHandler) ToggleCompleted(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
 	}
 
-	task, err := h.taskService.ToggleCompleted(uint(id), contactID, vaultID)
+	task, err := h.taskService.ToggleCompleted(uint(id), contactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")

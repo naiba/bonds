@@ -68,9 +68,9 @@ func createTaskStatusForVaultTaskTest(t *testing.T, svc *VaultTaskService, vault
 }
 
 func TestVaultTaskListEmpty(t *testing.T) {
-	svc, _, vaultID, _, _ := setupVaultTaskTest(t)
+	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
 
-	tasks, err := svc.List(vaultID, VaultTaskFilters{})
+	tasks, err := svc.List(vaultID, VaultTaskFilters{}, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestVaultTaskListWithTasks(t *testing.T) {
 		t.Fatalf("Create task failed: %v", err)
 	}
 
-	tasks, err := svc.List(vaultID, VaultTaskFilters{})
+	tasks, err := svc.List(vaultID, VaultTaskFilters{}, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestVaultTaskUpdateStatusToDoneSetsCompleted(t *testing.T) {
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "x"})
 	updated, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{
 		Status: models.TaskStatusDone,
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
@@ -217,10 +217,10 @@ func TestVaultTaskUpdateStatusFromDoneClearsCompleted(t *testing.T) {
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{
 		Label: "x", Status: models.TaskStatusDone,
 	})
-	_, _ = svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: models.TaskStatusDone})
+	_, _ = svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: models.TaskStatusDone}, userID)
 	updated, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{
 		Status: models.TaskStatusInProgress,
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestVaultTaskUpdateStatusRejectsInvalid(t *testing.T) {
 	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "x"})
 
-	_, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: "neon"})
+	_, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: "neon"}, userID)
 	if err != ErrInvalidTaskStatus {
 		t.Errorf("expected ErrInvalidTaskStatus, got %v", err)
 	}
@@ -244,7 +244,7 @@ func TestVaultTaskUpdateStatusAcceptsCustomStatus(t *testing.T) {
 	customStatus := createTaskStatusForVaultTaskTest(t, svc, vaultID, "Waiting Review")
 	task, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "x"})
 
-	updated, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: customStatus})
+	updated, err := svc.UpdateStatus(task.ID, vaultID, dto.UpdateTaskStatusRequest{Status: customStatus}, userID)
 	if err != nil {
 		t.Fatalf("UpdateStatus rejected account task status %q: %v", customStatus, err)
 	}
@@ -260,7 +260,7 @@ func TestVaultTaskUpdatePositionMovesAcrossColumns(t *testing.T) {
 	updated, err := svc.UpdatePosition(task.ID, vaultID, dto.UpdateTaskPositionRequest{
 		Position: 5,
 		Status:   models.TaskStatusInProgress,
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("UpdatePosition failed: %v", err)
 	}
@@ -278,16 +278,16 @@ func TestVaultTaskUpdatePositionResequencesDestinationColumn(t *testing.T) {
 	taskA, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "A", Status: models.TaskStatusTodo})
 	taskB, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "B", Status: models.TaskStatusTodo})
 	taskC, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "C", Status: models.TaskStatusTodo})
-	_, _ = svc.UpdatePosition(taskA.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo})
-	_, _ = svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 1, Status: models.TaskStatusTodo})
-	_, _ = svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 2, Status: models.TaskStatusTodo})
+	_, _ = svc.UpdatePosition(taskA.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo}, userID)
+	_, _ = svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 1, Status: models.TaskStatusTodo}, userID)
+	_, _ = svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 2, Status: models.TaskStatusTodo}, userID)
 
-	_, err := svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo})
+	_, err := svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo}, userID)
 	if err != nil {
 		t.Fatalf("UpdatePosition failed: %v", err)
 	}
 
-	tasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusTodo}[0]})
+	tasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusTodo}[0]}, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -309,16 +309,16 @@ func TestVaultTaskUpdatePositionResequencesSourceAndDestinationColumns(t *testin
 	taskA, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "A", Status: models.TaskStatusTodo})
 	taskB, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "B", Status: models.TaskStatusTodo})
 	taskC, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "C", Status: models.TaskStatusInProgress})
-	_, _ = svc.UpdatePosition(taskA.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo})
-	_, _ = svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 1, Status: models.TaskStatusTodo})
-	_, _ = svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusInProgress})
+	_, _ = svc.UpdatePosition(taskA.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusTodo}, userID)
+	_, _ = svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 1, Status: models.TaskStatusTodo}, userID)
+	_, _ = svc.UpdatePosition(taskC.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusInProgress}, userID)
 
-	_, err := svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusInProgress})
+	_, err := svc.UpdatePosition(taskB.ID, vaultID, dto.UpdateTaskPositionRequest{Position: 0, Status: models.TaskStatusInProgress}, userID)
 	if err != nil {
 		t.Fatalf("UpdatePosition failed: %v", err)
 	}
 
-	todoTasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusTodo}[0]})
+	todoTasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusTodo}[0]}, userID)
 	if err != nil {
 		t.Fatalf("List todo failed: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestVaultTaskUpdatePositionResequencesSourceAndDestinationColumns(t *testin
 		t.Fatalf("source column not resequenced: %+v", todoTasks)
 	}
 
-	wipTasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusInProgress}[0]})
+	wipTasks, err := svc.List(vaultID, VaultTaskFilters{Status: &[]string{models.TaskStatusInProgress}[0]}, userID)
 	if err != nil {
 		t.Fatalf("List in_progress failed: %v", err)
 	}
@@ -346,10 +346,10 @@ func TestVaultTaskListFilterByStatus(t *testing.T) {
 	svc, _, vaultID, _, userID := setupVaultTaskTest(t)
 	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "todo task"})
 	t2, _ := svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "wip task"})
-	_, _ = svc.UpdateStatus(t2.ID, vaultID, dto.UpdateTaskStatusRequest{Status: models.TaskStatusInProgress})
+	_, _ = svc.UpdateStatus(t2.ID, vaultID, dto.UpdateTaskStatusRequest{Status: models.TaskStatusInProgress}, userID)
 
 	wip := models.TaskStatusInProgress
-	tasks, err := svc.List(vaultID, VaultTaskFilters{Status: &wip})
+	tasks, err := svc.List(vaultID, VaultTaskFilters{Status: &wip}, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestVaultTaskUpdateAllFields(t *testing.T) {
 		Description: "richer description",
 		ContactIDs:  &assignees,
 		Status:      models.TaskStatusInProgress,
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -396,7 +396,7 @@ func TestVaultTaskUpdateClearsContactWhenEmpty(t *testing.T) {
 	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:      "x",
 		ContactIDs: &empty,
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -414,7 +414,7 @@ func TestVaultTaskUpdateLeavesAssigneesAloneWhenNil(t *testing.T) {
 	updated, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:      "renamed",
 		ContactIDs: nil, // intentionally untouched
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -429,7 +429,7 @@ func TestVaultTaskListFilterStandaloneOnly(t *testing.T) {
 	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "for contact", ContactIDs: []string{contactID}})
 
 	noContact := ""
-	tasks, err := svc.List(vaultID, VaultTaskFilters{ContactID: &noContact})
+	tasks, err := svc.List(vaultID, VaultTaskFilters{ContactID: &noContact}, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -454,7 +454,7 @@ func TestVaultTaskListFilterByContact(t *testing.T) {
 	_, _ = svc.Create(vaultID, userID, dto.CreateVaultTaskRequest{Label: "both", ContactIDs: []string{contactID, other.ID}})
 
 	cid := contactID
-	tasks, err := svc.List(vaultID, VaultTaskFilters{ContactID: &cid})
+	tasks, err := svc.List(vaultID, VaultTaskFilters{ContactID: &cid}, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -506,7 +506,7 @@ func TestVaultTaskSubTaskRejectsSelfParent(t *testing.T) {
 	_, err := svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:        "x",
 		ParentTaskID: dto.NullableUint{Present: true, Valid: true, Value: task.ID},
-	})
+	}, userID)
 	if err != ErrInvalidParentTask {
 		t.Errorf("expected ErrInvalidParentTask, got %v", err)
 	}

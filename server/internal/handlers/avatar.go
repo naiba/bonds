@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"path/filepath"
-	
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
@@ -41,9 +41,11 @@ func NewAvatarHandler(db *gorm.DB, vaultFileService *services.VaultFileService) 
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/avatar [get]
 func (h *AvatarHandler) GetAvatar(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 
 	var contact models.Contact
-	if err := h.db.First(&contact, "id = ?", contactID).Error; err != nil {
+	if err := h.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		return response.NotFound(c, "err.contact_not_found")
 	}
 
@@ -55,7 +57,17 @@ func (h *AvatarHandler) GetAvatar(c echo.Context) error {
 		}
 	}
 
-	name := utils.BuildContactName(&contact)
+	nameOrder, err := services.GetEffectiveVaultNameOrder(h.db, vaultID, userID)
+	if err != nil {
+		if errors.Is(err, services.ErrUserNotFound) {
+			return response.NotFound(c, "err.user_not_found")
+		}
+		if errors.Is(err, services.ErrVaultNotFound) {
+			return response.NotFound(c, "err.vault_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_get_contact")
+	}
+	name := utils.FormatContactName(nameOrder, &contact, "")
 	pngData := avatar.GenerateInitials(name, 128)
 
 	return c.Blob(http.StatusOK, "image/png", pngData)

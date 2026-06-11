@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -33,6 +34,7 @@ func NewSearchHandler(searchService *services.SearchService) *SearchHandler {
 //	@Router			/vaults/{vault_id}/search [get]
 func (h *SearchHandler) Search(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	query := c.QueryParam("q")
 	if query == "" {
 		return response.BadRequest(c, "err.search_query_required", nil)
@@ -41,7 +43,7 @@ func (h *SearchHandler) Search(c echo.Context) error {
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 
-	result, err := h.searchService.Search(vaultID, query, page, perPage)
+	result, err := h.searchService.SearchForUser(vaultID, userID, query, page, perPage)
 	if err != nil {
 		return response.InternalError(c, "err.search_failed")
 	}

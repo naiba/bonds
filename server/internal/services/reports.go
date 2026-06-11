@@ -31,7 +31,11 @@ func (s *ReportService) AddressReport(vaultID string) ([]dto.AddressReportItem, 
 	return results, nil
 }
 
-func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDateReportItem, error) {
+func (s *ReportService) ImportantDatesReport(vaultID, userID string) ([]dto.ImportantDateReportItem, error) {
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 	var contacts []models.Contact
 	if err := s.db.Where("vault_id = ?", vaultID).Select("id").Find(&contacts).Error; err != nil {
 		return nil, err
@@ -46,8 +50,14 @@ func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDat
 
 	type dateRow struct {
 		ContactID     string  `gorm:"column:contact_id"`
+		VaultID       string  `gorm:"column:vault_id"`
 		FirstName     *string `gorm:"column:first_name"`
 		LastName      *string `gorm:"column:last_name"`
+		MiddleName    *string `gorm:"column:middle_name"`
+		Nickname      *string `gorm:"column:nickname"`
+		MaidenName    *string `gorm:"column:maiden_name"`
+		Prefix        *string `gorm:"column:prefix"`
+		Suffix        *string `gorm:"column:suffix"`
 		Label         string  `gorm:"column:label"`
 		Day           *int    `gorm:"column:day"`
 		Month         *int    `gorm:"column:month"`
@@ -59,22 +69,33 @@ func (s *ReportService) ImportantDatesReport(vaultID string) ([]dto.ImportantDat
 	}
 
 	var rows []dateRow
-	err := s.db.Model(&models.ContactImportantDate{}).
-		Select("contact_important_dates.contact_id, contacts.first_name, contacts.last_name, contact_important_dates.label, contact_important_dates.day, contact_important_dates.month, contact_important_dates.year, contact_important_dates.calendar_type, contact_important_dates.original_day, contact_important_dates.original_month, contact_important_dates.original_year").
+	queryErr := s.db.Model(&models.ContactImportantDate{}).
+		Select("contact_important_dates.contact_id, contacts.vault_id, contacts.first_name, contacts.last_name, contacts.middle_name, contacts.nickname, contacts.maiden_name, contacts.prefix, contacts.suffix, contact_important_dates.label, contact_important_dates.day, contact_important_dates.month, contact_important_dates.year, contact_important_dates.calendar_type, contact_important_dates.original_day, contact_important_dates.original_month, contact_important_dates.original_year").
 		Joins("JOIN contacts ON contacts.id = contact_important_dates.contact_id").
 		Where("contact_important_dates.contact_id IN ?", contactIDs).
 		Order("contact_important_dates.month ASC, contact_important_dates.day ASC").
 		Scan(&rows).Error
-	if err != nil {
-		return nil, err
+	if queryErr != nil {
+		return nil, queryErr
 	}
 
 	result := make([]dto.ImportantDateReportItem, len(rows))
 	for i, r := range rows {
+		contact := models.Contact{VaultID: r.VaultID, FirstName: r.FirstName, LastName: r.LastName, MiddleName: r.MiddleName, Nickname: r.Nickname, MaidenName: r.MaidenName, Prefix: r.Prefix, Suffix: r.Suffix}
+		contactName, err := formatter.format(&contact, "")
+		if err != nil {
+			return nil, err
+		}
 		result[i] = dto.ImportantDateReportItem{
 			ContactID:     r.ContactID,
+			ContactName:   contactName,
 			FirstName:     ptrToStr(r.FirstName),
 			LastName:      ptrToStr(r.LastName),
+			MiddleName:    ptrToStr(r.MiddleName),
+			Nickname:      ptrToStr(r.Nickname),
+			MaidenName:    ptrToStr(r.MaidenName),
+			Prefix:        ptrToStr(r.Prefix),
+			Suffix:        ptrToStr(r.Suffix),
 			Label:         r.Label,
 			Day:           r.Day,
 			Month:         r.Month,

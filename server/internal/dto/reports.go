@@ -9,8 +9,14 @@ type AddressReportItem struct {
 
 type ImportantDateReportItem struct {
 	ContactID     string `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ContactName   string `json:"contact_name" example:"John Doe"`
 	FirstName     string `json:"first_name" example:"John"`
 	LastName      string `json:"last_name" example:"Doe"`
+	MiddleName    string `json:"middle_name" example:"Michael"`
+	Nickname      string `json:"nickname" example:"Johnny"`
+	MaidenName    string `json:"maiden_name" example:"Smith"`
+	Prefix        string `json:"prefix" example:"Dr."`
+	Suffix        string `json:"suffix" example:"Jr."`
 	Label         string `json:"label" example:"Birthday"`
 	Day           *int   `json:"day" example:"15"`
 	Month         *int   `json:"month" example:"6"`

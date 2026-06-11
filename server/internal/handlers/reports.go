@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -70,7 +71,7 @@ func (h *ReportHandler) Addresses(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/reports/importantDates [get]
 func (h *ReportHandler) ImportantDates(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	data, err := h.reportService.ImportantDatesReport(vaultID)
+	data, err := h.reportService.ImportantDatesReport(vaultID, middleware.GetUserID(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_important_dates_report")
 	}

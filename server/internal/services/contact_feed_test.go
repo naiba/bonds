@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupContactFeedTest(t *testing.T) (*FeedService, string, string) {
+func setupContactFeedTest(t *testing.T) (*FeedService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -38,13 +38,13 @@ func setupContactFeedTest(t *testing.T) (*FeedService, string, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewFeedService(db), contact.ID, vault.ID
+	return NewFeedService(db), contact.ID, vault.ID, resp.User.ID
 }
 
 func TestContactFeedList(t *testing.T) {
-	svc, contactID, _ := setupContactFeedTest(t)
+	svc, contactID, vaultID, userID := setupContactFeedTest(t)
 
-	items, meta, err := svc.ListContactFeed(contactID, 1, 15)
+	items, meta, err := svc.ListContactFeed(contactID, vaultID, 1, 15, userID)
 	if err != nil {
 		t.Fatalf("ListContactFeed failed: %v", err)
 	}
@@ -57,10 +57,9 @@ func TestContactFeedList(t *testing.T) {
 }
 
 func TestContactFeedListEmpty(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	svc := NewFeedService(db)
+	svc, _, vaultID, userID := setupContactFeedTest(t)
 
-	items, _, err := svc.ListContactFeed("nonexistent-contact", 1, 15)
+	items, _, err := svc.ListContactFeed("nonexistent-contact", vaultID, 1, 15, userID)
 	if err != nil {
 		t.Fatalf("ListContactFeed failed: %v", err)
 	}

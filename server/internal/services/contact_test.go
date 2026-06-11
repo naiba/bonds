@@ -242,7 +242,7 @@ func TestUpdateContactStayInTouchFields(t *testing.T) {
 
 	lastTalkedTo := time.Date(2026, 2, 1, 8, 0, 0, 0, time.UTC)
 	frequencyDays := 14
-	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:                "Updated",
 		LastTalkedTo:             &lastTalkedTo,
 		StayInTouchFrequencyDays: &frequencyDays,
@@ -255,7 +255,7 @@ func TestUpdateContactStayInTouchFields(t *testing.T) {
 		t.Fatalf("expected stay_in_touch_trigger_date %v, got %v", wantTriggerDate, updated.StayInTouchTriggerDate)
 	}
 
-	clearedFrequency, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	clearedFrequency, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:    "OnlyLastTalkedTo",
 		LastTalkedTo: &lastTalkedTo,
 	})
@@ -289,7 +289,7 @@ func TestUpdateContactFirstMetFieldsChangesAndClears(t *testing.T) {
 	}
 
 	firstMetAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:                "Updated",
 		FirstMetAt:               &firstMetAt,
 		FirstMetThroughContactID: &firstIntroducer.ID,
@@ -305,7 +305,7 @@ func TestUpdateContactFirstMetFieldsChangesAndClears(t *testing.T) {
 	}
 
 	changedFirstMetAt := time.Date(2026, 5, 2, 13, 30, 0, 0, time.UTC)
-	changed, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	changed, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:                "Changed",
 		FirstMetAt:               &changedFirstMetAt,
 		FirstMetThroughContactID: &secondIntroducer.ID,
@@ -323,7 +323,7 @@ func TestUpdateContactFirstMetFieldsChangesAndClears(t *testing.T) {
 		t.Fatalf("expected second introducer brief contact, got %+v", changed.FirstMetThroughContact)
 	}
 
-	cleared, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{FirstName: "Cleared"})
+	cleared, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{FirstName: "Cleared"})
 	if err != nil {
 		t.Fatalf("UpdateContact clear failed: %v", err)
 	}
@@ -353,7 +353,7 @@ func TestUpdateContactFirstMetThroughRejectsDifferentVault(t *testing.T) {
 		t.Fatalf("Create other vault contact failed: %v", err)
 	}
 
-	_, err = svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	_, err = svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:                "BlockedUpdate",
 		FirstMetThroughContactID: &otherVaultContact.ID,
 	})
@@ -381,7 +381,7 @@ func TestUpdateContactFirstMetThroughRejectsNonexistentContact(t *testing.T) {
 	}
 	nonexistentContactID := "00000000-0000-0000-0000-000000000000"
 
-	_, err = svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	_, err = svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:                "MissingIntroducerUpdate",
 		FirstMetThroughContactID: &nonexistentContactID,
 	})
@@ -593,7 +593,7 @@ func TestUpdateContact(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName: "Updated",
 		LastName:  "Name",
 	})
@@ -616,7 +616,7 @@ func TestUpdateContactWithNicknameOnly(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		Nickname: "Updated Nickname",
 	})
 	if err != nil {
@@ -638,7 +638,7 @@ func TestUpdateContactRejectsBlankFirstNameAndNickname(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	_, err = svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	_, err = svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName: "  ",
 		Nickname:  "\n",
 	})
@@ -766,9 +766,9 @@ func TestDeleteContact_FirstMetThroughHardDeleteSetsNull(t *testing.T) {
 }
 
 func TestToggleArchive(t *testing.T) {
-	svc, vaultID, _, introducer, created := setupContactWithFirstMetThrough(t)
+	svc, vaultID, userID, introducer, created := setupContactWithFirstMetThrough(t)
 
-	toggled, err := svc.ToggleArchive(created.ID, vaultID)
+	toggled, err := svc.ToggleArchive(created.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
@@ -782,7 +782,7 @@ func TestToggleArchive(t *testing.T) {
 		t.Fatalf("expected first_met_through_contact to be preserved, got %+v", toggled.FirstMetThroughContact)
 	}
 
-	toggledBack, err := svc.ToggleArchive(created.ID, vaultID)
+	toggledBack, err := svc.ToggleArchive(created.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("ToggleArchive back failed: %v", err)
 	}
@@ -830,9 +830,9 @@ func TestToggleFavorite(t *testing.T) {
 }
 
 func TestMarkCaughtUpPreservesFirstMetThroughMetadata(t *testing.T) {
-	svc, vaultID, _, introducer, created := setupContactWithFirstMetThrough(t)
+	svc, vaultID, userID, introducer, created := setupContactWithFirstMetThrough(t)
 
-	marked, err := svc.MarkCaughtUp(created.ID, vaultID)
+	marked, err := svc.MarkCaughtUp(created.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("MarkCaughtUp failed: %v", err)
 	}
@@ -872,7 +872,7 @@ func TestListCatchUpPromptsFiltersAndSortsByPriority(t *testing.T) {
 		t.Fatalf("CreateContact without last_talked_to failed: %v", err)
 	}
 	archived := createPromptContact("Archived", now.AddDate(0, 0, -100), 10)
-	if _, err := svc.ToggleArchive(archived.ID, vaultID); err != nil {
+	if _, err := svc.ToggleArchive(archived.ID, vaultID, userID); err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
 
@@ -890,7 +890,7 @@ func TestListCatchUpPromptsFiltersAndSortsByPriority(t *testing.T) {
 		t.Fatalf("Update shadow contact failed: %v", err)
 	}
 
-	prompts, err := svc.ListCatchUpPrompts(vaultID)
+	prompts, err := svc.ListCatchUpPrompts(vaultID, userID)
 	if err != nil {
 		t.Fatalf("ListCatchUpPrompts failed: %v", err)
 	}
@@ -925,7 +925,7 @@ func TestMarkCaughtUpRecomputesStayInTouchTrigger(t *testing.T) {
 	}
 
 	before := time.Now().Add(-time.Second)
-	updated, err := svc.MarkCaughtUp(created.ID, vaultID)
+	updated, err := svc.MarkCaughtUp(created.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("MarkCaughtUp failed: %v", err)
 	}
@@ -939,7 +939,7 @@ func TestMarkCaughtUpRecomputesStayInTouchTrigger(t *testing.T) {
 		t.Fatalf("expected recomputed trigger date %v, got %v", wantTriggerDate, updated.StayInTouchTriggerDate)
 	}
 
-	prompts, err := svc.ListCatchUpPrompts(vaultID)
+	prompts, err := svc.ListCatchUpPrompts(vaultID, userID)
 	if err != nil {
 		t.Fatalf("ListCatchUpPrompts failed: %v", err)
 	}
@@ -951,14 +951,14 @@ func TestMarkCaughtUpRecomputesStayInTouchTrigger(t *testing.T) {
 }
 
 func TestContactNotFound(t *testing.T) {
-	svc, _, _, _ := setupContactTest(t)
+	svc, _, userID, _ := setupContactTest(t)
 
 	_, err := svc.GetContact("nonexistent-id", "some-user", "some-vault")
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 
-	_, err = svc.UpdateContact("nonexistent-id", "some-vault", dto.UpdateContactRequest{FirstName: "nope"})
+	_, err = svc.UpdateContact("nonexistent-id", "some-vault", "some-user", dto.UpdateContactRequest{FirstName: "nope"})
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
@@ -968,7 +968,7 @@ func TestContactNotFound(t *testing.T) {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 
-	_, err = svc.ToggleArchive("nonexistent-id", "some-vault")
+	_, err = svc.ToggleArchive("nonexistent-id", "some-vault", userID)
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
@@ -1086,7 +1086,7 @@ func TestUpdateContact_WithAllFields(t *testing.T) {
 	var tmpl models.Template
 	db.Where("account_id = ?", accountID).First(&tmpl)
 
-	updated, err := svc.UpdateContact(created.ID, vaultID, dto.UpdateContactRequest{
+	updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
 		FirstName:  "Updated",
 		LastName:   "NewLast",
 		MiddleName: "NewMiddle",
@@ -1149,7 +1149,7 @@ func TestQuickSearch(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	results, err := svc.QuickSearch(vaultID, "Johnson")
+	results, err := svc.QuickSearch(vaultID, "Johnson", userID)
 	if err != nil {
 		t.Fatalf("QuickSearch failed: %v", err)
 	}
@@ -1163,7 +1163,7 @@ func TestQuickSearch(t *testing.T) {
 		t.Error("Expected non-empty Name")
 	}
 
-	results, err = svc.QuickSearch(vaultID, "Bob")
+	results, err = svc.QuickSearch(vaultID, "Bob", userID)
 	if err != nil {
 		t.Fatalf("QuickSearch failed: %v", err)
 	}
@@ -1174,7 +1174,7 @@ func TestQuickSearch(t *testing.T) {
 		t.Errorf("Expected name 'Bob Smith', got '%s'", results[0].Name)
 	}
 
-	results, err = svc.QuickSearch(vaultID, "nonexistent")
+	results, err = svc.QuickSearch(vaultID, "nonexistent", userID)
 	if err != nil {
 		t.Fatalf("QuickSearch failed: %v", err)
 	}
@@ -1182,7 +1182,7 @@ func TestQuickSearch(t *testing.T) {
 		t.Errorf("Expected 0 results, got %d", len(results))
 	}
 
-	results, err = svc.QuickSearch(vaultID, "")
+	results, err = svc.QuickSearch(vaultID, "", userID)
 	if err != nil {
 		t.Fatalf("QuickSearch with empty term failed: %v", err)
 	}
@@ -1246,7 +1246,7 @@ func TestListContacts_BirthdayAgeGroups(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create group failed: %v", err)
 	}
-	if err := groupSvc.AddContactToGroup(c1.ID, dto.AddContactToGroupRequest{GroupID: grp.ID}); err != nil {
+	if err := groupSvc.AddContactToGroup(c1.ID, vaultID, dto.AddContactToGroupRequest{GroupID: grp.ID}); err != nil {
 		t.Fatalf("AddContactToGroup failed: %v", err)
 	}
 

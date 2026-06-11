@@ -36,7 +36,8 @@ func NewRelationshipHandler(relationshipService *services.RelationshipService) *
 func (h *RelationshipHandler) List(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
-	relationships, err := h.relationshipService.List(contactID, vaultID)
+	userID := middleware.GetUserID(c)
+	relationships, err := h.relationshipService.List(contactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -109,6 +110,7 @@ func (h *RelationshipHandler) Create(c echo.Context) error {
 func (h *RelationshipHandler) Update(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_relationship_id", nil)
@@ -122,7 +124,7 @@ func (h *RelationshipHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	relationship, err := h.relationshipService.Update(uint(id), contactID, vaultID, req)
+	relationship, err := h.relationshipService.Update(uint(id), contactID, vaultID, req, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -189,7 +191,8 @@ func (h *RelationshipHandler) Delete(c echo.Context) error {
 func (h *RelationshipHandler) GetContactGraph(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
-	graph, err := h.relationshipService.GetContactGraph(contactID, vaultID)
+	userID := middleware.GetUserID(c)
+	graph, err := h.relationshipService.GetContactGraph(contactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")

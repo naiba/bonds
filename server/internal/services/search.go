@@ -9,6 +9,7 @@ import (
 )
 
 type SearchService struct {
+	db     *gorm.DB
 	engine search.Engine
 }
 
@@ -16,15 +17,85 @@ func NewSearchService(engine search.Engine) *SearchService {
 	return &SearchService{engine: engine}
 }
 
+func NewSearchServiceWithDB(db *gorm.DB, engine search.Engine) *SearchService {
+	return &SearchService{db: db, engine: engine}
+}
+
 func (s *SearchService) Search(vaultID, query string, page, perPage int) (*search.SearchResponse, error) {
+	page, perPage = normalizeSearchPagination(page, perPage)
+	offset := (page - 1) * perPage
+	return s.engine.Search(vaultID, query, perPage, offset)
+}
+
+func (s *SearchService) SearchForUser(vaultID, userID, query string, page, perPage int) (*search.SearchResponse, error) {
+	if userID == "" {
+		return nil, ErrUserNotFound
+	}
+	if s.db == nil {
+		return nil, fmt.Errorf("search service requires database for user-scoped contact name formatting")
+	}
+	page, perPage = normalizeSearchPagination(page, perPage)
+	offset := (page - 1) * perPage
+	resp, err := s.engine.Search(vaultID, query, perPage, offset)
+	if err != nil || resp == nil || len(resp.Contacts) == 0 {
+		return resp, err
+	}
+	return s.hydrateContactResultNames(resp, vaultID, userID)
+}
+
+func normalizeSearchPagination(page, perPage int) (int, int) {
 	if page < 1 {
 		page = 1
 	}
 	if perPage < 1 {
 		perPage = 20
 	}
-	offset := (page - 1) * perPage
-	return s.engine.Search(vaultID, query, perPage, offset)
+	return page, perPage
+}
+
+func (s *SearchService) hydrateContactResultNames(resp *search.SearchResponse, vaultID, userID string) (*search.SearchResponse, error) {
+	contactIDs := make([]string, 0, len(resp.Contacts))
+	for _, result := range resp.Contacts {
+		contactIDs = append(contactIDs, result.ID)
+	}
+	var contacts []models.Contact
+	if err := s.db.Where("id IN ? AND vault_id = ? AND listed = ?", contactIDs, vaultID, true).Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	nameByID := make(map[string]string, len(contacts))
+	for i := range contacts {
+		name, err := formatter.format(&contacts[i], "")
+		if err != nil {
+			return nil, err
+		}
+		nameByID[contacts[i].ID] = name
+	}
+	for i := range resp.Contacts {
+		if name, ok := nameByID[resp.Contacts[i].ID]; ok {
+			resp.Contacts[i].Name = name
+		}
+	}
+	filteredContacts := resp.Contacts[:0]
+	removedContactCount := 0
+	for _, result := range resp.Contacts {
+		if _, ok := nameByID[result.ID]; ok {
+			filteredContacts = append(filteredContacts, result)
+		} else {
+			removedContactCount++
+		}
+	}
+	resp.Contacts = filteredContacts
+	if removedContactCount > 0 {
+		resp.Total -= removedContactCount
+		if resp.Total < 0 {
+			resp.Total = 0
+		}
+	}
+	return resp, nil
 }
 
 func (s *SearchService) IndexContact(contact *models.Contact) error {

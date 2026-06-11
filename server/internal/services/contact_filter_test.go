@@ -1,11 +1,11 @@
 package services
 
 import (
-	"testing"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 	"gorm.io/gorm"
+	"testing"
 )
 
 func setupContactFilterTest(t *testing.T) (*ContactService, *gorm.DB, string, string) {
@@ -51,7 +51,7 @@ func TestListContacts_FilterActive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
-	_, err = svc.ToggleArchive(c3.ID, vaultID)
+	_, err = svc.ToggleArchive(c3.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestListContacts_FilterArchived(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
-	_, err = svc.ToggleArchive(c3.ID, vaultID)
+	_, err = svc.ToggleArchive(c3.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestListContacts_FilterAll(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
-	_, err = svc.ToggleArchive(c3.ID, vaultID)
+	_, err = svc.ToggleArchive(c3.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestListContacts_FilterArchivedExcludesFavorites(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToggleFavorite failed: %v", err)
 	}
-	_, err = svc.ToggleArchive(c1.ID, vaultID)
+	_, err = svc.ToggleArchive(c1.ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}
@@ -299,7 +299,7 @@ func TestListContactsByLabel_FilterActive(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 	db.Create(&models.ContactLabel{LabelID: label.ID, ContactID: c2.ID})
-	_, err = contactSvc.ToggleArchive(c2.ID, vault.ID)
+	_, err = contactSvc.ToggleArchive(c2.ID, vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ToggleArchive failed: %v", err)
 	}

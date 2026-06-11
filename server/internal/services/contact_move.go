@@ -64,6 +64,13 @@ func (s *ContactMoveService) Move(contactID, currentVaultID, targetVaultID, user
 		return nil, err
 	}
 
-	resp := toContactResponse(&contact, false)
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }

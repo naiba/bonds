@@ -12,6 +12,7 @@ import (
 type companyTestContext struct {
 	svc     *CompanyService
 	db      *gorm.DB
+	userID  string
 	vaultID string
 	company *models.Company
 }
@@ -51,6 +52,7 @@ func setupCompanyTest(t *testing.T) *companyTestContext {
 	return &companyTestContext{
 		svc:     NewCompanyService(db),
 		db:      db,
+		userID:  resp.User.ID,
 		vaultID: vault.ID,
 		company: company,
 	}
@@ -59,7 +61,7 @@ func setupCompanyTest(t *testing.T) *companyTestContext {
 func TestCompanyList(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
-	companies, err := ctx.svc.List(ctx.vaultID)
+	companies, err := ctx.svc.List(ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -77,7 +79,7 @@ func TestCompanyList(t *testing.T) {
 func TestCompanyGet(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
-	got, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID)
+	got, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -92,7 +94,7 @@ func TestCompanyGet(t *testing.T) {
 func TestCompanyGetNotFound(t *testing.T) {
 	ctx := setupCompanyTest(t)
 
-	_, err := ctx.svc.Get(9999, ctx.vaultID)
+	_, err := ctx.svc.Get(9999, ctx.vaultID, ctx.userID)
 	if err != ErrCompanyNotFound {
 		t.Errorf("Expected ErrCompanyNotFound, got %v", err)
 	}
@@ -120,7 +122,7 @@ func TestCompanyListEmpty(t *testing.T) {
 	}
 
 	svc := NewCompanyService(db)
-	companies, err := svc.List(vault.ID)
+	companies, err := svc.List(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -152,7 +154,7 @@ func TestCompanyCreate(t *testing.T) {
 		t.Errorf("Expected vaultID '%s', got '%s'", ctx.vaultID, company.VaultID)
 	}
 
-	companies, err := ctx.svc.List(ctx.vaultID)
+	companies, err := ctx.svc.List(ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -226,7 +228,7 @@ func TestCompanyDelete(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	companies, err := ctx.svc.List(ctx.vaultID)
+	companies, err := ctx.svc.List(ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -420,7 +422,7 @@ func TestCompanyGet_WithEmployees(t *testing.T) {
 		t.Fatalf("Create ContactCompany failed: %v", err)
 	}
 
-	got, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID)
+	got, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -461,7 +463,7 @@ func TestCompanyList_WithEmployees(t *testing.T) {
 		t.Fatalf("Create ContactCompany failed: %v", err)
 	}
 
-	companies, err := ctx.svc.List(ctx.vaultID)
+	companies, err := ctx.svc.List(ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}

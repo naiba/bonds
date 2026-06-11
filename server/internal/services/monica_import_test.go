@@ -282,7 +282,7 @@ func TestMonicaImport_AssignsCompany(t *testing.T) {
 	}
 
 	companySvc := NewCompanyService(svc.DB)
-	company, err := companySvc.Get(companies[0].ID, vaultID)
+	company, err := companySvc.Get(companies[0].ID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("get company: %v", err)
 	}

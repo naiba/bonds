@@ -16,7 +16,7 @@ func NewContactAvatarService(db *gorm.DB) *ContactAvatarService {
 	return &ContactAvatarService{db: db}
 }
 
-func (s *ContactAvatarService) UpdateAvatar(contactID, vaultID string, fileID uint) (*dto.ContactResponse, error) {
+func (s *ContactAvatarService) UpdateAvatar(contactID, vaultID, userID string, fileID uint) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -32,12 +32,19 @@ func (s *ContactAvatarService) UpdateAvatar(contactID, vaultID string, fileID ui
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
-func (s *ContactAvatarService) DeleteAvatar(contactID, vaultID string) (*dto.ContactResponse, error) {
+func (s *ContactAvatarService) DeleteAvatar(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -53,7 +60,14 @@ func (s *ContactAvatarService) DeleteAvatar(contactID, vaultID string) (*dto.Con
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }

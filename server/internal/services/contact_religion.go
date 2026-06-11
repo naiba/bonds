@@ -16,7 +16,7 @@ func NewContactReligionService(db *gorm.DB) *ContactReligionService {
 	return &ContactReligionService{db: db}
 }
 
-func (s *ContactReligionService) Update(contactID, vaultID string, req dto.UpdateContactReligionRequest) (*dto.ContactResponse, error) {
+func (s *ContactReligionService) Update(contactID, vaultID, userID string, req dto.UpdateContactReligionRequest) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -32,7 +32,14 @@ func (s *ContactReligionService) Update(contactID, vaultID string, req dto.Updat
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }

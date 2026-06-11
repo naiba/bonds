@@ -21,6 +21,8 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
+	"github.com/naiba/bonds/internal/utils"
+	"github.com/naiba/bonds/pkg/avatar"
 	"github.com/pquerna/otp/totp"
 	"gorm.io/gorm"
 )
@@ -2410,6 +2412,41 @@ func TestInvitationAccept_PersistsAcceptLanguageLocaleWithoutSeeders(t *testing.
 }
 
 // ==================== Avatar ====================
+
+func TestAvatar_GetInitialsUsesVaultNameOrder(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "avatar-name-order@example.com")
+	vault := ts.createTestVault(t, token, "Avatar Name Order Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "Alice")
+	override := "%last_name% %first_name%"
+	if err := ts.db.Model(&models.Vault{}).Where("id = ?", vault.ID).Update("name_order", override).Error; err != nil {
+		t.Fatalf("Update vault name_order failed: %v", err)
+	}
+
+	var storedContact models.Contact
+	if err := ts.db.First(&storedContact, "id = ?", contact.ID).Error; err != nil {
+		t.Fatalf("load contact failed: %v", err)
+	}
+	nameOrder, err := services.GetEffectiveVaultNameOrder(ts.db, vault.ID, auth.User.ID)
+	if err != nil {
+		t.Fatalf("GetEffectiveVaultNameOrder failed: %v", err)
+	}
+	legacyAvatar := avatar.GenerateInitials(utils.BuildContactName(&storedContact), 128)
+	vaultAwareAvatar := avatar.GenerateInitials(utils.FormatContactName(nameOrder, &storedContact, ""), 128)
+	if bytes.Equal(legacyAvatar, vaultAwareAvatar) {
+		t.Fatal("test fixture should produce different initials for legacy and vault-aware name order")
+	}
+
+	rec := ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/avatar", "", token)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Equal(rec.Body.Bytes(), vaultAwareAvatar) {
+		t.Fatal("generated avatar should use vault-aware contact name order")
+	}
+}
 
 func TestAvatar_GetInitials(t *testing.T) {
 	ts := setupTestServer(t)

@@ -8,6 +8,7 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/search"
 	"github.com/naiba/bonds/internal/services"
+	"github.com/naiba/bonds/internal/utils"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +18,7 @@ const (
 )
 
 type SearchService interface {
-	Search(vaultID, query string, page, perPage int) (*search.SearchResponse, error)
+	SearchForUser(vaultID, userID, query string, page, perPage int) (*search.SearchResponse, error)
 }
 
 type VaultAccessChecker interface {
@@ -83,7 +84,7 @@ func (s *BondsSearcher) Search(userID string, args SearchBondsArgs) (*SearchBond
 	items := make([]SearchItem, 0)
 
 	if s.searchService != nil {
-		resp, err := s.searchService.Search(args.VaultID, query, page, perPage)
+		resp, err := s.searchService.SearchForUser(args.VaultID, userID, query, page, perPage)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +95,7 @@ func (s *BondsSearcher) Search(userID string, args SearchBondsArgs) (*SearchBond
 		items = append(items, bleveItems...)
 	}
 
-	sqlItems, err := s.sqlSearch(args.VaultID, query, perPage)
+	sqlItems, err := s.sqlSearch(args.VaultID, userID, query, perPage)
 	if err != nil {
 		return nil, err
 	}
@@ -156,17 +157,21 @@ func itemsFromBleve(resp *search.SearchResponse) []SearchItem {
 	return items
 }
 
-func (s *BondsSearcher) sqlSearch(vaultID, query string, limit int) ([]SearchItem, error) {
+func (s *BondsSearcher) sqlSearch(vaultID, userID, query string, limit int) ([]SearchItem, error) {
 	items := make([]SearchItem, 0)
 	likeTerm := "%" + strings.ToLower(query) + "%"
+	nameOrder, err := services.GetEffectiveVaultNameOrder(s.db, vaultID, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	contacts, err := s.searchContacts(vaultID, likeTerm, limit)
+	contacts, err := s.searchContacts(vaultID, likeTerm, limit, nameOrder)
 	if err != nil {
 		return nil, err
 	}
 	items = append(items, contacts...)
 
-	contactInfo, err := s.searchContactInformation(vaultID, likeTerm, limit)
+	contactInfo, err := s.searchContactInformation(vaultID, likeTerm, limit, nameOrder)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +204,7 @@ func (s *BondsSearcher) sqlSearch(vaultID, query string, limit int) ([]SearchIte
 	return items, nil
 }
 
-func (s *BondsSearcher) searchContacts(vaultID, likeTerm string, limit int) ([]SearchItem, error) {
+func (s *BondsSearcher) searchContacts(vaultID, likeTerm string, limit int, nameOrder string) ([]SearchItem, error) {
 	var contacts []models.Contact
 	err := s.db.Where("vault_id = ? AND listed = ?", vaultID, true).
 		Where(s.db.Where("LOWER(first_name) LIKE ?", likeTerm).
@@ -214,11 +219,12 @@ func (s *BondsSearcher) searchContacts(vaultID, likeTerm string, limit int) ([]S
 		return nil, err
 	}
 	items := make([]SearchItem, 0, len(contacts))
-	for _, contact := range contacts {
+	for i := range contacts {
+		contact := &contacts[i]
 		items = append(items, SearchItem{
 			Type:        "contact",
 			ID:          contact.ID,
-			Title:       contactName(&contact),
+			Title:       utils.FormatContactName(nameOrder, contact, ""),
 			ResourceURI: "bonds://contact/" + contact.ID,
 			Reason:      "matched contact fields",
 		})
@@ -226,17 +232,23 @@ func (s *BondsSearcher) searchContacts(vaultID, likeTerm string, limit int) ([]S
 	return items, nil
 }
 
-func (s *BondsSearcher) searchContactInformation(vaultID, likeTerm string, limit int) ([]SearchItem, error) {
+func (s *BondsSearcher) searchContactInformation(vaultID, likeTerm string, limit int, nameOrder string) ([]SearchItem, error) {
 	type row struct {
-		ID        uint
-		Data      string
-		ContactID string
-		FirstName *string
-		LastName  *string
+		ID         uint
+		Data       string
+		ContactID  string
+		VaultID    string
+		FirstName  *string
+		MiddleName *string
+		LastName   *string
+		Nickname   *string
+		MaidenName *string
+		Prefix     *string
+		Suffix     *string
 	}
 	var rows []row
 	err := s.db.Table("contact_information").
-		Select("contact_information.id, contact_information.data, contacts.id AS contact_id, contacts.first_name, contacts.last_name").
+		Select("contact_information.id, contact_information.data, contacts.id AS contact_id, contacts.vault_id, contacts.first_name, contacts.middle_name, contacts.last_name, contacts.nickname, contacts.maiden_name, contacts.prefix, contacts.suffix").
 		Joins("JOIN contacts ON contacts.id = contact_information.contact_id").
 		Where("contacts.vault_id = ? AND contacts.listed = ?", vaultID, true).
 		Where("LOWER(contact_information.data) LIKE ?", likeTerm).
@@ -247,10 +259,21 @@ func (s *BondsSearcher) searchContactInformation(vaultID, likeTerm string, limit
 	}
 	items := make([]SearchItem, 0, len(rows))
 	for _, row := range rows {
+		contact := models.Contact{
+			ID:         row.ContactID,
+			VaultID:    row.VaultID,
+			FirstName:  row.FirstName,
+			MiddleName: row.MiddleName,
+			LastName:   row.LastName,
+			Nickname:   row.Nickname,
+			MaidenName: row.MaidenName,
+			Prefix:     row.Prefix,
+			Suffix:     row.Suffix,
+		}
 		items = append(items, SearchItem{
 			Type:        "contact_information",
 			ID:          fmt.Sprint(row.ID),
-			Title:       strings.TrimSpace(ptrString(row.FirstName) + " " + ptrString(row.LastName)),
+			Title:       utils.FormatContactName(nameOrder, &contact, ""),
 			ResourceURI: "bonds://contact/" + row.ContactID,
 			Reason:      "matched contact information: " + row.Data,
 		})
@@ -453,15 +476,6 @@ func mergeSearchItems(primary, secondary []SearchItem) []SearchItem {
 		result = append(result, item)
 	}
 	return result
-}
-
-func contactName(contact *models.Contact) string {
-	parts := []string{ptrString(contact.FirstName), ptrString(contact.MiddleName), ptrString(contact.LastName)}
-	name := strings.TrimSpace(strings.Join(parts, " "))
-	if name == "" {
-		name = ptrString(contact.Nickname)
-	}
-	return name
 }
 
 func ptrString(value *string) string {

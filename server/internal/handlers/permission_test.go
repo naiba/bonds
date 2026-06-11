@@ -1156,6 +1156,59 @@ func TestCrossVaultGroupDeleteBlocked(t *testing.T) {
 	}
 }
 
+func TestCrossVaultGroupMembershipAddBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-group-membership-add@example.com")
+	vault1 := ts.createTestVault(t, token, "Group Membership Add Vault A")
+	vault2 := ts.createTestVault(t, token, "Group Membership Add Vault B")
+	contact := ts.createTestContact(t, token, vault1.ID, "Grouped")
+	groupID := createTestGroup(t, ts, vault1.ID, "Grouped Contacts")
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/groups", vault2.ID, contact.ID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"group_id":%d}`, groupID), token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault group membership POST, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var count int64
+	if err := ts.db.Model(&models.ContactGroup{}).Where("group_id = ? AND contact_id = ?", groupID, contact.ID).Count(&count).Error; err != nil {
+		t.Fatalf("failed to count contact group after blocked add: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected blocked cross-vault add to leave no contact group, got count=%d", count)
+	}
+}
+
+func TestCrossVaultGroupMembershipDeleteBlocked(t *testing.T) {
+	ts := setupTestServer(t)
+
+	token, _ := ts.registerTestUser(t, "cross-vault-group-membership-delete@example.com")
+	vault1 := ts.createTestVault(t, token, "Group Membership Vault A")
+	vault2 := ts.createTestVault(t, token, "Group Membership Vault B")
+	contact := ts.createTestContact(t, token, vault1.ID, "Grouped")
+	groupID := createTestGroup(t, ts, vault1.ID, "Grouped Contacts")
+
+	contactGroup := models.ContactGroup{GroupID: groupID, ContactID: contact.ID}
+	if err := ts.db.Create(&contactGroup).Error; err != nil {
+		t.Fatalf("failed to create contact group: %v", err)
+	}
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/groups/%d", vault2.ID, contact.ID, groupID)
+	rec := ts.doRequest(http.MethodDelete, path, "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 for cross-vault group membership DELETE, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var count int64
+	if err := ts.db.Model(&models.ContactGroup{}).Where("group_id = ? AND contact_id = ?", groupID, contact.ID).Count(&count).Error; err != nil {
+		t.Fatalf("failed to count contact group after blocked delete: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected blocked cross-vault delete to preserve contact group, got count=%d", count)
+	}
+}
+
 // ==================== L. Cross-Vault IDOR Tests for Files ====================
 
 func TestCrossVaultFileDownloadBlocked(t *testing.T) {
@@ -2652,6 +2705,14 @@ func TestCrossVaultContactFeedReturnsEmpty(t *testing.T) {
 	rec := ts.doRequest(http.MethodGet, path, "", token)
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200 (empty feed) for cross-vault contact feed, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var items []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &items); err != nil {
+		t.Fatalf("parse feed response: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected cross-vault contact feed to be empty, got %d items", len(items))
 	}
 }
 

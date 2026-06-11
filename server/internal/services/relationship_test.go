@@ -68,6 +68,7 @@ func setupRelationshipTestFull(t *testing.T) relationshipTestCtx {
 		userID:           resp.User.ID,
 	}
 }
+
 type graphTestEnv struct {
 	svc     *RelationshipService
 	db      *gorm.DB
@@ -173,7 +174,7 @@ func TestListRelationships(t *testing.T) {
 	// Each contact only sees records they "own" (contact_id = their ID).
 	// John created 2 forward records; auto-reverse created 2 records for Jane.
 	// From John's page, we see exactly 2 (his owned records).
-	relationships, err := svc.List(contactID, vaultID)
+	relationships, err := svc.List(contactID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -201,7 +202,7 @@ func TestUpdateRelationship(t *testing.T) {
 	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateRelationshipRequest{
 		RelationshipTypeID: 3,
 		RelatedContactID:   relatedContactID,
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -225,7 +226,7 @@ func TestDeleteRelationship(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	relationships, err := svc.List(contactID, vaultID)
+	relationships, err := svc.List(contactID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -235,12 +236,12 @@ func TestDeleteRelationship(t *testing.T) {
 }
 
 func TestRelationshipNotFound(t *testing.T) {
-	svc, contactID, relatedContactID, vaultID, _ := setupRelationshipTest(t)
+	svc, contactID, relatedContactID, vaultID, userID := setupRelationshipTest(t)
 
 	_, err := svc.Update(9999, contactID, vaultID, dto.UpdateRelationshipRequest{
 		RelationshipTypeID: 1,
 		RelatedContactID:   relatedContactID,
-	})
+	}, userID)
 	if err != ErrRelationshipNotFound {
 		t.Errorf("Expected ErrRelationshipNotFound, got %v", err)
 	}
@@ -269,10 +270,10 @@ func createAsymmetricTypePair(t *testing.T, db *gorm.DB, accountID string) (pare
 		t.Fatalf("Create parent type failed: %v", err)
 	}
 	childType := models.RelationshipType{
-		RelationshipGroupTypeID:  group.ID,
-		Name:                     &childName,
-		NameReverseRelationship:  &parentName,
-		CanBeDeleted:             true,
+		RelationshipGroupTypeID:   group.ID,
+		Name:                      &childName,
+		NameReverseRelationship:   &parentName,
+		CanBeDeleted:              true,
 		ReverseRelationshipTypeID: &parentType.ID,
 	}
 	if err := db.Create(&childType).Error; err != nil {
@@ -297,7 +298,7 @@ func TestCreateRelationship_AutoCreatesReverse(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -329,7 +330,7 @@ func TestCreateRelationship_SymmetricType(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -373,7 +374,7 @@ func TestCreateRelationship_NoReverseType(t *testing.T) {
 	}
 
 	// List(contactID) returns 1 forward record (no reverse was auto-created)
-	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
+	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List forward failed: %v", err)
 	}
@@ -384,7 +385,7 @@ func TestCreateRelationship_NoReverseType(t *testing.T) {
 	// BUG FIX: List now uses simple contact_id query. The orphan type has no
 	// matching reverse, so no auto-reverse record was created for relatedContact.
 	// From relatedContact's page, no records have contact_id = relatedContactID.
-	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -406,7 +407,7 @@ func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
 	}
 
 	// Before delete: related contact has 1 auto-reverse record (contact_id = relatedContact)
-	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRels, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -418,7 +419,7 @@ func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
-	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID)
+	forwardRels, err := ctx.svc.List(ctx.contactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List forward failed: %v", err)
 	}
@@ -426,7 +427,7 @@ func TestDeleteRelationship_AutoDeletesReverse(t *testing.T) {
 		t.Errorf("Expected 0 forward relationships after delete, got %d", len(forwardRels))
 	}
 
-	reverseRels, err = ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRels, err = ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse after delete failed: %v", err)
 	}
@@ -469,7 +470,7 @@ func TestUpdateRelationship_NotBidirectional(t *testing.T) {
 	}
 
 	// Related contact has 1 auto-reverse record (the child type)
-	reverseRelsBefore, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRelsBefore, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -484,14 +485,14 @@ func TestUpdateRelationship_NotBidirectional(t *testing.T) {
 	_, err = ctx.svc.Update(created.ID, ctx.contactID, ctx.vaultID, dto.UpdateRelationshipRequest{
 		RelationshipTypeID: spouseType.ID,
 		RelatedContactID:   ctx.relatedContactID,
-	})
+	}, ctx.userID)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
 	// After updating forward to spouse, related contact still sees 1 record:
 	// the original auto-reverse (child type, update is not bidirectional)
-	reverseRelsAfter, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID)
+	reverseRelsAfter, err := ctx.svc.List(ctx.relatedContactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("List reverse after update failed: %v", err)
 	}
@@ -563,7 +564,7 @@ func TestCrossVaultRelationship_WithEditorPermission(t *testing.T) {
 	}
 
 	// Verify forward exists on contact1
-	forwardRels, err := relSvc.List(contact1.ID, vault1.ID)
+	forwardRels, err := relSvc.List(contact1.ID, vault1.ID, userID)
 	if err != nil {
 		t.Fatalf("List forward failed: %v", err)
 	}
@@ -572,7 +573,7 @@ func TestCrossVaultRelationship_WithEditorPermission(t *testing.T) {
 	}
 
 	// Verify auto-reverse exists on contact2 (user has Editor on vault2)
-	reverseRels, err := relSvc.List(contact2.ID, vault2.ID)
+	reverseRels, err := relSvc.List(contact2.ID, vault2.ID, userID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -672,7 +673,7 @@ func TestCrossVaultRelationship_WithoutEditorPermission(t *testing.T) {
 	}
 
 	// Forward relationship should exist on contact1
-	forwardRels, err := relSvc.List(contact1.ID, vault1.ID)
+	forwardRels, err := relSvc.List(contact1.ID, vault1.ID, user2ID)
 	if err != nil {
 		t.Fatalf("List forward failed: %v", err)
 	}
@@ -681,7 +682,7 @@ func TestCrossVaultRelationship_WithoutEditorPermission(t *testing.T) {
 	}
 
 	// Reverse relationship should NOT exist on contact2 (user2 only has Viewer on vault2)
-	reverseRels, err := relSvc.List(contact2.ID, vault2.ID)
+	reverseRels, err := relSvc.List(contact2.ID, vault2.ID, user2ID)
 	if err != nil {
 		t.Fatalf("List reverse failed: %v", err)
 	}
@@ -741,7 +742,7 @@ func TestCrossVaultRelationship_List(t *testing.T) {
 	}
 
 	// List relationships for contact1
-	rels, err := relSvc.List(contact1.ID, vault1.ID)
+	rels, err := relSvc.List(contact1.ID, vault1.ID, userID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -759,6 +760,176 @@ func TestCrossVaultRelationship_List(t *testing.T) {
 	}
 	if rel.RelatedVaultName != "Work" {
 		t.Errorf("Expected RelatedVaultName 'Work', got '%s'", rel.RelatedVaultName)
+	}
+}
+
+func TestCrossVaultRelationship_ReadsHideInaccessibleRelatedVault(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+	vaultSvc := NewVaultService(db)
+
+	owner, err := authSvc.Register(dto.RegisterRequest{FirstName: "Owner", LastName: "User", Email: "relationship-owner.com", Password: "password123"}, "en")
+	if err != nil {
+		t.Fatalf("Register owner failed: %v", err)
+	}
+	viewer, err := authSvc.Register(dto.RegisterRequest{FirstName: "Limited", LastName: "Reader", Email: "relationship-reader.com", Password: "password123"}, "en")
+	if err != nil {
+		t.Fatalf("Register viewer failed: %v", err)
+	}
+
+	sharedVault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Shared Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create shared vault failed: %v", err)
+	}
+	privateVault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Private Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create private vault failed: %v", err)
+	}
+	if err := db.Create(&models.UserVault{VaultID: sharedVault.ID, UserID: viewer.User.ID, Permission: models.PermissionViewer}).Error; err != nil {
+		t.Fatalf("Grant shared vault access failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	sharedContact, err := contactSvc.CreateContact(sharedVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Shared", LastName: "Person"})
+	if err != nil {
+		t.Fatalf("Create shared contact failed: %v", err)
+	}
+	privateContact, err := contactSvc.CreateContact(privateVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Private", LastName: "Secret"})
+	if err != nil {
+		t.Fatalf("Create private contact failed: %v", err)
+	}
+	relTypeID := createNameOrderRelationshipType(t, db, owner.User.AccountID).ID
+	if err := db.Create(&models.Relationship{ContactID: sharedContact.ID, RelatedContactID: privateContact.ID, RelationshipTypeID: relTypeID}).Error; err != nil {
+		t.Fatalf("Create legacy cross-vault relationship failed: %v", err)
+	}
+
+	relSvc := NewRelationshipService(db)
+	rels, err := relSvc.List(sharedContact.ID, sharedVault.ID, viewer.User.ID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(rels) != 0 {
+		t.Fatalf("expected inaccessible related vault relationship to be hidden, got %#v", rels)
+	}
+
+	graph, err := relSvc.GetContactGraph(sharedContact.ID, sharedVault.ID, viewer.User.ID)
+	if err != nil {
+		t.Fatalf("GetContactGraph failed: %v", err)
+	}
+	for _, node := range graph.Nodes {
+		if node.ID == privateContact.ID || node.Label == "Private Secret" {
+			t.Fatalf("graph exposed inaccessible related contact: %#v", node)
+		}
+	}
+	for _, edge := range graph.Edges {
+		if edge.Source == privateContact.ID || edge.Target == privateContact.ID {
+			t.Fatalf("graph exposed inaccessible edge: %#v", edge)
+		}
+	}
+}
+
+func TestContactGraphIncludesAccessibleSecondLayerEdges(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+	vaultSvc := NewVaultService(db)
+
+	owner, err := authSvc.Register(dto.RegisterRequest{FirstName: "Graph", LastName: "Owner", Email: "graph-edge-owner@example.com", Password: "password123"}, "en")
+	if err != nil {
+		t.Fatalf("Register owner failed: %v", err)
+	}
+	viewer, err := authSvc.Register(dto.RegisterRequest{FirstName: "Graph", LastName: "Viewer", Email: "graph-edge-viewer@example.com", Password: "password123"}, "en")
+	if err != nil {
+		t.Fatalf("Register viewer failed: %v", err)
+	}
+
+	sharedVault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Shared Graph Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create shared vault failed: %v", err)
+	}
+	if err := db.Create(&models.UserVault{VaultID: sharedVault.ID, UserID: viewer.User.ID, Permission: models.PermissionViewer}).Error; err != nil {
+		t.Fatalf("Grant shared vault access failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	center, err := contactSvc.CreateContact(sharedVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Center"})
+	if err != nil {
+		t.Fatalf("Create center contact failed: %v", err)
+	}
+	sharedLeft, err := contactSvc.CreateContact(sharedVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Shared", LastName: "Left"})
+	if err != nil {
+		t.Fatalf("Create shared left contact failed: %v", err)
+	}
+	sharedRight, err := contactSvc.CreateContact(sharedVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Shared", LastName: "Right"})
+	if err != nil {
+		t.Fatalf("Create shared right contact failed: %v", err)
+	}
+	relTypeID := createNameOrderRelationshipType(t, db, owner.User.AccountID).ID
+	relationships := []models.Relationship{
+		{ContactID: center.ID, RelatedContactID: sharedLeft.ID, RelationshipTypeID: relTypeID},
+		{ContactID: center.ID, RelatedContactID: sharedRight.ID, RelationshipTypeID: relTypeID},
+		{ContactID: sharedLeft.ID, RelatedContactID: sharedRight.ID, RelationshipTypeID: relTypeID},
+	}
+	if err := db.Create(&relationships).Error; err != nil {
+		t.Fatalf("Create graph relationships failed: %v", err)
+	}
+
+	graph, err := NewRelationshipService(db).GetContactGraph(center.ID, sharedVault.ID, viewer.User.ID)
+	if err != nil {
+		t.Fatalf("GetContactGraph failed: %v", err)
+	}
+	foundSharedSecondLayerEdge := false
+	for _, edge := range graph.Edges {
+		if edge.Source == sharedLeft.ID && edge.Target == sharedRight.ID {
+			foundSharedSecondLayerEdge = true
+		}
+	}
+	if !foundSharedSecondLayerEdge {
+		t.Fatal("expected accessible second-layer edge between shared contacts")
+	}
+}
+
+func TestCalculateKinshipRejectsInaccessibleRelatedVault(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+	vaultSvc := NewVaultService(db)
+
+	owner, err := authSvc.Register(dto.RegisterRequest{FirstName: "Owner", LastName: "User", Email: "kinship-owner@example.com", Password: "password123"}, "en")
+	if err != nil {
+		t.Fatalf("Register owner failed: %v", err)
+	}
+	viewer, err := authSvc.Register(dto.RegisterRequest{FirstName: "Limited", LastName: "Reader", Email: "kinship-reader@example.com", Password: "password123"}, "en")
+	if err != nil {
+		t.Fatalf("Register viewer failed: %v", err)
+	}
+
+	sharedVault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Shared Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create shared vault failed: %v", err)
+	}
+	privateVault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Private Vault"}, "en")
+	if err != nil {
+		t.Fatalf("Create private vault failed: %v", err)
+	}
+	if err := db.Create(&models.UserVault{VaultID: sharedVault.ID, UserID: viewer.User.ID, Permission: models.PermissionViewer}).Error; err != nil {
+		t.Fatalf("Grant shared vault access failed: %v", err)
+	}
+
+	contactSvc := NewContactService(db)
+	sharedContact, err := contactSvc.CreateContact(sharedVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Shared", LastName: "Person"})
+	if err != nil {
+		t.Fatalf("Create shared contact failed: %v", err)
+	}
+	privateContact, err := contactSvc.CreateContact(privateVault.ID, owner.User.ID, dto.CreateContactRequest{FirstName: "Private", LastName: "Secret"})
+	if err != nil {
+		t.Fatalf("Create private contact failed: %v", err)
+	}
+	if err := db.Create(&models.Relationship{ContactID: sharedContact.ID, RelatedContactID: privateContact.ID, RelationshipTypeID: findRelTypeByDegree(t, db, 1)}).Error; err != nil {
+		t.Fatalf("Create legacy kinship relationship failed: %v", err)
+	}
+
+	_, err = NewRelationshipService(db).CalculateKinship(sharedContact.ID, privateContact.ID, sharedVault.ID, viewer.User.ID)
+	if err != ErrContactNotFound {
+		t.Fatalf("Expected ErrContactNotFound for inaccessible related contact, got %v", err)
 	}
 }
 
@@ -924,7 +1095,7 @@ func TestCrossVaultRelationship_DeleteRemovesCrossVaultReverse(t *testing.T) {
 	}
 
 	// Verify reverse exists before delete
-	reverseRels, err := relSvc.List(contact2.ID, vault2.ID)
+	reverseRels, err := relSvc.List(contact2.ID, vault2.ID, userID)
 	if err != nil {
 		t.Fatalf("List reverse before delete failed: %v", err)
 	}
@@ -938,7 +1109,7 @@ func TestCrossVaultRelationship_DeleteRemovesCrossVaultReverse(t *testing.T) {
 	}
 
 	// Verify forward is gone
-	forwardRels, err := relSvc.List(contact1.ID, vault1.ID)
+	forwardRels, err := relSvc.List(contact1.ID, vault1.ID, userID)
 	if err != nil {
 		t.Fatalf("List forward after delete failed: %v", err)
 	}
@@ -947,7 +1118,7 @@ func TestCrossVaultRelationship_DeleteRemovesCrossVaultReverse(t *testing.T) {
 	}
 
 	// Verify reverse is also gone (tolerant delete works cross-vault)
-	reverseRels, err = relSvc.List(contact2.ID, vault2.ID)
+	reverseRels, err = relSvc.List(contact2.ID, vault2.ID, userID)
 	if err != nil {
 		t.Fatalf("List reverse after delete failed: %v", err)
 	}

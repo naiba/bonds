@@ -88,12 +88,16 @@ func preloadContactVCardRelations(db *gorm.DB) *gorm.DB {
 
 func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto.VCardImportResponse, error) {
 	dec := vcard.NewDecoder(data)
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	var imported []dto.ContactResponse
 	var skippedCount int
 	var importErrors []string
 
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		var vault models.Vault
 		if err := tx.First(&vault, "id = ?", vaultID).Error; err != nil {
 			return fmt.Errorf("vault not found: %w", err)
@@ -148,7 +152,11 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 				return err
 			}
 
-			imported = append(imported, toContactResponse(&contact, false))
+			resp, err := toContactResponse(&contact, false, formatter)
+			if err != nil {
+				return err
+			}
+			imported = append(imported, resp)
 		}
 		return nil
 	})

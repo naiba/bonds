@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func setupContactAvatarTest(t *testing.T) (*ContactAvatarService, string, string, *gorm.DB) {
+func setupContactAvatarTest(t *testing.T) (*ContactAvatarService, string, string, string, *gorm.DB) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -37,11 +37,11 @@ func setupContactAvatarTest(t *testing.T) (*ContactAvatarService, string, string
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewContactAvatarService(db), contact.ID, vault.ID, db
+	return NewContactAvatarService(db), contact.ID, vault.ID, resp.User.ID, db
 }
 
 func TestContactAvatarUpdate(t *testing.T) {
-	svc, contactID, vaultID, db := setupContactAvatarTest(t)
+	svc, contactID, vaultID, userID, db := setupContactAvatarTest(t)
 
 	file := models.File{
 		VaultID:  vaultID,
@@ -55,7 +55,7 @@ func TestContactAvatarUpdate(t *testing.T) {
 		t.Fatalf("Create file failed: %v", err)
 	}
 
-	resp, err := svc.UpdateAvatar(contactID, vaultID, file.ID)
+	resp, err := svc.UpdateAvatar(contactID, vaultID, userID, file.ID)
 	if err != nil {
 		t.Fatalf("UpdateAvatar failed: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestContactAvatarUpdate(t *testing.T) {
 }
 
 func TestContactAvatarDelete(t *testing.T) {
-	svc, contactID, vaultID, db := setupContactAvatarTest(t)
+	svc, contactID, vaultID, userID, db := setupContactAvatarTest(t)
 
 	file := models.File{
 		VaultID:  vaultID,
@@ -79,12 +79,12 @@ func TestContactAvatarDelete(t *testing.T) {
 		t.Fatalf("Create file failed: %v", err)
 	}
 
-	_, err := svc.UpdateAvatar(contactID, vaultID, file.ID)
+	_, err := svc.UpdateAvatar(contactID, vaultID, userID, file.ID)
 	if err != nil {
 		t.Fatalf("UpdateAvatar failed: %v", err)
 	}
 
-	resp, err := svc.DeleteAvatar(contactID, vaultID)
+	resp, err := svc.DeleteAvatar(contactID, vaultID, userID)
 	if err != nil {
 		t.Fatalf("DeleteAvatar failed: %v", err)
 	}
@@ -94,18 +94,18 @@ func TestContactAvatarDelete(t *testing.T) {
 }
 
 func TestContactAvatarUpdateNotFound(t *testing.T) {
-	svc, _, vaultID, _ := setupContactAvatarTest(t)
+	svc, _, vaultID, userID, _ := setupContactAvatarTest(t)
 
-	_, err := svc.UpdateAvatar("nonexistent-id", vaultID, 1)
+	_, err := svc.UpdateAvatar("nonexistent-id", vaultID, userID, 1)
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}
 }
 
 func TestContactAvatarDeleteNotFound(t *testing.T) {
-	svc, _, vaultID, _ := setupContactAvatarTest(t)
+	svc, _, vaultID, userID, _ := setupContactAvatarTest(t)
 
-	_, err := svc.DeleteAvatar("nonexistent-id", vaultID)
+	_, err := svc.DeleteAvatar("nonexistent-id", vaultID, userID)
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}

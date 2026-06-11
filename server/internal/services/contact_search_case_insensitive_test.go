@@ -66,7 +66,7 @@ func TestContactSearchIsCaseInsensitive(t *testing.T) {
 			t.Errorf("ListContacts(%q) = %v; want 1 match 'Alice'", term, got)
 		}
 
-		qs, err := contactSvc.QuickSearch(vault.ID, term)
+		qs, err := contactSvc.QuickSearch(vault.ID, term, resp.User.ID)
 		if err != nil {
 			t.Fatalf("QuickSearch(%q) failed: %v", term, err)
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -196,13 +197,14 @@ func (h *ContactJobHandler) DeleteJob(c echo.Context) error {
 func (h *ContactJobHandler) LegacyUpdate(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 
 	var req dto.UpdateJobInfoRequest
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
 
-	contact, err := h.contactJobService.LegacyUpdate(contactID, vaultID, req)
+	contact, err := h.contactJobService.LegacyUpdate(contactID, vaultID, userID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
@@ -229,8 +231,9 @@ func (h *ContactJobHandler) LegacyUpdate(c echo.Context) error {
 func (h *ContactJobHandler) LegacyDelete(c echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 
-	contact, err := h.contactJobService.LegacyDelete(contactID, vaultID)
+	contact, err := h.contactJobService.LegacyDelete(contactID, vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")

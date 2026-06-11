@@ -36,6 +36,7 @@ func NewVaultTaskHandler(vaultTaskService *services.VaultTaskService) *VaultTask
 //	@Router			/vaults/{vault_id}/tasks [get]
 func (h *VaultTaskHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 
 	filters := services.VaultTaskFilters{}
 	if cq := c.QueryParam("contact_id"); cq != "" {
@@ -50,7 +51,7 @@ func (h *VaultTaskHandler) List(c echo.Context) error {
 		filters.Status = &sq
 	}
 
-	tasks, err := h.vaultTaskService.List(vaultID, filters)
+	tasks, err := h.vaultTaskService.List(vaultID, filters, userID)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_vault_tasks")
 	}
@@ -122,6 +123,7 @@ func (h *VaultTaskHandler) Create(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/tasks/{id} [patch]
 func (h *VaultTaskHandler) Update(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
@@ -134,7 +136,7 @@ func (h *VaultTaskHandler) Update(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	task, err := h.vaultTaskService.Update(uint(id), vaultID, req)
+	task, err := h.vaultTaskService.Update(uint(id), vaultID, req, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrTaskNotFound) {
 			return response.NotFound(c, "err.task_not_found")
@@ -172,6 +174,7 @@ func (h *VaultTaskHandler) Update(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/tasks/{id}/status [patch]
 func (h *VaultTaskHandler) UpdateStatus(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
@@ -184,7 +187,7 @@ func (h *VaultTaskHandler) UpdateStatus(c echo.Context) error {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
 
-	task, err := h.vaultTaskService.UpdateStatus(uint(id), vaultID, req)
+	task, err := h.vaultTaskService.UpdateStatus(uint(id), vaultID, req, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrTaskNotFound) {
 			return response.NotFound(c, "err.task_not_found")
@@ -216,6 +219,7 @@ func (h *VaultTaskHandler) UpdateStatus(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/tasks/{id}/position [patch]
 func (h *VaultTaskHandler) UpdatePosition(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_task_id", nil)
@@ -225,7 +229,7 @@ func (h *VaultTaskHandler) UpdatePosition(c echo.Context) error {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
 
-	task, err := h.vaultTaskService.UpdatePosition(uint(id), vaultID, req)
+	task, err := h.vaultTaskService.UpdatePosition(uint(id), vaultID, req, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrTaskNotFound) {
 			return response.NotFound(c, "err.task_not_found")

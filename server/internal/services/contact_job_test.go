@@ -14,6 +14,7 @@ type contactJobTestContext struct {
 	db        *gorm.DB
 	contactID string
 	vaultID   string
+	userID    string
 	companyID uint
 }
 
@@ -59,6 +60,7 @@ func setupContactJobTest(t *testing.T) *contactJobTestContext {
 		db:        db,
 		contactID: contact.ID,
 		vaultID:   vault.ID,
+		userID:    resp.User.ID,
 		companyID: company.ID,
 	}
 }
@@ -331,7 +333,7 @@ func TestContactJob_RemoveEmployee_NotFound(t *testing.T) {
 func TestContactJob_LegacyUpdate(t *testing.T) {
 	ctx := setupContactJobTest(t)
 
-	resp, err := ctx.svc.LegacyUpdate(ctx.contactID, ctx.vaultID, dto.UpdateJobInfoRequest{
+	resp, err := ctx.svc.LegacyUpdate(ctx.contactID, ctx.vaultID, ctx.userID, dto.UpdateJobInfoRequest{
 		CompanyID:   &ctx.companyID,
 		JobPosition: "Engineer",
 	})
@@ -358,7 +360,7 @@ func TestContactJob_LegacyUpdate(t *testing.T) {
 func TestContactJob_LegacyUpdate_NotFound(t *testing.T) {
 	ctx := setupContactJobTest(t)
 
-	_, err := ctx.svc.LegacyUpdate("nonexistent-id", ctx.vaultID, dto.UpdateJobInfoRequest{
+	_, err := ctx.svc.LegacyUpdate("nonexistent-id", ctx.vaultID, ctx.userID, dto.UpdateJobInfoRequest{
 		JobPosition: "Engineer",
 	})
 	if err != ErrContactNotFound {
@@ -370,7 +372,7 @@ func TestContactJob_LegacyDelete(t *testing.T) {
 	ctx := setupContactJobTest(t)
 
 	// First create a job via legacy
-	_, err := ctx.svc.LegacyUpdate(ctx.contactID, ctx.vaultID, dto.UpdateJobInfoRequest{
+	_, err := ctx.svc.LegacyUpdate(ctx.contactID, ctx.vaultID, ctx.userID, dto.UpdateJobInfoRequest{
 		CompanyID:   &ctx.companyID,
 		JobPosition: "Engineer",
 	})
@@ -378,7 +380,7 @@ func TestContactJob_LegacyDelete(t *testing.T) {
 		t.Fatalf("LegacyUpdate failed: %v", err)
 	}
 
-	resp, err := ctx.svc.LegacyDelete(ctx.contactID, ctx.vaultID)
+	resp, err := ctx.svc.LegacyDelete(ctx.contactID, ctx.vaultID, ctx.userID)
 	if err != nil {
 		t.Fatalf("LegacyDelete failed: %v", err)
 	}
@@ -399,7 +401,7 @@ func TestContactJob_LegacyDelete(t *testing.T) {
 func TestContactJob_LegacyDelete_NotFound(t *testing.T) {
 	ctx := setupContactJobTest(t)
 
-	_, err := ctx.svc.LegacyDelete("nonexistent-id", ctx.vaultID)
+	_, err := ctx.svc.LegacyDelete("nonexistent-id", ctx.vaultID, ctx.userID)
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}

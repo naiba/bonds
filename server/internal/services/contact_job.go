@@ -182,7 +182,7 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 
 // LegacyUpdate creates or updates the first job for backward compatibility with the old PUT /jobInformation endpoint.
 // Uses the new ContactCompany table instead of Contact.CompanyID.
-func (s *ContactJobService) LegacyUpdate(contactID, vaultID string, req dto.UpdateJobInfoRequest) (*dto.ContactResponse, error) {
+func (s *ContactJobService) LegacyUpdate(contactID, vaultID, userID string, req dto.UpdateJobInfoRequest) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -230,13 +230,20 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID string, req dto.Upda
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
 // LegacyDelete clears all jobs for a contact for backward compatibility with the old DELETE /jobInformation endpoint.
-func (s *ContactJobService) LegacyDelete(contactID, vaultID string) (*dto.ContactResponse, error) {
+func (s *ContactJobService) LegacyDelete(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -259,8 +266,15 @@ func (s *ContactJobService) LegacyDelete(contactID, vaultID string) (*dto.Contac
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 

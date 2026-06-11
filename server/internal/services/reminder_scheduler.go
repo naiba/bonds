@@ -92,6 +92,19 @@ func (s *ReminderSchedulerService) processOne(scheduled *models.ContactReminderS
 		enableAltCalendar = channel.User.EnableAlternativeCalendar
 	}
 	contactName := buildContactName(&reminder.Contact, locale)
+	if channel.UserID != nil {
+		formatter, err := newContactNameFormatter(s.db, *channel.UserID)
+		if err != nil {
+			log.Printf("[reminder-scheduler] Failed to load name formatter for user %s: %v", *channel.UserID, err)
+			return
+		}
+		formatted, err := formatter.format(&reminder.Contact, i18n.T(locale, "reminder.unknown_contact"))
+		if err != nil {
+			log.Printf("[reminder-scheduler] Failed to format contact name for reminder %d: %v", reminder.ID, err)
+			return
+		}
+		contactName = formatted
+	}
 	dateStr := formatReminderDate(reminder, scheduled.ScheduledAt, enableAltCalendar)
 	subject := i18n.Tt(locale, "reminder.subject", map[string]string{"label": reminder.Label})
 	htmlBody := i18n.Tt(locale, "reminder.body", map[string]string{

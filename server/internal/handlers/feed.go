@@ -4,8 +4,9 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
-	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
 
@@ -35,10 +36,11 @@ func NewFeedHandler(feedService *services.FeedService) *FeedHandler {
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/feed [get]
 func (h *FeedHandler) GetContactFeed(c echo.Context) error {
 	contactID := c.Param("contact_id")
+	userID := middleware.GetUserID(c)
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 
-	items, meta, err := h.feedService.ListContactFeed(contactID, page, perPage)
+	items, meta, err := h.feedService.ListContactFeed(contactID, c.Param("vault_id"), page, perPage, userID)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_feed")
 	}
@@ -60,10 +62,11 @@ func (h *FeedHandler) GetContactFeed(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/feed [get]
 func (h *FeedHandler) Get(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	page, _ := strconv.Atoi(c.QueryParam("page"))
 	perPage, _ := strconv.Atoi(c.QueryParam("per_page"))
 
-	items, meta, err := h.feedService.GetFeed(vaultID, page, perPage)
+	items, meta, err := h.feedService.GetFeed(vaultID, page, perPage, userID)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_feed")
 	}

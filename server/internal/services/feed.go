@@ -1,7 +1,6 @@
 package services
 
 import (
-	"github.com/naiba/bonds/internal/utils"
 	"math"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -18,7 +17,7 @@ func NewFeedService(db *gorm.DB) *FeedService {
 	return &FeedService{db: db}
 }
 
-func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItemResponse, response.Meta, error) {
+func (s *FeedService) GetFeed(vaultID string, page, perPage int, userID string) ([]dto.FeedItemResponse, response.Meta, error) {
 	var contacts []models.Contact
 	if err := s.db.Where("vault_id = ?", vaultID).Select("id").Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
@@ -31,10 +30,10 @@ func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItem
 		return []dto.FeedItemResponse{}, response.Meta{Page: 1, PerPage: perPage}, nil
 	}
 
-	query := s.db.Where("contact_id IN ?", contactIDs)
+	query := s.db.Model(&models.ContactFeedItem{}).Where("contact_id IN ?", contactIDs)
 
 	var total int64
-	if err := query.Model(&models.ContactFeedItem{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -51,8 +50,16 @@ func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItem
 		return nil, response.Meta{}, err
 	}
 
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, response.Meta{}, err
+	}
 	result := make([]dto.FeedItemResponse, len(items))
 	for i, item := range items {
+		contactName, err := formatter.format(&item.Contact, "")
+		if err != nil {
+			return nil, response.Meta{}, err
+		}
 		authorID := ""
 		if item.AuthorID != nil {
 			authorID = *item.AuthorID
@@ -64,7 +71,7 @@ func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItem
 		result[i] = dto.FeedItemResponse{
 			ID:          item.ID,
 			ContactID:   item.ContactID,
-			ContactName: utils.BuildContactName(&item.Contact),
+			ContactName: contactName,
 			AuthorID:    authorID,
 			Action:      item.Action,
 			Description: desc,
@@ -81,8 +88,10 @@ func (s *FeedService) GetFeed(vaultID string, page, perPage int) ([]dto.FeedItem
 	return result, meta, nil
 }
 
-func (s *FeedService) ListContactFeed(contactID string, page, perPage int) ([]dto.FeedItemResponse, response.Meta, error) {
-	query := s.db.Where("contact_id = ?", contactID)
+func (s *FeedService) ListContactFeed(contactID, vaultID string, page, perPage int, userID string) ([]dto.FeedItemResponse, response.Meta, error) {
+	query := s.db.Model(&models.ContactFeedItem{}).
+		Where("contact_id = ?", contactID).
+		Where("EXISTS (SELECT 1 FROM contacts WHERE contacts.id = contact_feed_items.contact_id AND contacts.vault_id = ?)", vaultID)
 
 	var total int64
 	if err := query.Model(&models.ContactFeedItem{}).Count(&total).Error; err != nil {
@@ -102,8 +111,16 @@ func (s *FeedService) ListContactFeed(contactID string, page, perPage int) ([]dt
 		return nil, response.Meta{}, err
 	}
 
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, response.Meta{}, err
+	}
 	result := make([]dto.FeedItemResponse, len(items))
 	for i, item := range items {
+		contactName, err := formatter.format(&item.Contact, "")
+		if err != nil {
+			return nil, response.Meta{}, err
+		}
 		authorID := ""
 		if item.AuthorID != nil {
 			authorID = *item.AuthorID
@@ -115,7 +132,7 @@ func (s *FeedService) ListContactFeed(contactID string, page, perPage int) ([]dt
 		result[i] = dto.FeedItemResponse{
 			ID:          item.ID,
 			ContactID:   item.ContactID,
-			ContactName: utils.BuildContactName(&item.Contact),
+			ContactName: contactName,
 			AuthorID:    authorID,
 			Action:      item.Action,
 			Description: desc,

@@ -138,7 +138,7 @@ func TestImportantDatesReport(t *testing.T) {
 	}
 
 	svc := NewReportService(db)
-	report, err := svc.ImportantDatesReport(vault.ID)
+	report, err := svc.ImportantDatesReport(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ImportantDatesReport failed: %v", err)
 	}
@@ -147,6 +147,9 @@ func TestImportantDatesReport(t *testing.T) {
 	}
 	if len(report) > 0 && report[0].Label != "Christmas" {
 		t.Errorf("Expected label 'Christmas', got '%s'", report[0].Label)
+	}
+	if len(report) > 0 && report[0].ContactName != "Alice" {
+		t.Errorf("Expected contact_name 'Alice', got '%s'", report[0].ContactName)
 	}
 }
 
@@ -199,7 +202,7 @@ func TestImportantDatesReportLunar(t *testing.T) {
 	}
 
 	svc := NewReportService(db)
-	report, err := svc.ImportantDatesReport(vault.ID)
+	report, err := svc.ImportantDatesReport(vault.ID, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ImportantDatesReport failed: %v", err)
 	}
@@ -227,6 +230,34 @@ func TestImportantDatesReportLunar(t *testing.T) {
 	}
 	if item.Month == nil || *item.Month != 2 {
 		t.Errorf("Expected gregorian Month 2, got %v", item.Month)
+	}
+	if item.ContactName != "Lunar" {
+		t.Errorf("Expected contact_name 'Lunar', got '%s'", item.ContactName)
+	}
+}
+
+func TestImportantDatesReportUsesVaultNameOrder(t *testing.T) {
+	ctx := setupNameOrderRegressionTest(t, "reports-name-order@example.com")
+	day := 25
+	month := 12
+	if err := ctx.db.Create(&models.ContactImportantDate{
+		ContactID: ctx.contact.ID,
+		Label:     "Birthday",
+		Day:       &day,
+		Month:     &month,
+	}).Error; err != nil {
+		t.Fatalf("Create important date failed: %v", err)
+	}
+
+	report, err := NewReportService(ctx.db).ImportantDatesReport(ctx.vaultID, ctx.userID)
+	if err != nil {
+		t.Fatalf("ImportantDatesReport failed: %v", err)
+	}
+	if len(report) != 1 {
+		t.Fatalf("Expected 1 report item, got %d", len(report))
+	}
+	if report[0].ContactName != "Zephyr, Alice (Ace)" {
+		t.Fatalf("Expected contact_name 'Zephyr, Alice (Ace)', got '%s'", report[0].ContactName)
 	}
 }
 

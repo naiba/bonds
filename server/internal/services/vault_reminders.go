@@ -17,13 +17,17 @@ func NewVaultReminderService(db *gorm.DB) *VaultReminderService {
 	return &VaultReminderService{db: db}
 }
 
-func (s *VaultReminderService) List(vaultID string) ([]dto.VaultReminderItem, error) {
+func (s *VaultReminderService) List(vaultID, userID string) ([]dto.VaultReminderItem, error) {
 	var contacts []models.Contact
-	if err := s.db.Where("vault_id = ?", vaultID).Select("id, first_name, last_name").Find(&contacts).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Select("id, vault_id, first_name, last_name, middle_name, nickname, maiden_name, prefix, suffix").Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 	if len(contacts) == 0 {
 		return []dto.VaultReminderItem{}, nil
+	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
 	}
 
 	contactMap := make(map[string]models.Contact, len(contacts))
@@ -42,10 +46,15 @@ func (s *VaultReminderService) List(vaultID string) ([]dto.VaultReminderItem, er
 	now := time.Now()
 	for i, r := range reminders {
 		contact := contactMap[r.ContactID]
+		contactName, err := formatter.format(&contact, "")
+		if err != nil {
+			return nil, err
+		}
 		result[i] = dto.VaultReminderItem{
 			ReminderResponse: toReminderResponse(&r),
 			ContactFirstName: ptrToStr(contact.FirstName),
 			ContactLastName:  ptrToStr(contact.LastName),
+			ContactName:      contactName,
 		}
 	}
 

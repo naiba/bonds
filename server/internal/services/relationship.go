@@ -4,7 +4,6 @@ import (
 	"container/heap"
 	"errors"
 	"math"
-	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -26,7 +25,7 @@ func (s *RelationshipService) SetFeedRecorder(fr *FeedRecorder) {
 	s.feedRecorder = fr
 }
 
-func (s *RelationshipService) List(contactID, vaultID string) ([]dto.RelationshipResponse, error) {
+func (s *RelationshipService) List(contactID, vaultID, userID string) ([]dto.RelationshipResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -44,9 +43,24 @@ func (s *RelationshipService) List(contactID, vaultID string) ([]dto.Relationshi
 		Order("created_at DESC").Find(&relationships).Error; err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	accessibleVaults, err := accessibleVaultIDSet(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]dto.RelationshipResponse, 0, len(relationships))
 	for _, r := range relationships {
-		resp := toRelationshipResponse(&r)
+		// Historical cross-vault rows can outlive a user's access to the related vault.
+		if !canReadContactInVault(accessibleVaults, r.RelatedContact) {
+			continue
+		}
+		resp, err := toRelationshipResponse(&r, formatter)
+		if err != nil {
+			return nil, err
+		}
 		result = append(result, resp)
 	}
 	return result, nil
@@ -57,14 +71,13 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 		return nil, err
 	}
 
-	// Verify the related contact exists (it may belong to any vault the user can access)
-	var relatedContact models.Contact
-	if err := s.db.Where("id = ?", req.RelatedContactID).First(&relatedContact).Error; err != nil {
+	relatedContact, err := validateAccessibleRelatedContact(s.db, userID, req.RelatedContactID)
+	if err != nil {
 		return nil, ErrContactNotFound
 	}
 
 	var relationship models.Relationship
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	transactionErr := s.db.Transaction(func(tx *gorm.DB) error {
 		relationship = models.Relationship{
 			ContactID:          contactID,
 			RelationshipTypeID: req.RelationshipTypeID,
@@ -96,8 +109,8 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 
 		return nil
 	})
-	if err != nil {
-		return nil, err
+	if transactionErr != nil {
+		return nil, transactionErr
 	}
 
 	if s.feedRecorder != nil {
@@ -105,13 +118,26 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 		s.feedRecorder.Record(contactID, "", ActionRelationshipAdded, "Added a relationship", &relationship.ID, &entityType)
 	}
 
-	resp := toRelationshipResponse(&relationship)
+	if err := s.db.Preload("RelationshipType").Preload("RelatedContact").Preload("RelatedContact.Vault").First(&relationship, relationship.ID).Error; err != nil {
+		return nil, err
+	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := toRelationshipResponse(&relationship, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
-func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto.UpdateRelationshipRequest) (*dto.RelationshipResponse, error) {
+func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto.UpdateRelationshipRequest, userID string) (*dto.RelationshipResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
+	}
+	if _, err := validateAccessibleRelatedContact(s.db, userID, req.RelatedContactID); err != nil {
+		return nil, ErrContactNotFound
 	}
 	var relationship models.Relationship
 	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&relationship).Error; err != nil {
@@ -125,7 +151,17 @@ func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto
 	if err := s.db.Save(&relationship).Error; err != nil {
 		return nil, err
 	}
-	resp := toRelationshipResponse(&relationship)
+	if err := s.db.Preload("RelationshipType").Preload("RelatedContact").Preload("RelatedContact.Vault").First(&relationship, relationship.ID).Error; err != nil {
+		return nil, err
+	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := toRelationshipResponse(&relationship, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -173,10 +209,14 @@ func findReverseTypeID(tx *gorm.DB, typeID uint) (uint, bool) {
 	return *rt.ReverseRelationshipTypeID, true
 }
 
-func toRelationshipResponse(r *models.Relationship) dto.RelationshipResponse {
+func toRelationshipResponse(r *models.Relationship, formatter *contactNameFormatter) (dto.RelationshipResponse, error) {
 	typeName := ""
 	if r.RelationshipType.Name != nil {
 		typeName = *r.RelationshipType.Name
+	}
+	relatedContactName, err := formatter.format(&r.RelatedContact, "")
+	if err != nil {
+		return dto.RelationshipResponse{}, err
 	}
 	resp := dto.RelationshipResponse{
 		ID:                   r.ID,
@@ -184,7 +224,7 @@ func toRelationshipResponse(r *models.Relationship) dto.RelationshipResponse {
 		RelatedContactID:     r.RelatedContactID,
 		RelationshipTypeID:   r.RelationshipTypeID,
 		RelationshipTypeName: typeName,
-		RelatedContactName:   contactLabel(&r.RelatedContact),
+		RelatedContactName:   relatedContactName,
 		RelatedVaultID:       r.RelatedContact.VaultID,
 		CreatedAt:            r.CreatedAt,
 		UpdatedAt:            r.UpdatedAt,
@@ -193,21 +233,10 @@ func toRelationshipResponse(r *models.Relationship) dto.RelationshipResponse {
 	if r.RelatedContact.Vault.Name != "" {
 		resp.RelatedVaultName = r.RelatedContact.Vault.Name
 	}
-	return resp
+	return resp, nil
 }
 
-func contactLabel(c *models.Contact) string {
-	var parts []string
-	if c.FirstName != nil && *c.FirstName != "" {
-		parts = append(parts, *c.FirstName)
-	}
-	if c.LastName != nil && *c.LastName != "" {
-		parts = append(parts, *c.LastName)
-	}
-	return strings.TrimSpace(strings.Join(parts, " "))
-}
-
-func (s *RelationshipService) GetContactGraph(contactID, vaultID string) (*dto.ContactGraphResponse, error) {
+func (s *RelationshipService) GetContactGraph(contactID, vaultID, userID string) (*dto.ContactGraphResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -227,10 +256,22 @@ func (s *RelationshipService) GetContactGraph(contactID, vaultID string) (*dto.C
 		return nil, err
 	}
 
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	accessibleVaults, err := accessibleVaultIDSet(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	centerLabel, err := formatter.format(&center, "")
+	if err != nil {
+		return nil, err
+	}
 	nodeMap := make(map[string]dto.GraphNode)
 	nodeMap[contactID] = dto.GraphNode{
 		ID:       center.ID,
-		Label:    contactLabel(&center),
+		Label:    centerLabel,
 		IsCenter: true,
 	}
 
@@ -238,16 +279,28 @@ func (s *RelationshipService) GetContactGraph(contactID, vaultID string) (*dto.C
 	connectedIDs := make(map[string]bool)
 
 	for _, r := range relationships {
+		// Graph nodes and edges must not reveal contacts in vaults the user can no longer read.
+		if !canReadContactInVault(accessibleVaults, r.Contact) || !canReadContactInVault(accessibleVaults, r.RelatedContact) {
+			continue
+		}
 		if _, exists := nodeMap[r.Contact.ID]; !exists {
+			label, err := formatter.format(&r.Contact, "")
+			if err != nil {
+				return nil, err
+			}
 			nodeMap[r.Contact.ID] = dto.GraphNode{
 				ID:    r.Contact.ID,
-				Label: contactLabel(&r.Contact),
+				Label: label,
 			}
 		}
 		if _, exists := nodeMap[r.RelatedContact.ID]; !exists {
+			label, err := formatter.format(&r.RelatedContact, "")
+			if err != nil {
+				return nil, err
+			}
 			nodeMap[r.RelatedContact.ID] = dto.GraphNode{
 				ID:    r.RelatedContact.ID,
-				Label: contactLabel(&r.RelatedContact),
+				Label: label,
 			}
 		}
 
@@ -278,12 +331,17 @@ func (s *RelationshipService) GetContactGraph(contactID, vaultID string) (*dto.C
 		var secondLayerRels []models.Relationship
 		if err := s.db.
 			Preload("RelationshipType").
+			Preload("Contact").
+			Preload("RelatedContact").
 			Where("contact_id IN ? AND related_contact_id IN ?", ids, ids).
 			Find(&secondLayerRels).Error; err != nil {
 			return nil, err
 		}
 
 		for _, r := range secondLayerRels {
+			if !canReadContactInVault(accessibleVaults, r.Contact) || !canReadContactInVault(accessibleVaults, r.RelatedContact) {
+				continue
+			}
 			typeName := ""
 			if r.RelationshipType.Name != nil {
 				typeName = *r.RelationshipType.Name
@@ -311,18 +369,21 @@ func (s *RelationshipService) CalculateKinship(contactID1, contactID2, vaultID, 
 	if err := validateContactBelongsToVault(s.db, contactID1, vaultID); err != nil {
 		return nil, err
 	}
-	// contactID2 may belong to a different vault (cross-vault relationship),
-	// so only verify it exists as a valid contact (not vault membership).
-	var c2 models.Contact
-	if err := s.db.Where("id = ?", contactID2).First(&c2).Error; err != nil {
+	if _, err := validateAccessibleRelatedContact(s.db, userID, contactID2); err != nil {
 		return nil, ErrContactNotFound
 	}
 
 	// Load all relationships across vaults the user can access for Dijkstra traversal.
-	userVaultIDs := getUserVaultIDs(s.db, userID)
+	accessibleVaults, err := accessibleVaultIDSet(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	userVaultIDs := vaultIDList(accessibleVaults)
 	var relationships []models.Relationship
 	if err := s.db.
 		Preload("RelationshipType").
+		Preload("Contact").
+		Preload("RelatedContact").
 		Where("contact_id IN (SELECT id FROM contacts WHERE vault_id IN ?)", userVaultIDs).
 		Find(&relationships).Error; err != nil {
 		return nil, err
@@ -336,6 +397,10 @@ func (s *RelationshipService) CalculateKinship(contactID1, contactID2, vaultID, 
 
 	for _, r := range relationships {
 		if r.RelationshipType.Degree == nil {
+			continue
+		}
+		// Historical rows can reference contacts in vaults the caller no longer reads.
+		if !canReadContactInVault(accessibleVaults, r.Contact) || !canReadContactInVault(accessibleVaults, r.RelatedContact) {
 			continue
 		}
 		w := *r.RelationshipType.Degree
@@ -434,13 +499,45 @@ func hasEditorPermission(db *gorm.DB, userID, vaultID string) bool {
 	return uv.Permission <= models.PermissionEditor
 }
 
-// getUserVaultIDs returns all vault IDs the user has access to.
-func getUserVaultIDs(db *gorm.DB, userID string) []string {
+func validateAccessibleRelatedContact(db *gorm.DB, userID, relatedContactID string) (*models.Contact, error) {
+	var relatedContact models.Contact
+	if err := db.Preload("Vault").Where("id = ?", relatedContactID).First(&relatedContact).Error; err != nil {
+		return nil, ErrContactNotFound
+	}
+	if err := NewVaultService(db).CheckUserVaultAccess(userID, relatedContact.VaultID, models.PermissionViewer); err != nil {
+		return nil, ErrContactNotFound
+	}
+	return &relatedContact, nil
+}
+
+// accessibleVaultIDSet returns all vault IDs the user can read.
+func accessibleVaultIDSet(db *gorm.DB, userID string) (map[string]struct{}, error) {
+	if userID == "" {
+		return nil, ErrUserNotFound
+	}
 	var userVaults []models.UserVault
-	db.Where("user_id = ?", userID).Find(&userVaults)
-	ids := make([]string, len(userVaults))
-	for i, uv := range userVaults {
-		ids[i] = uv.VaultID
+	if err := db.Where("user_id = ?", userID).Find(&userVaults).Error; err != nil {
+		return nil, err
+	}
+	vaultIDs := make(map[string]struct{}, len(userVaults))
+	for _, uv := range userVaults {
+		vaultIDs[uv.VaultID] = struct{}{}
+	}
+	return vaultIDs, nil
+}
+
+func canReadContactInVault(accessibleVaults map[string]struct{}, contact models.Contact) bool {
+	if contact.VaultID == "" {
+		return false
+	}
+	_, ok := accessibleVaults[contact.VaultID]
+	return ok
+}
+
+func vaultIDList(vaults map[string]struct{}) []string {
+	ids := make([]string, 0, len(vaults))
+	for id := range vaults {
+		ids = append(ids, id)
 	}
 	return ids
 }
@@ -478,12 +575,21 @@ func (s *RelationshipService) ListContactsAcrossVaults(userID string) ([]dto.Cro
 		return nil, err
 	}
 
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]dto.CrossVaultContactItem, 0, len(contacts))
-	for _, c := range contacts {
+	for i := range contacts {
+		c := contacts[i]
+		contactName, err := formatter.format(&c, "")
+		if err != nil {
+			return nil, err
+		}
 		perm := permMap[c.VaultID]
 		result = append(result, dto.CrossVaultContactItem{
 			ContactID:   c.ID,
-			ContactName: contactLabel(&c),
+			ContactName: contactName,
 			VaultID:     c.VaultID,
 			VaultName:   vaultNameMap[c.VaultID],
 			HasEditor:   perm <= models.PermissionEditor,

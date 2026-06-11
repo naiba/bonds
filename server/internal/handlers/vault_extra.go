@@ -33,7 +33,7 @@ func NewVaultReminderHandler(svc *services.VaultReminderService) *VaultReminderH
 //	@Router			/vaults/{vault_id}/reminders [get]
 func (h *VaultReminderHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	reminders, err := h.svc.List(vaultID)
+	reminders, err := h.svc.List(vaultID, middleware.GetUserID(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_vault_reminders")
 	}
@@ -141,7 +141,7 @@ func (h *ReportHandler) Index(c echo.Context) error {
 func (h *ReportHandler) AddressesByCity(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	city := c.Param("city")
-	data, err := h.reportService.AddressesByCity(vaultID, city)
+	data, err := h.reportService.AddressesByCity(vaultID, city, middleware.GetUserID(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_address_report")
 	}
@@ -163,7 +163,7 @@ func (h *ReportHandler) AddressesByCity(c echo.Context) error {
 func (h *ReportHandler) AddressesByCountry(c echo.Context) error {
 	vaultID := c.Param("vault_id")
 	country := c.Param("country")
-	data, err := h.reportService.AddressesByCountry(vaultID, country)
+	data, err := h.reportService.AddressesByCountry(vaultID, country, middleware.GetUserID(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_address_report")
 	}

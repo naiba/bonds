@@ -18,7 +18,12 @@ func NewCompanyService(db *gorm.DB) *CompanyService {
 	return &CompanyService{db: db}
 }
 
-func (s *CompanyService) List(vaultID string) ([]dto.CompanyResponse, error) {
+func (s *CompanyService) List(vaultID, userID string) ([]dto.CompanyResponse, error) {
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	var companies []models.Company
 	// BUG FIX (#55): Must Preload ContactCompanies+Contact so the Employees column
 	// in the frontend list is populated, not just in the single-Get detail view.
@@ -27,7 +32,11 @@ func (s *CompanyService) List(vaultID string) ([]dto.CompanyResponse, error) {
 	}
 	result := make([]dto.CompanyResponse, len(companies))
 	for i, c := range companies {
-		result[i] = toCompanyResponseWithEmployees(&c)
+		resp, err := toCompanyResponseWithEmployees(&c, formatter)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = resp
 	}
 	return result, nil
 }
@@ -59,7 +68,12 @@ func (s *CompanyService) ListForContact(contactID, vaultID string) ([]dto.Compan
 
 // Get returns a single company with its employees loaded via the ContactCompany join table.
 // SECURITY: WHERE vault_id 防止跨 vault IDOR，勿删。
-func (s *CompanyService) Get(id uint, vaultID string) (*dto.CompanyResponse, error) {
+func (s *CompanyService) Get(id uint, vaultID, userID string) (*dto.CompanyResponse, error) {
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	var company models.Company
 	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).
 		Preload("ContactCompanies").Preload("ContactCompanies.Contact").
@@ -69,7 +83,10 @@ func (s *CompanyService) Get(id uint, vaultID string) (*dto.CompanyResponse, err
 		}
 		return nil, err
 	}
-	resp := toCompanyResponseWithEmployees(&company)
+	resp, err := toCompanyResponseWithEmployees(&company, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -138,12 +155,17 @@ func toCompanyResponse(c *models.Company) dto.CompanyResponse {
 }
 
 // toCompanyResponseWithEmployees builds CompanyResponse with employee briefs from the ContactCompany join table.
-func toCompanyResponseWithEmployees(c *models.Company) dto.CompanyResponse {
+func toCompanyResponseWithEmployees(c *models.Company, formatter *contactNameFormatter) (dto.CompanyResponse, error) {
 	resp := toCompanyResponse(c)
 	contacts := make([]dto.CompanyContactBrief, len(c.ContactCompanies))
 	for i, cc := range c.ContactCompanies {
+		name, err := formatter.format(&cc.Contact, "")
+		if err != nil {
+			return dto.CompanyResponse{}, err
+		}
 		contacts[i] = dto.CompanyContactBrief{
 			ID:          cc.Contact.ID,
+			Name:        name,
 			FirstName:   ptrToStr(cc.Contact.FirstName),
 			LastName:    ptrToStr(cc.Contact.LastName),
 			JobPosition: ptrToStr(cc.JobPosition),
@@ -151,5 +173,5 @@ func toCompanyResponseWithEmployees(c *models.Company) dto.CompanyResponse {
 		}
 	}
 	resp.Contacts = contacts
-	return resp
+	return resp, nil
 }

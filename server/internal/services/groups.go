@@ -31,27 +31,42 @@ func (s *GroupService) Create(vaultID string, req dto.CreateGroupRequest) (*dto.
 	return &resp, nil
 }
 
-func (s *GroupService) List(vaultID string) ([]dto.GroupResponse, error) {
+func (s *GroupService) List(vaultID, userID string) ([]dto.GroupResponse, error) {
 	var groups []models.Group
-	if err := s.db.Where("vault_id = ?", vaultID).Preload("Contacts").Order("created_at DESC").Find(&groups).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Preload("Contacts", "vault_id = ?", vaultID).Order("created_at DESC").Find(&groups).Error; err != nil {
+		return nil, err
+	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
 		return nil, err
 	}
 	result := make([]dto.GroupResponse, len(groups))
 	for i, g := range groups {
-		result[i] = toGroupResponseWithContacts(&g)
+		resp, err := toGroupResponseWithContacts(&g, formatter)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = resp
 	}
 	return result, nil
 }
 
-func (s *GroupService) Get(id uint, vaultID string) (*dto.GroupResponse, error) {
+func (s *GroupService) Get(id uint, vaultID, userID string) (*dto.GroupResponse, error) {
 	var group models.Group
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).Preload("Contacts").First(&group).Error; err != nil {
+	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).Preload("Contacts", "vault_id = ?", vaultID).First(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrGroupNotFound
 		}
 		return nil, err
 	}
-	resp := toGroupResponseWithContacts(&group)
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := toGroupResponseWithContacts(&group, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -72,7 +87,17 @@ func (s *GroupService) ListByContact(contactID, vaultID string) ([]dto.GroupResp
 	return result, nil
 }
 
-func (s *GroupService) AddContactToGroup(contactID string, req dto.AddContactToGroupRequest) error {
+func (s *GroupService) AddContactToGroup(contactID, vaultID string, req dto.AddContactToGroupRequest) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
+	var group models.Group
+	if err := s.db.Where("id = ? AND vault_id = ?", req.GroupID, vaultID).First(&group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrGroupNotFound
+		}
+		return err
+	}
 	cg := models.ContactGroup{
 		GroupID:         req.GroupID,
 		ContactID:       contactID,
@@ -81,7 +106,17 @@ func (s *GroupService) AddContactToGroup(contactID string, req dto.AddContactToG
 	return s.db.Create(&cg).Error
 }
 
-func (s *GroupService) RemoveContactFromGroup(contactID string, groupID uint) error {
+func (s *GroupService) RemoveContactFromGroup(contactID, vaultID string, groupID uint) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
+	var group models.Group
+	if err := s.db.Where("id = ? AND vault_id = ?", groupID, vaultID).First(&group).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrGroupNotFound
+		}
+		return err
+	}
 	return s.db.Where("contact_id = ? AND group_id = ?", contactID, groupID).Delete(&models.ContactGroup{}).Error
 }
 
@@ -129,16 +164,21 @@ func toGroupResponse(g *models.Group) dto.GroupResponse {
 	}
 }
 
-func toGroupResponseWithContacts(g *models.Group) dto.GroupResponse {
+func toGroupResponseWithContacts(g *models.Group, formatter *contactNameFormatter) (dto.GroupResponse, error) {
 	resp := toGroupResponse(g)
 	contacts := make([]dto.GroupContactResponse, len(g.Contacts))
-	for i, c := range g.Contacts {
+	for i := range g.Contacts {
+		name, err := formatter.format(&g.Contacts[i], "")
+		if err != nil {
+			return dto.GroupResponse{}, err
+		}
 		contacts[i] = dto.GroupContactResponse{
-			ID:        c.ID,
-			FirstName: ptrToStr(c.FirstName),
-			LastName:  ptrToStr(c.LastName),
+			ID:        g.Contacts[i].ID,
+			Name:      name,
+			FirstName: ptrToStr(g.Contacts[i].FirstName),
+			LastName:  ptrToStr(g.Contacts[i].LastName),
 		}
 	}
 	resp.Contacts = contacts
-	return resp
+	return resp, nil
 }

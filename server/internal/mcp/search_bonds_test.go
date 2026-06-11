@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/search"
+	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
+	"gorm.io/gorm"
 )
 
 type allowVaultChecker struct {
@@ -23,7 +26,7 @@ func (c allowVaultChecker) CheckUserVaultAccess(_ string, vaultID string, _ int)
 
 type fakeSearchService struct{}
 
-func (fakeSearchService) Search(vaultID, query string, page, perPage int) (*search.SearchResponse, error) {
+func (fakeSearchService) SearchForUser(vaultID, userID, query string, page, perPage int) (*search.SearchResponse, error) {
 	return &search.SearchResponse{
 		Contacts: []search.SearchResult{{ID: "bleve-contact", Type: "contact", Name: "Bleve Contact", Score: 1}},
 		Notes:    []search.SearchResult{},
@@ -31,8 +34,69 @@ func (fakeSearchService) Search(vaultID, query string, page, perPage int) (*sear
 	}, nil
 }
 
+type mcpNameOrderContext struct {
+	db      *gorm.DB
+	userID  string
+	vaultID string
+	contact *dto.ContactResponse
+}
+
+func seedMCPAccessFixtures(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	account := models.Account{ID: "account-1"}
+	if err := db.Create(&account).Error; err != nil {
+		t.Fatalf("failed to create account: %v", err)
+	}
+	user := models.User{ID: "user-1", AccountID: account.ID, Email: "mcp-test@example.com", NameOrder: "%first_name% %last_name%"}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+	vaults := []models.Vault{
+		{ID: "vault-a", AccountID: account.ID, Type: "personal", Name: "Vault A"},
+		{ID: "vault-b", AccountID: account.ID, Type: "personal", Name: "Vault B"},
+	}
+	if err := db.Create(&vaults).Error; err != nil {
+		t.Fatalf("failed to create vaults: %v", err)
+	}
+}
+
+func setupMCPNameOrderTest(t *testing.T) *mcpNameOrderContext {
+	t.Helper()
+	db := testutil.SetupTestDB(t)
+	authSvc := services.NewAuthService(db, testutil.TestJWTConfig())
+	vaultSvc := services.NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "MCP",
+		LastName:  "Tester",
+		Email:     "mcp-name-order@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "MCP Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	override := "%last_name%, %first_name% {nickname? (%nickname%)}"
+	if err := db.Model(&models.Vault{}).Where("id = ?", vault.ID).Update("name_order", override).Error; err != nil {
+		t.Fatalf("Update vault name_order failed: %v", err)
+	}
+	contact, err := services.NewContactService(db).CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{
+		FirstName: "Alice",
+		LastName:  "Zephyr",
+		Nickname:  "Ace",
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	return &mcpNameOrderContext{db: db, userID: resp.User.ID, vaultID: vault.ID, contact: contact}
+}
+
 func TestBondsSearcherScopesToVault(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	seedMCPAccessFixtures(t, db)
 	first := "Alice"
 	last := "Smith"
 	contact := models.Contact{VaultID: "vault-a", FirstName: &first, LastName: &last, Listed: true}
@@ -81,6 +145,7 @@ func TestBondsSearcherDeniesInaccessibleVault(t *testing.T) {
 
 func TestBondsSearcherSkipsNotesForUnlistedContacts(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	seedMCPAccessFixtures(t, db)
 	listedName := "Listed"
 	listedContact := models.Contact{VaultID: "vault-a", FirstName: &listedName, Listed: true}
 	if err := db.Create(&listedContact).Error; err != nil {
@@ -127,6 +192,7 @@ func TestBondsSearcherSkipsNotesForUnlistedContacts(t *testing.T) {
 
 func TestBondsSearcherSkipsTasksOnlyAssignedToUnlistedContacts(t *testing.T) {
 	db := testutil.SetupTestDB(t)
+	seedMCPAccessFixtures(t, db)
 	listedName := "Listed"
 	listedContact := models.Contact{VaultID: "vault-a", FirstName: &listedName, Listed: true}
 	if err := db.Create(&listedContact).Error; err != nil {
@@ -183,5 +249,27 @@ func TestBondsSearcherSkipsTasksOnlyAssignedToUnlistedContacts(t *testing.T) {
 	}
 	if !foundStandalone {
 		t.Fatal("expected standalone vault task in results")
+	}
+}
+
+func TestBondsSearcherSQLFallbackUsesVaultNameOrder(t *testing.T) {
+	ctx := setupMCPNameOrderTest(t)
+	searcher := NewBondsSearcher(ctx.db, nil, allowVaultChecker{allowedVault: ctx.vaultID})
+
+	result, err := searcher.Search(ctx.userID, SearchBondsArgs{VaultID: ctx.vaultID, Query: "Alice"})
+	if err != nil {
+		t.Fatalf("Search returned error: %v", err)
+	}
+	foundContact := false
+	for _, item := range result.Results {
+		if item.Type == "contact" && item.ID == ctx.contact.ID {
+			foundContact = true
+			if item.Title != "Zephyr, Alice (Ace)" {
+				t.Fatalf("SQL fallback contact title = %q, want %q", item.Title, "Zephyr, Alice (Ace)")
+			}
+		}
+	}
+	if !foundContact {
+		t.Fatal("expected SQL fallback contact result")
 	}
 }

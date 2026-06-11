@@ -26,7 +26,7 @@ func TestVaultTaskRejectsDescendantParent(t *testing.T) {
 	_, err = svc.Update(a.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:        "A",
 		ParentTaskID: dto.NullableUint{Present: true, Valid: true, Value: b.ID},
-	})
+	}, userID)
 	if err != ErrInvalidParentTask {
 		t.Errorf("setting parent to descendant should fail, got %v", err)
 	}
@@ -42,7 +42,7 @@ func TestVaultTaskRejectsThreeNodeCycle(t *testing.T) {
 	_, err := svc.Update(a.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:        "A",
 		ParentTaskID: dto.NullableUint{Present: true, Valid: true, Value: c.ID},
-	})
+	}, userID)
 	if err != ErrInvalidParentTask {
 		t.Errorf("expected ErrInvalidParentTask for A->C cycle, got %v", err)
 	}
@@ -59,7 +59,7 @@ func TestVaultTaskParentTaskIDLeaveUnchanged(t *testing.T) {
 
 	updated, err := svc.Update(child.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label: "C renamed",
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("update without parent_task_id: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestVaultTaskParentTaskIDExplicitClear(t *testing.T) {
 	updated, err := svc.Update(child.ID, vaultID, dto.UpdateVaultTaskRequest{
 		Label:        "C",
 		ParentTaskID: dto.NullableUint{Present: true, Valid: false},
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("update with cleared parent_task_id: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestVaultTaskConcurrentAssigneeReplaceDoesNotDuplicate(t *testing.T) {
 		svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 			Label:      "shared",
 			ContactIDs: &ids,
-		})
+		}, userID)
 	}()
 	go func() {
 		defer wg.Done()
@@ -149,7 +149,7 @@ func TestVaultTaskConcurrentAssigneeReplaceDoesNotDuplicate(t *testing.T) {
 		svc.Update(task.ID, vaultID, dto.UpdateVaultTaskRequest{
 			Label:      "shared",
 			ContactIDs: &ids,
-		})
+		}, userID)
 	}()
 	wg.Wait()
 

@@ -29,7 +29,7 @@ func (s *TaskService) SetFeedRecorder(fr *FeedRecorder) {
 
 // List returns the tasks for which the given contact is an assignee, ordered
 // by position then most-recent-created.
-func (s *TaskService) List(contactID, vaultID string) ([]dto.TaskResponse, error) {
+func (s *TaskService) List(contactID, vaultID, userID string) ([]dto.TaskResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -41,10 +41,10 @@ func (s *TaskService) List(contactID, vaultID string) ([]dto.TaskResponse, error
 		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
-	return buildTaskResponses(s.db, tasks)
+	return buildTaskResponses(s.db, tasks, userID)
 }
 
-func (s *TaskService) ListCompleted(contactID, vaultID string) ([]dto.TaskResponse, error) {
+func (s *TaskService) ListCompleted(contactID, vaultID, userID string) ([]dto.TaskResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func (s *TaskService) ListCompleted(contactID, vaultID string) ([]dto.TaskRespon
 		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
-	return buildTaskResponses(s.db, tasks)
+	return buildTaskResponses(s.db, tasks, userID)
 }
 
 func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.CreateTaskRequest) (*dto.TaskResponse, error) {
@@ -100,14 +100,14 @@ func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.Create
 		s.feedRecorder.Record(contactID, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType)
 	}
 
-	resps, err := buildTaskResponses(s.db, []models.ContactTask{task})
+	resps, err := buildTaskResponses(s.db, []models.ContactTask{task}, authorID)
 	if err != nil {
 		return nil, err
 	}
 	return &resps[0], nil
 }
 
-func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateTaskRequest) (*dto.TaskResponse, error) {
+func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateTaskRequest, userID string) (*dto.TaskResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -157,14 +157,14 @@ func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateT
 		return nil, err
 	}
 
-	resps, err := buildTaskResponses(s.db, []models.ContactTask{task})
+	resps, err := buildTaskResponses(s.db, []models.ContactTask{task}, userID)
 	if err != nil {
 		return nil, err
 	}
 	return &resps[0], nil
 }
 
-func (s *TaskService) ToggleCompleted(id uint, contactID, vaultID string) (*dto.TaskResponse, error) {
+func (s *TaskService) ToggleCompleted(id uint, contactID, vaultID, userID string) (*dto.TaskResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (s *TaskService) ToggleCompleted(id uint, contactID, vaultID string) (*dto.
 		s.feedRecorder.Record(contactID, "", ActionTaskCompleted, "Completed task: "+task.Label, &task.ID, &entityType)
 	}
 
-	resps, err := buildTaskResponses(s.db, []models.ContactTask{task})
+	resps, err := buildTaskResponses(s.db, []models.ContactTask{task}, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -301,12 +301,12 @@ func deleteTaskCascade(db *gorm.DB, task *models.ContactTask) error {
 	})
 }
 
-func buildTaskResponses(db *gorm.DB, tasks []models.ContactTask) ([]dto.TaskResponse, error) {
+func buildTaskResponses(db *gorm.DB, tasks []models.ContactTask, userID string) ([]dto.TaskResponse, error) {
 	ids := make([]uint, len(tasks))
 	for i, t := range tasks {
 		ids[i] = t.ID
 	}
-	assignees, err := taskAssignees(db, ids)
+	assignees, err := taskAssignees(db, ids, userID)
 	if err != nil {
 		return nil, err
 	}

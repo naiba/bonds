@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -34,7 +35,8 @@ func NewCompanyHandler(companyService *services.CompanyService, contactJobServic
 //	@Router			/vaults/{vault_id}/companies [get]
 func (h *CompanyHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	companies, err := h.companyService.List(vaultID)
+	userID := middleware.GetUserID(c)
+	companies, err := h.companyService.List(vaultID, userID)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_companies")
 	}
@@ -79,11 +81,12 @@ func (h *CompanyHandler) ListForContact(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/companies/{id} [get]
 func (h *CompanyHandler) Get(c echo.Context) error {
 	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_company_id", nil)
 	}
-	company, err := h.companyService.Get(uint(id), vaultID)
+	company, err := h.companyService.Get(uint(id), vaultID, userID)
 	if err != nil {
 		if errors.Is(err, services.ErrCompanyNotFound) {
 			return response.NotFound(c, "err.company_not_found")

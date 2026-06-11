@@ -52,6 +52,11 @@ func reloadContactWithSameVaultFirstMetThrough(db *gorm.DB, contact *models.Cont
 }
 
 func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int, search, sort, filter string) ([]dto.ContactResponse, response.Meta, error) {
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, response.Meta{}, err
+	}
+
 	// Exclude UserVault shadow contacts (can_be_deleted=false AND listed=false)
 	query := s.db.Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false)
 	switch filter {
@@ -110,7 +115,11 @@ func (s *ContactService) ListContacts(vaultID, userID string, page, perPage int,
 	birthdayMap, groupMap := s.fetchBirthdayAndGroupMaps(contactIDs)
 	result := make([]dto.ContactResponse, len(contacts))
 	for i, c := range contacts {
-		result[i] = toContactResponse(&c, favoriteMap[c.ID])
+		resp, err := toContactResponse(&c, favoriteMap[c.ID], formatter)
+		if err != nil {
+			return nil, response.Meta{}, err
+		}
+		result[i] = resp
 	}
 
 	enrichContactsWithBirthdayAndGroups(result, contacts, birthdayMap, groupMap)
@@ -181,6 +190,10 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	if s.feedRecorder != nil {
 		desc := "Created contact " + req.FirstName
@@ -195,7 +208,10 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		go s.davPushService.PushContactChange(contact.ID, vaultID)
 	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -215,11 +231,18 @@ func (s *ContactService) GetContact(contactID, userID, vaultID string) (*dto.Con
 		s.db.Model(&cvu).Update("number_of_views", cvu.NumberOfViews+1)
 	}
 
-	resp := toContactResponse(&contact, isFav)
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := toContactResponse(&contact, isFav, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
-func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
+func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dto.UpdateContactRequest) (*dto.ContactResponse, error) {
 	if err := validateContactName(req.FirstName, req.Nickname); err != nil {
 		return nil, err
 	}
@@ -264,6 +287,10 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
 	if s.feedRecorder != nil {
 		desc := "Updated contact " + req.FirstName
@@ -278,7 +305,10 @@ func (s *ContactService) UpdateContact(contactID, vaultID string, req dto.Update
 		go s.davPushService.PushContactChange(contactID, vaultID)
 	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -310,7 +340,7 @@ func (s *ContactService) DeleteContact(contactID, vaultID string) error {
 	return nil
 }
 
-func (s *ContactService) ToggleArchive(contactID, vaultID string) (*dto.ContactResponse, error) {
+func (s *ContactService) ToggleArchive(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -326,8 +356,15 @@ func (s *ContactService) ToggleArchive(contactID, vaultID string) (*dto.ContactR
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -365,11 +402,23 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 		return nil, err
 	}
 
-	resp := toContactResponse(&contact, cvu.IsFavorite)
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := toContactResponse(&contact, cvu.IsFavorite, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
-func (s *ContactService) ListCatchUpPrompts(vaultID string) ([]dto.CatchUpPromptResponse, error) {
+func (s *ContactService) ListCatchUpPrompts(vaultID, userID string) ([]dto.CatchUpPromptResponse, error) {
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	var contacts []models.Contact
 	if err := s.db.Where("vault_id = ?", vaultID).
@@ -390,8 +439,13 @@ func (s *ContactService) ListCatchUpPrompts(vaultID string) ([]dto.CatchUpPrompt
 		daysSinceLastContact := daysBetween(*contact.LastTalkedTo, now)
 		daysOverdue := daysBetween(*triggerDate, now)
 		frequencyDays := *contact.StayInTouchFrequencyDays
+		name, err := formatter.format(&contact, "")
+		if err != nil {
+			return nil, err
+		}
 		prompts = append(prompts, dto.CatchUpPromptResponse{
 			ContactID:                contact.ID,
+			Name:                     name,
 			FirstName:                ptrToStr(contact.FirstName),
 			LastName:                 ptrToStr(contact.LastName),
 			LastTalkedTo:             *contact.LastTalkedTo,
@@ -409,7 +463,7 @@ func (s *ContactService) ListCatchUpPrompts(vaultID string) ([]dto.CatchUpPrompt
 	return prompts, nil
 }
 
-func (s *ContactService) MarkCaughtUp(contactID, vaultID string) (*dto.ContactResponse, error) {
+func (s *ContactService) MarkCaughtUp(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -428,8 +482,15 @@ func (s *ContactService) MarkCaughtUp(contactID, vaultID string) (*dto.ContactRe
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
 		return nil, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 
-	resp := toContactResponse(&contact, false)
+	resp, err := toContactResponse(&contact, false, formatter)
+	if err != nil {
+		return nil, err
+	}
 	return &resp, nil
 }
 
@@ -468,6 +529,10 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	if err := query.Preload("FirstMetThrough", "vault_id = ?", vaultID).Offset(offset).Limit(perPage).Order(finalOrder).Find(&contacts).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, response.Meta{}, err
+	}
 	contactIDs := make([]string, len(contacts))
 	for i, c := range contacts {
 		contactIDs[i] = c.ID
@@ -484,7 +549,11 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	birthdayMap, groupMap := s.fetchBirthdayAndGroupMaps(contactIDs)
 	result := make([]dto.ContactResponse, len(contacts))
 	for i, c := range contacts {
-		result[i] = toContactResponse(&c, favoriteMap[c.ID])
+		resp, err := toContactResponse(&c, favoriteMap[c.ID], formatter)
+		if err != nil {
+			return nil, response.Meta{}, err
+		}
+		result[i] = resp
 	}
 
 	enrichContactsWithBirthdayAndGroups(result, contacts, birthdayMap, groupMap)
@@ -497,7 +566,7 @@ func (s *ContactService) ListContactsByLabel(vaultID, userID string, labelID uin
 	return result, meta, nil
 }
 
-func (s *ContactService) QuickSearch(vaultID, term string) ([]dto.ContactSearchItem, error) {
+func (s *ContactService) QuickSearch(vaultID, term, userID string) ([]dto.ContactSearchItem, error) {
 	if term == "" {
 		return []dto.ContactSearchItem{}, nil
 	}
@@ -518,34 +587,22 @@ func (s *ContactService) QuickSearch(vaultID, term string) ([]dto.ContactSearchI
 		return nil, err
 	}
 
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
 	result := make([]dto.ContactSearchItem, len(contacts))
-	for i, c := range contacts {
+	for i := range contacts {
+		name, err := formatter.format(&contacts[i], "")
+		if err != nil {
+			return nil, err
+		}
 		result[i] = dto.ContactSearchItem{
-			ID:   c.ID,
-			Name: buildContactDisplayName(&c),
+			ID:   contacts[i].ID,
+			Name: name,
 		}
 	}
 	return result, nil
-}
-
-func buildContactDisplayName(c *models.Contact) string {
-	parts := make([]string, 0, 5)
-	if c.FirstName != nil && *c.FirstName != "" {
-		parts = append(parts, *c.FirstName)
-	}
-	if c.LastName != nil && *c.LastName != "" {
-		parts = append(parts, *c.LastName)
-	}
-	if c.Nickname != nil && *c.Nickname != "" {
-		parts = append(parts, *c.Nickname)
-	}
-	if c.MaidenName != nil && *c.MaidenName != "" {
-		parts = append(parts, *c.MaidenName)
-	}
-	if c.MiddleName != nil && *c.MiddleName != "" {
-		parts = append(parts, *c.MiddleName)
-	}
-	return strings.Join(parts, " ")
 }
 
 // validateContactBelongsToVault checks that a contact exists and belongs to the given vault.
@@ -591,14 +648,18 @@ func contactSortOrder(sort string) string {
 	}
 }
 
-func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
+func toContactResponse(c *models.Contact, isFavorite bool, formatter *contactNameFormatter) (dto.ContactResponse, error) {
 	var firstMetThroughContact *dto.ContactSearchItem
 	var firstMetThroughContactID *string
 	if c.FirstMetThrough != nil && c.FirstMetThrough.VaultID == c.VaultID {
 		firstMetThroughContactID = c.FirstMetThroughContactID
+		name, err := formatter.format(c.FirstMetThrough, "")
+		if err != nil {
+			return dto.ContactResponse{}, err
+		}
 		firstMetThroughContact = &dto.ContactSearchItem{
 			ID:   c.FirstMetThrough.ID,
-			Name: buildContactDisplayName(c.FirstMetThrough),
+			Name: name,
 		}
 	}
 
@@ -632,7 +693,7 @@ func toContactResponse(c *models.Contact, isFavorite bool) dto.ContactResponse {
 		NeedsVerification:        c.NeedsVerification,
 		CreatedAt:                c.CreatedAt,
 		UpdatedAt:                c.UpdatedAt,
-	}
+	}, nil
 }
 
 func calculateStayInTouchTriggerDate(lastTalkedTo *time.Time, frequencyDays *int) *time.Time {

@@ -8,7 +8,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupFeedTest(t *testing.T) (*FeedService, string, string) {
+func setupFeedTest(t *testing.T) (*FeedService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -36,13 +36,13 @@ func setupFeedTest(t *testing.T) (*FeedService, string, string) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewFeedService(db), vault.ID, contact.ID
+	return NewFeedService(db), vault.ID, contact.ID, resp.User.ID
 }
 
 func TestFeedEmpty(t *testing.T) {
-	svc, vaultID, _ := setupFeedTest(t)
+	svc, vaultID, _, userID := setupFeedTest(t)
 
-	items, meta, err := svc.GetFeed(vaultID, 1, 15)
+	items, meta, err := svc.GetFeed(vaultID, 1, 15, userID)
 	if err != nil {
 		t.Fatalf("GetFeed failed: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestFeedWithItems(t *testing.T) {
 	}
 
 	svc := NewFeedService(db)
-	items, meta, err := svc.GetFeed(vault.ID, 1, 15)
+	items, meta, err := svc.GetFeed(vault.ID, 1, 15, resp.User.ID)
 	if err != nil {
 		t.Fatalf("GetFeed failed: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestFeedPagination(t *testing.T) {
 	}
 
 	svc := NewFeedService(db)
-	items, meta, err := svc.GetFeed(vault.ID, 1, 2)
+	items, meta, err := svc.GetFeed(vault.ID, 1, 2, resp.User.ID)
 	if err != nil {
 		t.Fatalf("GetFeed failed: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestFeedPagination(t *testing.T) {
 		t.Errorf("Expected 3 total pages, got %d", meta.TotalPages)
 	}
 
-	items2, _, err := svc.GetFeed(vault.ID, 3, 2)
+	items2, _, err := svc.GetFeed(vault.ID, 3, 2, resp.User.ID)
 	if err != nil {
 		t.Fatalf("GetFeed page 3 failed: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestFeedContactName(t *testing.T) {
 	}
 
 	svc := NewFeedService(db)
-	items, _, err := svc.GetFeed(vault.ID, 1, 15)
+	items, _, err := svc.GetFeed(vault.ID, 1, 15, resp.User.ID)
 	if err != nil {
 		t.Fatalf("GetFeed failed: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestFeedContactName(t *testing.T) {
 	}
 
 	// Also verify ListContactFeed returns the same contact_name
-	items2, _, err := svc.ListContactFeed(contact.ID, 1, 15)
+	items2, _, err := svc.ListContactFeed(contact.ID, vault.ID, 1, 15, resp.User.ID)
 	if err != nil {
 		t.Fatalf("ListContactFeed failed: %v", err)
 	}

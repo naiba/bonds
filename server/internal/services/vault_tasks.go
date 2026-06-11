@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -36,7 +35,7 @@ type VaultTaskFilters struct {
 
 // List returns all tasks in a vault, ordered by status column then Position
 // within each column, with CreatedAt as a stable tiebreaker.
-func (s *VaultTaskService) List(vaultID string, filters VaultTaskFilters) ([]dto.VaultTaskResponse, error) {
+func (s *VaultTaskService) List(vaultID string, filters VaultTaskFilters, userID string) ([]dto.VaultTaskResponse, error) {
 	q := s.db.Model(&models.ContactTask{}).Where("contact_tasks.vault_id = ?", vaultID)
 	if filters.ContactID != nil {
 		if *filters.ContactID == "" {
@@ -60,7 +59,7 @@ func (s *VaultTaskService) List(vaultID string, filters VaultTaskFilters) ([]dto
 		Find(&tasks).Error; err != nil {
 		return nil, err
 	}
-	return s.buildResponses(tasks)
+	return s.buildResponses(tasks, userID)
 }
 
 func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
@@ -107,7 +106,7 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 		}
 	}
 
-	resps, err := s.buildResponses([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task}, authorID)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 // Update replaces the editable fields of a vault task in one call. Used by
 // the click-to-edit modal. When ContactIDs is provided, the assignee set is
 // replaced; nil means "leave assignees untouched".
-func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTaskRequest) (*dto.VaultTaskResponse, error) {
+func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTaskRequest, userID string) (*dto.VaultTaskResponse, error) {
 	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
@@ -191,7 +190,7 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 		return nil, err
 	}
 
-	resps, err := s.buildResponses([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task}, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +199,7 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 
 // UpdateStatus moves a task to a different kanban column. Used by drag-drop
 // across columns. Validates that the target status is recognized.
-func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateTaskStatusRequest) (*dto.VaultTaskResponse, error) {
+func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateTaskStatusRequest, userID string) (*dto.VaultTaskResponse, error) {
 	if !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
@@ -229,7 +228,7 @@ func (s *VaultTaskService) UpdateStatus(id uint, vaultID string, req dto.UpdateT
 	}
 	task.Status = req.Status
 
-	resps, err := s.buildResponses([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task}, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +249,7 @@ func (s *VaultTaskService) Delete(id uint, vaultID string) error {
 }
 
 // UpdatePosition reorders a task within (or across) columns.
-func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.UpdateTaskPositionRequest) (*dto.VaultTaskResponse, error) {
+func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.UpdateTaskPositionRequest, userID string) (*dto.VaultTaskResponse, error) {
 	if req.Status != "" && !taskStatusExistsForVault(s.db, req.Status, vaultID) {
 		return nil, ErrInvalidTaskStatus
 	}
@@ -272,7 +271,7 @@ func (s *VaultTaskService) UpdatePosition(id uint, vaultID string, req dto.Updat
 		return nil, err
 	}
 
-	resps, err := s.buildResponses([]models.ContactTask{task})
+	resps, err := s.buildResponses([]models.ContactTask{task}, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +358,7 @@ func updateTaskColumnPositions(tx *gorm.DB, orderedIDs []uint) error {
 	return nil
 }
 
-func (s *VaultTaskService) buildResponses(tasks []models.ContactTask) ([]dto.VaultTaskResponse, error) {
+func (s *VaultTaskService) buildResponses(tasks []models.ContactTask, userID string) ([]dto.VaultTaskResponse, error) {
 	if len(tasks) == 0 {
 		return []dto.VaultTaskResponse{}, nil
 	}
@@ -367,7 +366,7 @@ func (s *VaultTaskService) buildResponses(tasks []models.ContactTask) ([]dto.Vau
 	for i, t := range tasks {
 		ids[i] = t.ID
 	}
-	assignees, err := taskAssignees(s.db, ids)
+	assignees, err := taskAssignees(s.db, ids, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -376,19 +375,6 @@ func (s *VaultTaskService) buildResponses(tasks []models.ContactTask) ([]dto.Vau
 		out[i] = toVaultTaskResponse(&t, assignees[t.ID])
 	}
 	return out, nil
-}
-
-func formatPersonName(first, last string) string {
-	if first == "" && last == "" {
-		return ""
-	}
-	if last == "" {
-		return first
-	}
-	if first == "" {
-		return last
-	}
-	return fmt.Sprintf("%s %s", first, last)
 }
 
 func toVaultTaskResponse(t *models.ContactTask, contacts []dto.TaskContactRef) dto.VaultTaskResponse {

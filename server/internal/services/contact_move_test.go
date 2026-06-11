@@ -67,7 +67,7 @@ func TestMoveContactClearsCrossVaultFirstMetThrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create introducer failed: %v", err)
 	}
-	if _, err := contactSvc.UpdateContact(contactID, vault1ID, dto.UpdateContactRequest{
+	if _, err := contactSvc.UpdateContact(contactID, vault1ID, userID, dto.UpdateContactRequest{
 		FirstName:                "John",
 		FirstMetThroughContactID: &introducedBy.ID,
 	}); err != nil {

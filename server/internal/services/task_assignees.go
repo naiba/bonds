@@ -10,7 +10,7 @@ import (
 // taskAssignees loads the contact assignees for a set of task IDs in two
 // queries (pivot + contacts), returning a map from task ID to a slice of
 // TaskContactRef sorted by first name then last name for stable output.
-func taskAssignees(db *gorm.DB, taskIDs []uint) (map[uint][]dto.TaskContactRef, error) {
+func taskAssignees(db *gorm.DB, taskIDs []uint, userID string) (map[uint][]dto.TaskContactRef, error) {
 	if len(taskIDs) == 0 {
 		return map[uint][]dto.TaskContactRef{}, nil
 	}
@@ -32,13 +32,20 @@ func taskAssignees(db *gorm.DB, taskIDs []uint) (map[uint][]dto.TaskContactRef, 
 		contactIDs = append(contactIDs, id)
 	}
 	var contacts []models.Contact
-	if err := db.Where("id IN ?", contactIDs).
-		Select("id", "first_name", "last_name").Find(&contacts).Error; err != nil {
+	if err := db.Where("id IN ?", contactIDs).Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+	formatter, err := newContactNameFormatter(db, userID)
+	if err != nil {
 		return nil, err
 	}
 	nameByID := make(map[string]string, len(contacts))
-	for _, c := range contacts {
-		nameByID[c.ID] = formatPersonName(ptrToStr(c.FirstName), ptrToStr(c.LastName))
+	for i := range contacts {
+		name, err := formatter.format(&contacts[i], "")
+		if err != nil {
+			return nil, err
+		}
+		nameByID[contacts[i].ID] = name
 	}
 
 	result := make(map[uint][]dto.TaskContactRef, len(taskIDs))

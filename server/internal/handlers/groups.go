@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/pkg/response"
 )
@@ -62,7 +63,7 @@ func (h *GroupHandler) Create(c echo.Context) error {
 //	@Router			/vaults/{vault_id}/groups [get]
 func (h *GroupHandler) List(c echo.Context) error {
 	vaultID := c.Param("vault_id")
-	groups, err := h.groupService.List(vaultID)
+	groups, err := h.groupService.List(vaultID, middleware.GetUserID(c))
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_list_groups")
 	}
@@ -89,7 +90,7 @@ func (h *GroupHandler) Get(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_group_id", nil)
 	}
-	group, err := h.groupService.Get(uint(id), vaultID)
+	group, err := h.groupService.Get(uint(id), vaultID, middleware.GetUserID(c))
 	if err != nil {
 		if errors.Is(err, services.ErrGroupNotFound) {
 			return response.NotFound(c, "err.group_not_found")
@@ -138,6 +139,7 @@ func (h *GroupHandler) ListContactGroups(c echo.Context) error {
 //	@Param			request		body		dto.AddContactToGroupRequest	true	"Add contact to group request"
 //	@Success		201			{object}	response.APIResponse
 //	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/groups [post]
 func (h *GroupHandler) AddContactToGroup(c echo.Context) error {
@@ -146,7 +148,13 @@ func (h *GroupHandler) AddContactToGroup(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	if err := h.groupService.AddContactToGroup(contactID, req); err != nil {
+	if err := h.groupService.AddContactToGroup(contactID, c.Param("vault_id"), req); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrGroupNotFound) {
+			return response.NotFound(c, "err.group_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_add_contact_to_group")
 	}
 	return response.Created(c, map[string]string{"status": "ok"})
@@ -164,6 +172,7 @@ func (h *GroupHandler) AddContactToGroup(c echo.Context) error {
 //	@Param			id			path	integer	true	"Group ID"
 //	@Success		204			"No Content"
 //	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/groups/{id} [delete]
 func (h *GroupHandler) RemoveContactFromGroup(c echo.Context) error {
@@ -172,7 +181,13 @@ func (h *GroupHandler) RemoveContactFromGroup(c echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_group_id", nil)
 	}
-	if err := h.groupService.RemoveContactFromGroup(contactID, uint(id)); err != nil {
+	if err := h.groupService.RemoveContactFromGroup(contactID, c.Param("vault_id"), uint(id)); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrGroupNotFound) {
+			return response.NotFound(c, "err.group_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_remove_contact_from_group")
 	}
 	return response.NoContent(c)

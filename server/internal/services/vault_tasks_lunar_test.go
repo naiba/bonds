@@ -107,7 +107,7 @@ func TestVaultTaskUpdateSwitchesLunarToGregorianClearsOriginals(t *testing.T) {
 		Label:        "Lunar task",
 		DueAt:        &newDue,
 		CalendarType: "gregorian",
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}

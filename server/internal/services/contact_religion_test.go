@@ -7,7 +7,7 @@ import (
 	"github.com/naiba/bonds/internal/testutil"
 )
 
-func setupContactReligionTest(t *testing.T) (*ContactReligionService, string, string) {
+func setupContactReligionTest(t *testing.T) (*ContactReligionService, string, string, string) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
@@ -35,14 +35,14 @@ func setupContactReligionTest(t *testing.T) (*ContactReligionService, string, st
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	return NewContactReligionService(db), contact.ID, vault.ID
+	return NewContactReligionService(db), contact.ID, vault.ID, resp.User.ID
 }
 
 func TestContactReligionUpdate(t *testing.T) {
-	svc, contactID, vaultID := setupContactReligionTest(t)
+	svc, contactID, vaultID, userID := setupContactReligionTest(t)
 
 	religionID := uint(1)
-	resp, err := svc.Update(contactID, vaultID, dto.UpdateContactReligionRequest{ReligionID: &religionID})
+	resp, err := svc.Update(contactID, vaultID, userID, dto.UpdateContactReligionRequest{ReligionID: &religionID})
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -52,15 +52,15 @@ func TestContactReligionUpdate(t *testing.T) {
 }
 
 func TestContactReligionUpdateClear(t *testing.T) {
-	svc, contactID, vaultID := setupContactReligionTest(t)
+	svc, contactID, vaultID, userID := setupContactReligionTest(t)
 
 	religionID := uint(1)
-	_, err := svc.Update(contactID, vaultID, dto.UpdateContactReligionRequest{ReligionID: &religionID})
+	_, err := svc.Update(contactID, vaultID, userID, dto.UpdateContactReligionRequest{ReligionID: &religionID})
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	resp, err := svc.Update(contactID, vaultID, dto.UpdateContactReligionRequest{ReligionID: nil})
+	resp, err := svc.Update(contactID, vaultID, userID, dto.UpdateContactReligionRequest{ReligionID: nil})
 	if err != nil {
 		t.Fatalf("Update to nil failed: %v", err)
 	}
@@ -70,10 +70,10 @@ func TestContactReligionUpdateClear(t *testing.T) {
 }
 
 func TestContactReligionUpdateNotFound(t *testing.T) {
-	svc, _, vaultID := setupContactReligionTest(t)
+	svc, _, vaultID, userID := setupContactReligionTest(t)
 
 	religionID := uint(1)
-	_, err := svc.Update("nonexistent-id", vaultID, dto.UpdateContactReligionRequest{ReligionID: &religionID})
+	_, err := svc.Update("nonexistent-id", vaultID, userID, dto.UpdateContactReligionRequest{ReligionID: &religionID})
 	if err != ErrContactNotFound {
 		t.Errorf("Expected ErrContactNotFound, got %v", err)
 	}

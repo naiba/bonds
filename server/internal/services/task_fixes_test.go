@@ -44,7 +44,7 @@ func TestContactScopedRejectsDescendantParent(t *testing.T) {
 	_, err := svc.Update(a.ID, contactID, vaultID, dto.UpdateTaskRequest{
 		Label:        "A",
 		ParentTaskID: dto.NullableUint{Present: true, Valid: true, Value: b.ID},
-	})
+	}, userID)
 	if err != ErrInvalidParentTask {
 		t.Errorf("expected ErrInvalidParentTask, got %v", err)
 	}
@@ -61,7 +61,7 @@ func TestContactScopedParentTaskIDLeaveUnchanged(t *testing.T) {
 
 	updated, err := svc.Update(child.ID, contactID, vaultID, dto.UpdateTaskRequest{
 		Label: "C renamed",
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestContactScopedParentTaskIDExplicitClear(t *testing.T) {
 	updated, err := svc.Update(child.ID, contactID, vaultID, dto.UpdateTaskRequest{
 		Label:        "C",
 		ParentTaskID: dto.NullableUint{Present: true, Valid: false},
-	})
+	}, userID)
 	if err != nil {
 		t.Fatalf("update: %v", err)
 	}

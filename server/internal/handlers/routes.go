@@ -152,7 +152,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	} else {
 		searchEngine = &search.NoopEngine{}
 	}
-	searchService := services.NewSearchService(searchEngine)
+	searchService := services.NewSearchServiceWithDB(db, searchEngine)
 
 	// Wire FeedRecorder into services
 	contactService.SetFeedRecorder(feedRecorder)
