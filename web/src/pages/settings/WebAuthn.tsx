@@ -11,7 +11,7 @@ import {
 import { DeleteOutlined, KeyOutlined, PlusOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "@/api";
+import { api, httpClient } from "@/api";
 import type { WebAuthnCredential, APIError } from "@/api";
 import { startRegistration } from "@simplewebauthn/browser";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
@@ -40,9 +40,9 @@ export default function WebAuthn() {
       const options = beginRes.data!.publicKey;
 
       // 2. Create credential in browser
-      await startRegistration({ optionsJSON: options as unknown as SimpleWebAuthnCreationOptions });
+      const registrationResponse = await startRegistration({ optionsJSON: options as unknown as SimpleWebAuthnCreationOptions });
 
-      await api.webauthn.webauthnRegisterFinishCreate();
+      await httpClient.instance.post("/settings/webauthn/register/finish", registrationResponse);
     },
     onSuccess: () => {
       message.success(t("settings.webauthn.registered"));
