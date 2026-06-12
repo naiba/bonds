@@ -53,6 +53,41 @@ func setupWebAuthnTest(t *testing.T) (*WebAuthnService, string) {
 	return svc, resp.User.ID
 }
 
+func setupWebAuthnTestWithEmptyEnvConfig(t *testing.T) (*WebAuthnService, *SystemSettingService, string) {
+	t.Helper()
+	db := testutil.SetupTestDB(t)
+	jwtCfg := testutil.TestJWTConfig()
+
+	authSvc := NewAuthService(db, jwtCfg)
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "WebAuthn",
+		LastName:  "Test",
+		Email:     "webauthn@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+
+	svc, err := NewWebAuthnService(db, &config.WebAuthnConfig{})
+	if err != nil {
+		t.Fatalf("NewWebAuthnService failed: %v", err)
+	}
+
+	settings := NewSystemSettingService(db)
+	if err := settings.Set("webauthn.rp_id", "localhost"); err != nil {
+		t.Fatalf("Failed to seed rp_id: %v", err)
+	}
+	if err := settings.Set("webauthn.rp_display_name", "Bonds Test"); err != nil {
+		t.Fatalf("Failed to seed rp_display_name: %v", err)
+	}
+	if err := settings.Set("webauthn.rp_origins", "http://localhost:8080"); err != nil {
+		t.Fatalf("Failed to seed rp_origins: %v", err)
+	}
+
+	return svc, settings, resp.User.ID
+}
+
 func TestListCredentialsEmpty(t *testing.T) {
 	svc, userID := setupWebAuthnTest(t)
 
@@ -162,6 +197,133 @@ func TestBeginRegistration(t *testing.T) {
 	}
 	if options == nil {
 		t.Error("Expected non-nil options")
+	}
+}
+
+func TestBeginRegistrationReloadsPersistedDBConfigAfterAttachingSystemSettings(t *testing.T) {
+	svc, settings, userID := setupWebAuthnTestWithEmptyEnvConfig(t)
+	svc.SetSystemSettings(settings)
+
+	if !svc.IsEnabled() {
+		t.Fatal("Expected WebAuthn to be enabled from persisted DB settings")
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("BeginRegistration panicked after attaching persisted DB settings: %v", r)
+		}
+	}()
+
+	options, err := svc.BeginRegistration(userID)
+	if err != nil {
+		t.Fatalf("BeginRegistration failed: %v", err)
+	}
+	if options == nil {
+		t.Fatal("Expected non-nil registration options after loading persisted DB settings")
+	}
+}
+
+func TestReloadConfigTrimsDBRpOrigins(t *testing.T) {
+	svc, settings, _ := setupWebAuthnTestWithEmptyEnvConfig(t)
+	if err := settings.Set("webauthn.rp_origins", "https://bonds.example.com, https://www.bonds.example.com"); err != nil {
+		t.Fatalf("Failed to update rp_origins: %v", err)
+	}
+
+	svc.SetSystemSettings(settings)
+	if err := svc.ReloadConfig(); err != nil {
+		t.Fatalf("ReloadConfig failed: %v", err)
+	}
+
+	if svc.webauthn == nil {
+		t.Fatal("Expected WebAuthn config to be built from persisted DB settings")
+	}
+
+	expected := []string{"https://bonds.example.com", "https://www.bonds.example.com"}
+	if len(svc.webauthn.Config.RPOrigins) != len(expected) {
+		t.Fatalf("Expected %d RP origins, got %d: %#v", len(expected), len(svc.webauthn.Config.RPOrigins), svc.webauthn.Config.RPOrigins)
+	}
+	for i := range expected {
+		if svc.webauthn.Config.RPOrigins[i] != expected[i] {
+			t.Fatalf("Expected RP origin %d to be %q, got %q", i, expected[i], svc.webauthn.Config.RPOrigins[i])
+		}
+	}
+}
+
+func TestInvalidPersistedDBWebAuthnConfigIsDisabled(t *testing.T) {
+	svc, settings, userID := setupWebAuthnTestWithEmptyEnvConfig(t)
+	if err := settings.Set("webauthn.rp_origins", "   "); err != nil {
+		t.Fatalf("Failed to clear rp_origins: %v", err)
+	}
+
+	svc.SetSystemSettings(settings)
+
+	if svc.IsEnabled() {
+		t.Fatal("Expected WebAuthn to stay disabled when persisted DB config is invalid")
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("BeginRegistration panicked with invalid persisted DB settings: %v", r)
+		}
+	}()
+
+	_, err := svc.BeginRegistration(userID)
+	if err != ErrWebAuthnNotConfigured {
+		t.Fatalf("Expected ErrWebAuthnNotConfigured, got %v", err)
+	}
+}
+
+func TestReloadConfigDisablesPreviouslyEnabledWebAuthnWhenPersistedConfigIsInvalid(t *testing.T) {
+	svc, settings, userID := setupWebAuthnTestWithEmptyEnvConfig(t)
+	svc.SetSystemSettings(settings)
+
+	if !svc.IsEnabled() {
+		t.Fatal("Expected WebAuthn to be enabled from initial persisted DB settings")
+	}
+
+	invalidSettings := []struct {
+		name  string
+		key   string
+		value string
+	}{
+		{name: "empty rp id", key: "webauthn.rp_id", value: ""},
+		{name: "blank rp origins", key: "webauthn.rp_origins", value: "   "},
+	}
+
+	for _, tt := range invalidSettings {
+		t.Run(tt.name, func(t *testing.T) {
+			svc.SetSystemSettings(settings)
+			if !svc.IsEnabled() {
+				t.Fatal("Expected WebAuthn to be enabled before invalid persisted setting is applied")
+			}
+
+			if err := settings.Set(tt.key, tt.value); err != nil {
+				t.Fatalf("Failed to apply invalid setting: %v", err)
+			}
+			_ = svc.ReloadConfig()
+
+			if svc.IsEnabled() {
+				t.Fatal("Expected WebAuthn to be disabled after invalid persisted DB settings")
+			}
+
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("BeginRegistration panicked after invalid persisted DB settings: %v", r)
+				}
+			}()
+
+			_, err := svc.BeginRegistration(userID)
+			if err != ErrWebAuthnNotConfigured {
+				t.Fatalf("Expected ErrWebAuthnNotConfigured, got %v", err)
+			}
+
+			if err := settings.Set("webauthn.rp_id", "localhost"); err != nil {
+				t.Fatalf("Failed to restore rp_id: %v", err)
+			}
+			if err := settings.Set("webauthn.rp_origins", "http://localhost:8080"); err != nil {
+				t.Fatalf("Failed to restore rp_origins: %v", err)
+			}
+		})
 	}
 }
 

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -55,6 +56,11 @@ func NewWebAuthnService(db *gorm.DB, cfg *config.WebAuthnConfig) (*WebAuthnServi
 
 func (s *WebAuthnService) SetSystemSettings(settings *SystemSettingService) {
 	s.settings = settings
+	if s.settings != nil {
+		if err := s.ReloadConfig(); err != nil {
+			s.webauthn = nil
+		}
+	}
 }
 
 // IsEnabled returns true if WebAuthn is configured (either via constructor or DB settings).
@@ -62,21 +68,16 @@ func (s *WebAuthnService) IsEnabled() bool {
 	if s == nil {
 		return false
 	}
-	if s.webauthn != nil {
-		return true
-	}
-	// Check DB settings — may have been configured after startup
-	if s.settings != nil {
-		rpID := s.settings.GetWithDefault("webauthn.rp_id", "")
-		return rpID != ""
-	}
-	return false
+	return s.webauthn != nil
 }
 
 func (s *WebAuthnService) ReloadConfig() error {
 	if s.settings == nil {
 		return nil
 	}
+	// Persisted settings are authoritative at reload time; fail closed instead
+	// of keeping a stale RP ID/origin after an admin config change.
+	s.webauthn = nil
 	rpID := s.settings.GetWithDefault("webauthn.rp_id", "")
 	if rpID == "" {
 		return nil
@@ -111,11 +112,11 @@ func splitComma(s string) []string {
 	start := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] == ',' {
-			result = append(result, s[start:i])
+			result = append(result, strings.TrimSpace(s[start:i]))
 			start = i + 1
 		}
 	}
-	result = append(result, s[start:])
+	result = append(result, strings.TrimSpace(s[start:]))
 	return result
 }
 
