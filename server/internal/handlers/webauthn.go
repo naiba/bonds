@@ -89,6 +89,7 @@ func (h *WebAuthnHandler) FinishRegistration(c echo.Context) error {
 //	@Tags			webauthn
 //	@Accept			json
 //	@Produce		json
+//	@Param			request	body		dto.WebAuthnLoginBeginRequest	true	"Login details"
 //	@Success		200	{object}	response.APIResponse
 //	@Failure		400	{object}	response.APIResponse
 //	@Failure		404	{object}	response.APIResponse
@@ -99,9 +100,7 @@ func (h *WebAuthnHandler) BeginLogin(c echo.Context) error {
 	if !h.webauthnService.IsEnabled() {
 		return response.BadRequest(c, "err.webauthn_not_configured", nil)
 	}
-	var req struct {
-		Email string `json:"email" validate:"required,email"`
-	}
+	var req dto.WebAuthnLoginBeginRequest
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}

@@ -2,6 +2,10 @@ package dto
 
 import "time"
 
+type WebAuthnLoginBeginRequest struct {
+	Email string `json:"email" validate:"required,email" example:"user@example.com"`
+}
+
 type WebAuthnCredentialResponse struct {
 	ID        uint      `json:"id" example:"1"`
 	Name      string    `json:"name" example:"YubiKey 5"`
