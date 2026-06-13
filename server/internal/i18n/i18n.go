@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-//go:embed en.json zh.json es.json fr.json
+//go:embed en.json zh.json es.json fr.json de.json
 var localeFS embed.FS
 
 var (

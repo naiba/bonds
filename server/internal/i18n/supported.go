@@ -12,8 +12,8 @@ package i18n
 //   - services/preferences.go (defensive check on the service layer)
 //
 // Keeping these three in sync prevents the trap where a user persists an
-// unsupported locale (e.g. "de") and the UI silently falls back to English.
-var Supported = []string{"en", "zh", "es", "fr"}
+// unsupported locale (e.g. "ja") and the UI silently falls back to English.
+var Supported = []string{"en", "zh", "es", "fr", "de"}
 
 // IsSupported reports whether lang exactly matches one of the loaded
 // locale bundles. Callers that need to coerce region tags like "zh-CN"
