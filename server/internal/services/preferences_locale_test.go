@@ -8,7 +8,7 @@ import (
 )
 
 // TestUpdateLocaleRejectsUnsupported guards the gap that lets a user persist
-// e.g. "de" into the locale column, which the i18n bundle cannot honor — the
+// e.g. "ja" into the locale column, which the i18n bundle cannot honor — the
 // UI then silently falls back to English and the saved preference appears to
 // do nothing. Only locales listed in i18n.Supported are accepted; anything
 // else (including empty, made-up codes, region-only variants the bundle
@@ -25,7 +25,7 @@ func TestUpdateLocaleRejectsUnsupported(t *testing.T) {
 		{"chinese", "zh", false},
 		{"spanish", "es", false},
 		{"french", "fr", false},
-		{"german_unsupported", "de", true},
+		{"german", "de", false},
 		{"japanese_unsupported", "ja", true},
 		{"empty", "", true},
 		{"region_only", "zh-CN", true},
@@ -65,9 +65,9 @@ func TestUpdateAllRejectsUnsupportedLocale(t *testing.T) {
 	svc, userID := setupPreferenceTest(t)
 
 	_, err := svc.UpdateAll(userID, dto.UpdatePreferencesRequest{
-		Locale: "de",
+		Locale: "ja",
 	})
 	if err == nil || !errors.Is(err, ErrUnsupportedLocale) {
-		t.Fatalf("UpdateAll(locale=de) expected ErrUnsupportedLocale, got %v", err)
+		t.Fatalf("UpdateAll(locale=ja) expected ErrUnsupportedLocale, got %v", err)
 	}
 }
