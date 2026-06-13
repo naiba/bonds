@@ -47,6 +47,12 @@ describe("Accept-Language request interceptor", () => {
     expect((config.headers as Record<string, unknown>)["Accept-Language"]).toBe("zh");
   });
 
+  it("sends German Accept-Language when the UI is German", async () => {
+    await i18n.changeLanguage("de");
+    const config = await runRequestInterceptors(makeConfig());
+    expect((config.headers as Record<string, unknown>)["Accept-Language"]).toBe("de");
+  });
+
   it("falls back to en when the language is unsupported", async () => {
     await i18n.changeLanguage("ja");
     const config = await runRequestInterceptors(makeConfig());
@@ -58,6 +64,7 @@ describe("normalizeLanguageCode", () => {
   it("maps regional zh tags to zh", () => {
     expect(normalizeLanguageCode("zh-CN")).toBe("zh");
     expect(normalizeLanguageCode("zh-Hans")).toBe("zh");
+    expect(normalizeLanguageCode("de-DE")).toBe("de");
   });
   it("returns en for unsupported languages", () => {
     expect(normalizeLanguageCode("ja")).toBe("en");
