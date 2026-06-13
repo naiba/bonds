@@ -57,3 +57,4 @@ Bonds 站在 [@djaiss](https://github.com/djaiss)、[@asbiin](https://github.com
 - **个人用户**：非商业使用完全免费
 - **组织/企业**：商业使用需向 Licensor 购买许可
 - **转换日期**：2030年6月13日 — 届时自动转为 AGPL-3.0
+- **贡献**：提交贡献即表示贡献者同意 [贡献条款](https://github.com/naiba/bonds/blob/main/CONTRIBUTING.md)，包括在法律允许的最大范围内放弃该贡献中的所有所有权及其他权利或主张

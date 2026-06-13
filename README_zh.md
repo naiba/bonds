@@ -225,3 +225,5 @@ Bonds 是受 [Monica](https://github.com/monicahq/monica)（AGPL-3.0）启发的
 - **转换日期**：2030年6月13日，届时自动转为 [AGPL-3.0](LICENSE)（与原版 Monica 相同）。
 
 转换日期后，软件将以 AGPL-3.0 完全开源。
+
+提交代码、文档、翻译或任何其他贡献，即表示贡献者同意 [贡献条款](CONTRIBUTING.md)，包括在法律允许的最大范围内放弃该贡献中的所有所有权及其他任何权利或主张。

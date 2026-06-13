@@ -57,3 +57,4 @@ Bonds stands on the shoulders of [@djaiss](https://github.com/djaiss), [@asbiin]
 - **Individuals**: Free for any non-commercial use
 - **Organizations**: Commercial use requires a paid license
 - **Change Date**: June 13, 2030 — automatically converts to AGPL-3.0
+- **Contributions**: Submitting a contribution means accepting the [contribution terms](https://github.com/naiba/bonds/blob/main/CONTRIBUTING.md), including waiving all ownership and other rights or claims in that contribution to the fullest extent permitted by law
