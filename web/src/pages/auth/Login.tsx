@@ -16,6 +16,13 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const { Title, Text } = Typography;
 
+function isFormValidationError(error: unknown): error is { errorFields: unknown[] } {
+  if (typeof error !== "object" || error === null || !("errorFields" in error)) {
+    return false;
+  }
+  return Array.isArray((error as { errorFields?: unknown }).errorFields);
+}
+
 /* ---- CSS keyframes injected once ---- */
 const styleId = "bonds-auth-animations";
 if (typeof document !== "undefined" && !document.getElementById(styleId)) {
@@ -58,6 +65,7 @@ export default function Login() {
   const { themeMode, setThemeMode } = useTheme();
   const [isWebAuthnSupported, setIsWebAuthnSupported] = useState(false);
   const [instanceInfo, setInstanceInfo] = useState<InstanceInfo | null>(null);
+  const [form] = Form.useForm<LoginRequest>();
 
   const themeModeOrder: ThemeMode[] = ["light", "dark", "system"];
   const themeModeIcons: Record<ThemeMode, React.ReactNode> = {
@@ -109,19 +117,17 @@ export default function Login() {
 
   async function handleWebAuthnLogin() {
     try {
-      // 1. Get options from server
-      const beginRes = await api.webauthn.webauthnLoginBeginCreate();
+      const { email } = await form.validateFields(["email"]);
+      const beginRes = await api.webauthn.webauthnLoginBeginCreate({ email });
       const options = beginRes.data!.publicKey;
 
-      // 2. Authenticate with browser
       const asseResp = await startAuthentication({ optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON });
 
-      // 3. Verify with server — send assertion as raw body via httpClient
-      //    (generated client doesn't declare a body param for this endpoint)
+      // Keep email out of the assertion body so go-webauthn can parse it unchanged.
       const verifyRes = await httpClient.instance.post<{
         success: boolean;
         data: { token: string; user: { id: string; email: string } };
-      }>("/auth/webauthn/login/finish", asseResp);
+      }>(`/auth/webauthn/login/finish?email=${encodeURIComponent(email)}`, asseResp);
       
       const auth = verifyRes.data.data;
       localStorage.setItem("token", auth.token);
@@ -129,6 +135,9 @@ export default function Login() {
       window.location.href = from;
       
     } catch (error) {
+      if (isFormValidationError(error)) {
+        return;
+      }
       console.error(error);
       message.error(t("auth.login.passkey_failed"));
     }
@@ -304,7 +313,7 @@ export default function Login() {
           </div>
 
           {/* Form */}
-          <Form layout="vertical" onFinish={onFinish} size="large">
+          <Form form={form} layout="vertical" onFinish={onFinish} size="large">
             <div style={fadeIn(1)}>
               <Form.Item
                 name="email"
