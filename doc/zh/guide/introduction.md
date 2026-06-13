@@ -56,4 +56,4 @@ Bonds 站在 [@djaiss](https://github.com/djaiss)、[@asbiin](https://github.com
 
 - **个人用户**：非商业使用完全免费
 - **组织/企业**：商业使用需向 Licensor 购买许可
-- **转换日期**：2030年2月17日 — 届时自动转为 AGPL-3.0
+- **转换日期**：2030年6月13日 — 届时自动转为 AGPL-3.0

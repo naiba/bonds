@@ -56,4 +56,4 @@ Bonds stands on the shoulders of [@djaiss](https://github.com/djaiss), [@asbiin]
 
 - **Individuals**: Free for any non-commercial use
 - **Organizations**: Commercial use requires a paid license
-- **Change Date**: February 17, 2030 — automatically converts to AGPL-3.0
+- **Change Date**: June 13, 2030 — automatically converts to AGPL-3.0
