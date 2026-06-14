@@ -309,26 +309,23 @@ test.describe('Contact Modules - Documents', () => {
   });
 });
 
-test.describe('Contact Modules - Photos', () => {
-  test('should show photos module with upload area', async ({ page }) => {
-    await setupVault(page, 'photos');
+test.describe('Contact Modules - Media', () => {
+  test('should show media module with upload area', async ({ page }) => {
+    await setupVault(page, 'media');
     await goToContacts(page);
-    // Avoid "Photos" in contact name to prevent selector ambiguity
     await createContact(page, 'Pic', 'Tester');
 
-    // Dynamic tab: "Information" (exact match)
     await navigateToTab(page, 'Information', true);
 
-    // Photos card — match by title span text AND presence of upload area
-    const photosCard = page.locator('.ant-card').filter({
-      has: page.locator('span', { hasText: 'Photos' }),
+    const mediaCard = page.locator('.ant-card').filter({
+      has: page.locator('span', { hasText: 'Media' }),
     }).filter({
       has: page.locator('.ant-upload-drag'),
     });
-    await expect(photosCard).toBeVisible({ timeout: 10000 });
+    await expect(mediaCard).toBeVisible({ timeout: 10000 });
 
-    await expect(photosCard.locator('.ant-upload-drag')).toBeVisible({ timeout: 5000 });
-    await expect(photosCard.getByText('No photos uploaded')).toBeVisible({ timeout: 5000 });
+    await expect(mediaCard.locator('.ant-upload-drag')).toBeVisible({ timeout: 5000 });
+    await expect(mediaCard.getByText('No media uploaded')).toBeVisible({ timeout: 5000 });
   });
 });
 
