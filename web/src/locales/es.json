@@ -598,7 +598,7 @@
         "information": "Información",
         "activities": "Actividades",
         "life": "Vida",
-        "photos_docs": "Fotos y documentos"
+        "photos_docs": "Medios y documentos"
       },
       "first_name": "Nombre",
       "last_name": "Apellidos",
@@ -953,17 +953,17 @@
       "stress": "Estrés"
     },
     "photos": {
-      "title": "Fotos",
-      "detail": "Detalle de la foto",
+      "title": "Medios",
+      "detail": "Detalle del medio",
       "file_name": "Nombre del archivo",
       "file_size": "Tamaño del archivo",
       "uploaded_at": "Subida el",
-      "upload_text": "Haz clic o arrastra para subir fotos",
-      "no_photos": "No se han subido fotos",
-      "uploaded": "Foto subida",
+      "upload_text": "Haz clic o arrastra para subir fotos y vídeos",
+      "no_photos": "No se han subido medios",
+      "uploaded": "Medio subido",
       "upload_failed": "Error al subir",
-      "deleted": "Foto eliminada",
-      "delete_confirm": "¿Eliminar esta foto?"
+      "deleted": "Medio eliminado",
+      "delete_confirm": "¿Eliminar este medio?"
     },
     "documents": {
       "title": "Documentos",

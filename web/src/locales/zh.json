@@ -598,7 +598,7 @@
         "information": "信息",
         "activities": "活动",
         "life": "生活",
-        "photos_docs": "照片与文档"
+        "photos_docs": "媒体与文档"
       },
       "first_name": "名",
       "last_name": "姓",
@@ -953,17 +953,17 @@
       "stress": "压力"
     },
     "photos": {
-      "title": "照片",
-      "detail": "照片详情",
+      "title": "媒体",
+      "detail": "媒体详情",
       "file_name": "文件名",
       "file_size": "文件大小",
       "uploaded_at": "上传时间",
-      "upload_text": "点击或拖拽上传照片",
-      "no_photos": "暂无照片",
-      "uploaded": "照片已上传",
+      "upload_text": "点击或拖拽上传照片和视频",
+      "no_photos": "暂无媒体",
+      "uploaded": "媒体已上传",
       "upload_failed": "上传失败",
-      "deleted": "照片已删除",
-      "delete_confirm": "确定删除这张照片？"
+      "deleted": "媒体已删除",
+      "delete_confirm": "确定删除此媒体？"
     },
     "documents": {
       "title": "文档",

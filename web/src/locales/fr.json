@@ -598,7 +598,7 @@
         "information": "Information",
         "activities": "Activités",
         "life": "Vie",
-        "photos_docs": "Photos et documents"
+        "photos_docs": "Médias et documents"
       },
       "first_name": "Prénom",
       "last_name": "Nom de famille",
@@ -953,17 +953,17 @@
       "stress": "Stress"
     },
     "photos": {
-      "title": "Photos",
-      "detail": "Détail de la photo",
+      "title": "Médias",
+      "detail": "Détail du média",
       "file_name": "Nom de fichier",
       "file_size": "Taille du fichier",
       "uploaded_at": "Téléchargé à",
-      "upload_text": "Cliquez ou faites glisser pour télécharger des photos",
-      "no_photos": "Aucune photo téléchargée",
-      "uploaded": "Photo téléchargée",
+      "upload_text": "Cliquez ou faites glisser pour téléverser des photos et des vidéos",
+      "no_photos": "Aucun média téléversé",
+      "uploaded": "Média téléversé",
       "upload_failed": "Échec du téléchargement",
-      "deleted": "Photo supprimée",
-      "delete_confirm": "Supprimer cette photo ?"
+      "deleted": "Média supprimé",
+      "delete_confirm": "Supprimer ce média ?"
     },
     "documents": {
       "title": "Documents",
