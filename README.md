@@ -38,7 +38,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **CSV Import**: Import contacts from a CSV file with a user-defined column mapping (name, email, phone, birthday, address, tags, groups, notes).
 - **Monica Import**: Migrate contacts directly from a Monica instance via API.
 - **vCard Import/Export**: Bulk import `.vcf` files, export individual or all contacts.
-- **File Upload**: Photos and documents attached to contacts, with generated initials avatars. Storage size limits managed directly from the UI.
+- **File Upload**: Contact media with photos and videos, document attachments, and generated initials avatars. Storage size limits managed directly from the UI.
 - **Two-Factor Auth (TOTP)**: TOTP-based 2FA with recovery codes.
 - **WebAuthn / FIDO2**: Passkey login (hardware keys, biometrics).
 - **OAuth Login**: GitHub and Google single sign-on.

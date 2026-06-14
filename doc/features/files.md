@@ -1,6 +1,6 @@
 # Files & Avatars
 
-Bonds supports secure file uploads for contact photos, documents, and vault-level files.
+Bonds supports secure file uploads for contact media, documents, and vault-level files.
 
 ## File Upload
 
@@ -9,7 +9,7 @@ Upload files to contacts or vaults using the following endpoints:
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/vaults/:vault_id/files` | Upload vault-level files |
-| `POST .../contacts/:contact_id/photos` | Upload contact photos |
+| `POST .../contacts/:contact_id/photos` | Upload contact media photos or videos |
 | `POST .../contacts/:contact_id/documents` | Upload contact documents |
 
 ### Supported File Types
@@ -17,6 +17,7 @@ Upload files to contacts or vaults using the following endpoints:
 Bonds enforces a strict MIME type whitelist:
 
 - **Images**: JPEG, PNG, GIF, WebP.
+- **Videos**: MP4, WebM, Ogg, QuickTime.
 - **Documents**: PDF.
 
 ### Size Limits

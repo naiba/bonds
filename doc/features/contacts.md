@@ -36,7 +36,7 @@ Contact edit pages are built from **modules**, which are configurable building b
 | Pets | Pets with names and categories (categories are managed at the account level) |
 | Groups | Contact group membership |
 | Documents | Uploaded files (PDF, images) |
-| Photos | Photo gallery |
+| Media | Photo and video gallery |
 | Posts | Journal-style entries with templates |
 | Goals | Personal goals tracking |
 | Feed | Activity timeline |
@@ -49,7 +49,7 @@ Templates control the layout of contact detail pages. Each template has **pages*
 2. **Feed**: Activity timeline.
 3. **Social**: Relationships, pets, groups, addresses, contact methods.
 4. **Life & goals**: Life events, goals.
-5. **Information**: Documents, photos, notes, reminders, loans, tasks, calls, posts.
+5. **Information**: Documents, media, notes, reminders, loans, tasks, calls, posts.
 
 Templates and module assignments are customizable through the [personalization settings](/features/admin#personalization).
 
