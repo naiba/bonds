@@ -3094,6 +3094,123 @@ func TestContactPhotoList_IncludesAvatar(t *testing.T) {
 	}
 }
 
+func TestContactPhotoRouteAcceptsListsPreviewsAndDeletesVideoMedia(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "contact-video-media@example.com")
+	vault := ts.createTestVault(t, token, "Video Media Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "VideoMedia")
+
+	videoData := []byte("\x00\x00\x00\x18ftypmp42" + strings.Repeat("v", 128))
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos",
+		token, "file", "family-trip.mp4", "video/mp4", videoData)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload video through /photos route: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true for video upload")
+	}
+	var uploaded map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &uploaded); err != nil {
+		t.Fatalf("failed to parse uploaded video: %v", err)
+	}
+	if uploaded["type"] != "video" {
+		t.Fatalf("expected uploaded media type 'video', got %v", uploaded["type"])
+	}
+	videoID := fmt.Sprintf("%.0f", uploaded["id"].(float64))
+
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list contact media: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var media []map[string]interface{}
+	if err := json.Unmarshal(resp.Data, &media); err != nil {
+		t.Fatalf("failed to parse contact media list: %v", err)
+	}
+	foundVideo := false
+	for _, item := range media {
+		if fmt.Sprintf("%.0f", item["id"].(float64)) == videoID && item["type"] == "video" {
+			foundVideo = true
+		}
+	}
+	if !foundVideo {
+		t.Fatalf("expected GET /photos to include uploaded video id %s, got %+v", videoID, media)
+	}
+
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/files/"+videoID+"/download?preview=true", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preview video download: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if contentDisposition := rec.Header().Get("Content-Disposition"); !strings.Contains(contentDisposition, "inline") {
+		t.Fatalf("preview=true for video should be served inline, got Content-Disposition %q", contentDisposition)
+	}
+
+	rec = ts.doRequest(http.MethodDelete,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos/"+videoID, "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete video through /photos route: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list after video delete: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	media = nil
+	if err := json.Unmarshal(resp.Data, &media); err != nil {
+		t.Fatalf("failed to parse contact media after delete: %v", err)
+	}
+	for _, item := range media {
+		if fmt.Sprintf("%.0f", item["id"].(float64)) == videoID {
+			t.Fatalf("deleted video id %s should not remain in GET /photos response: %+v", videoID, media)
+		}
+	}
+}
+
+func TestContactPhotoUploadRejectsSpoofedVideoContent(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "contact-video-spoof@example.com")
+	vault := ts.createTestVault(t, token, "Spoofed Media Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "SpoofedMedia")
+
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/photos",
+		token, "file", "spoof.mp4", "video/mp4", []byte("<script>alert('xss')</script>"))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("spoofed video upload: expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+	if resp.Error == nil || resp.Error.Code != "BAD_REQUEST" {
+		t.Errorf("expected BAD_REQUEST error, got %+v", resp.Error)
+	}
+}
+
+func TestVaultDocumentUploadRejectsVideoMime(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "vault-video-document@example.com")
+	vault := ts.createTestVault(t, token, "Video Document Vault")
+
+	videoData := []byte("\x00\x00\x00\x18ftypmp42" + strings.Repeat("v", 128))
+	rec := ts.doMultipartUpload(t,
+		"/api/vaults/"+vault.ID+"/files",
+		token, "file", "document-video.mp4", "video/mp4", videoData)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("vault document video upload: expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+}
+
 func TestContactPhotoDelete_Success(t *testing.T) {
 	ts := setupTestServerWithStorage(t)
 	token, _ := ts.registerTestUser(t, "photo-del@example.com")

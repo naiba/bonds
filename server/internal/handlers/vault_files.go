@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,6 +24,10 @@ var allowedMimeTypes = map[string]bool{
 	"image/png":          true,
 	"image/gif":          true,
 	"image/webp":         true,
+	"video/mp4":          true,
+	"video/webm":         true,
+	"video/ogg":          true,
+	"video/quicktime":    true,
 	"application/pdf":    true,
 	"text/plain":         true,
 	"application/msword": true,
@@ -102,7 +109,7 @@ func (h *VaultFileHandler) Delete(c echo.Context) error {
 //	@Param			vault_id	path		string	true	"Vault ID"
 //	@Param			file		formData	file	true	"File to upload"
 //	@Param			contact_id	formData	string	false	"Contact ID"
-//	@Param			file_type	formData	string	false	"File type (document/photo)"
+//	@Param			file_type	formData	string	false	"File type (document/photo/video)"
 //	@Success		201			{object}	response.APIResponse{data=dto.VaultFileResponse}
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
@@ -121,7 +128,7 @@ func (h *VaultFileHandler) Upload(c echo.Context) error {
 // UploadContactFile godoc
 //
 //	@Summary		Upload a contact file
-//	@Description	Upload a photo or document for a contact
+//	@Description	Upload media or document for a contact
 //	@Tags			files
 //	@Accept			mpfd
 //	@Produce		json
@@ -139,10 +146,63 @@ func (h *VaultFileHandler) UploadContactFile(c echo.Context) error {
 
 	fileType := "document"
 	if strings.HasSuffix(c.Path(), "photos") {
-		fileType = "photo"
+		fileType = "media"
 	}
 
 	return h.handleUpload(c, vaultID, contactID, fileType)
+}
+
+func contactMediaFileType(mimeType string) (string, bool) {
+	if strings.HasPrefix(mimeType, "image/") {
+		return "photo", true
+	}
+	if strings.HasPrefix(mimeType, "video/") {
+		return "video", true
+	}
+	return "", false
+}
+
+func uploadFileTypeMatchesMime(fileType, mimeType string) bool {
+	switch fileType {
+	case "media":
+		_, ok := contactMediaFileType(mimeType)
+		return ok
+	case "photo", "avatar":
+		return strings.HasPrefix(mimeType, "image/")
+	case "video":
+		return strings.HasPrefix(mimeType, "video/")
+	default:
+		return !strings.HasPrefix(mimeType, "video/")
+	}
+}
+
+func uploadMediaMimeMatches(mimeType string, sniffedData []byte) bool {
+	detectedMimeType := http.DetectContentType(sniffedData)
+	switch mimeType {
+	case "image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm":
+		return detectedMimeType == mimeType
+	case "video/ogg":
+		return detectedMimeType == "application/ogg" || detectedMimeType == "video/ogg"
+	case "video/quicktime":
+		return len(sniffedData) >= 12 && bytes.Equal(sniffedData[4:8], []byte("ftyp")) && bytes.Equal(sniffedData[8:12], []byte("qt  "))
+	default:
+		return false
+	}
+}
+
+func verifyUploadedMediaContent(src interface {
+	io.Reader
+	io.Seeker
+}, mimeType string) (bool, error) {
+	var sniffBuffer [512]byte
+	n, err := src.Read(sniffBuffer[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return false, err
+	}
+	return uploadMediaMimeMatches(mimeType, sniffBuffer[:n]), nil
 }
 
 func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, fileType string) error {
@@ -175,16 +235,36 @@ func (h *VaultFileHandler) handleUpload(c echo.Context, vaultID, contactID, file
 		}
 	}
 
-	mimeType := fileHeader.Header.Get("Content-Type")
-	if !allowedMimeTypes[mimeType] {
-		return response.BadRequest(c, "err.file_type_not_allowed", nil)
-	}
-
 	src, err := fileHeader.Open()
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_read_file")
 	}
 	defer src.Close()
+
+	mimeType := fileHeader.Header.Get("Content-Type")
+	if !allowedMimeTypes[mimeType] {
+		return response.BadRequest(c, "err.file_type_not_allowed", nil)
+	}
+	if !uploadFileTypeMatchesMime(fileType, mimeType) {
+		return response.BadRequest(c, "err.file_type_not_allowed", nil)
+	}
+	if strings.HasPrefix(mimeType, "image/") || strings.HasPrefix(mimeType, "video/") {
+		// Multipart Content-Type is user controlled; validate inline-previewable media by bytes.
+		validMedia, err := verifyUploadedMediaContent(src, mimeType)
+		if err != nil {
+			return response.InternalError(c, "err.failed_to_read_file")
+		}
+		if !validMedia {
+			return response.BadRequest(c, "err.file_type_not_allowed", nil)
+		}
+	}
+	if fileType == "media" {
+		inferredFileType, ok := contactMediaFileType(mimeType)
+		if !ok {
+			return response.BadRequest(c, "err.file_type_not_allowed", nil)
+		}
+		fileType = inferredFileType
+	}
 
 	authorID := middleware.GetUserID(c)
 	result, err := h.vaultFileService.Upload(vaultID, contactID, authorID, fileType, fileHeader.Filename, mimeType, fileHeader.Size, src)
@@ -225,7 +305,9 @@ func (h *VaultFileHandler) Serve(c echo.Context) error {
 	}
 
 	filePath := filepath.Join(h.vaultFileService.UploadDir(), file.UUID)
-	if c.QueryParam("preview") == "true" && strings.HasPrefix(file.MimeType, "image/") {
+	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
+	if c.QueryParam("preview") == "true" && (strings.HasPrefix(file.MimeType, "image/") || strings.HasPrefix(file.MimeType, "video/")) {
+		c.Response().Header().Set(echo.HeaderContentType, file.MimeType)
 		return c.Inline(filePath, file.Name)
 	}
 	return c.Attachment(filePath, file.Name)
