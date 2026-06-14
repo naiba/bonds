@@ -22,8 +22,8 @@ func NewContactPhotoHandler(vaultFileService *services.VaultFileService) *Contac
 
 // List godoc
 //
-//	@Summary		List contact photos
-//	@Description	Return all photos for a contact
+//	@Summary		List contact media
+//	@Description	Return all photos and videos for a contact
 //	@Tags			contact-photos
 //	@Produce		json
 //	@Security		BearerAuth
@@ -48,8 +48,8 @@ func (h *ContactPhotoHandler) List(c echo.Context) error {
 
 // Get godoc
 //
-//	@Summary		Get a contact photo
-//	@Description	Return a single contact photo by ID
+//	@Summary		Get contact media
+//	@Description	Return a single contact media item by ID
 //	@Tags			contact-photos
 //	@Produce		json
 //	@Security		BearerAuth
@@ -80,8 +80,8 @@ func (h *ContactPhotoHandler) Get(c echo.Context) error {
 
 // Delete godoc
 //
-//	@Summary		Delete a contact photo
-//	@Description	Delete a contact photo by ID
+//	@Summary		Delete contact media
+//	@Description	Delete a contact media item by ID
 //	@Tags			contact-photos
 //	@Produce		json
 //	@Security		BearerAuth

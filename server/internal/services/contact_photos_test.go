@@ -69,6 +69,148 @@ func TestListContactPhotos(t *testing.T) {
 	}
 }
 
+func TestListContactPhotosIncludesPhotoAvatarAndVideoMediaOnly(t *testing.T) {
+	svc, contactID, vaultID := setupContactPhotoTest(t)
+
+	mediaFiles := []models.File{
+		{
+			VaultID:     vaultID,
+			UUID:        "contact-avatar-media-uuid",
+			Name:        "avatar.png",
+			MimeType:    "image/png",
+			Type:        "avatar",
+			Size:        512,
+			UfileableID: &contactID,
+		},
+		{
+			VaultID:     vaultID,
+			UUID:        "contact-video-media-uuid",
+			Name:        "birthday.mp4",
+			MimeType:    "video/mp4",
+			Type:        "video",
+			Size:        4096,
+			UfileableID: &contactID,
+		},
+		{
+			VaultID:     vaultID,
+			UUID:        "contact-document-media-uuid",
+			Name:        "private.pdf",
+			MimeType:    "application/pdf",
+			Type:        "document",
+			Size:        2048,
+			UfileableID: &contactID,
+		},
+	}
+	for i := range mediaFiles {
+		if err := svc.db.Create(&mediaFiles[i]).Error; err != nil {
+			t.Fatalf("Create media file failed: %v", err)
+		}
+	}
+
+	quickFactType := "QuickFact"
+	quickFactVideo := models.File{
+		VaultID:      vaultID,
+		UUID:         "quick-fact-video-media-uuid",
+		Name:         "quick-fact.mp4",
+		MimeType:     "video/mp4",
+		Type:         "video",
+		Size:         8192,
+		FileableType: &quickFactType,
+		UfileableID:  &contactID,
+	}
+	if err := svc.db.Create(&quickFactVideo).Error; err != nil {
+		t.Fatalf("Create quick fact video failed: %v", err)
+	}
+
+	files, meta, err := svc.ListContactPhotos(contactID, vaultID, 1, 30)
+	if err != nil {
+		t.Fatalf("ListContactPhotos failed: %v", err)
+	}
+	if meta.Total != 4 || len(files) != 4 {
+		t.Fatalf("Expected 4 contact media files (2 photos + avatar + video), got total=%d files=%+v", meta.Total, files)
+	}
+
+	typeCounts := map[string]int{}
+	for _, file := range files {
+		typeCounts[file.Type]++
+		if file.Type == "document" {
+			t.Fatalf("document file should stay excluded from contact media list: %+v", file)
+		}
+		if file.ID == quickFactVideo.ID {
+			t.Fatalf("QuickFact-owned video should stay excluded from contact media list: %+v", file)
+		}
+	}
+	if typeCounts["photo"] != 2 || typeCounts["avatar"] != 1 || typeCounts["video"] != 1 {
+		t.Fatalf("Expected media type counts photo=2 avatar=1 video=1, got %+v", typeCounts)
+	}
+}
+
+func TestGetAndDeleteContactPhotoSupportsVideoMedia(t *testing.T) {
+	svc, contactID, vaultID := setupContactPhotoTest(t)
+
+	video := models.File{
+		VaultID:     vaultID,
+		UUID:        "contact-video-get-delete-uuid",
+		Name:        "recital.mp4",
+		MimeType:    "video/mp4",
+		Type:        "video",
+		Size:        4096,
+		UfileableID: &contactID,
+	}
+	if err := svc.db.Create(&video).Error; err != nil {
+		t.Fatalf("Create video file failed: %v", err)
+	}
+
+	got, err := svc.GetContactPhoto(video.ID, contactID, vaultID)
+	if err != nil {
+		t.Fatalf("GetContactPhoto should load video media: %v", err)
+	}
+	if got.Type != "video" || got.MimeType != "video/mp4" {
+		t.Fatalf("Expected video/mp4 media, got %+v", got)
+	}
+
+	if err := svc.DeleteContactPhoto(video.ID, contactID, vaultID); err != nil {
+		t.Fatalf("DeleteContactPhoto should delete video media: %v", err)
+	}
+	if _, err := svc.GetContactPhoto(video.ID, contactID, vaultID); err != ErrFileNotFound {
+		t.Fatalf("Expected deleted video to return ErrFileNotFound, got %v", err)
+	}
+}
+
+func TestDeleteContactPhotoProtectsQuickFactOwnedVideoMedia(t *testing.T) {
+	svc, contactID, vaultID := setupContactPhotoTest(t)
+
+	quickFactType := "QuickFact"
+	quickFactID := uint(173)
+	video := models.File{
+		VaultID:      vaultID,
+		UUID:         "quick-fact-video-protected-uuid",
+		Name:         "protected.mp4",
+		MimeType:     "video/mp4",
+		Type:         "video",
+		Size:         4096,
+		FileableID:   &quickFactID,
+		FileableType: &quickFactType,
+		UfileableID:  &contactID,
+	}
+	if err := svc.db.Create(&video).Error; err != nil {
+		t.Fatalf("Create quick fact video failed: %v", err)
+	}
+	templateLabel := "Favorite video"
+	template := models.VaultQuickFactsTemplate{VaultID: vaultID, Label: &templateLabel, FieldType: "photo", Position: 1}
+	if err := svc.db.Create(&template).Error; err != nil {
+		t.Fatalf("Create quick fact template failed: %v", err)
+	}
+	quickFact := models.QuickFact{ID: quickFactID, VaultQuickFactsTemplateID: template.ID, ContactID: contactID, Content: video.Name, FileID: &video.ID}
+	if err := svc.db.Create(&quickFact).Error; err != nil {
+		t.Fatalf("Create quick fact failed: %v", err)
+	}
+
+	if err := svc.DeleteContactPhoto(video.ID, contactID, vaultID); err != ErrFileInUse {
+		t.Fatalf("Expected QuickFact-owned video delete to return ErrFileInUse, got %v", err)
+	}
+}
+
 func TestListContactPhotosEmpty(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()
