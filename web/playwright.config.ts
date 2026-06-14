@@ -18,8 +18,20 @@ function readPortEnv(name: string, fallback: number): number {
   return port;
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 const serverPort = readPortEnv('PLAYWRIGHT_SERVER_PORT', 8080);
 const vitePort = readPortEnv('PLAYWRIGHT_VITE_PORT', 5173);
+const webAuthnRpID = process.env.WEBAUTHN_RP_ID ?? 'localhost';
+const webAuthnRpOrigins = process.env.WEBAUTHN_RP_ORIGINS ?? `http://localhost:${vitePort}`;
+const webAuthnRpDisplayName = process.env.WEBAUTHN_RP_DISPLAY_NAME ?? 'Bonds E2E';
+const webAuthnEnv = [
+  `WEBAUTHN_RP_ID=${shellQuote(webAuthnRpID)}`,
+  `WEBAUTHN_RP_ORIGINS=${shellQuote(webAuthnRpOrigins)}`,
+  `WEBAUTHN_RP_DISPLAY_NAME=${shellQuote(webAuthnRpDisplayName)}`,
+].join(' ');
 
 export default defineConfig({
   testDir: './e2e',
@@ -41,7 +53,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -f ../server/bonds.db ../server/bonds.db-shm ../server/bonds.db-wal && cd ../server && SERVER_PORT=${serverPort} go run -ldflags="-X main.Version=e2e-test" cmd/server/main.go`,
+      command: `rm -f ../server/bonds.db ../server/bonds.db-shm ../server/bonds.db-wal && cd ../server && SERVER_PORT=${serverPort} ${webAuthnEnv} go run -ldflags="-X main.Version=e2e-test" cmd/server/main.go`,
       port: serverPort,
       reuseExistingServer: !process.env.CI,
     },
