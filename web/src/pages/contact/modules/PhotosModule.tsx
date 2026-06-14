@@ -30,8 +30,8 @@ export default function PhotosModule({
       return { items: res.data ?? [], meta: res.meta as PaginationMeta | undefined };
     },
   });
-  const photos = photosResponse?.items ?? [];
-  const total = photosResponse?.meta?.total ?? photos.length;
+  const mediaItems = (photosResponse?.items ?? []) as Photo[];
+  const total = photosResponse?.meta?.total ?? mediaItems.length;
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => api.contactPhotos.contactsPhotosDelete(String(vaultId), String(contactId), id),
@@ -53,6 +53,7 @@ export default function PhotosModule({
     >
       <Dragger
         name="file"
+        accept="image/*,video/*"
         action={`/api/vaults/${vaultId}/contacts/${contactId}/photos`}
         headers={{
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -80,36 +81,55 @@ export default function PhotosModule({
         <p className="ant-upload-text" style={{ color: token.colorTextSecondary }}>{t("modules.photos.upload_text")}</p>
       </Dragger>
 
-      {photos.length === 0 ? (
+      {mediaItems.length === 0 ? (
         <Empty description={t("modules.photos.no_photos")} />
       ) : (
         <Image.PreviewGroup>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {(photos as Photo[]).map((photo: Photo) => (
-              <div key={photo.id} style={{ position: 'relative', display: 'inline-block' }}>
-                <Image
-                  width={120}
-                  height={120}
-                  src={`/api/vaults/${vaultId}/files/${photo.id}/download?token=${localStorage.getItem("token")}`}
-                  style={{ objectFit: "cover", borderRadius: token.borderRadius }}
-                />
+            {mediaItems.map((photo) => (
+              <div key={photo.id} style={{ position: "relative", display: "inline-block" }}>
+                {photo.mime_type?.startsWith("video/") ? (
+                  <video
+                    width={120}
+                    height={120}
+                    controls
+                    preload="metadata"
+                    style={{
+                      objectFit: "cover",
+                      borderRadius: token.borderRadius,
+                      background: token.colorFillQuaternary,
+                    }}
+                  >
+                    <source
+                      src={`/api/vaults/${vaultId}/files/${photo.id}/download?token=${localStorage.getItem("token")}&preview=true`}
+                      type={photo.mime_type}
+                    />
+                  </video>
+                ) : (
+                  <Image
+                    width={120}
+                    height={120}
+                    src={`/api/vaults/${vaultId}/files/${photo.id}/download?token=${localStorage.getItem("token")}`}
+                    style={{ objectFit: "cover", borderRadius: token.borderRadius }}
+                  />
+                )}
                 <Popconfirm
                   title={t("modules.photos.delete_confirm")}
                   onConfirm={() => deleteMutation.mutate(photo.id!)}
                   okText={t("common.delete")}
                   cancelText={t("common.cancel")}
                 >
-                  <Button 
-                    type="text" 
-                    danger 
-                    icon={<DeleteOutlined />} 
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
                     size="small"
-                    style={{ 
-                      position: 'absolute', 
-                      top: 4, 
-                      right: 4, 
-                      background: 'rgba(255, 255, 255, 0.8)',
-                      borderRadius: '50%',
+                    style={{
+                      position: "absolute",
+                      top: 4,
+                      right: 4,
+                      background: "rgba(255, 255, 255, 0.8)",
+                      borderRadius: "50%",
                     }}
                   />
                 </Popconfirm>
