@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import AdminSettings from "@/pages/admin/Settings";
+
+const mockSettingsUpdate = vi.fn();
 
 vi.mock("@/api", () => ({
   api: {
     admin: {
       settingsList: vi.fn(),
-      settingsUpdate: vi.fn(),
+      settingsUpdate: (...args: unknown[]) => mockSettingsUpdate(...args),
     },
   },
 }));
@@ -16,7 +19,16 @@ vi.mock("@/api", () => ({
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useMutation: (options: { mutationFn?: (v: unknown) => Promise<unknown>; onSuccess?: () => void }) => ({
+    mutate: (vars: unknown) => {
+      if (options.mutationFn) {
+        options.mutationFn(vars).then(() => {
+          if (options.onSuccess) options.onSuccess();
+        });
+      }
+    },
+    isPending: false,
+  }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -66,5 +78,39 @@ describe("AdminSettings", () => {
     expect(screen.getByText("User Registration")).toBeInTheDocument();
     expect(screen.getByText("SMTP Email")).toBeInTheDocument();
     expect(screen.getByText("WebAuthn")).toBeInTheDocument();
+  });
+
+  it("preserves unmounted fields when saving unrelated settings", async () => {
+    mockUseQuery.mockReturnValue({
+      data: [
+        { key: "app.name", value: "Bonds" },
+        { key: "webauthn.rp_id", value: "bonds.example.com" },
+        { key: "webauthn.rp_display_name", value: "Bonds Passkeys" },
+        { key: "webauthn.rp_origins", value: "https://bonds.example.com" },
+      ],
+      isLoading: false,
+    });
+    mockSettingsUpdate.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderAdminSettings();
+
+    // Ant Design's Collapse defaults to unmounting inactive panels.
+    expect(screen.queryByPlaceholderText("e.g. bonds.example.com")).not.toBeInTheDocument();
+
+    const appNameInput = screen.getByLabelText("Application Name");
+    await user.clear(appNameInput);
+    await user.type(appNameInput, "Test Bonds App");
+    await user.click(screen.getByRole("button", { name: "Save Settings" }));
+
+    await waitFor(() => {
+      expect(mockSettingsUpdate).toHaveBeenCalled();
+    });
+
+    const payload = mockSettingsUpdate.mock.calls[0][0] as { settings: { key: string; value: string }[] };
+    const settings = payload.settings;
+    expect(settings).toContainEqual({ key: "app.name", value: "Test Bonds App" });
+    expect(settings).toContainEqual({ key: "webauthn.rp_id", value: "bonds.example.com" });
+    expect(settings).toContainEqual({ key: "webauthn.rp_display_name", value: "Bonds Passkeys" });
+    expect(settings).toContainEqual({ key: "webauthn.rp_origins", value: "https://bonds.example.com" });
   });
 });

@@ -86,7 +86,7 @@ export default function AdminSettings() {
   const [form] = Form.useForm();
   const qk = ["admin", "settings"];
 
-  const { isLoading } = useQuery({
+  const { isLoading, data: initialSettings } = useQuery({
     queryKey: qk,
     queryFn: async () => {
       const res = await api.admin.settingsList();
@@ -123,11 +123,17 @@ export default function AdminSettings() {
   });
 
   function handleSave() {
-    const values = form.getFieldsValue();
-    const settings: SystemSettingItem[] = KNOWN_SETTINGS.map((ks) => ({
-      key: ks.key,
-      value: values[ks.key] != null ? String(values[ks.key]) : "",
-    }));
+    const values = form.getFieldsValue(true) as Record<string, unknown>;
+    const loadedSettings = new Map((initialSettings ?? []).map(s => [s.key, s.value ?? ""]));
+    const settings: SystemSettingItem[] = KNOWN_SETTINGS.map((ks) => {
+      const hasFormValue = Object.prototype.hasOwnProperty.call(values, ks.key);
+      const formVal = values[ks.key];
+      const finalVal = hasFormValue ? (formVal != null ? String(formVal) : "") : (loadedSettings.get(ks.key) ?? "");
+      return {
+        key: ks.key,
+        value: finalVal,
+      };
+    });
     saveMutation.mutate(settings);
   }
 
