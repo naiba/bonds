@@ -1,9 +1,13 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"io"
 	"strconv"
 
+	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/middleware"
@@ -76,6 +80,9 @@ func (h *WebAuthnHandler) FinishRegistration(c echo.Context) error {
 		if errors.Is(err, services.ErrWebAuthnSessionNotFound) {
 			return response.BadRequest(c, "err.webauthn_session_expired", nil)
 		}
+		if isWebAuthnCeremonyError(err) {
+			return response.BadRequest(c, "err.failed_to_finish_webauthn_registration", nil)
+		}
 		return response.InternalError(c, "err.failed_to_finish_webauthn_registration")
 	}
 
@@ -140,15 +147,19 @@ func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
 	if !h.webauthnService.IsEnabled() {
 		return response.BadRequest(c, "err.webauthn_not_configured", nil)
 	}
-	var req struct {
-		Email string `json:"email"`
-	}
 	// Try to get email from query parameter (WebAuthn flow)
 	email := c.QueryParam("email")
 	if email == "" {
-		// Peek at JSON body — but WebAuthn FinishLogin needs the raw body for parsing.
-		// We pass email via query param instead.
-		if err := c.Bind(&req); err == nil && req.Email != "" {
+		body, err := io.ReadAll(c.Request().Body)
+		if err != nil {
+			return response.BadRequest(c, "err.invalid_request_body", nil)
+		}
+		c.Request().Body = io.NopCloser(bytes.NewReader(body))
+
+		var req struct {
+			Email string `json:"email"`
+		}
+		if len(body) > 0 && json.Unmarshal(body, &req) == nil && req.Email != "" {
 			email = req.Email
 		}
 	}
@@ -164,6 +175,9 @@ func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
 		if errors.Is(err, services.ErrWebAuthnSessionNotFound) {
 			return response.BadRequest(c, "err.webauthn_session_expired", nil)
 		}
+		if isWebAuthnCeremonyError(err) {
+			return response.BadRequest(c, "err.failed_to_finish_webauthn_login", nil)
+		}
 		return response.InternalError(c, "err.failed_to_finish_webauthn_login")
 	}
 
@@ -173,6 +187,11 @@ func (h *WebAuthnHandler) FinishLogin(c echo.Context) error {
 	}
 
 	return response.OK(c, authResp)
+}
+
+func isWebAuthnCeremonyError(err error) bool {
+	var protocolErr *protocol.Error
+	return errors.As(err, &protocolErr)
 }
 
 // ListCredentials godoc

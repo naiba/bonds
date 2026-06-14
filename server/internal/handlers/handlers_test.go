@@ -116,6 +116,20 @@ type catchUpPromptData struct {
 }
 
 func setupTestServer(t *testing.T) *testServer {
+	return setupTestServerWithConfig(t, nil)
+}
+
+func setupTestServerWithWebAuthn(t *testing.T) *testServer {
+	return setupTestServerWithConfig(t, func(cfg *config.Config) {
+		cfg.WebAuthn = config.WebAuthnConfig{
+			RPID:          "localhost",
+			RPDisplayName: "Bonds Test",
+			RPOrigins:     []string{"http://localhost:8080"},
+		}
+	})
+}
+
+func setupTestServerWithConfig(t *testing.T, configure func(*config.Config)) *testServer {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	blevePath, err := os.MkdirTemp("", "test-bleve-*")
@@ -132,6 +146,9 @@ func setupTestServer(t *testing.T) *testServer {
 		},
 		App:   config.AppConfig{Name: "Monica Test", Env: "test", URL: "http://localhost:8080"},
 		Bleve: config.BleveConfig{IndexPath: blevePath + "/test.bleve"},
+	}
+	if configure != nil {
+		configure(cfg)
 	}
 	settingSvc := services.NewSystemSettingService(db)
 	if err := services.SeedSettingsFromEnv(settingSvc, cfg); err != nil {
@@ -369,6 +386,38 @@ func TestLogin_NonexistentUser(t *testing.T) {
 	resp := parseResponse(t, rec)
 	if resp.Error == nil || resp.Error.Code != "UNAUTHORIZED" {
 		t.Errorf("expected error code UNAUTHORIZED, got %+v", resp.Error)
+	}
+}
+
+func TestWebAuthnFinishLoginMalformedAssertionReturnsBadRequest(t *testing.T) {
+	ts := setupTestServerWithWebAuthn(t)
+	_, auth := ts.registerTestUser(t, "webauthn-malformed@example.com")
+	cred := models.WebAuthnCredential{
+		UserID:       auth.User.ID,
+		CredentialID: []byte("malformed-assertion-credential"),
+		PublicKey:    []byte("invalid-public-key"),
+		Name:         "Malformed Assertion Key",
+	}
+	if err := ts.db.Create(&cred).Error; err != nil {
+		t.Fatalf("create webauthn credential: %v", err)
+	}
+
+	rec := ts.doRequest(http.MethodPost, "/api/auth/webauthn/login/begin",
+		`{"email":"webauthn-malformed@example.com"}`, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("begin webauthn login: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodPost, "/api/auth/webauthn/login/finish?email=webauthn-malformed@example.com", `{}`, "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("finish malformed webauthn assertion: expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Success {
+		t.Fatal("expected success=false")
+	}
+	if resp.Error == nil || resp.Error.Code != "BAD_REQUEST" {
+		t.Errorf("expected error code BAD_REQUEST, got %+v", resp.Error)
 	}
 }
 
