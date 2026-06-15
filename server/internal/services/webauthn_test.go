@@ -327,6 +327,80 @@ func TestReloadConfigDisablesPreviouslyEnabledWebAuthnWhenPersistedConfigIsInval
 	}
 }
 
+func TestWebAuthnCredentialsRehydratesPersistedFlags(t *testing.T) {
+	// Regression for #174: go-webauthn rejects login when the stored
+	// credential's BackupEligible flag disagrees with the assertion, so dropped
+	// flags break every synced-passkey login.
+	svc, userID := setupWebAuthnTest(t)
+
+	cred := models.WebAuthnCredential{
+		UserID:         userID,
+		CredentialID:   []byte("synced-passkey"),
+		PublicKey:      []byte("test-public-key"),
+		Name:           "iCloud Keychain",
+		UserPresent:    true,
+		UserVerified:   true,
+		BackupEligible: true,
+		BackupState:    true,
+	}
+	if err := svc.db.Create(&cred).Error; err != nil {
+		t.Fatalf("Failed to create credential: %v", err)
+	}
+
+	var loaded []models.WebAuthnCredential
+	if err := svc.db.Where("user_id = ?", userID).Find(&loaded).Error; err != nil {
+		t.Fatalf("Failed to load credentials: %v", err)
+	}
+
+	user := &models.User{ID: userID, Email: "webauthn@example.com"}
+	wCreds := newWebAuthnUser(user, loaded).WebAuthnCredentials()
+	if len(wCreds) != 1 {
+		t.Fatalf("Expected 1 rehydrated credential, got %d", len(wCreds))
+	}
+
+	flags := wCreds[0].Flags
+	if !flags.BackupEligible {
+		t.Error("Expected rehydrated BackupEligible=true; got false (synced passkey login would fail)")
+	}
+	if !flags.BackupState {
+		t.Error("Expected rehydrated BackupState=true; got false")
+	}
+	if !flags.UserPresent {
+		t.Error("Expected rehydrated UserPresent=true; got false")
+	}
+	if !flags.UserVerified {
+		t.Error("Expected rehydrated UserVerified=true; got false")
+	}
+}
+
+func TestWebAuthnCredentialPersistsFlagsRoundTrip(t *testing.T) {
+	svc, userID := setupWebAuthnTest(t)
+
+	cred := models.WebAuthnCredential{
+		UserID:         userID,
+		CredentialID:   []byte("roundtrip"),
+		PublicKey:      []byte("test-public-key"),
+		Name:           "Round Trip",
+		UserPresent:    true,
+		UserVerified:   false,
+		BackupEligible: true,
+		BackupState:    false,
+	}
+	if err := svc.db.Create(&cred).Error; err != nil {
+		t.Fatalf("Failed to create credential: %v", err)
+	}
+
+	var loaded models.WebAuthnCredential
+	if err := svc.db.First(&loaded, "credential_id = ?", []byte("roundtrip")).Error; err != nil {
+		t.Fatalf("Failed to reload credential: %v", err)
+	}
+
+	if !loaded.UserPresent || loaded.UserVerified || !loaded.BackupEligible || loaded.BackupState {
+		t.Errorf("Flags not persisted faithfully: UP=%v UV=%v BE=%v BS=%v",
+			loaded.UserPresent, loaded.UserVerified, loaded.BackupEligible, loaded.BackupState)
+	}
+}
+
 func TestBeginLoginNoCredentials(t *testing.T) {
 	svc, _ := setupWebAuthnTest(t)
 
