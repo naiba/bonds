@@ -11,7 +11,11 @@ async function registerUser(page: import('@playwright/test').Page, email: string
   await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
 }
 
-async function addVirtualAuthenticator(context: BrowserContext, page: Page) {
+async function addVirtualAuthenticator(
+  context: BrowserContext,
+  page: Page,
+  backup: { eligible: boolean; state: boolean } = { eligible: false, state: false },
+) {
   const cdp = await context.newCDPSession(page);
   await cdp.send('WebAuthn.enable');
   await cdp.send('WebAuthn.addVirtualAuthenticator', {
@@ -22,6 +26,8 @@ async function addVirtualAuthenticator(context: BrowserContext, page: Page) {
       hasUserVerification: true,
       isUserVerified: true,
       automaticPresenceSimulation: true,
+      defaultBackupEligibility: backup.eligible,
+      defaultBackupState: backup.state,
     },
   });
 }
@@ -74,7 +80,11 @@ test.describe('Authentication', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('should finish passkey login without returning internal error', async ({ page, context }) => {
+  async function runPasskeyRegisterAndLogin(
+    page: Page,
+    context: BrowserContext,
+    backup: { eligible: boolean; state: boolean },
+  ) {
     const authEvents: string[] = [];
     page.on('console', msg => authEvents.push(`console.${msg.type()}: ${msg.text()}`));
     page.on('pageerror', err => authEvents.push(`pageerror: ${err.message}`));
@@ -97,7 +107,7 @@ test.describe('Authentication', () => {
       'Playwright config must enable WebAuthn so this regression test cannot silently skip',
     ).toBe(true);
 
-    await addVirtualAuthenticator(context, page);
+    await addVirtualAuthenticator(context, page, backup);
 
     const email = `passkey-${Date.now()}@example.com`;
     await registerUser(page, email);
@@ -146,5 +156,13 @@ test.describe('Authentication', () => {
       `passkey login finish returned ${loginResponse.status()} from ${loginResponse.url()}\n${authEvents.join('\n')}`,
     ).toBe(200);
     await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
+  }
+
+  test('should finish passkey login without returning internal error', async ({ page, context }) => {
+    await runPasskeyRegisterAndLogin(page, context, { eligible: false, state: false });
+  });
+
+  test('should finish synced passkey login when backup eligible', async ({ page, context }) => {
+    await runPasskeyRegisterAndLogin(page, context, { eligible: true, state: true });
   });
 });
