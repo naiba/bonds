@@ -169,6 +169,10 @@ func (s *WebAuthnService) FinishRegistration(userID string, r *http.Request) err
 		AttestationType: credential.AttestationType,
 		AAGUID:          credential.Authenticator.AAGUID,
 		SignCount:       credential.Authenticator.SignCount,
+		UserPresent:     credential.Flags.UserPresent,
+		UserVerified:    credential.Flags.UserVerified,
+		BackupEligible:  credential.Flags.BackupEligible,
+		BackupState:     credential.Flags.BackupState,
 		Name:            "Security Key",
 	}
 	return s.db.Create(&cred).Error
@@ -233,10 +237,16 @@ func (s *WebAuthnService) FinishLogin(email string, r *http.Request) (string, er
 		return "", err
 	}
 
-	// Update sign count
+	// BackupEligible is fixed for the credential's lifetime; the other flags
+	// (sign count, backup/presence/verification state) can change per login.
 	for _, c := range creds {
 		if string(c.CredentialID) == string(credential.ID) {
-			s.db.Model(&c).Update("sign_count", credential.Authenticator.SignCount)
+			s.db.Model(&c).Updates(map[string]any{
+				"sign_count":    credential.Authenticator.SignCount,
+				"user_present":  credential.Flags.UserPresent,
+				"user_verified": credential.Flags.UserVerified,
+				"backup_state":  credential.Flags.BackupState,
+			})
 			break
 		}
 	}

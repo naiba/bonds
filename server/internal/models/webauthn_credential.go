@@ -10,6 +10,10 @@ type WebAuthnCredential struct {
 	AttestationType string `json:"attestation_type" gorm:"type:text"`
 	AAGUID          []byte `json:"-" gorm:"type:bytea"`
 	SignCount       uint32 `json:"sign_count" gorm:"default:0"`
+	UserPresent     bool   `json:"-" gorm:"default:false"`
+	UserVerified    bool   `json:"-" gorm:"default:false"`
+	BackupEligible  bool   `json:"-" gorm:"default:false"`
+	BackupState     bool   `json:"-" gorm:"default:false"`
 	Name            string `json:"name" gorm:"type:text"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
