@@ -66,6 +66,13 @@ Bonds supports passwordless login via WebAuthn:
   - **RP Display Name**: Shown to users during authentication.
   - **RP Origins**: Allowed origins (e.g., `https://bonds.example.com`).
 
+### Upgrading from v0.12.5 or earlier
+
+Passkeys registered before backup-flag persistence was added cannot recover their
+original backup-eligible value, so synced passkeys (iCloud Keychain, Google
+Password Manager, 1Password, etc.) will keep failing to log in until re-enrolled.
+Delete and register the passkey again under Settings, Security.
+
 ## OAuth Login
 
 Bonds supports single sign-on via:
