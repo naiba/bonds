@@ -30,7 +30,7 @@ func NewSMTPMailer(cfg *config.SMTPConfig) (Mailer, error) {
 	}
 
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
-	auth := smtp.PlainAuth("", cfg.Username, cfg.Password, cfg.Host)
+	auth := smtpAuth(cfg.Host, cfg.Username, cfg.Password)
 
 	pool, err := email.NewPool(addr, 4, auth)
 	if err != nil {
@@ -77,7 +77,7 @@ func (m *DynamicMailer) Send(to, subject, htmlBody string) error {
 	from := m.settings.GetWithDefault("smtp.from", "")
 
 	addr := fmt.Sprintf("%s:%s", host, port)
-	auth := smtp.PlainAuth("", username, password, host)
+	auth := smtpAuth(host, username, password)
 
 	e := email.NewEmail()
 	e.From = from
@@ -89,6 +89,14 @@ func (m *DynamicMailer) Send(to, subject, htmlBody string) error {
 }
 
 func (m *DynamicMailer) Close() {}
+
+func smtpAuth(host, username, password string) smtp.Auth {
+	if username == "" && password == "" {
+		// net/smtp treats nil auth as the signal to skip AUTH entirely.
+		return nil
+	}
+	return smtp.PlainAuth("", username, password, host)
+}
 
 type NoopMailer struct{}
 
