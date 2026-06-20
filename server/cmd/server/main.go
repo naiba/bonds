@@ -59,12 +59,11 @@ func main() {
 		log.Fatalf("Failed to seed currencies: %v", err)
 	}
 
-	systemSettingService := services.NewSystemSettingService(db)
+	systemSettingService := startupSystemSettingService(db, cfg)
 	if err := services.SeedSettingsFromEnv(systemSettingService, cfg); err != nil {
 		log.Fatalf("Failed to seed system settings: %v", err)
 	}
-	oauthProviderService := services.NewOAuthProviderService(db)
-	oauthProviderService.SetSystemSettings(systemSettingService)
+	oauthProviderService := startupOAuthProviderService(db, cfg, systemSettingService)
 	oauthProviderService.ReloadProviders()
 
 	migrateUploadDir(cfg.Storage.UploadDir)
@@ -176,6 +175,17 @@ func main() {
 	}
 
 	log.Println("Server exited")
+}
+
+func startupSystemSettingService(db *gorm.DB, cfg *config.Config) *services.SystemSettingService {
+	// Startup reads encrypted rows before route registration, so it must use SETTINGS_ENC_KEY.
+	return services.NewSystemSettingServiceWithCipher(db, cfg.Security.SettingsEncKey)
+}
+
+func startupOAuthProviderService(db *gorm.DB, cfg *config.Config, systemSettingService *services.SystemSettingService) *services.OAuthProviderService {
+	oauthProviderService := services.NewOAuthProviderServiceWithCipher(db, cfg.Security.SettingsEncKey)
+	oauthProviderService.SetSystemSettings(systemSettingService)
+	return oauthProviderService
 }
 
 func migrateModulesToContactPage(db *gorm.DB) {
