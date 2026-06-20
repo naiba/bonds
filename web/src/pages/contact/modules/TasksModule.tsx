@@ -195,12 +195,18 @@ export default function TasksModule({
           <Checkbox
             checked={task.completed}
             onChange={() => toggleMutation.mutate(task)}
-            style={{
-              textDecoration: task.completed ? "line-through" : undefined,
-              color: task.completed ? token.colorTextQuaternary : token.colorText,
-            }}
+            style={{ display: "flex", alignItems: "flex-start" }}
           >
-            {task.label}
+            <span
+              style={{
+                textDecoration: task.completed ? "line-through" : undefined,
+                color: task.completed ? token.colorTextQuaternary : token.colorText,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+              }}
+            >
+              {task.label}
+            </span>
           </Checkbox>
           {task.description && (
             <div

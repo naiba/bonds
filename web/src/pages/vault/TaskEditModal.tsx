@@ -384,6 +384,9 @@ function TaskEditModalContent({
                   <span
                     style={{
                       flex: 1,
+                      minWidth: 0,
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
                       textDecoration: st.completed ? "line-through" : undefined,
                       color: st.completed ? token.colorTextSecondary : undefined,
                     }}

@@ -357,7 +357,14 @@ function TaskCardBody({ task, token, dateFormats, dueLabel }: Omit<TaskCardCommo
   const hasMeta = contacts.length > 0 || task.due_at;
   return (
     <Card size="small" styles={{ body: { padding: 12 } }} style={{ borderRadius: token.borderRadius }}>
-      <div style={{ fontWeight: 500, marginBottom: hasMeta ? 6 : 0 }}>
+      <div
+        style={{
+          fontWeight: 500,
+          marginBottom: hasMeta ? 6 : 0,
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
+        }}
+      >
         {task.label}
       </div>
       {hasMeta && (
