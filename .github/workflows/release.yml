@@ -38,7 +38,7 @@ jobs:
             runner: ubuntu-24.04-arm
             arch: arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.check.outputs.tag }}
 
@@ -117,7 +117,7 @@ jobs:
           - runner: ubuntu-24.04-arm
             arch: arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.check.outputs.tag }}
 
@@ -151,7 +151,7 @@ jobs:
             -C server/bin bonds-server
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bonds-server-linux-${{ matrix.arch }}
           path: dist/*.tar.gz
@@ -162,12 +162,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check, merge-manifests, build-binaries]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.check.outputs.tag }}
 
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: bonds-server-linux-*
           path: dist
