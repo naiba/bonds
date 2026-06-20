@@ -83,6 +83,7 @@ func preloadContactVCardRelations(db *gorm.DB) *gorm.DB {
 	return db.Preload("ContactInformations.ContactInformationType").
 		Preload("Addresses").
 		Preload("ImportantDates.ContactImportantDateType").
+		Preload("Company").
 		Preload("File")
 }
 
@@ -327,6 +328,9 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 	if contact.JobPosition != nil && *contact.JobPosition != "" {
 		card.SetValue(vcard.FieldTitle, *contact.JobPosition)
 	}
+	if contact.Company != nil && strings.TrimSpace(contact.Company.Name) != "" {
+		card.SetValue(vcard.FieldOrganization, strings.TrimSpace(contact.Company.Name))
+	}
 	if contact.Description != nil && *contact.Description != "" {
 		card.SetValue(vcard.FieldNote, *contact.Description)
 	}
@@ -338,6 +342,9 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 	}
 	if birthday := contactBirthdayVCardValue(contact.ImportantDates); birthday != "" {
 		card.SetValue(vcard.FieldBirthday, birthday)
+	}
+	if anniversary := contactAnniversaryVCardValue(contact.ImportantDates); anniversary != "" {
+		card.SetValue(vcard.FieldAnniversary, anniversary)
 	}
 	if photoURL, mediaType := contactPhotoVCardValue(contact.File); photoURL != "" {
 		params := vcard.Params{}
@@ -351,8 +358,10 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 		typeName := ptrToStr(info.ContactInformationType.Type)
 		switch typeName {
 		case "phone":
-			params := contactInformationParams(&info)
-			params.Add(vcard.ParamType, vcard.TypeVoice)
+			params := contactInformationParams(&info, phoneKindToVCardTypes)
+			if !paramHasType(params) {
+				params.Add(vcard.ParamType, vcard.TypeVoice)
+			}
 			card.Add(vcard.FieldTelephone, &vcard.Field{
 				Value:  info.Data,
 				Params: params,
@@ -360,7 +369,7 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 		case "email":
 			card.Add(vcard.FieldEmail, &vcard.Field{
 				Value:  info.Data,
-				Params: contactInformationParams(&info),
+				Params: contactInformationParams(&info, emailKindToVCardTypes),
 			})
 		case "social":
 			addSocialVCardFields(card, &info)
@@ -382,10 +391,19 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 
 const vcardFieldSocialProfile = "X-SOCIALPROFILE"
 
-func contactInformationParams(info *models.ContactInformation) vcard.Params {
+func contactInformationParams(info *models.ContactInformation, kindMapper func(string) []string) vcard.Params {
 	params := vcard.Params{}
 	if info.Kind != nil && strings.TrimSpace(*info.Kind) != "" {
-		params.Add(vcard.ParamType, strings.ToLower(strings.TrimSpace(*info.Kind)))
+		kind := strings.ToLower(strings.TrimSpace(*info.Kind))
+		types := []string{kind}
+		if kindMapper != nil {
+			if mapped := kindMapper(kind); len(mapped) > 0 {
+				types = mapped
+			}
+		}
+		for _, t := range types {
+			params.Add(vcard.ParamType, t)
+		}
 	}
 	if info.Pref {
 		params.Set(vcard.ParamPreferred, "1")
@@ -393,12 +411,54 @@ func contactInformationParams(info *models.ContactInformation) vcard.Params {
 	return params
 }
 
+func paramHasType(params vcard.Params) bool {
+	return len(params[vcard.ParamType]) > 0
+}
+
+// phoneKindToVCardTypes maps a user kind to RFC 6350 TEL TYPE values (e.g. mobile -> cell).
+func phoneKindToVCardTypes(kind string) []string {
+	switch kind {
+	case "mobile", "cell", "cellphone", "cell phone":
+		return []string{vcard.TypeCell, vcard.TypeVoice}
+	case "home":
+		return []string{vcard.TypeHome, vcard.TypeVoice}
+	case "work", "office":
+		return []string{vcard.TypeWork, vcard.TypeVoice}
+	case "main":
+		return []string{"main", vcard.TypeVoice}
+	case "fax":
+		return []string{vcard.TypeFax}
+	case "home fax", "home_fax":
+		return []string{vcard.TypeHome, vcard.TypeFax}
+	case "work fax", "work_fax":
+		return []string{vcard.TypeWork, vcard.TypeFax}
+	case "pager":
+		return []string{vcard.TypePager}
+	case "voice":
+		return []string{vcard.TypeVoice}
+	default:
+		return nil
+	}
+}
+
+// emailKindToVCardTypes maps a user kind to RFC 6350 EMAIL TYPE values (home/work).
+func emailKindToVCardTypes(kind string) []string {
+	switch kind {
+	case "home", "personal":
+		return []string{vcard.TypeHome}
+	case "work", "office":
+		return []string{vcard.TypeWork}
+	default:
+		return nil
+	}
+}
+
 func addSocialVCardFields(card vcard.Card, info *models.ContactInformation) {
 	if strings.TrimSpace(info.Data) == "" {
 		return
 	}
 	platform := contactInformationPlatform(info.ContactInformationType)
-	params := contactInformationParams(info)
+	params := contactInformationParams(info, nil)
 	if platform != "" {
 		params.Add(vcard.ParamType, platform)
 	}
@@ -462,12 +522,26 @@ func contactBirthdayVCardValue(dates []models.ContactImportantDate) string {
 		if !isBirthdateImportantDate(&date) || date.Month == nil || date.Day == nil {
 			continue
 		}
-		if date.Year != nil {
-			return fmt.Sprintf("%04d-%02d-%02d", *date.Year, *date.Month, *date.Day)
-		}
-		return fmt.Sprintf("--%02d-%02d", *date.Month, *date.Day)
+		return formatImportantDateVCardValue(&date)
 	}
 	return ""
+}
+
+func contactAnniversaryVCardValue(dates []models.ContactImportantDate) string {
+	for _, date := range dates {
+		if !isAnniversaryImportantDate(&date) || date.Month == nil || date.Day == nil {
+			continue
+		}
+		return formatImportantDateVCardValue(&date)
+	}
+	return ""
+}
+
+func formatImportantDateVCardValue(date *models.ContactImportantDate) string {
+	if date.Year != nil {
+		return fmt.Sprintf("%04d-%02d-%02d", *date.Year, *date.Month, *date.Day)
+	}
+	return fmt.Sprintf("--%02d-%02d", *date.Month, *date.Day)
 }
 
 func isBirthdateImportantDate(date *models.ContactImportantDate) bool {
@@ -475,6 +549,13 @@ func isBirthdateImportantDate(date *models.ContactImportantDate) bool {
 		return *date.ContactImportantDateType.InternalType == "birthdate"
 	}
 	return strings.EqualFold(date.Label, "Birthdate") || strings.EqualFold(date.Label, "Birthday")
+}
+
+func isAnniversaryImportantDate(date *models.ContactImportantDate) bool {
+	if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil {
+		return *date.ContactImportantDateType.InternalType == "anniversary"
+	}
+	return strings.EqualFold(date.Label, "Anniversary")
 }
 
 func buildVCardFormattedName(prefix, firstName, middleName, lastName, suffix string) string {

@@ -331,6 +331,7 @@ func preloadContactForCardDAV(db *gorm.DB) *gorm.DB {
 	return db.Preload("ContactInformations.ContactInformationType").
 		Preload("Addresses").
 		Preload("ImportantDates.ContactImportantDateType").
+		Preload("Company").
 		Preload("File")
 }
 

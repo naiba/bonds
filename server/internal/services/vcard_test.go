@@ -448,6 +448,75 @@ func TestExportContactWithContactInfo(t *testing.T) {
 	}
 }
 
+func TestExportContactOrgAnniversaryAndTypes(t *testing.T) {
+	svc, contactID, vaultID, _ := setupVCardTest(t)
+
+	var vault models.Vault
+	svc.db.First(&vault, "id = ?", vaultID)
+
+	company := models.Company{VaultID: vaultID, Name: "Acme Corp"}
+	svc.db.Create(&company)
+	svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Update("company_id", company.ID)
+
+	var anniversaryType models.ContactImportantDateType
+	svc.db.Where("vault_id = ? AND internal_type = ?", vaultID, "anniversary").First(&anniversaryType)
+	svc.db.Create(&models.ContactImportantDate{
+		ContactID:                  contactID,
+		ContactImportantDateTypeID: &anniversaryType.ID,
+		Label:                      "Anniversary",
+		Day:                        intPtr(20),
+		Month:                      intPtr(6),
+		Year:                       intPtr(2015),
+	})
+
+	var phoneType models.ContactInformationType
+	svc.db.Where("account_id = ? AND type = ?", vault.AccountID, "phone").First(&phoneType)
+	var emailType models.ContactInformationType
+	svc.db.Where("account_id = ? AND type = ?", vault.AccountID, "email").First(&emailType)
+
+	svc.db.Create(&models.ContactInformation{ContactID: contactID, TypeID: phoneType.ID, Data: "+1-555-1111", Kind: strPtrOrNil("mobile")})
+	svc.db.Create(&models.ContactInformation{ContactID: contactID, TypeID: emailType.ID, Data: "work@example.com", Kind: strPtrOrNil("work")})
+
+	data, err := svc.ExportContact(contactID, vaultID)
+	if err != nil {
+		t.Fatalf("ExportContact failed: %v", err)
+	}
+
+	card := mustDecodeVCard(t, data)
+	if got := card.Value(vcard.FieldOrganization); got != "Acme Corp" {
+		t.Fatalf("expected ORG Acme Corp, got %q", got)
+	}
+	if got := card.Value(vcard.FieldAnniversary); got != "2015-06-20" {
+		t.Fatalf("expected ANNIVERSARY 2015-06-20, got %q", got)
+	}
+
+	tel := card[vcard.FieldTelephone]
+	if len(tel) != 1 {
+		t.Fatalf("expected one TEL field, got %d", len(tel))
+	}
+	telTypes := tel[0].Params[vcard.ParamType]
+	if !containsString(telTypes, vcard.TypeCell) || !containsString(telTypes, vcard.TypeVoice) {
+		t.Fatalf("expected TEL TYPE to include cell and voice, got %v", telTypes)
+	}
+
+	email := card[vcard.FieldEmail]
+	if len(email) != 1 {
+		t.Fatalf("expected one EMAIL field, got %d", len(email))
+	}
+	if got := email[0].Params[vcard.ParamType]; !containsString(got, vcard.TypeWork) {
+		t.Fatalf("expected EMAIL TYPE to include work, got %v", got)
+	}
+}
+
+func containsString(values []string, target string) bool {
+	for _, v := range values {
+		if strings.EqualFold(v, target) {
+			return true
+		}
+	}
+	return false
+}
+
 func mustDecodeVCard(t *testing.T, data []byte) vcard.Card {
 	t.Helper()
 	card, err := vcard.NewDecoder(strings.NewReader(string(data))).Decode()
