@@ -59,11 +59,11 @@ type LifeEvent struct {
 	// that may have drifted by a day.
 	// Defaults to "gregorian" so legacy rows pre-dating the column read as
 	// gregorian without a backfill needing to touch them on every boot.
-	CalendarType  string `json:"calendar_type" gorm:"default:'gregorian'"`
-	OriginalDay   *int   `json:"original_day"`
-	OriginalMonth *int   `json:"original_month"`
-	OriginalYear  *int   `json:"original_year"`
-	Collapsed     bool   `json:"collapsed" gorm:"default:false"`
+	CalendarType      string    `json:"calendar_type" gorm:"default:'gregorian'"`
+	OriginalDay       *int      `json:"original_day"`
+	OriginalMonth     *int      `json:"original_month"`
+	OriginalYear      *int      `json:"original_year"`
+	Collapsed         bool      `json:"collapsed" gorm:"default:false"`
 	Summary           *string   `json:"summary"`
 	Description       *string   `json:"description" gorm:"type:text"`
 	Costs             *int      `json:"costs"`
@@ -87,8 +87,9 @@ type LifeEvent struct {
 }
 
 type TimelineEventParticipant struct {
-	ContactID       string    `json:"contact_id" gorm:"type:text;not null;index"`
-	TimelineEventID uint      `json:"timeline_event_id" gorm:"not null;index"`
+	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	ContactID       string    `json:"contact_id" gorm:"type:text;not null;uniqueIndex:idx_timeline_event_participant_unique"`
+	TimelineEventID uint      `json:"timeline_event_id" gorm:"not null;uniqueIndex:idx_timeline_event_participant_unique"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
@@ -98,8 +99,9 @@ func (TimelineEventParticipant) TableName() string {
 }
 
 type LifeEventParticipant struct {
-	ContactID   string    `json:"contact_id" gorm:"type:text;not null;index"`
-	LifeEventID uint      `json:"life_event_id" gorm:"not null;index"`
+	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	ContactID   string    `json:"contact_id" gorm:"type:text;not null;uniqueIndex:idx_life_event_participant_unique"`
+	LifeEventID uint      `json:"life_event_id" gorm:"not null;uniqueIndex:idx_life_event_participant_unique"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

@@ -56,10 +56,122 @@ func AutoMigrate(db *gorm.DB) error {
 	if err := migrateLegacyContactTasks(db); err != nil {
 		return err
 	}
+	if err := migrateLegacyLifeEventParticipantPivots(db); err != nil {
+		return err
+	}
 	if existingSQLiteSchema {
 		return autoMigrateExistingSQLiteSchema(db)
 	}
 	return db.AutoMigrate(AllModels()...)
+}
+
+type participantPivotMigration struct {
+	tableName    string
+	entityColumn string
+	model        interface{}
+}
+
+func migrateLegacyLifeEventParticipantPivots(db *gorm.DB) error {
+	migrations := []participantPivotMigration{
+		{tableName: "timeline_event_participants", entityColumn: "timeline_event_id", model: &models.TimelineEventParticipant{}},
+		{tableName: "life_event_participants", entityColumn: "life_event_id", model: &models.LifeEventParticipant{}},
+	}
+	for _, migration := range migrations {
+		if !db.Migrator().HasTable(migration.tableName) || hasColumn(db, migration.tableName, "id") {
+			continue
+		}
+		if db.Dialector.Name() == "sqlite" {
+			if err := migrateLegacyParticipantPivotSQLite(db, migration); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := migrateLegacyParticipantPivotPortable(db, migration); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func migrateLegacyParticipantPivotSQLite(db *gorm.DB, migration participantPivotMigration) error {
+	return db.Connection(func(conn *gorm.DB) error {
+		if err := conn.Exec(`PRAGMA foreign_keys = OFF`).Error; err != nil {
+			return err
+		}
+		defer conn.Exec(`PRAGMA foreign_keys = ON`)
+		if err := conn.Exec(`PRAGMA legacy_alter_table = ON`).Error; err != nil {
+			return err
+		}
+		defer conn.Exec(`PRAGMA legacy_alter_table = OFF`)
+
+		return conn.Transaction(func(tx *gorm.DB) error {
+			oldTableName := migration.tableName + "_old"
+			if err := tx.Exec(fmt.Sprintf("ALTER TABLE %s RENAME TO %s", quoteIdentifier(migration.tableName), quoteIdentifier(oldTableName))).Error; err != nil {
+				return fmt.Errorf("migrate legacy %s: rename legacy table: %w", migration.tableName, err)
+			}
+
+			var oldIndexNames []string
+			if err := tx.Raw(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND name NOT LIKE 'sqlite_autoindex_%'`, oldTableName).Scan(&oldIndexNames).Error; err != nil {
+				return fmt.Errorf("migrate legacy %s: inspect legacy indexes: %w", migration.tableName, err)
+			}
+			for _, indexName := range oldIndexNames {
+				if err := tx.Exec(fmt.Sprintf("DROP INDEX IF EXISTS %s", quoteIdentifier(indexName))).Error; err != nil {
+					return fmt.Errorf("migrate legacy %s: drop legacy index %s: %w", migration.tableName, indexName, err)
+				}
+			}
+
+			if err := tx.Migrator().CreateTable(migration.model); err != nil {
+				return fmt.Errorf("migrate legacy %s: create current schema: %w", migration.tableName, err)
+			}
+			if err := copyDistinctParticipantPivotRows(tx, migration, oldTableName); err != nil {
+				return err
+			}
+			if err := tx.Exec(fmt.Sprintf("DROP TABLE %s", quoteIdentifier(oldTableName))).Error; err != nil {
+				return fmt.Errorf("migrate legacy %s: drop legacy table: %w", migration.tableName, err)
+			}
+			return nil
+		})
+	})
+}
+
+func migrateLegacyParticipantPivotPortable(db *gorm.DB, migration participantPivotMigration) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if tx.Dialector.Name() != "postgres" {
+			return nil
+		}
+		if err := tx.Exec(fmt.Sprintf(`
+			DELETE FROM %s a
+			USING %s b
+			WHERE a.ctid < b.ctid
+			AND a.%s = b.%s
+			AND a.%s = b.%s
+		`, quoteIdentifier(migration.tableName), quoteIdentifier(migration.tableName), quoteIdentifier("contact_id"), quoteIdentifier("contact_id"), quoteIdentifier(migration.entityColumn), quoteIdentifier(migration.entityColumn))).Error; err != nil {
+			return fmt.Errorf("migrate legacy %s: dedupe rows: %w", migration.tableName, err)
+		}
+		if err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s bigserial", quoteIdentifier(migration.tableName), quoteIdentifier("id"))).Error; err != nil {
+			return fmt.Errorf("migrate legacy %s: add id: %w", migration.tableName, err)
+		}
+		if err := tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD PRIMARY KEY (%s)", quoteIdentifier(migration.tableName), quoteIdentifier("id"))).Error; err != nil {
+			return fmt.Errorf("migrate legacy %s: add id primary key: %w", migration.tableName, err)
+		}
+		return nil
+	})
+}
+
+func copyDistinctParticipantPivotRows(tx *gorm.DB, migration participantPivotMigration, sourceTable string) error {
+	if err := tx.Exec(fmt.Sprintf(`
+		INSERT INTO %s (contact_id, %s, created_at, updated_at)
+		SELECT contact_id,
+			%s,
+			MIN(COALESCE(created_at, CURRENT_TIMESTAMP)),
+			MIN(COALESCE(updated_at, CURRENT_TIMESTAMP))
+		FROM %s
+		WHERE contact_id IS NOT NULL AND contact_id <> '' AND %s IS NOT NULL
+		GROUP BY contact_id, %s
+	`, quoteIdentifier(migration.tableName), quoteIdentifier(migration.entityColumn), quoteIdentifier(migration.entityColumn), quoteIdentifier(sourceTable), quoteIdentifier(migration.entityColumn), quoteIdentifier(migration.entityColumn))).Error; err != nil {
+		return fmt.Errorf("migrate legacy %s: copy distinct rows: %w", migration.tableName, err)
+	}
+	return nil
 }
 
 func autoMigrateExistingSQLiteSchema(db *gorm.DB) error {

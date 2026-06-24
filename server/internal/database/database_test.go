@@ -223,6 +223,60 @@ func TestAutoMigrateFailsWhenLegacyContactTaskVaultCannotBeBackfilled(t *testing
 	}
 }
 
+func TestAutoMigrateMigratesLegacyLifeEventParticipantPivots(t *testing.T) {
+	db := openMigrationTestDB(t)
+	if err := db.Migrator().CreateTable(&models.Account{}); err != nil {
+		t.Fatalf("create existing account table: %v", err)
+	}
+	createLegacyLifeEventParticipantPivotSchema(t, db)
+
+	if err := db.Exec(`
+		INSERT INTO timeline_event_participants (contact_id, timeline_event_id, created_at, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`, "contact-1", 10, "contact-1", 10).Error; err != nil {
+		t.Fatalf("insert duplicate legacy timeline participants: %v", err)
+	}
+	if err := db.Exec(`
+		INSERT INTO life_event_participants (contact_id, life_event_id, created_at, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP), (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	`, "contact-1", 20, "contact-1", 20).Error; err != nil {
+		t.Fatalf("insert duplicate legacy life participants: %v", err)
+	}
+
+	if err := AutoMigrate(db); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+
+	if !columnIsPrimaryKey(t, db, "timeline_event_participants", "id") {
+		t.Fatal("timeline_event_participants.id should be the primary key after migration")
+	}
+	if !columnIsPrimaryKey(t, db, "life_event_participants", "id") {
+		t.Fatal("life_event_participants.id should be the primary key after migration")
+	}
+
+	var timelineCount int64
+	if err := db.Model(&models.TimelineEventParticipant{}).Count(&timelineCount).Error; err != nil {
+		t.Fatalf("count migrated timeline participants: %v", err)
+	}
+	if timelineCount != 1 {
+		t.Fatalf("timeline_event_participants rows = %d, want 1", timelineCount)
+	}
+	var lifeCount int64
+	if err := db.Model(&models.LifeEventParticipant{}).Count(&lifeCount).Error; err != nil {
+		t.Fatalf("count migrated life participants: %v", err)
+	}
+	if lifeCount != 1 {
+		t.Fatalf("life_event_participants rows = %d, want 1", lifeCount)
+	}
+
+	if err := db.Create(&models.TimelineEventParticipant{ContactID: "contact-1", TimelineEventID: 10}).Error; err == nil {
+		t.Fatal("expected duplicate migrated timeline participant to fail")
+	}
+	if err := db.Create(&models.LifeEventParticipant{ContactID: "contact-1", LifeEventID: 20}).Error; err == nil {
+		t.Fatal("expected duplicate migrated life participant to fail")
+	}
+}
+
 func openMigrationTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
@@ -298,6 +352,31 @@ func createPartiallyMigratedContactTaskSchema(t *testing.T, db *gorm.DB) {
 		updated_at datetime
 	)`).Error; err != nil {
 		t.Fatalf("create partially migrated task schema: %v", err)
+	}
+}
+
+func createLegacyLifeEventParticipantPivotSchema(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	statements := []string{
+		`CREATE TABLE timeline_event_participants (
+			contact_id text NOT NULL,
+			timeline_event_id integer NOT NULL,
+			created_at datetime,
+			updated_at datetime
+		)`,
+		`CREATE INDEX idx_legacy_timeline_event_participants_contact_id ON timeline_event_participants (contact_id)`,
+		`CREATE TABLE life_event_participants (
+			contact_id text NOT NULL,
+			life_event_id integer NOT NULL,
+			created_at datetime,
+			updated_at datetime
+		)`,
+		`CREATE INDEX idx_legacy_life_event_participants_contact_id ON life_event_participants (contact_id)`,
+	}
+	for _, statement := range statements {
+		if err := db.Exec(statement).Error; err != nil {
+			t.Fatalf("create legacy participant pivot schema: %v", err)
+		}
 	}
 }
 
@@ -434,6 +513,24 @@ func columnIsNotNull(t *testing.T, db *gorm.DB, tableName, columnName string) bo
 	for _, row := range rows {
 		if row.Name == columnName {
 			return row.NotNull == 1
+		}
+	}
+	t.Fatalf("column %s.%s not found", tableName, columnName)
+	return false
+}
+
+func columnIsPrimaryKey(t *testing.T, db *gorm.DB, tableName, columnName string) bool {
+	t.Helper()
+	var rows []struct {
+		Name string `gorm:"column:name"`
+		PK   int    `gorm:"column:pk"`
+	}
+	if err := db.Raw(`PRAGMA table_info(` + tableName + `)`).Scan(&rows).Error; err != nil {
+		t.Fatalf("read table info: %v", err)
+	}
+	for _, row := range rows {
+		if row.Name == columnName {
+			return row.PK > 0
 		}
 	}
 	t.Fatalf("column %s.%s not found", tableName, columnName)
