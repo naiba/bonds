@@ -52,7 +52,7 @@ DB_DSN="host=localhost port=5432 user=bonds password=secret dbname=bonds sslmode
 - **常规**：应用名称、公开 URL、公告横幅。
 - **认证**：密码登录开关、注册开关。
 - **JWT**：令牌过期时间、刷新窗口。
-- **SMTP**：邮件服务器设置，用于发送通知和邀请。
+- **SMTP**：邮件服务器设置，用于发送通知和邀请。用户名和密码都留空时会跳过 SMTP AUTH，用于无需认证的 relay。
 - **OAuth**：GitHub 和 Google OAuth 客户端凭证。
 - **OIDC**：OpenID Connect 提供商，用于企业 SSO（Authentik、Keycloak 等）。
 - **WebAuthn**：通行密钥认证的 Relying Party 配置。

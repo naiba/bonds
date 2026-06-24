@@ -136,7 +136,7 @@ cp server/.env.example server/.env
 - **应用**：名称、URL、公告横幅。
 - **认证**：密码登录开关、用户注册开关。
 - **JWT**：令牌过期时间、刷新窗口。
-- **SMTP**：主机、端口、用户名、密码、发件人邮箱。
+- **SMTP**：主机、端口、可选用户名/密码、发件人邮箱。用户名和密码都留空时会跳过 SMTP AUTH，用于无需认证的 relay。
 - **OAuth / OIDC**：GitHub、Google 和 OIDC/SSO 凭据。
 - **WebAuthn**：依赖方 ID、显示名称、允许来源。
 - **Telegram**：Bot Token（通知推送）。

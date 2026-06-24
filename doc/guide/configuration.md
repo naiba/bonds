@@ -52,7 +52,7 @@ Most application settings are configured through the **Admin Settings** panel, a
 - **General**: Application name, public URL, announcement banner.
 - **Authentication**: Password login toggle, registration toggle.
 - **JWT**: Token expiry, refresh window.
-- **SMTP**: Mail server host, port, credentials, sender address.
+- **SMTP**: Mail server host, port, optional credentials, sender address. Leave both username and password empty to skip SMTP AUTH for unauthenticated relays.
 - **OAuth**: GitHub and Google OAuth client credentials.
 - **OIDC**: OpenID Connect provider for SSO (Authentik, Keycloak, etc.).
 - **WebAuthn**: Relying Party configuration for passkey authentication.

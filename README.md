@@ -135,7 +135,7 @@ The following are managed from the **Admin > System Settings** page after login:
 - **Application**: Name, URL, Announcement banner.
 - **Authentication**: Password auth toggle, User registration toggle.
 - **JWT**: Token expiry, Refresh window.
-- **SMTP**: Host, Port, Username, Password, Sender email.
+- **SMTP**: Host, Port, optional Username/Password, Sender email. Leave both Username and Password empty for unauthenticated relays.
 - **OAuth / OIDC**: GitHub, Google, and OIDC/SSO credentials.
 - **WebAuthn**: Relying Party ID, Display Name, Origins.
 - **Telegram**: Bot token for notifications.

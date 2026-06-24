@@ -21,7 +21,7 @@ Most configuration is stored in the database. The admin panel provides a web UI 
 | Category | Settings |
 |----------|----------|
 | **General** | Application name, URL, announcement banner |
-| **SMTP** | Mail server host, port, credentials, sender address |
+| **SMTP** | Mail server host, port, optional credentials, sender address. Empty username and password skip SMTP AUTH. |
 | **OAuth** | GitHub and Google OAuth client credentials |
 | **OIDC** | OpenID Connect provider for SSO |
 | **WebAuthn** | Relying Party ID, display name, allowed origins |

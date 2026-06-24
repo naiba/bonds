@@ -21,7 +21,7 @@ Bonds 包含管理面板，用于系统级配置和用户管理。
 | 类别 | 设置项 |
 |------|--------|
 | **常规** | 应用名称、URL、公告横幅 |
-| **SMTP** | 邮件服务器地址、端口、凭证、发件人 |
+| **SMTP** | 邮件服务器地址、端口、可选凭证、发件人。用户名和密码都留空时跳过 SMTP AUTH。 |
 | **OAuth** | GitHub 和 Google OAuth 客户端凭证 |
 | **OIDC** | OpenID Connect 提供商（SSO） |
 | **WebAuthn** | Relying Party ID、显示名、允许的来源 |
