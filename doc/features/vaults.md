@@ -48,7 +48,7 @@ Displays your **Recent Contacts** and **Most Consulted** contacts for quick acce
 ### Center Column
 Features a Segmented control to switch between three dynamic tabs. Your selected tab is persisted to the server using the `defaultTab` setting, loading your preferred tab automatically on next visit.
 1. **Activity**: A feed showing recent changes and actions taken by users in this vault.
-2. **Your Life Events**: An overview of personal milestones recorded on your shadow contact.
+2. **Your Life Events**: An overview of personal milestones recorded on your shadow contact. Events can include additional participants from the same vault and will appear on each participant's contact timeline.
 3. **Life Metrics**: Simple event logs tracking custom metrics. Click "+1" to log an occurrence. Click details to view a monthly bar chart of recorded events.
 
 ### Right Column
