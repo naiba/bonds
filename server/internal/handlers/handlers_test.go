@@ -5547,14 +5547,34 @@ func TestListForContact_ReturnsEmptyWhenNoCompany(t *testing.T) {
 	}
 }
 
+func assertHandlerParticipantIDs(t *testing.T, participants []struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}, expected ...string) {
+	t.Helper()
+	seen := make(map[string]int, len(participants))
+	for _, participant := range participants {
+		seen[participant.ID]++
+	}
+	if len(seen) != len(expected) {
+		t.Fatalf("expected participants %v, got %+v", expected, participants)
+	}
+	for _, id := range expected {
+		if seen[id] != 1 {
+			t.Fatalf("expected participant %s exactly once, got %+v", id, participants)
+		}
+	}
+}
+
 func TestTimelineEvent_CRUD(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "timeline-crud@example.com")
 	vault := ts.createTestVault(t, token, "Timeline Vault")
 	contact := ts.createTestContact(t, token, vault.ID, "TimelineContact")
+	participant := ts.createTestContact(t, token, vault.ID, "TimelineParticipant")
 
 	// Create timeline event with RFC3339 date
-	body := `{"started_at":"2026-06-15T00:00:00Z","label":"Summer Trip"}`
+	body := fmt.Sprintf(`{"started_at":"2026-06-15T00:00:00Z","label":"Summer Trip","participants":["%s","%s"]}`, participant.ID, participant.ID)
 	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", body, token)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create timeline: expected 201, got %d: %s", rec.Code, rec.Body.String())
@@ -5564,9 +5584,13 @@ func TestTimelineEvent_CRUD(t *testing.T) {
 		t.Fatal("expected success=true")
 	}
 	var teData struct {
-		ID      uint   `json:"id"`
-		VaultID string `json:"vault_id"`
-		Label   string `json:"label"`
+		ID           uint   `json:"id"`
+		VaultID      string `json:"vault_id"`
+		Label        string `json:"label"`
+		Participants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
 	}
 	if err := json.Unmarshal(resp.Data, &teData); err != nil {
 		t.Fatalf("failed to parse timeline event: %v", err)
@@ -5577,6 +5601,7 @@ func TestTimelineEvent_CRUD(t *testing.T) {
 	if teData.Label != "Summer Trip" {
 		t.Errorf("expected label 'Summer Trip', got '%s'", teData.Label)
 	}
+	assertHandlerParticipantIDs(t, teData.Participants, contact.ID, participant.ID)
 
 	// List timeline events
 	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", "", token)
@@ -5587,6 +5612,20 @@ func TestTimelineEvent_CRUD(t *testing.T) {
 	if !resp.Success {
 		t.Fatal("expected success=true on list")
 	}
+	var listedTimelines []struct {
+		ID           uint `json:"id"`
+		Participants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
+	}
+	if err := json.Unmarshal(resp.Data, &listedTimelines); err != nil {
+		t.Fatalf("failed to parse listed timelines: %v", err)
+	}
+	if len(listedTimelines) != 1 {
+		t.Fatalf("expected 1 listed timeline, got %d", len(listedTimelines))
+	}
+	assertHandlerParticipantIDs(t, listedTimelines[0].Participants, contact.ID, participant.ID)
 
 	// Toggle timeline collapsed state
 	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/toggle", vault.ID, contact.ID, teData.ID), "", token)
@@ -5617,9 +5656,12 @@ func TestLifeEvent_CreateWithValidType(t *testing.T) {
 	token, _ := ts.registerTestUser(t, "life-event-type@example.com")
 	vault := ts.createTestVault(t, token, "Life Event Vault")
 	contact := ts.createTestContact(t, token, vault.ID, "LifeContact")
+	timelineParticipant := ts.createTestContact(t, token, vault.ID, "LifeTimelineParticipant")
+	lifeParticipant := ts.createTestContact(t, token, vault.ID, "LifeParticipant")
+	replacementParticipant := ts.createTestContact(t, token, vault.ID, "LifeReplacement")
 
 	// Create timeline first
-	tlBody := `{"started_at":"2026-06-15T00:00:00Z","label":"Test Timeline"}`
+	tlBody := fmt.Sprintf(`{"started_at":"2026-06-15T00:00:00Z","label":"Test Timeline","participants":["%s"]}`, timelineParticipant.ID)
 	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/timelineEvents", tlBody, token)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create timeline: expected 201, got %d: %s", rec.Code, rec.Body.String())
@@ -5640,7 +5682,7 @@ func TestLifeEvent_CreateWithValidType(t *testing.T) {
 	}
 
 	// Create life event with valid type and RFC3339 date
-	leBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-06-20T00:00:00Z","summary":"Got promoted"}`, typeID)
+	leBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-06-20T00:00:00Z","summary":"Got promoted","participants":["%s","%s"]}`, typeID, lifeParticipant.ID, lifeParticipant.ID)
 	rec = ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents", vault.ID, contact.ID, teData.ID), leBody, token)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create life event: expected 201, got %d: %s", rec.Code, rec.Body.String())
@@ -5653,6 +5695,10 @@ func TestLifeEvent_CreateWithValidType(t *testing.T) {
 		ID              uint   `json:"id"`
 		TimelineEventID uint   `json:"timeline_event_id"`
 		Summary         string `json:"summary"`
+		Participants    []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
 	}
 	if err := json.Unmarshal(resp.Data, &leData); err != nil {
 		t.Fatalf("failed to parse life event: %v", err)
@@ -5663,17 +5709,22 @@ func TestLifeEvent_CreateWithValidType(t *testing.T) {
 	if leData.Summary != "Got promoted" {
 		t.Errorf("expected summary 'Got promoted', got '%s'", leData.Summary)
 	}
+	assertHandlerParticipantIDs(t, leData.Participants, contact.ID, timelineParticipant.ID, lifeParticipant.ID)
 
 	// Update the life event
-	updateBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-07-01T00:00:00Z","summary":"Got a raise","description":"Big promotion"}`, typeID)
+	updateBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-07-01T00:00:00Z","summary":"Got a raise","description":"Big promotion","participants":["%s"]}`, typeID, replacementParticipant.ID)
 	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents/%d", vault.ID, contact.ID, teData.ID, leData.ID), updateBody, token)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("update life event: expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	resp = parseResponse(t, rec)
 	var updatedLE struct {
-		Summary     string `json:"summary"`
-		Description string `json:"description"`
+		Summary      string `json:"summary"`
+		Description  string `json:"description"`
+		Participants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
 	}
 	if err := json.Unmarshal(resp.Data, &updatedLE); err != nil {
 		t.Fatalf("failed to parse updated life event: %v", err)
@@ -5681,6 +5732,7 @@ func TestLifeEvent_CreateWithValidType(t *testing.T) {
 	if updatedLE.Summary != "Got a raise" {
 		t.Errorf("expected updated summary 'Got a raise', got '%s'", updatedLE.Summary)
 	}
+	assertHandlerParticipantIDs(t, updatedLE.Participants, contact.ID, timelineParticipant.ID, replacementParticipant.ID)
 
 	// Toggle life event collapsed state
 	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/contacts/%s/timelineEvents/%d/lifeEvents/%d/toggle", vault.ID, contact.ID, teData.ID, leData.ID), "", token)

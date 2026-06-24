@@ -129,6 +129,7 @@ func (h *LifeEventHandler) CreateTimelineEvent(c echo.Context) error {
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/timelineEvents/{id}/lifeEvents [post]
 func (h *LifeEventHandler) AddLifeEvent(c echo.Context) error {
+	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -138,10 +139,13 @@ func (h *LifeEventHandler) AddLifeEvent(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	event, err := h.lifeEventService.AddLifeEvent(uint(id), vaultID, req)
+	event, err := h.lifeEventService.AddLifeEvent(contactID, uint(id), vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrTimelineEventNotFound) {
 			return response.NotFound(c, "err.timeline_event_not_found")
+		}
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_add_life_event")
 	}
@@ -168,6 +172,7 @@ func (h *LifeEventHandler) AddLifeEvent(c echo.Context) error {
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/timelineEvents/{id}/lifeEvents/{lifeEventId} [put]
 func (h *LifeEventHandler) UpdateLifeEvent(c echo.Context) error {
+	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -181,10 +186,16 @@ func (h *LifeEventHandler) UpdateLifeEvent(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	event, err := h.lifeEventService.UpdateLifeEvent(uint(id), uint(lifeEventID), vaultID, req)
+	event, err := h.lifeEventService.UpdateLifeEvent(contactID, uint(id), uint(lifeEventID), vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrLifeEventNotFound) {
 			return response.NotFound(c, "err.life_event_not_found")
+		}
+		if errors.Is(err, services.ErrTimelineEventNotFound) {
+			return response.NotFound(c, "err.timeline_event_not_found")
+		}
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_update_life_event")
 	}

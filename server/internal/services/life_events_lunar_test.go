@@ -26,7 +26,7 @@ func TestAddLifeEventWithLunarCalendar(t *testing.T) {
 	// Client sends a placeholder gregorian date; server should overwrite it.
 	placeholder := time.Date(2025, 1, 1, 9, 30, 0, 0, time.UTC)
 	day, month, year := 15, 1, 2025
-	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
+	le, err := svc.AddLifeEvent(contactID, te.ID, vaultID, dto.CreateLifeEventRequest{
 		LifeEventTypeID: 1,
 		HappenedAt:      placeholder,
 		Summary:         "Lantern festival memory",
@@ -69,7 +69,7 @@ func TestUpdateLifeEventClearsLunarWhenSwitchedBackToGregorian(t *testing.T) {
 		StartedAt: time.Now(), Label: "T",
 	})
 	day, month, year := 15, 1, 2025
-	le, err := svc.AddLifeEvent(te.ID, vaultID, dto.CreateLifeEventRequest{
+	le, err := svc.AddLifeEvent(contactID, te.ID, vaultID, dto.CreateLifeEventRequest{
 		LifeEventTypeID: 1,
 		HappenedAt:      time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		CalendarType:    "lunar",
@@ -79,7 +79,7 @@ func TestUpdateLifeEventClearsLunarWhenSwitchedBackToGregorian(t *testing.T) {
 		t.Fatalf("AddLifeEvent: %v", err)
 	}
 
-	updated, err := svc.UpdateLifeEvent(te.ID, le.ID, vaultID, dto.UpdateLifeEventRequest{
+	updated, err := svc.UpdateLifeEvent(contactID, te.ID, le.ID, vaultID, dto.UpdateLifeEventRequest{
 		HappenedAt:   time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC),
 		CalendarType: "gregorian",
 	})

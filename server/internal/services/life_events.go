@@ -3,11 +3,14 @@ package services
 import (
 	"errors"
 	"math"
+	"sort"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/utils"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -32,10 +35,12 @@ func (s *LifeEventService) ListTimelineEvents(contactID, vaultID string, page, p
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, response.Meta{}, err
 	}
-	var participantIDs []uint
-	s.db.Model(&models.TimelineEventParticipant{}).Where("contact_id = ?", contactID).Pluck("timeline_event_id", &participantIDs)
+	participantIDs, err := timelineIDsForContact(s.db, contactID)
+	if err != nil {
+		return nil, response.Meta{}, err
+	}
 
-	query := s.db.Where("id IN ?", participantIDs)
+	query := s.db.Where("id IN ? AND vault_id = ?", participantIDs, vaultID)
 
 	var total int64
 	if err := query.Model(&models.TimelineEvent{}).Count(&total).Error; err != nil {
@@ -51,7 +56,7 @@ func (s *LifeEventService) ListTimelineEvents(contactID, vaultID string, page, p
 	offset := (page - 1) * perPage
 
 	var events []models.TimelineEvent
-	if err := query.Preload("LifeEvents").Offset(offset).Limit(perPage).Order("started_at DESC").Find(&events).Error; err != nil {
+	if err := query.Preload("Participants").Preload("LifeEvents.Participants").Offset(offset).Limit(perPage).Order("started_at DESC").Find(&events).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -86,7 +91,7 @@ func (s *LifeEventService) ListVaultTimelineEvents(vaultID string, page, perPage
 	offset := (page - 1) * perPage
 
 	var events []models.TimelineEvent
-	if err := s.db.Where("vault_id = ?", vaultID).Preload("LifeEvents").Offset(offset).Limit(perPage).Order("started_at DESC").Find(&events).Error; err != nil {
+	if err := s.db.Where("vault_id = ?", vaultID).Preload("Participants").Preload("LifeEvents.Participants").Offset(offset).Limit(perPage).Order("started_at DESC").Find(&events).Error; err != nil {
 		return nil, response.Meta{}, err
 	}
 
@@ -105,9 +110,11 @@ func (s *LifeEventService) ListVaultTimelineEvents(vaultID string, page, perPage
 }
 
 func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dto.CreateTimelineEventRequest) (*dto.TimelineEventResponse, error) {
-	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+	participantIDs := mergeContactIDs([]string{contactID}, req.Participants)
+	if err := validateContactsBelongToVault(s.db, participantIDs, vaultID); err != nil {
 		return nil, err
 	}
+
 	label := req.Label
 	event := models.TimelineEvent{
 		VaultID:   vaultID,
@@ -118,11 +125,7 @@ func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dt
 		if err := tx.Create(&event).Error; err != nil {
 			return err
 		}
-		p := models.TimelineEventParticipant{
-			ContactID:       contactID,
-			TimelineEventID: event.ID,
-		}
-		return tx.Create(&p).Error
+		return replaceTimelineEventParticipantsLocked(tx, event.ID, participantIDs)
 	})
 	if err != nil {
 		return nil, err
@@ -133,16 +136,29 @@ func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dt
 		s.feedRecorder.Record(contactID, "", ActionLifeEventCreated, "Created a life event", &event.ID, &entityType)
 	}
 
+	if err := s.db.Preload("Participants").First(&event, event.ID).Error; err != nil {
+		return nil, err
+	}
 	resp := toTimelineEventResponse(&event)
 	return &resp, nil
 }
 
-func (s *LifeEventService) AddLifeEvent(timelineEventID uint, vaultID string, req dto.CreateLifeEventRequest) (*dto.LifeEventResponse, error) {
+func (s *LifeEventService) AddLifeEvent(contactID string, timelineEventID uint, vaultID string, req dto.CreateLifeEventRequest) (*dto.LifeEventResponse, error) {
 	var te models.TimelineEvent
 	if err := s.db.Where("id = ? AND vault_id = ?", timelineEventID, vaultID).First(&te).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrTimelineEventNotFound
 		}
+		return nil, err
+	}
+
+	timelineParticipantIDs, err := timelineEventParticipantIDs(s.db, timelineEventID)
+	if err != nil {
+		return nil, err
+	}
+	requiredParticipantIDs := mergeContactIDs([]string{contactID}, timelineParticipantIDs)
+	participantIDs := mergeContactIDs(requiredParticipantIDs, req.Participants)
+	if err := validateContactsBelongToVault(s.db, participantIDs, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -164,19 +180,54 @@ func (s *LifeEventService) AddLifeEvent(timelineEventID uint, vaultID string, re
 	}
 	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
 		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
-	if err := s.db.Create(&le).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&le).Error; err != nil {
+			return err
+		}
+		return replaceLifeEventParticipantsLocked(tx, le.ID, participantIDs)
+	}); err != nil {
+		return nil, err
+	}
+	if err := s.db.Preload("Participants").First(&le, le.ID).Error; err != nil {
 		return nil, err
 	}
 	resp := toLifeEventResponse(&le)
 	return &resp, nil
 }
 
-func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, vaultID string, req dto.UpdateLifeEventRequest) (*dto.LifeEventResponse, error) {
+func (s *LifeEventService) UpdateLifeEvent(contactID string, timelineEventID, lifeEventID uint, vaultID string, req dto.UpdateLifeEventRequest) (*dto.LifeEventResponse, error) {
+	var te models.TimelineEvent
+	if err := s.db.Where("id = ? AND vault_id = ?", timelineEventID, vaultID).First(&te).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrTimelineEventNotFound
+		}
+		return nil, err
+	}
+
 	var le models.LifeEvent
 	if err := s.db.Where("id = ? AND timeline_event_id = ?", lifeEventID, timelineEventID).First(&le).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrLifeEventNotFound
 		}
+		return nil, err
+	}
+
+	timelineParticipantIDs, err := timelineEventParticipantIDs(s.db, timelineEventID)
+	if err != nil {
+		return nil, err
+	}
+	requiredParticipantIDs := mergeContactIDs([]string{contactID}, timelineParticipantIDs)
+	participantIDs := requiredParticipantIDs
+	if req.Participants != nil {
+		participantIDs = mergeContactIDs(requiredParticipantIDs, req.Participants)
+	} else {
+		existingParticipantIDs, err := lifeEventParticipantIDs(s.db, lifeEventID)
+		if err != nil {
+			return nil, err
+		}
+		participantIDs = mergeContactIDs(requiredParticipantIDs, existingParticipantIDs)
+	}
+	if err := validateContactsBelongToVault(s.db, participantIDs, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -200,7 +251,15 @@ func (s *LifeEventService) UpdateLifeEvent(timelineEventID, lifeEventID uint, va
 	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
 		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 
-	if err := s.db.Save(&le).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&le).Error; err != nil {
+			return err
+		}
+		return replaceLifeEventParticipantsLocked(tx, le.ID, participantIDs)
+	}); err != nil {
+		return nil, err
+	}
+	if err := s.db.Preload("Participants").First(&le, le.ID).Error; err != nil {
 		return nil, err
 	}
 	resp := toLifeEventResponse(&le)
@@ -216,6 +275,9 @@ func (s *LifeEventService) DeleteTimelineEvent(id uint, vaultID string) error {
 		return err
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("life_event_id IN (?)", tx.Model(&models.LifeEvent{}).Select("id").Where("timeline_event_id = ?", id)).Delete(&models.LifeEventParticipant{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("timeline_event_id = ?", id).Delete(&models.LifeEvent{}).Error; err != nil {
 			return err
 		}
@@ -227,6 +289,15 @@ func (s *LifeEventService) DeleteTimelineEvent(id uint, vaultID string) error {
 }
 
 func (s *LifeEventService) DeleteLifeEvent(timelineEventID, lifeEventID uint, vaultID string) error {
+	var te models.TimelineEvent
+	// Authorize through the route vault; numeric timeline IDs are guessable across vaults.
+	if err := s.db.Where("id = ? AND vault_id = ?", timelineEventID, vaultID).First(&te).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTimelineEventNotFound
+		}
+		return err
+	}
+
 	var le models.LifeEvent
 	if err := s.db.Where("id = ? AND timeline_event_id = ?", lifeEventID, timelineEventID).First(&le).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -234,7 +305,12 @@ func (s *LifeEventService) DeleteLifeEvent(timelineEventID, lifeEventID uint, va
 		}
 		return err
 	}
-	return s.db.Delete(&le).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("life_event_id = ?", lifeEventID).Delete(&models.LifeEventParticipant{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&le).Error
+	})
 }
 
 func (s *LifeEventService) ToggleTimelineEvent(id uint, vaultID string) error {
@@ -271,13 +347,14 @@ func (s *LifeEventService) ToggleLifeEvent(timelineEventID, lifeEventID uint, va
 
 func toTimelineEventResponse(e *models.TimelineEvent) dto.TimelineEventResponse {
 	resp := dto.TimelineEventResponse{
-		ID:        e.ID,
-		VaultID:   e.VaultID,
-		StartedAt: e.StartedAt,
-		Label:     ptrToStr(e.Label),
-		Collapsed: e.Collapsed,
-		CreatedAt: e.CreatedAt,
-		UpdatedAt: e.UpdatedAt,
+		ID:           e.ID,
+		VaultID:      e.VaultID,
+		StartedAt:    e.StartedAt,
+		Label:        ptrToStr(e.Label),
+		Collapsed:    e.Collapsed,
+		CreatedAt:    e.CreatedAt,
+		Participants: contactRefs(e.Participants),
+		UpdatedAt:    e.UpdatedAt,
 	}
 	if e.LifeEvents != nil {
 		les := make([]dto.LifeEventResponse, len(e.LifeEvents))
@@ -311,7 +388,157 @@ func toLifeEventResponse(le *models.LifeEvent) dto.LifeEventResponse {
 		FromPlace:         ptrToStr(le.FromPlace),
 		ToPlace:           ptrToStr(le.ToPlace),
 		Place:             ptrToStr(le.Place),
+		Participants:      contactRefs(le.Participants),
 		CreatedAt:         le.CreatedAt,
 		UpdatedAt:         le.UpdatedAt,
 	}
+}
+
+func timelineIDsForContact(db *gorm.DB, contactID string) ([]uint, error) {
+	timelineIDSet := make(map[uint]struct{})
+
+	var directTimelineIDs []uint
+	if err := db.Model(&models.TimelineEventParticipant{}).
+		Where("contact_id = ?", contactID).
+		Pluck("timeline_event_id", &directTimelineIDs).Error; err != nil {
+		return nil, err
+	}
+	for _, id := range directTimelineIDs {
+		timelineIDSet[id] = struct{}{}
+	}
+
+	var lifeEventTimelineIDs []uint
+	if err := db.Model(&models.LifeEvent{}).
+		Joins("JOIN life_event_participants ON life_event_participants.life_event_id = life_events.id").
+		Where("life_event_participants.contact_id = ?", contactID).
+		Pluck("DISTINCT life_events.timeline_event_id", &lifeEventTimelineIDs).Error; err != nil {
+		return nil, err
+	}
+	for _, id := range lifeEventTimelineIDs {
+		timelineIDSet[id] = struct{}{}
+	}
+
+	timelineIDs := make([]uint, 0, len(timelineIDSet))
+	for id := range timelineIDSet {
+		timelineIDs = append(timelineIDs, id)
+	}
+	return timelineIDs, nil
+}
+
+func timelineEventParticipantIDs(db *gorm.DB, timelineEventID uint) ([]string, error) {
+	var ids []string
+	if err := db.Model(&models.TimelineEventParticipant{}).
+		Where("timeline_event_id = ?", timelineEventID).
+		Pluck("contact_id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return dedupeContactIDs(ids), nil
+}
+
+func lifeEventParticipantIDs(db *gorm.DB, lifeEventID uint) ([]string, error) {
+	var ids []string
+	if err := db.Model(&models.LifeEventParticipant{}).
+		Where("life_event_id = ?", lifeEventID).
+		Pluck("contact_id", &ids).Error; err != nil {
+		return nil, err
+	}
+	return dedupeContactIDs(ids), nil
+}
+
+func replaceTimelineEventParticipants(tx *gorm.DB, timelineEventID uint, contactIDs []string) error {
+	if err := tx.Where("timeline_event_id = ?", timelineEventID).Delete(&models.TimelineEventParticipant{}).Error; err != nil {
+		return err
+	}
+	ids := dedupeContactIDs(contactIDs)
+	if len(ids) == 0 {
+		return nil
+	}
+	rows := make([]models.TimelineEventParticipant, 0, len(ids))
+	for _, contactID := range ids {
+		rows = append(rows, models.TimelineEventParticipant{
+			ContactID:       contactID,
+			TimelineEventID: timelineEventID,
+		})
+	}
+	return tx.Create(&rows).Error
+}
+
+func replaceTimelineEventParticipantsLocked(tx *gorm.DB, timelineEventID uint, contactIDs []string) error {
+	var lockTarget models.TimelineEvent
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id").
+		Where("id = ?", timelineEventID).
+		First(&lockTarget).Error; err != nil {
+		return err
+	}
+	return replaceTimelineEventParticipants(tx, timelineEventID, contactIDs)
+}
+
+func replaceLifeEventParticipants(tx *gorm.DB, lifeEventID uint, contactIDs []string) error {
+	if err := tx.Where("life_event_id = ?", lifeEventID).Delete(&models.LifeEventParticipant{}).Error; err != nil {
+		return err
+	}
+	ids := dedupeContactIDs(contactIDs)
+	if len(ids) == 0 {
+		return nil
+	}
+	rows := make([]models.LifeEventParticipant, 0, len(ids))
+	for _, contactID := range ids {
+		rows = append(rows, models.LifeEventParticipant{
+			ContactID:   contactID,
+			LifeEventID: lifeEventID,
+		})
+	}
+	return tx.Create(&rows).Error
+}
+
+func replaceLifeEventParticipantsLocked(tx *gorm.DB, lifeEventID uint, contactIDs []string) error {
+	var lockTarget models.LifeEvent
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id").
+		Where("id = ?", lifeEventID).
+		First(&lockTarget).Error; err != nil {
+		return err
+	}
+	return replaceLifeEventParticipants(tx, lifeEventID, contactIDs)
+}
+
+func mergeContactIDs(required, additional []string) []string {
+	merged := make([]string, 0, len(required)+len(additional))
+	merged = append(merged, required...)
+	merged = append(merged, additional...)
+	return dedupeContactIDs(merged)
+}
+
+func dedupeContactIDs(contactIDs []string) []string {
+	seen := make(map[string]struct{}, len(contactIDs))
+	result := make([]string, 0, len(contactIDs))
+	for _, contactID := range contactIDs {
+		if contactID == "" {
+			continue
+		}
+		if _, exists := seen[contactID]; exists {
+			continue
+		}
+		seen[contactID] = struct{}{}
+		result = append(result, contactID)
+	}
+	return result
+}
+
+func contactRefs(contacts []models.Contact) []dto.TaskContactRef {
+	refs := make([]dto.TaskContactRef, 0, len(contacts))
+	for i := range contacts {
+		refs = append(refs, dto.TaskContactRef{
+			ID:   contacts[i].ID,
+			Name: utils.FormatContactName("%first_name% %last_name%", &contacts[i], contacts[i].ID),
+		})
+	}
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].Name == refs[j].Name {
+			return refs[i].ID < refs[j].ID
+		}
+		return refs[i].Name < refs[j].Name
+	})
+	return refs
 }
