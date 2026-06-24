@@ -51,6 +51,7 @@ import type {
   UserPreferences,
   CatchUpPrompt,
   Reminder,
+  Contact,
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
@@ -577,6 +578,44 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   });
   const altCalendar = prefs?.enable_alternative_calendar ?? false;
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [contactSearch, setContactSearch] = useState("");
+  const nameOrder = useVaultNameOrder(vaultId);
+
+  const { data: contactsData = [] } = useQuery({
+    queryKey: ["vaults", vaultId, "contacts", "for-le-modal", contactSearch],
+    queryFn: async () => {
+      const params: Parameters<typeof api.contacts.contactsList>[1] = { per_page: 200 };
+      if (contactSearch.length > 2) {
+        params.search = contactSearch;
+      }
+      const res = await api.contacts.contactsList(String(vaultId), params);
+      return (res.data ?? []) as Contact[];
+    },
+    enabled: !!vaultId && addModalOpen,
+  });
+
+  const getForcedParticipantIds = useCallback(() => {
+    const forced = new Set<string>();
+    forced.add(String(userContactId));
+    return forced;
+  }, [userContactId]);
+
+  const contactOptions = (() => {
+    const forcedIds = getForcedParticipantIds();
+
+    const optionsMap = new Map<string, { value: string; label: string }>();
+
+    contactsData.forEach((c) => {
+      if (c.id && !forcedIds.has(String(c.id))) {
+        optionsMap.set(String(c.id), {
+          value: String(c.id),
+          label: formatContactName(nameOrder, c),
+        });
+      }
+    });
+
+    return Array.from(optionsMap.values());
+  })();
 
   const { isLoading, isFetching } = useQuery({
     queryKey: ["vaults", vaultId, "dashboardLifeEvents", page],
@@ -606,12 +645,12 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const filteredTypes = lifeEventCategories.find((c) => c.id === selectedCategoryId)?.types ?? [];
 
   const addLifeEventMutation = useMutation({
-    mutationFn: async (values: { life_event_type_id: number; happened_at: CalendarAwareDateValue; summary?: string; description?: string }) => {
+    mutationFn: async (values: { life_event_type_id: number; happened_at: CalendarAwareDateValue; summary?: string; description?: string; participants?: string[] }) => {
       const dateStr = values.happened_at.date.toISOString();
       const timelineRes = await api.lifeEvents.contactsTimelineEventsCreate(
         String(vaultId),
         userContactId!,
-        { started_at: dateStr, label: values.summary || undefined },
+        { started_at: dateStr, label: values.summary || undefined, participants: values.participants },
       );
       const timelineId = timelineRes.data?.id;
       if (!timelineId) throw new Error("Failed to create timeline event");
@@ -628,6 +667,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
           original_day: values.happened_at.originalDay ?? undefined,
           original_month: values.happened_at.originalMonth ?? undefined,
           original_year: values.happened_at.originalYear ?? undefined,
+          participants: values.participants,
         },
       );
     },
@@ -719,6 +759,15 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
                           {le.description}
                         </div>
                       )}
+                      {le.participants && le.participants.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                          {le.participants.map(p => (
+                            <Tag key={p.id} bordered={false} style={{ margin: 0, fontSize: 12 }}>
+                              {p.name}
+                            </Tag>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -793,6 +842,17 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
           </Form.Item>
           <Form.Item name="description" label={t("vault.dashboard.life_event_description")}>
             <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="participants" label={t("modules.life_events.participants")}>
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder={t("modules.life_events.participants_placeholder")}
+              showSearch
+              onSearch={setContactSearch}
+              filterOption={false}
+              options={contactOptions}
+            />
           </Form.Item>
         </Form>
       </Modal>
