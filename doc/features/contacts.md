@@ -32,7 +32,7 @@ Contact edit pages are built from **modules**, which are configurable building b
 | Gifts | Gift ideas and tracking |
 | Debts / Loans | Money lent or borrowed |
 | Activities | Shared activities and events |
-| Life events | Major milestones (graduation, marriage, etc.) |
+| Life events | Major milestones (graduation, marriage, etc.), including shared events with other contacts in the same vault |
 | Pets | Pets with names and categories (categories are managed at the account level) |
 | Groups | Contact group membership |
 | Documents | Uploaded files (PDF, images) |
