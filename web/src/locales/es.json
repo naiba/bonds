@@ -923,6 +923,8 @@
       "new_timeline": "Nueva cronología",
       "no_timelines": "No hay cronologías de eventos",
       "no_events": "No hay eventos en esta cronología",
+      "participants": "Otros participantes",
+      "participants_placeholder": "Seleccionar participantes...",
       "event": "Evento",
       "delete_timeline_confirm": "¿Eliminar cronología?",
       "delete_event_confirm": "¿Eliminar?",
