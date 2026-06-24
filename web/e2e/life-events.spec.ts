@@ -1,7 +1,30 @@
 import { test, expect } from '@playwright/test';
+import { apiUrl } from './api-base-url';
+
+let counter = 0;
+
+function uniqueEmail(prefix: string): string {
+  return `${prefix}-${Date.now()}-${++counter}-${Math.random().toString(36).slice(2, 6)}@example.com`;
+}
+
+type ApiResponse<T> = {
+  data: T;
+};
+
+type LifeEventCategory = {
+  types?: Array<{ id?: number }>;
+};
+
+type ContactResponse = {
+  id?: string;
+};
+
+type TimelineEventResponse = {
+  id?: number;
+};
 
 async function setupVault(page: import('@playwright/test').Page) {
-  const email = `levt-${Date.now()}@example.com`;
+  const email = uniqueEmail('levt');
   await page.goto('/register');
   await page.getByPlaceholder('First name').fill('LifeEvent');
   await page.getByPlaceholder('Last name').fill('Tester');
@@ -20,6 +43,104 @@ async function setupVault(page: import('@playwright/test').Page) {
   await createVaultResp;
   await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 10000 });
   await page.waitForLoadState('networkidle');
+}
+
+async function getVaultId(page: import('@playwright/test').Page): Promise<string> {
+  const match = page.url().match(/\/vaults\/([a-f0-9-]{36})/);
+  if (!match) throw new Error(`Could not extract vault ID from URL: ${page.url()}`);
+  return match[1];
+}
+
+async function getAuthToken(page: import('@playwright/test').Page): Promise<string> {
+  const token = await page.evaluate(() => localStorage.getItem('token'));
+  if (!token) throw new Error('No auth token found in localStorage');
+  return token;
+}
+
+async function createContactViaAPI(
+  page: import('@playwright/test').Page,
+  vaultId: string,
+  token: string,
+  firstName: string,
+  lastName: string,
+): Promise<string> {
+  const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts`), {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { first_name: firstName, last_name: lastName },
+  });
+  expect(resp.ok()).toBeTruthy();
+  const body = await resp.json() as ApiResponse<ContactResponse>;
+  if (!body.data.id) throw new Error(`Contact create response missing id for ${firstName} ${lastName}`);
+  return body.data.id;
+}
+
+async function getLifeEventTypeId(page: import('@playwright/test').Page, vaultId: string, token: string): Promise<number> {
+  const resp = await page.request.get(apiUrl(`/vaults/${vaultId}/settings/lifeEventCategories`), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(resp.ok()).toBeTruthy();
+  const body = await resp.json() as ApiResponse<LifeEventCategory[]>;
+  const typeId = body.data.flatMap((category) => category.types ?? []).find((type) => type.id)?.id;
+  if (!typeId) throw new Error('No seeded life event type found');
+  return typeId;
+}
+
+async function createParticipantLifeEventViaAPI(
+  page: import('@playwright/test').Page,
+  vaultId: string,
+  token: string,
+  contactId: string,
+  participantId: string,
+  typeId: number,
+) {
+  const timelineResp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts/${contactId}/timelineEvents`), {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      started_at: '2026-06-15T00:00:00Z',
+      label: 'Shared Summer Trip',
+      participants: [participantId],
+    },
+  });
+  expect(timelineResp.ok()).toBeTruthy();
+  const timelineBody = await timelineResp.json() as ApiResponse<TimelineEventResponse>;
+  const timelineId = timelineBody.data.id;
+  if (!timelineId) throw new Error('Timeline create response missing id');
+
+  const lifeEventResp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts/${contactId}/timelineEvents/${timelineId}/lifeEvents`), {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      life_event_type_id: typeId,
+      happened_at: '2026-06-20T00:00:00Z',
+      calendar_type: 'gregorian',
+      summary: 'Shared festival memory',
+      description: 'A participant-linked life event',
+      participants: [participantId],
+    },
+  });
+  expect(lifeEventResp.ok()).toBeTruthy();
+}
+
+async function navigateToContactLifeGoals(page: import('@playwright/test').Page, vaultId: string, contactId: string) {
+  await page.goto(`/vaults/${vaultId}/contacts/${contactId}`);
+  await page.waitForLoadState('networkidle');
+  await page.locator('.ant-segmented-item-label').getByText('Full view', { exact: true }).click();
+  const lifeGoalsTab = page.getByRole('tab', { name: 'Life & goals' });
+  await expect(lifeGoalsTab).toBeVisible({ timeout: 10000 });
+  await lifeGoalsTab.click();
+  await page.waitForLoadState('networkidle');
+}
+
+async function expectParticipantLifeEventVisible(page: import('@playwright/test').Page, participantName: string) {
+  const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
+  const timelinePanel = lifeEventsCard.locator('.ant-collapse-item').filter({ hasText: 'Shared Summer Trip' }).first();
+  await expect(timelinePanel).toBeVisible({ timeout: 10000 });
+  await expect(timelinePanel.getByText(participantName)).toBeVisible({ timeout: 10000 });
+
+  const isExpanded = await timelinePanel.evaluate((element) => element.classList.contains('ant-collapse-item-active'));
+  if (!isExpanded) {
+    await timelinePanel.locator('.ant-collapse-header').click();
+  }
+  await expect(timelinePanel.getByText('Shared festival memory')).toBeVisible({ timeout: 10000 });
 }
 
 function getVaultUrl(page: import('@playwright/test').Page): string {
@@ -129,5 +250,22 @@ test.describe('Vault Settings - Life Events', () => {
     const refreshedFirstType = firstPanel.locator('.ant-list-item').first();
     const firstTypeUpArrow = refreshedFirstType.locator('button', { has: page.locator('.anticon-arrow-up') });
     await expect(firstTypeUpArrow).toBeDisabled({ timeout: 5000 });
+  });
+
+  test('should show participant life events on each participant contact timeline', async ({ page }) => {
+    await setupVault(page);
+    const vaultId = await getVaultId(page);
+    const token = await getAuthToken(page);
+    const contactAId = await createContactViaAPI(page, vaultId, token, 'AliceLife', 'Host');
+    const contactBId = await createContactViaAPI(page, vaultId, token, 'BobLife', 'Participant');
+    const typeId = await getLifeEventTypeId(page, vaultId, token);
+
+    await createParticipantLifeEventViaAPI(page, vaultId, token, contactAId, contactBId, typeId);
+
+    await navigateToContactLifeGoals(page, vaultId, contactAId);
+    await expectParticipantLifeEventVisible(page, 'BobLife Participant');
+
+    await navigateToContactLifeGoals(page, vaultId, contactBId);
+    await expectParticipantLifeEventVisible(page, 'AliceLife Host');
   });
 });
