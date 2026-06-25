@@ -337,6 +337,52 @@ test.describe('Contact Modules - Loans', () => {
 
     await expect(loansCard.getByText('Settled', { exact: true })).toBeVisible({ timeout: 10000 });
   });
+
+  test('should create an item loan with quantity and due date', async ({ page }) => {
+    await setupVault(page, 'loan-item-create');
+    await goToContacts(page);
+    await createContact(page, 'ItemLoanTest', 'User');
+
+    await navigateToTab(page, 'Information', true);
+
+    const loansCard = page.locator('.ant-card').filter({ hasText: /^Loans/ });
+    await expect(loansCard).toBeVisible({ timeout: 10000 });
+    await loansCard.getByRole('button', { name: /add/i }).click();
+
+    const modal = page.locator('.ant-modal').filter({ hasText: /add loan/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+
+    await modal.locator('.ant-form-item').filter({ hasText: /category/i }).locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Item' }).click();
+
+    await modal.locator('.ant-form-item').filter({ hasText: /name/i }).first().locator('input').fill('Camera kit');
+    await modal.locator('.ant-form-item').filter({ hasText: /item name/i }).locator('input').fill('Sony Camera');
+    await modal.locator('.ant-form-item').filter({ hasText: /quantity/i }).locator('.ant-input-number-input').fill('2');
+    await modal.locator('.ant-picker').click();
+    await page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first().click();
+
+    const createResp = page.waitForResponse(
+      (resp) => resp.url().includes('/loans') && resp.request().method() === 'POST'
+    );
+    await page.locator('.ant-modal-footer .ant-btn-primary').click();
+    const resp = await createResp;
+    expect(resp.status()).toBeLessThan(400);
+
+    await expect(loansCard.getByText('Camera kit')).toBeVisible({ timeout: 10000 });
+    await expect(loansCard.getByText('Item', { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(loansCard.getByText('Sony Camera')).toBeVisible({ timeout: 10000 });
+    await expect(loansCard.getByText('Qty: 2')).toBeVisible({ timeout: 10000 });
+    await expect(loansCard.getByText(/Due [A-Z][a-z]{2} \d{1,2}, \d{4}/)).toBeVisible({ timeout: 10000 });
+
+    const toggleResp = page.waitForResponse(
+      (response) => response.url().includes('/toggle') && response.request().method() === 'PUT'
+    );
+    await loansCard.getByRole('button', { name: /mark returned/i }).click();
+    const toggleResult = await toggleResp;
+    expect(toggleResult.status()).toBeLessThan(400);
+
+    await expect(loansCard.getByText('Returned', { exact: true })).toBeVisible({ timeout: 10000 });
+  });
 });
 
 test.describe('Contact Modules - Goals', () => {
