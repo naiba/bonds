@@ -241,6 +241,56 @@ test.describe('Admin Features', () => {
     await expect(reloadedInput).toHaveValue('Test Bonds App', { timeout: 10000 });
   });
 
+  test('admin settings SMTP password masking/preserve hint is visible and works', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/settings');
+    await page.waitForLoadState('networkidle');
+
+    // Click SMTP Email section to expand it
+    await page.getByText('SMTP Email').click();
+
+    const passwordInput = page.locator('#smtp\\.password');
+    await expect(passwordInput).toBeVisible({ timeout: 5000 });
+
+    // Ensure there's no hint when password is empty
+    await expect(page.getByText('*** preserves existing password. Type a new value to replace it.')).not.toBeVisible();
+
+    // Set a password
+    await passwordInput.clear();
+    await passwordInput.fill('my-secret-smtp-password');
+
+    await page.getByRole('button', { name: 'Save Settings' }).click();
+    await page.waitForLoadState('networkidle');
+
+    // Reload page to verify redaction and hint
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+
+    await page.getByText('SMTP Email').click();
+
+    const reloadedPasswordInput = page.locator('#smtp\\.password');
+    await expect(reloadedPasswordInput).toBeVisible({ timeout: 5000 });
+    await expect(reloadedPasswordInput).toHaveValue('***', { timeout: 10000 });
+
+    // Hint should now be visible
+    await expect(page.getByText('*** preserves existing password. Type a new value to replace it.')).toBeVisible();
+
+    // Type *** should preserve the password (verified backend, here we just verify UI still shows ***)
+    await reloadedPasswordInput.clear();
+    await reloadedPasswordInput.fill('***');
+
+    await page.getByRole('button', { name: 'Save Settings' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.getByText('SMTP Email').click();
+
+    const finalPasswordInput = page.locator('#smtp\\.password');
+    await expect(finalPasswordInput).toHaveValue('***', { timeout: 10000 });
+    await expect(page.getByText('*** preserves existing password. Type a new value to replace it.')).toBeVisible();
+  });
+
 
   test('backups page loads with config', async ({ page }) => {
     await loginUser(page, adminEmail);
