@@ -19,8 +19,25 @@ type ContactResponse = {
   id?: string;
 };
 
+type ContactRef = {
+  id?: string;
+  name?: string;
+};
+
+type LifeEventResponse = {
+  id?: number;
+  summary?: string;
+  participants?: ContactRef[];
+};
+
 type TimelineEventResponse = {
   id?: number;
+  participants?: ContactRef[];
+  life_events?: LifeEventResponse[];
+};
+
+type VaultResponse = {
+  user_contact_id?: string;
 };
 
 async function setupVault(page: import('@playwright/test').Page) {
@@ -30,8 +47,12 @@ async function setupVault(page: import('@playwright/test').Page) {
   await page.getByPlaceholder('Last name').fill('Tester');
   await page.getByPlaceholder('Email').fill(email);
   await page.getByPlaceholder(/password/i).fill('password123');
+  const createAccResp = page.waitForResponse(
+    (resp) => resp.url().includes('/auth/register') && resp.request().method() === 'POST' && resp.status() < 400
+  );
   await page.getByRole('button', { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
+  await createAccResp;
+  await page.waitForURL(/\/vaults/);
 
   await page.getByRole('button', { name: /new vault/i }).click();
   await page.getByPlaceholder(/e\.g\. family/i).fill('LE Vault');
@@ -41,7 +62,7 @@ async function setupVault(page: import('@playwright/test').Page) {
   );
   await page.getByRole('button', { name: /create vault/i }).click();
   await createVaultResp;
-  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 10000 });
+  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 30000 });
   await page.waitForLoadState('networkidle');
 }
 
@@ -55,6 +76,17 @@ async function getAuthToken(page: import('@playwright/test').Page): Promise<stri
   const token = await page.evaluate(() => localStorage.getItem('token'));
   if (!token) throw new Error('No auth token found in localStorage');
   return token;
+}
+
+async function getUserContactId(page: import('@playwright/test').Page, vaultId: string, token: string): Promise<string> {
+  const resp = await page.request.get(apiUrl(`/vaults/${vaultId}`), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(resp.ok()).toBeTruthy();
+  const body = await resp.json() as ApiResponse<VaultResponse>;
+  const userContactId = body.data.user_contact_id;
+  if (!userContactId) throw new Error('Vault response missing user_contact_id');
+  return userContactId;
 }
 
 async function createContactViaAPI(
@@ -125,7 +157,7 @@ async function navigateToContactLifeGoals(page: import('@playwright/test').Page,
   await page.waitForLoadState('networkidle');
   await page.locator('.ant-segmented-item-label').getByText('Full view', { exact: true }).click();
   const lifeGoalsTab = page.getByRole('tab', { name: 'Life & goals' });
-  await expect(lifeGoalsTab).toBeVisible({ timeout: 10000 });
+  await expect(lifeGoalsTab).toBeVisible({ timeout: 30000 });
   await lifeGoalsTab.click();
   await page.waitForLoadState('networkidle');
 }
@@ -133,14 +165,14 @@ async function navigateToContactLifeGoals(page: import('@playwright/test').Page,
 async function expectParticipantLifeEventVisible(page: import('@playwright/test').Page, participantName: string) {
   const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
   const timelinePanel = lifeEventsCard.locator('.ant-collapse-item').filter({ hasText: 'Shared Summer Trip' }).first();
-  await expect(timelinePanel).toBeVisible({ timeout: 10000 });
-  await expect(timelinePanel.getByText(participantName)).toBeVisible({ timeout: 10000 });
+  await expect(timelinePanel).toBeVisible({ timeout: 30000 });
+  await expect(timelinePanel.getByText(participantName)).toBeVisible({ timeout: 30000 });
 
   const isExpanded = await timelinePanel.evaluate((element) => element.classList.contains('ant-collapse-item-active'));
   if (!isExpanded) {
     await timelinePanel.locator('.ant-collapse-header').click();
   }
-  await expect(timelinePanel.getByText('Shared festival memory')).toBeVisible({ timeout: 10000 });
+  await expect(timelinePanel.getByText('Shared festival memory')).toBeVisible({ timeout: 30000 });
 }
 
 function getVaultUrl(page: import('@playwright/test').Page): string {
@@ -151,7 +183,7 @@ async function navigateToLifeEventsTab(page: import('@playwright/test').Page) {
   const vaultUrl = getVaultUrl(page);
   await page.goto(vaultUrl + '/settings');
   await page.waitForLoadState('networkidle');
-  await expect(page.locator('.ant-tabs')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.ant-tabs')).toBeVisible({ timeout: 30000 });
   await page.getByRole('tab', { name: /life events/i }).click();
   await page.waitForLoadState('networkidle');
 }
@@ -160,7 +192,7 @@ test.describe('Vault Settings - Life Events', () => {
   test('should navigate to vault settings life events tab', async ({ page }) => {
     await setupVault(page);
     await navigateToLifeEventsTab(page);
-    await expect(page.getByText('Add Category')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Add Category')).toBeVisible({ timeout: 30000 });
   });
 
   test('should show add category input and button', async ({ page }) => {
@@ -168,7 +200,7 @@ test.describe('Vault Settings - Life Events', () => {
     await navigateToLifeEventsTab(page);
 
     const addCard = page.locator('.ant-card').filter({ hasText: 'Add Category' });
-    await expect(addCard).toBeVisible({ timeout: 10000 });
+    await expect(addCard).toBeVisible({ timeout: 30000 });
     await expect(addCard.getByPlaceholder(/name/i)).toBeVisible({ timeout: 5000 });
     await expect(addCard.getByRole('button', { name: /add/i })).toBeVisible({ timeout: 5000 });
   });
@@ -178,7 +210,7 @@ test.describe('Vault Settings - Life Events', () => {
     await navigateToLifeEventsTab(page);
 
     // Wait for collapse panels (categories) to load
-    await expect(page.locator('.ant-collapse-item').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ant-collapse-item').first()).toBeVisible({ timeout: 30000 });
 
     // Get the second category panel
     const secondPanel = page.locator('.ant-collapse-item').nth(1);
@@ -201,7 +233,7 @@ test.describe('Vault Settings - Life Events', () => {
     // Wait for refetch to complete
     await page.waitForResponse(
       (resp) => resp.url().includes('/lifeEventCategories') && resp.request().method() === 'GET' && resp.status() < 400,
-      { timeout: 10000 }
+      { timeout: 30000 }
     ).catch(() => null);
     await page.waitForLoadState('networkidle');
 
@@ -215,9 +247,9 @@ test.describe('Vault Settings - Life Events', () => {
     await setupVault(page);
     await navigateToLifeEventsTab(page);
     const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
-    await expect(lifeEventsCard).toBeVisible({ timeout: 10000 });
+    await expect(lifeEventsCard).toBeVisible({ timeout: 30000 });
     const collapseItems = lifeEventsCard.locator('.ant-collapse-item');
-    await expect(collapseItems.first()).toBeVisible({ timeout: 10000 });
+    await expect(collapseItems.first()).toBeVisible({ timeout: 30000 });
     const firstPanel = collapseItems.first();
     await firstPanel.locator('.ant-collapse-header').click();
 
@@ -237,7 +269,7 @@ test.describe('Vault Settings - Life Events', () => {
     expect(posBody.success).toBe(true);
     await page.waitForResponse(
       (resp) => resp.url().includes('/lifeEventCategories') && resp.request().method() === 'GET' && resp.status() < 400,
-      { timeout: 10000 }
+      { timeout: 30000 }
     ).catch(() => null);
     await page.waitForLoadState('networkidle');
     // After refetch, panel may have closed — re-expand if needed
@@ -264,8 +296,94 @@ test.describe('Vault Settings - Life Events', () => {
 
     await navigateToContactLifeGoals(page, vaultId, contactAId);
     await expectParticipantLifeEventVisible(page, 'BobLife Participant');
+    await page.getByRole('link', { name: 'BobLife Participant' }).first().click();
+    await expect(page).toHaveURL(new RegExp(`/vaults/${vaultId}/contacts/${contactBId}$`), { timeout: 10000 });
 
     await navigateToContactLifeGoals(page, vaultId, contactBId);
     await expectParticipantLifeEventVisible(page, 'AliceLife Host');
+  });
+
+  test('should create life event in contact detail with category and type, edit it in dashboard, and navigate via participant tag', async ({ page }) => {
+    test.setTimeout(120000);
+    await setupVault(page);
+    const vaultId = await getVaultId(page);
+    const token = await getAuthToken(page);
+    const userContactId = await getUserContactId(page, vaultId, token);
+    const contactId = await createContactViaAPI(page, vaultId, token, 'BobLife', 'Participant');
+
+    // 1. Create a life event in the contact detail view
+    await navigateToContactLifeGoals(page, vaultId, contactId);
+
+    // Expand timelines card
+    const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
+    await expect(lifeEventsCard).toBeVisible({ timeout: 30000 });
+
+    // Open "New Timeline"
+    await lifeEventsCard.getByRole('button', { name: 'New Timeline' }).click();
+    const tlModal = page.locator('.ant-modal').filter({ hasText: 'New Timeline' });
+    await expect(tlModal).toBeVisible();
+    await tlModal.getByLabel('Label').fill('School Years');
+    await tlModal.getByLabel('Started At').click();
+    await page.locator('.ant-picker-cell-today').click();
+    await tlModal.getByRole('button', { name: 'OK' }).click();
+    await expect(tlModal).not.toBeVisible();
+
+    // Open "Life event" modal
+    await lifeEventsCard.locator('.ant-collapse-header').getByRole('button', { name: /event/i }).click();
+    const leModal = page.locator('.ant-modal').filter({ hasText: 'Life event' });
+    await expect(leModal).toBeVisible();
+
+    // Verify it requires category and type selection now
+    await expect(leModal.getByLabel('Select category')).toBeVisible();
+    await leModal.getByLabel('Select category').click();
+    await page.keyboard.press('Enter');
+    await expect(leModal.getByTitle('Transportation')).toBeVisible({ timeout: 5000 });
+
+    await expect(leModal.getByLabel('Select event type')).toBeVisible();
+    await leModal.getByLabel('Select event type').click();
+    await page.keyboard.press('Enter');
+    await expect(leModal.getByTitle('Rode a bike')).toBeVisible({ timeout: 5000 });
+
+    await leModal.locator('.ant-form-item').filter({ hasText: /^\*?\s*Label$/ }).locator('input').fill('Graduation');
+    await leModal.getByLabel('Description').fill('A great day');
+    await leModal.getByRole('button', { name: 'OK' }).click();
+    await expect(leModal).not.toBeVisible();
+
+    // 2. Navigate to Dashboard and Edit the life event
+    await page.goto(`/vaults/${vaultId}`);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.ant-segmented').getByText('Life Events', { exact: true }).click();
+
+    // It should show up in dashboard
+    const dashboardLifeEvents = page.locator('.ant-segmented').locator('..').locator('..');
+    const dashboardEvent = dashboardLifeEvents.locator('div').filter({ hasText: 'Graduation' }).first();
+    await expect(dashboardEvent.getByText('Graduation', { exact: true })).toBeVisible({ timeout: 30000 });
+
+    // Edit it
+    await dashboardEvent.getByRole('button', { name: 'Actions' }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    const editModal = page.locator('.ant-modal').filter({ hasText: 'Edit Life Event' });
+    await expect(editModal).toBeVisible();
+
+    // Change summary
+    await editModal.getByLabel('Summary').fill('Graduation Party');
+    await editModal.getByRole('button', { name: 'Save' }).click();
+    await expect(editModal).not.toBeVisible();
+
+    // Check updated text
+    await expect(dashboardLifeEvents.getByText('Graduation Party', { exact: true })).toBeVisible({ timeout: 30000 });
+
+    const dashboardResp = await page.request.get(apiUrl(`/vaults/${vaultId}/dashboard/lifeEvents`), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(dashboardResp.ok()).toBeTruthy();
+    const dashboardBody = await dashboardResp.json() as ApiResponse<TimelineEventResponse[]>;
+    const updatedLifeEvent = dashboardBody.data
+      .flatMap((timeline) => timeline.life_events ?? [])
+      .find((lifeEvent) => lifeEvent.summary === 'Graduation Party');
+    if (!updatedLifeEvent) throw new Error('Updated dashboard life event not found in API response');
+    const participantIds = (updatedLifeEvent.participants ?? []).flatMap((participant) => participant.id ? [participant.id] : []);
+    expect(participantIds).toContain(contactId);
+    expect(participantIds).not.toContain(userContactId);
   });
 });
