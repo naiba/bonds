@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useParams, useNavigate, Outlet } from "react-router-dom";
+import { useParams, useNavigate, Outlet, Link } from "react-router-dom";
 import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate, formatMonthYear, formatShortDate } from "@/utils/dateFormat";
 import { formatShortDateOnly } from "@/utils/dateOnlyInput";
@@ -46,8 +46,10 @@ import type {
   LifeMetricStats,
   LifeMetricMonthData,
   TimelineEvent,
+  LifeEvent,
   MoodTrackingParameterResponse,
   LifeEventCategoryResponse,
+  LifeEventCategoryTypeResponse,
   UserPreferences,
   CatchUpPrompt,
   Reminder,
@@ -63,6 +65,20 @@ import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue
 dayjs.extend(relativeTime);
 
 const { Title, Text } = Typography;
+
+type LifeEventFormValues = {
+  category_id: number;
+  life_event_type_id: number;
+  happened_at: CalendarAwareDateValue;
+  summary?: string;
+  description?: string;
+  participants?: string[];
+};
+
+type LifeEventEditTarget = {
+  tl: TimelineEvent;
+  le: LifeEvent;
+};
 
 type DashboardTab = "activity" | "life_events" | "life_metrics";
 
@@ -80,6 +96,16 @@ function getVaultReminderContactName(reminder: VaultReminderItem): string {
     .filter(Boolean)
     .join(" ")
     .trim();
+}
+
+function getDashboardLifeEventRouteContactId(editingTarget: LifeEventEditTarget): string {
+  const timelineParticipantId = editingTarget.tl.participants?.find((participant) => participant.id)?.id;
+  if (timelineParticipantId) return timelineParticipantId;
+
+  const lifeEventParticipantId = editingTarget.le.participants?.find((participant) => participant.id)?.id;
+  if (lifeEventParticipantId) return lifeEventParticipantId;
+
+  throw new Error("Dashboard life event is missing a contact participant");
 }
 
 // ─── Main Component ──────────────────────────────────────────────
@@ -569,6 +595,11 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const [hasMore, setHasMore] = useState(true);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm] = Form.useForm();
+  const [editingLe, setEditingLe] = useState<LifeEventEditTarget | null>(null);
+
+  const handleEditClick = (tl: TimelineEvent, le: LifeEvent) => {
+    setEditingLe({ tl, le });
+  };
   const { data: prefs } = useQuery({
     queryKey: ["settings", "preferences"],
     queryFn: async () => {
@@ -591,7 +622,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
       const res = await api.contacts.contactsList(String(vaultId), params);
       return (res.data ?? []) as Contact[];
     },
-    enabled: !!vaultId && addModalOpen,
+    enabled: !!vaultId && (addModalOpen || !!editingLe),
   });
 
   const getForcedParticipantIds = useCallback(() => {
@@ -610,6 +641,16 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
         optionsMap.set(String(c.id), {
           value: String(c.id),
           label: formatContactName(nameOrder, c),
+        });
+      }
+    });
+
+    editingLe?.le.participants?.forEach((participant) => {
+      const participantId = participant.id ? String(participant.id) : "";
+      if (participantId && !forcedIds.has(participantId) && !optionsMap.has(participantId)) {
+        optionsMap.set(participantId, {
+          value: participantId,
+          label: participant.name || participantId,
         });
       }
     });
@@ -639,7 +680,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
       const res = await api.vaultSettings.settingsLifeEventCategoriesList(String(vaultId));
       return (res.data ?? []) as LifeEventCategoryResponse[];
     },
-    enabled: !!vaultId && addModalOpen,
+    enabled: !!vaultId && (addModalOpen || !!editingLe),
   });
 
   const filteredTypes = lifeEventCategories.find((c) => c.id === selectedCategoryId)?.types ?? [];
@@ -650,7 +691,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
       const timelineRes = await api.lifeEvents.contactsTimelineEventsCreate(
         String(vaultId),
         userContactId!,
-        { started_at: dateStr, label: values.summary || undefined, participants: values.participants },
+        { started_at: dateStr, label: values.summary || undefined },
       );
       const timelineId = timelineRes.data?.id;
       if (!timelineId) throw new Error("Failed to create timeline event");
@@ -676,6 +717,39 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
       setAddModalOpen(false);
       addForm.resetFields();
       setSelectedCategoryId(null);
+      setPage(1);
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "dashboardLifeEvents"] });
+    },
+  });
+
+  const editLifeEventMutation = useMutation({
+    mutationFn: async (values: LifeEventFormValues) => {
+      if (!editingLe) throw new Error("No editing event");
+      const dateStr = values.happened_at.date.toISOString();
+      // Dashboard events are vault-wide; using the current user's shadow contact here
+      // would make the contact-scoped update API add that user as a participant.
+      const routeContactId = getDashboardLifeEventRouteContactId(editingLe);
+      await api.lifeEvents.contactsTimelineEventsLifeEventsUpdate(
+        String(vaultId),
+        routeContactId,
+        editingLe.tl.id!,
+        editingLe.le.id!,
+        {
+          life_event_type_id: values.life_event_type_id,
+          happened_at: dateStr,
+          summary: values.summary || undefined,
+          description: values.description || undefined,
+          calendar_type: values.happened_at.calendarType,
+          original_day: values.happened_at.originalDay ?? undefined,
+          original_month: values.happened_at.originalMonth ?? undefined,
+          original_year: values.happened_at.originalYear ?? undefined,
+          participants: values.participants,
+        },
+      );
+    },
+    onSuccess: () => {
+      message.success(t("modules.life_events.event_updated"));
+      setEditingLe(null);
       setPage(1);
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "dashboardLifeEvents"] });
     },
@@ -747,27 +821,45 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
                           background: token.colorPrimary,
                         }}
                       />
-                      <Text style={{ fontWeight: 500, fontSize: 13 }}>
-                        {le.summary ?? le.description}
-                      </Text>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {formatDate(le.happened_at, dateFormats)}
-                      </Text>
-                      {le.description && le.summary && (
-                        <div style={{ marginTop: 2, color: token.colorTextSecondary, fontSize: 12 }}>
-                          {le.description}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div>
+                          <Text style={{ fontWeight: 500, fontSize: 13 }}>
+                            {le.summary ?? le.description}
+                          </Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {formatDate(le.happened_at, dateFormats)}
+                          </Text>
+                          {le.description && le.summary && (
+                            <div style={{ marginTop: 2, color: token.colorTextSecondary, fontSize: 12 }}>
+                              {le.description}
+                            </div>
+                          )}
+                          {le.participants && le.participants.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                              {le.participants.map(p => (
+                                <Link key={p.id} to={`/vaults/${vaultId}/contacts/${p.id}`} onClick={(e) => e.stopPropagation()}>
+                                  <Tag bordered={false} style={{ margin: 0, fontSize: 12, cursor: "pointer" }}>
+                                    {p.name}
+                                  </Tag>
+                                </Link>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {le.participants && le.participants.length > 0 && (
-                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
-                          {le.participants.map(p => (
-                            <Tag key={p.id} bordered={false} style={{ margin: 0, fontSize: 12 }}>
-                              {p.name}
-                            </Tag>
-                          ))}
-                        </div>
-                      )}
+                        <Dropdown
+                          menu={{
+                            items: [
+                              { key: "edit", label: t("common.edit"), icon: <EditOutlined />, onClick: () => handleEditClick(tl, le) },
+                            ],
+                          }}
+                          trigger={["click"]}
+                        >
+                          <Button type="text" size="small" aria-label={t("common.actions")} style={{ color: token.colorTextSecondary }}>
+                            ···
+                          </Button>
+                        </Dropdown>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -856,7 +948,142 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal
+        title={t("modules.life_events.edit_event")}
+        open={!!editingLe}
+        onCancel={() => setEditingLe(null)}
+        footer={null}
+        destroyOnClose
+      >
+        {editingLe && lifeEventCategories.length === 0 && (
+          <div style={{ textAlign: "center", padding: 24 }}>
+            <Spin />
+          </div>
+        )}
+        {editingLe && lifeEventCategories.length > 0 && (
+          <LifeEventEditForm
+            key={`${editingLe.le.id}-${lifeEventCategories.length}`}
+            initialData={editingLe.le}
+            categories={lifeEventCategories}
+            contactOptions={contactOptions}
+            onSearchContact={setContactSearch}
+            onSubmit={(values) => editLifeEventMutation.mutate(values)}
+            isPending={editLifeEventMutation.isPending}
+            onCancel={() => setEditingLe(null)}
+            altCalendar={altCalendar}
+          />
+        )}
+      </Modal>
     </div>
+  );
+}
+
+type SelectOption = { value: string; label: string };
+
+type LifeEventEditFormProps = {
+  initialData: LifeEvent;
+  categories: LifeEventCategoryResponse[];
+  contactOptions: SelectOption[];
+  onSearchContact: (value: string) => void;
+  onSubmit: (values: LifeEventFormValues) => void;
+  isPending: boolean;
+  onCancel: () => void;
+  altCalendar: boolean;
+};
+
+function LifeEventEditForm({
+  initialData,
+  categories,
+  contactOptions,
+  onSearchContact,
+  onSubmit,
+  isPending,
+  onCancel,
+  altCalendar,
+}: LifeEventEditFormProps) {
+  const { t } = useTranslation();
+  const [form] = Form.useForm<LifeEventFormValues>();
+
+  const initialCategory = categories.find((c) => c.types?.some((type) => type.id === initialData.life_event_type_id))?.id;
+  const [selectedCat, setSelectedCat] = useState<number | undefined>(initialCategory);
+
+  const filteredTypes = categories.find((category) => category.id === selectedCat)?.types ?? [];
+
+  return (
+    <Form
+      form={form}
+      layout="vertical"
+      onFinish={onSubmit}
+      initialValues={{
+        category_id: initialCategory,
+        life_event_type_id: initialData.life_event_type_id,
+        summary: initialData.summary,
+        description: initialData.description,
+        happened_at: buildCalendarAwareValue(
+          initialData.happened_at,
+          initialData.calendar_type,
+          initialData.original_day,
+          initialData.original_month,
+          initialData.original_year
+        ),
+        participants: initialData.participants?.flatMap((participant) => participant.id ? [String(participant.id)] : []) || [],
+      }}
+    >
+      <Form.Item
+        name="category_id"
+        label={t("vault.dashboard.select_category")}
+        rules={[{ required: true, message: t("common.required") }]}
+      >
+        <Select
+          placeholder={t("vault.dashboard.select_category")}
+          onChange={(v) => {
+            setSelectedCat(v);
+            form.setFieldValue("life_event_type_id", undefined);
+          }}
+          options={categories.map((c) => ({ label: c.label, value: c.id }))}
+        />
+      </Form.Item>
+      <Form.Item
+        name="life_event_type_id"
+        label={t("vault.dashboard.select_type")}
+        rules={[{ required: true, message: t("common.required") }]}
+      >
+        <Select
+          placeholder={t("vault.dashboard.select_type")}
+          disabled={!selectedCat}
+          options={filteredTypes.map((type: LifeEventCategoryTypeResponse) => ({ label: type.label, value: type.id }))}
+        />
+      </Form.Item>
+      <Form.Item
+        name="happened_at"
+        label={t("vault.dashboard.life_event_date")}
+        rules={[{ required: true, message: t("common.required") }]}
+      >
+        <CalendarAwareDatePicker enableAlternativeCalendar={altCalendar} />
+      </Form.Item>
+      <Form.Item name="summary" label={t("vault.dashboard.life_event_summary")}>
+        <Input />
+      </Form.Item>
+      <Form.Item name="description" label={t("vault.dashboard.life_event_description")}>
+        <Input.TextArea rows={3} />
+      </Form.Item>
+      <Form.Item name="participants" label={t("modules.life_events.participants")}>
+        <Select
+          mode="multiple"
+          allowClear
+          placeholder={t("modules.life_events.participants_placeholder")}
+          showSearch
+          onSearch={onSearchContact}
+          filterOption={false}
+          options={contactOptions}
+        />
+      </Form.Item>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
+        <Button onClick={onCancel}>{t("common.cancel")}</Button>
+        <Button type="primary" htmlType="submit" loading={isPending}>{t("common.save")}</Button>
+      </div>
+    </Form>
   );
 }
 

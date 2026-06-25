@@ -30,6 +30,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { TimelineEvent as TEvent, PaginationMeta, APIError, LifeEventCategoryResponse, UserPreferences, Contact } from "@/api";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import { useDateFormat, formatDate, formatMonthYear } from "@/utils/dateFormat";
 import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import dayjs from "dayjs";
@@ -50,6 +51,7 @@ export default function LifeEventsModule({
   const [leOpen, setLeOpen] = useState(false);
   const [selectedTimeline, setSelectedTimeline] = useState<number | null>(null);
   const [editingLeId, setEditingLeId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [allTimelines, setAllTimelines] = useState<TEvent[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -125,7 +127,7 @@ export default function LifeEventsModule({
   })();
 
   // Fetch life event categories to get a valid type ID (instead of hardcoded 1)
-  const { data: lifeEventCategories } = useQuery({
+  const { data: lifeEventCategories = [] } = useQuery({
     queryKey: ["vault", vaultId, "lifeEventCategories"],
     queryFn: async () => {
       const res = await api.vaultSettings.settingsLifeEventCategoriesList(String(vaultId));
@@ -133,10 +135,7 @@ export default function LifeEventsModule({
     },
   });
 
-  // Use the first available life event type ID from seed data
-  const defaultLifeEventTypeId = lifeEventCategories
-    ?.flatMap((cat) => cat.types ?? [])
-    ?.find((t) => t.id)?.id ?? 0;
+  const filteredTypes = lifeEventCategories.find((c) => c.id === selectedCategoryId)?.types ?? [];
 
   const resetPagination = useCallback(() => {
     setPage(1);
@@ -192,13 +191,13 @@ export default function LifeEventsModule({
   const altCalendar = prefs?.enable_alternative_calendar ?? false;
 
   const createLifeEventMutation = useMutation({
-    mutationFn: (values: { label: string; happened_at: CalendarAwareDateValue; description?: string; participants?: string[] }) => {
+    mutationFn: (values: { life_event_type_id: number; label: string; happened_at: CalendarAwareDateValue; description?: string; participants?: string[] }) => {
       if (!selectedTimeline) throw new Error("No timeline");
       const data = {
         summary: values.label,
         happened_at: values.happened_at.date.toISOString(),
         description: values.description,
-        life_event_type_id: defaultLifeEventTypeId,
+        life_event_type_id: values.life_event_type_id,
         calendar_type: values.happened_at.calendarType,
         original_day: values.happened_at.originalDay ?? undefined,
         original_month: values.happened_at.originalMonth ?? undefined,
@@ -215,6 +214,7 @@ export default function LifeEventsModule({
       queryClient.invalidateQueries({ queryKey: qk });
       setLeOpen(false);
       setEditingLeId(null);
+      setSelectedCategoryId(null);
       leForm.resetFields();
       message.success(editingLeId ? t("modules.life_events.event_updated") : t("modules.life_events.event_added"));
     },
@@ -263,9 +263,11 @@ export default function LifeEventsModule({
            {tl.participants && tl.participants.length > 0 && (
              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 2 }}>
                {tl.participants.map(p => (
-                 <Tag key={p.id} bordered={false} style={{ margin: 0, fontSize: 12 }}>
-                   {p.name}
-                 </Tag>
+                 <Link key={p.id} to={`/vaults/${vaultId}/contacts/${p.id}`} onClick={(e) => e.stopPropagation()}>
+                   <Tag bordered={false} style={{ margin: 0, fontSize: 12, cursor: "pointer" }}>
+                     {p.name}
+                   </Tag>
+                 </Link>
                ))}
              </div>
            )}
@@ -291,6 +293,7 @@ export default function LifeEventsModule({
               e.stopPropagation();
                setSelectedTimeline(tl.id ?? null);
                setEditingLeId(null);
+               setSelectedCategoryId(null);
                leForm.resetFields();
                leForm.setFieldsValue({ happened_at: buildCalendarAwareValue(dayjs(), "gregorian", null, null, null) });
                setLeOpen(true);
@@ -340,9 +343,11 @@ export default function LifeEventsModule({
                  {le.participants && le.participants.length > 0 && (
                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
                      {le.participants.map(p => (
-                       <Tag key={p.id} bordered={false} style={{ margin: 0, fontSize: 12 }}>
-                         {p.name}
-                       </Tag>
+                       <Link key={p.id} to={`/vaults/${vaultId}/contacts/${p.id}`} onClick={(e) => e.stopPropagation()}>
+                         <Tag bordered={false} style={{ margin: 0, fontSize: 12, cursor: "pointer" }}>
+                           {p.name}
+                         </Tag>
+                       </Link>
                      ))}
                    </div>
                  )}
@@ -369,7 +374,13 @@ export default function LifeEventsModule({
                     e.stopPropagation();
                     setSelectedTimeline(tl.id ?? null);
                     setEditingLeId(le.id!);
+
+                    const catId = lifeEventCategories.find(c => c.types?.some(t => t.id === le.life_event_type_id))?.id;
+                    setSelectedCategoryId(catId ?? null);
+
                     leForm.setFieldsValue({
+                      category_id: catId,
+                      life_event_type_id: le.life_event_type_id,
                       label: le.summary,
                       happened_at: buildCalendarAwareValue(
                         le.happened_at,
@@ -482,11 +493,36 @@ export default function LifeEventsModule({
       <Modal
         title={editingLeId ? t("modules.life_events.edit_event") : t("modules.life_events.event_modal")}
         open={leOpen}
-        onCancel={() => { setLeOpen(false); setEditingLeId(null); leForm.resetFields(); }}
+        onCancel={() => { setLeOpen(false); setEditingLeId(null); setSelectedCategoryId(null); leForm.resetFields(); }}
         onOk={() => leForm.submit()}
         confirmLoading={createLifeEventMutation.isPending}
       >
         <Form form={leForm} layout="vertical" onFinish={(v) => createLifeEventMutation.mutate(v)}>
+          <Form.Item
+            name="category_id"
+            label={t("vault.dashboard.select_category")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              placeholder={t("vault.dashboard.select_category")}
+              onChange={(v: number) => {
+                setSelectedCategoryId(v);
+                leForm.setFieldValue("life_event_type_id", undefined);
+              }}
+              options={lifeEventCategories.map((c) => ({ label: c.label, value: c.id }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="life_event_type_id"
+            label={t("vault.dashboard.select_type")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              placeholder={t("vault.dashboard.select_type")}
+              disabled={!selectedCategoryId}
+              options={filteredTypes.map((tp) => ({ label: tp.label, value: tp.id }))}
+            />
+          </Form.Item>
           <Form.Item name="label" label={t("modules.life_events.label")} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
