@@ -2,6 +2,7 @@ package services
 
 import (
 	"bufio"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"strings"
@@ -99,7 +100,9 @@ type fakeSMTPRelay struct {
 	port string
 	ln   net.Listener
 	mu   sync.Mutex
-	auth bool
+	auth         bool
+	authUsername string
+	authPassword string
 }
 
 func startFakeSMTPRelay(t *testing.T) *fakeSMTPRelay {
@@ -160,17 +163,34 @@ func (r *fakeSMTPRelay) handleConn(conn net.Conn) {
 		case strings.HasPrefix(upper, "EHLO "):
 			writeLine("250-fake-smtp-relay greets you")
 			writeLine("250-PIPELINING")
+			writeLine("250-AUTH PLAIN")
 			writeLine("250-SIZE 35882577")
 			writeLine("250-8BITMIME")
 			writeLine("250 OK")
 		case strings.HasPrefix(upper, "HELO "):
 			writeLine("250 fake-smtp-relay greets you")
 		case strings.HasPrefix(upper, "AUTH "):
+			parts := strings.SplitN(command, " ", 3)
+			if len(parts) != 3 || !strings.EqualFold(parts[1], "PLAIN") {
+				writeLine("504 unsupported auth mechanism")
+				return
+			}
+			payload, err := base64.StdEncoding.DecodeString(parts[2])
+			if err != nil {
+				writeLine("501 malformed auth payload")
+				return
+			}
+			fields := strings.Split(string(payload), "\x00")
+			if len(fields) != 3 {
+				writeLine("501 malformed auth fields")
+				return
+			}
 			r.mu.Lock()
 			r.auth = true
+			r.authUsername = fields[1]
+			r.authPassword = fields[2]
 			r.mu.Unlock()
-			writeLine("502 AUTH not supported")
-			return
+			writeLine("235 Authentication successful")
 		case strings.HasPrefix(upper, "MAIL FROM:"):
 			writeLine("250 OK")
 		case strings.HasPrefix(upper, "RCPT TO:"):
@@ -205,5 +225,49 @@ func (r *fakeSMTPRelay) assertNoAuth(t *testing.T) {
 
 	if r.auth {
 		t.Fatal("unexpected AUTH command recorded by fake SMTP relay")
+	}
+}
+
+func TestDynamicMailerSendUsesRealPassword(t *testing.T) {
+	server := startFakeSMTPRelay(t)
+
+	db := testutil.SetupTestDB(t)
+	settings := NewSystemSettingService(db)
+
+	if err := settings.Set("smtp.host", server.host); err != nil {
+		t.Fatalf("failed to set smtp.host: %v", err)
+	}
+	if err := settings.Set("smtp.port", server.port); err != nil {
+		t.Fatalf("failed to set smtp.port: %v", err)
+	}
+	if err := settings.Set("smtp.username", "user"); err != nil {
+		t.Fatalf("failed to set smtp.username: %v", err)
+	}
+	if err := settings.Set("smtp.password", "secret"); err != nil {
+		t.Fatalf("failed to set smtp.password: %v", err)
+	}
+	if err := settings.Set("smtp.from", "sender@example.com"); err != nil {
+		t.Fatalf("failed to set smtp.from: %v", err)
+	}
+
+	mailer := NewDynamicMailer(settings)
+	if err := mailer.Send("recipient@example.com", "Subject", "<p>Hello</p>"); err != nil {
+		t.Fatalf("DynamicMailer.Send returned error: %v", err)
+	}
+
+	server.assertAuthCredentials(t, "user", "secret")
+}
+
+func (r *fakeSMTPRelay) assertAuthCredentials(t *testing.T, username, password string) {
+	t.Helper()
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.auth {
+		t.Fatal("expected AUTH command recorded by fake SMTP relay")
+	}
+	if r.authUsername != username || r.authPassword != password {
+		t.Fatalf("expected AUTH credentials %q/%q, got %q/%q", username, password, r.authUsername, r.authPassword)
 	}
 }
