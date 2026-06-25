@@ -6,6 +6,8 @@ import zhCN from "antd/locale/zh_CN";
 import esES from "antd/locale/es_ES";
 import frFR from "antd/locale/fr_FR";
 import deDE from "antd/locale/de_DE";
+import ptBR from "antd/locale/pt_BR";
+import ptPT from "antd/locale/pt_PT";
 import type { Locale } from "antd/lib/locale";
 import { useTheme } from "@/stores/theme";
 import { normalizeLanguageCode } from "@/i18n";
@@ -30,6 +32,8 @@ const ANTD_LOCALES: Record<string, Locale> = {
   es: esES,
   fr: frFR,
   de: deDE,
+  "pt-BR": ptBR,
+  "pt-PT": ptPT,
 };
 
 export default function ThemedApp() {

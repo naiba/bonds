@@ -26,9 +26,12 @@ func TestUpdateLocaleRejectsUnsupported(t *testing.T) {
 		{"spanish", "es", false},
 		{"french", "fr", false},
 		{"german", "de", false},
+		{"brazilian_portuguese", "pt-BR", false},
+		{"european_portuguese", "pt-PT", false},
 		{"japanese_unsupported", "ja", true},
 		{"empty", "", true},
 		{"region_only", "zh-CN", true},
+		{"region_case", "pt-br", true},
 		{"garbage", "xx", true},
 	}
 

@@ -43,8 +43,11 @@ func TestIsSupported(t *testing.T) {
 		{"es", true},
 		{"fr", true},
 		{"de", true},
+		{"pt-BR", true},
+		{"pt-PT", true},
 		{"", false},
 		{"zh-CN", false},
+		{"pt-BR", false},
 		{"EN", false},
 	}
 	for _, tt := range tests {
