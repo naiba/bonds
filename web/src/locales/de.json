@@ -840,12 +840,24 @@
       "settled": "Beglichen",
       "settled_at": "Beglichen {{date}}",
       "modal_title": "Darlehen hinzufügen",
+      "category": "Kategorie",
+      "category_money": "Geld",
+      "category_item": "Gegenstand",
       "name": "Name",
       "direction": "Richtung",
       "i_lent": "Ich habe Geld geliehen",
       "i_borrowed": "Ich habe Geld geborgt",
       "amount": "Betrag",
-      "currency": "Währung"
+      "currency": "Währung",
+      "currency_placeholder": "Währung auswählen",
+      "item_name": "Gegenstandsname",
+      "quantity": "Anzahl",
+      "quantity_value": "Anzahl: {{count}}",
+      "due_date": "Fälligkeitsdatum",
+      "due_at": "Fällig {{date}}",
+      "mark_returned": "Als zurückgegeben markieren",
+      "returned": "Zurückgegeben",
+      "returned_at": "Zurückgegeben {{date}}"
     },
     "gifts": {
       "title": "Geschenke",
@@ -1567,6 +1579,7 @@
         "port": "SMTP-Port",
         "username": "SMTP-Benutzername",
         "password": "SMTP-Passwort",
+        "password_hint": "*** behält das bestehende Passwort. Geben Sie einen neuen Wert ein, um es zu ersetzen.",
         "from": "Absender-E-Mail"
       },
       "webauthn": {

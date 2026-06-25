@@ -840,12 +840,24 @@
       "settled": "Saldado",
       "settled_at": "Saldado el {{date}}",
       "modal_title": "Añadir préstamo",
+      "category": "Categoría",
+      "category_money": "Dinero",
+      "category_item": "Objeto",
       "name": "Nombre",
       "direction": "Dirección",
       "i_lent": "He prestado dinero",
       "i_borrowed": "He pedido dinero prestado",
       "amount": "Cantidad",
-      "currency": "Moneda"
+      "currency": "Moneda",
+      "currency_placeholder": "Selecciona una moneda",
+      "item_name": "Nombre del objeto",
+      "quantity": "Cantidad",
+      "quantity_value": "Cant.: {{count}}",
+      "due_date": "Fecha límite",
+      "due_at": "Vence el {{date}}",
+      "mark_returned": "Marcar devuelto",
+      "returned": "Devuelto",
+      "returned_at": "Devuelto el {{date}}"
     },
     "gifts": {
       "title": "Regalos",
@@ -1567,7 +1579,8 @@
         "port": "Puerto SMTP",
         "username": "Usuario SMTP",
         "password": "Contraseña SMTP",
-        "from": "Correo del remitente"
+        "password_hint": "*** conserva la contraseña existente. Escriba un nuevo valor para reemplazarla.",
+        "from": "Email del remitente"
       },
       "webauthn": {
         "rp_id": "ID de Relying Party",

@@ -840,12 +840,24 @@
       "settled": "Réglé",
       "settled_at": "Réglé {{date}}",
       "modal_title": "Ajouter un prêt",
+      "category": "Catégorie",
+      "category_money": "Argent",
+      "category_item": "Objet",
       "name": "Nom",
       "direction": "Direction",
       "i_lent": "j'ai prêté de l'argent",
       "i_borrowed": "j'ai emprunté de l'argent",
       "amount": "Montant",
-      "currency": "Devise"
+      "currency": "Devise",
+      "currency_placeholder": "Sélectionnez une devise",
+      "item_name": "Nom de l'objet",
+      "quantity": "Quantité",
+      "quantity_value": "Qté : {{count}}",
+      "due_date": "Date d'échéance",
+      "due_at": "Échéance {{date}}",
+      "mark_returned": "Marquer comme rendu",
+      "returned": "Rendu",
+      "returned_at": "Rendu {{date}}"
     },
     "gifts": {
       "title": "Cadeaux",
@@ -1563,11 +1575,12 @@
         "refresh_hrs": "Fenêtre d'actualisation (heures)"
       },
       "smtp": {
-        "host": "SMTP Hôte",
-        "port": "SMTP Port",
-        "username": "SMTP Nom d'utilisateur",
-        "password": "SMTP Mot de passe",
-        "from": "E-mail de l'expéditeur"
+        "host": "Hôte SMTP",
+        "port": "Port SMTP",
+        "username": "Nom d'utilisateur SMTP",
+        "password": "Mot de passe SMTP",
+        "password_hint": "*** conserve le mot de passe existant. Tapez une nouvelle valeur pour le remplacer.",
+        "from": "Email de l'expéditeur"
       },
       "webauthn": {
         "rp_id": "ID de partie utilisatrice",

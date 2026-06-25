@@ -840,12 +840,24 @@
       "settled": "Settled",
       "settled_at": "Settled {{date}}",
       "modal_title": "Add Loan",
+      "category": "Category",
+      "category_money": "Money",
+      "category_item": "Item",
       "name": "Name",
       "direction": "Direction",
       "i_lent": "I lent money",
       "i_borrowed": "I borrowed money",
       "amount": "Amount",
-      "currency": "Currency"
+      "currency": "Currency",
+      "currency_placeholder": "Select currency",
+      "item_name": "Item name",
+      "quantity": "Quantity",
+      "quantity_value": "Qty: {{count}}",
+      "due_date": "Due date",
+      "due_at": "Due {{date}}",
+      "mark_returned": "Mark returned",
+      "returned": "Returned",
+      "returned_at": "Returned {{date}}"
     },
     "gifts": {
       "title": "Gifts",
@@ -1567,6 +1579,7 @@
         "port": "SMTP Port",
         "username": "SMTP Username",
         "password": "SMTP Password",
+        "password_hint": "*** preserves existing password. Type a new value to replace it.",
         "from": "Sender Email"
       },
       "webauthn": {
