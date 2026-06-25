@@ -1669,6 +1669,105 @@ func TestLoanCreate_Success(t *testing.T) {
 	if !resp.Success {
 		t.Fatal("expected success=true")
 	}
+	var created dto.LoanResponse
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created loan: %v", err)
+	}
+	if created.Category != "money" {
+		t.Fatalf("expected default category=money, got %q", created.Category)
+	}
+	if created.AmountLent == nil || *created.AmountLent != 50 {
+		t.Fatalf("expected amount_lent=50, got %v", created.AmountLent)
+	}
+}
+
+func TestLoanCreateItem_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "loan-create-item@example.com")
+	vault := ts.createTestVault(t, token, "Item Loan Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+
+	body := `{"name":"Board game loan","type":"lent","category":"item","item_name":"Catan","quantity":2,"due_at":"2026-03-12T09:00:00Z"}`
+	rec := ts.doRequest(http.MethodPost,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/loans",
+		body, token)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if !resp.Success {
+		t.Fatal("expected success=true")
+	}
+	var created dto.LoanResponse
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created loan: %v", err)
+	}
+	if created.Category != "item" || created.ItemName != "Catan" {
+		t.Fatalf("unexpected item loan fields: %+v", created)
+	}
+	if created.Quantity == nil || *created.Quantity != 2 {
+		t.Fatalf("expected quantity=2, got %v", created.Quantity)
+	}
+	if created.DueAt == nil || created.DueAt.Format(time.RFC3339) != "2026-03-12T09:00:00Z" {
+		t.Fatalf("expected due_at round trip, got %v", created.DueAt)
+	}
+	if created.ReturnedAt != nil {
+		t.Fatalf("expected returned_at nil on create, got %v", created.ReturnedAt)
+	}
+
+	toggleRec := ts.doRequest(http.MethodPut,
+		"/api/vaults/"+vault.ID+"/contacts/"+contact.ID+"/loans/"+fmt.Sprintf("%d", created.ID)+"/toggle",
+		"", token)
+	if toggleRec.Code != http.StatusOK {
+		t.Fatalf("expected toggle 200, got %d: %s", toggleRec.Code, toggleRec.Body.String())
+	}
+	toggleResp := parseResponse(t, toggleRec)
+	var toggled dto.LoanResponse
+	if err := json.Unmarshal(toggleResp.Data, &toggled); err != nil {
+		t.Fatalf("failed to parse toggled loan: %v", err)
+	}
+	if !toggled.Settled || toggled.SettledAt == nil || toggled.ReturnedAt == nil {
+		t.Fatalf("expected toggle to set settled_at and returned_at, got %+v", toggled)
+	}
+}
+
+func TestLoanUpdateItem_Success(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "loan-update-item@example.com")
+	vault := ts.createTestVault(t, token, "Item Loan Update Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+	basePath := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/loans"
+
+	createRec := ts.doRequest(http.MethodPost, basePath, `{"name":"Tent","type":"lent","category":"item","item_name":"Tent"}`, token)
+	if createRec.Code != http.StatusCreated {
+		t.Fatalf("expected create 201, got %d: %s", createRec.Code, createRec.Body.String())
+	}
+	createResp := parseResponse(t, createRec)
+	var created dto.LoanResponse
+	if err := json.Unmarshal(createResp.Data, &created); err != nil {
+		t.Fatalf("failed to parse created loan: %v", err)
+	}
+
+	updateBody := `{"name":"Camping tent","type":"borrowed","category":"item","item_name":"Four person tent","quantity":1,"due_at":"2026-05-01T18:00:00Z"}`
+	updateRec := ts.doRequest(http.MethodPut, basePath+"/"+fmt.Sprintf("%d", created.ID), updateBody, token)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected update 200, got %d: %s", updateRec.Code, updateRec.Body.String())
+	}
+	updateResp := parseResponse(t, updateRec)
+	var updated dto.LoanResponse
+	if err := json.Unmarshal(updateResp.Data, &updated); err != nil {
+		t.Fatalf("failed to parse updated loan: %v", err)
+	}
+	if updated.Category != "item" || updated.ItemName != "Four person tent" {
+		t.Fatalf("unexpected updated item loan fields: %+v", updated)
+	}
+	if updated.Quantity == nil || *updated.Quantity != 1 {
+		t.Fatalf("expected quantity=1, got %v", updated.Quantity)
+	}
+	if updated.DueAt == nil || updated.DueAt.Format(time.RFC3339) != "2026-05-01T18:00:00Z" {
+		t.Fatalf("expected updated due_at round trip, got %v", updated.DueAt)
+	}
 }
 
 func TestLoanToggle_Success(t *testing.T) {
