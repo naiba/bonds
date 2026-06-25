@@ -7,7 +7,7 @@ Bonds records a feed of all changes across contacts, providing a complete audit 
 - Contact created, updated, deleted.
 - Notes added, edited, removed.
 - Reminders created, triggered.
-- Tasks, gifts, debts, activities, and other entity changes.
+- Tasks, gifts, loans, activities, and other entity changes.
 
 The feed is accessible per vault at `GET /api/vaults/:vault_id/feed`, showing who made what change and when.
 
@@ -80,7 +80,7 @@ Invitations are sent via email with a unique token link, valid for 7 days.
 
 ## Currencies
 
-Bonds includes a comprehensive currency table (160+ currencies) for tracking financial data like debts and gifts. Currencies are linked to accounts and can be managed through personalization settings.
+Bonds includes a comprehensive currency table (160+ currencies) for tracking financial data like money loans and gifts. Currencies are linked to accounts and can be managed through personalization settings.
 
 ## Calendar Support
 

@@ -30,7 +30,7 @@ Contact edit pages are built from **modules**, which are configurable building b
 | Reminders | Scheduled notifications |
 | Calls | Phone call logs with notes |
 | Gifts | Gift ideas and tracking |
-| Debts / Loans | Money lent or borrowed |
+| Loans | Money or items lent and borrowed, including quantity, loan date, due date, and returned status |
 | Activities | Shared activities and events |
 | Life events | Major milestones (graduation, marriage, etc.), including shared events with other contacts in the same vault |
 | Pets | Pets with names and categories (categories are managed at the account level) |
