@@ -153,12 +153,16 @@ export default function AdminSettings() {
             </Select>
           </Form.Item>
         );
-      case "password":
+      case "password": {
+        const extra = def.key === "smtp.password" && initialSettings?.find(s => s.key === def.key)?.value === "***"
+          ? <Text type="secondary" style={{ display: "block", marginTop: 4 }}>{t("admin.settings.smtp.password_hint")}</Text>
+          : null;
         return (
-          <Form.Item key={def.key} name={def.key} label={label}>
+          <Form.Item key={def.key} name={def.key} label={label} extra={extra}>
             <Input.Password placeholder={ph} />
           </Form.Item>
         );
+      }
       case "number":
         return (
           <Form.Item key={def.key} name={def.key} label={label}>

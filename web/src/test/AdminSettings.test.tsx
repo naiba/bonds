@@ -67,7 +67,9 @@ describe("AdminSettings", () => {
 
   it("renders known setting labels", () => {
     mockUseQuery.mockReturnValue({
-      data: [],
+      data: [
+        { key: "smtp.password", value: "***" },
+      ],
       isLoading: false,
     });
     renderAdminSettings();
@@ -78,6 +80,27 @@ describe("AdminSettings", () => {
     expect(screen.getByText("User Registration")).toBeInTheDocument();
     expect(screen.getByText("SMTP Email")).toBeInTheDocument();
     expect(screen.getByText("WebAuthn")).toBeInTheDocument();
+  });
+
+  it("explains SMTP password redaction when existing password is set", async () => {
+    mockUseQuery.mockReturnValue({
+      data: [{ key: "smtp.password", value: "***" }],
+      isLoading: false,
+    });
+    renderAdminSettings();
+
+    const user = userEvent.setup();
+    // Expand the SMTP Email section
+    await user.click(screen.getByText("SMTP Email"));
+
+    // Wait for the mockUseQuery form settings update to happen and input to become visible
+    await waitFor(async () => {
+      const passwordInput = document.querySelector('input[type="password"]');
+      expect(passwordInput).toBeInTheDocument();
+      // Test that the hint exists in the DOM. Form initialValues matching will be tested by antd implicitly,
+      // what matters is that we render the hint conditionally based on value.
+      expect(screen.getByText("*** preserves existing password. Type a new value to replace it.")).toBeInTheDocument();
+    });
   });
 
   it("preserves unmounted fields when saving unrelated settings", async () => {
