@@ -5,19 +5,27 @@ import "time"
 type CreateLoanRequest struct {
 	Name        string     `json:"name" validate:"required" example:"Laptop loan"`
 	Type        string     `json:"type" validate:"required" example:"debt"`
+	Category    string     `json:"category" example:"item"`
 	Description string     `json:"description" example:"Borrowed money for new laptop"`
+	ItemName    string     `json:"item_name" example:"Laptop"`
+	Quantity    *uint      `json:"quantity" example:"1"`
 	AmountLent  *int       `json:"amount_lent" example:"500"`
 	CurrencyID  *uint      `json:"currency_id" example:"1"`
 	LoanedAt    *time.Time `json:"loaned_at" example:"2026-01-15T10:30:00Z"`
+	DueAt       *time.Time `json:"due_at" example:"2026-02-15T10:30:00Z"`
 }
 
 type UpdateLoanRequest struct {
 	Name        string     `json:"name" validate:"required" example:"Laptop loan"`
 	Type        string     `json:"type" validate:"required" example:"debt"`
+	Category    string     `json:"category" example:"item"`
 	Description string     `json:"description" example:"Borrowed money for new laptop"`
+	ItemName    string     `json:"item_name" example:"Laptop"`
+	Quantity    *uint      `json:"quantity" example:"1"`
 	AmountLent  *int       `json:"amount_lent" example:"500"`
 	CurrencyID  *uint      `json:"currency_id" example:"1"`
 	LoanedAt    *time.Time `json:"loaned_at" example:"2026-01-15T10:30:00Z"`
+	DueAt       *time.Time `json:"due_at" example:"2026-02-15T10:30:00Z"`
 }
 
 type LoanResponse struct {
@@ -25,12 +33,17 @@ type LoanResponse struct {
 	VaultID     string     `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name        string     `json:"name" example:"Laptop loan"`
 	Type        string     `json:"type" example:"debt"`
+	Category    string     `json:"category" example:"item"`
 	Description string     `json:"description" example:"Borrowed money for new laptop"`
+	ItemName    string     `json:"item_name" example:"Laptop"`
+	Quantity    *uint      `json:"quantity" example:"1"`
 	AmountLent  *int       `json:"amount_lent" example:"500"`
 	CurrencyID  *uint      `json:"currency_id" example:"1"`
 	LoanedAt    *time.Time `json:"loaned_at" example:"2026-01-15T10:30:00Z"`
+	DueAt       *time.Time `json:"due_at" example:"2026-02-15T10:30:00Z"`
 	Settled     bool       `json:"settled" example:"false"`
 	SettledAt   *time.Time `json:"settled_at" example:"2026-01-15T10:30:00Z"`
+	ReturnedAt  *time.Time `json:"returned_at" example:"2026-01-15T10:30:00Z"`
 	CreatedAt   time.Time  `json:"created_at" example:"2026-01-15T10:30:00Z"`
 	UpdatedAt   time.Time  `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }

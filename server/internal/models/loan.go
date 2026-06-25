@@ -6,13 +6,18 @@ type Loan struct {
 	ID          uint       `json:"id" gorm:"primaryKey;autoIncrement"`
 	VaultID     string     `json:"vault_id" gorm:"type:text;not null;index"`
 	Type        string     `json:"type" gorm:"not null"`
+	Category    string     `json:"category" gorm:"type:text"`
 	Name        string     `json:"name" gorm:"not null"`
 	Description *string    `json:"description" gorm:"type:text"`
+	ItemName    string     `json:"item_name" gorm:"type:text"`
+	Quantity    *uint      `json:"quantity"`
 	AmountLent  *int       `json:"amount_lent"`
 	CurrencyID  *uint      `json:"currency_id" gorm:"index"`
 	LoanedAt    *time.Time `json:"loaned_at"`
+	DueAt       *time.Time `json:"due_at"`
 	Settled     bool       `json:"settled" gorm:"default:false"`
 	SettledAt   *time.Time `json:"settled_at"`
+	ReturnedAt  *time.Time `json:"returned_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 

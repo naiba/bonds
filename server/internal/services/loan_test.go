@@ -2,8 +2,10 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -58,11 +60,73 @@ func TestCreateLoan(t *testing.T) {
 	if loan.Description != "Lent a book" {
 		t.Errorf("Expected description 'Lent a book', got '%s'", loan.Description)
 	}
+	if loan.Category != "money" {
+		t.Errorf("Expected default category 'money', got '%s'", loan.Category)
+	}
 	if loan.Settled {
 		t.Error("Expected loan to not be settled")
 	}
 	if loan.ID == 0 {
 		t.Error("Expected loan ID to be non-zero")
+	}
+}
+
+func TestCreateItemLoanIncludesLendingFields(t *testing.T) {
+	svc, contactID, vaultID := setupLoanTest(t)
+	dueAt := time.Date(2026, 3, 12, 9, 0, 0, 0, time.UTC)
+	quantity := uint(2)
+
+	loan, err := svc.Create(contactID, vaultID, dto.CreateLoanRequest{
+		Name:        "Board game",
+		Type:        "lent",
+		Category:    "item",
+		ItemName:    "Catan",
+		Quantity:    &quantity,
+		DueAt:       &dueAt,
+		Description: "Expansion included",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if loan.Category != "item" {
+		t.Fatalf("expected category=item, got %q", loan.Category)
+	}
+	if loan.ItemName != "Catan" {
+		t.Fatalf("expected item_name=Catan, got %q", loan.ItemName)
+	}
+	if loan.Quantity == nil || *loan.Quantity != quantity {
+		t.Fatalf("expected quantity=%d, got %v", quantity, loan.Quantity)
+	}
+	if loan.DueAt == nil || !loan.DueAt.Equal(dueAt) {
+		t.Fatalf("expected due_at=%s, got %v", dueAt.Format(time.RFC3339), loan.DueAt)
+	}
+	if loan.ReturnedAt != nil {
+		t.Fatalf("expected returned_at to start nil, got %v", loan.ReturnedAt)
+	}
+	if loan.AmountLent != nil || loan.CurrencyID != nil {
+		t.Fatalf("expected item loan to preserve nil money fields, got amount=%v currency=%v", loan.AmountLent, loan.CurrencyID)
+	}
+}
+
+func TestListLegacyLoanWithoutCategoryDefaultsToMoney(t *testing.T) {
+	svc, contactID, vaultID := setupLoanTest(t)
+	loan := models.Loan{VaultID: vaultID, Name: "Legacy loan", Type: "debt"}
+	if err := svc.db.Create(&loan).Error; err != nil {
+		t.Fatalf("create legacy loan failed: %v", err)
+	}
+	if err := svc.db.Create(&models.ContactLoan{LoanID: loan.ID, LoanerID: contactID, LoaneeID: contactID}).Error; err != nil {
+		t.Fatalf("create legacy contact loan failed: %v", err)
+	}
+
+	loans, err := svc.List(contactID, vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(loans) != 1 {
+		t.Fatalf("expected 1 loan, got %d", len(loans))
+	}
+	if loans[0].Category != "money" {
+		t.Fatalf("expected legacy empty category to return money, got %q", loans[0].Category)
 	}
 }
 
@@ -111,6 +175,37 @@ func TestUpdateLoan(t *testing.T) {
 	}
 }
 
+func TestUpdateItemLoanFields(t *testing.T) {
+	svc, contactID, vaultID := setupLoanTest(t)
+	created, err := svc.Create(contactID, vaultID, dto.CreateLoanRequest{Name: "Original item", Type: "lent", Category: "item", ItemName: "Tent"})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	dueAt := time.Date(2026, 5, 1, 18, 0, 0, 0, time.UTC)
+	quantity := uint(1)
+
+	updated, err := svc.Update(created.ID, vaultID, dto.UpdateLoanRequest{
+		Name:     "Updated item",
+		Type:     "borrowed",
+		Category: "item",
+		ItemName: "Camping tent",
+		Quantity: &quantity,
+		DueAt:    &dueAt,
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.Category != "item" || updated.ItemName != "Camping tent" {
+		t.Fatalf("unexpected item fields after update: %+v", updated)
+	}
+	if updated.Quantity == nil || *updated.Quantity != quantity {
+		t.Fatalf("expected quantity=%d, got %v", quantity, updated.Quantity)
+	}
+	if updated.DueAt == nil || !updated.DueAt.Equal(dueAt) {
+		t.Fatalf("expected due_at=%s, got %v", dueAt.Format(time.RFC3339), updated.DueAt)
+	}
+}
+
 func TestDeleteLoan(t *testing.T) {
 	svc, contactID, vaultID := setupLoanTest(t)
 
@@ -150,6 +245,9 @@ func TestToggleLoanSettled(t *testing.T) {
 	if toggled.SettledAt == nil {
 		t.Error("Expected SettledAt to be set")
 	}
+	if toggled.ReturnedAt == nil {
+		t.Error("Expected ReturnedAt to be set with SettledAt")
+	}
 
 	toggledBack, err := svc.ToggleSettled(created.ID, vaultID)
 	if err != nil {
@@ -160,6 +258,9 @@ func TestToggleLoanSettled(t *testing.T) {
 	}
 	if toggledBack.SettledAt != nil {
 		t.Error("Expected SettledAt to be nil after second toggle")
+	}
+	if toggledBack.ReturnedAt != nil {
+		t.Error("Expected ReturnedAt to be nil after second toggle")
 	}
 }
 

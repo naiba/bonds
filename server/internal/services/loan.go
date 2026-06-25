@@ -59,10 +59,14 @@ func (s *LoanService) Create(contactID, vaultID string, req dto.CreateLoanReques
 		VaultID:     vaultID,
 		Name:        req.Name,
 		Type:        req.Type,
+		Category:    loanCategoryOrDefault(req.Category),
 		Description: strPtrOrNil(req.Description),
+		ItemName:    req.ItemName,
+		Quantity:    req.Quantity,
 		AmountLent:  req.AmountLent,
 		CurrencyID:  req.CurrencyID,
 		LoanedAt:    req.LoanedAt,
+		DueAt:       req.DueAt,
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -99,10 +103,14 @@ func (s *LoanService) Update(id uint, vaultID string, req dto.UpdateLoanRequest)
 	}
 	loan.Name = req.Name
 	loan.Type = req.Type
+	loan.Category = loanCategoryOrDefault(req.Category)
 	loan.Description = strPtrOrNil(req.Description)
+	loan.ItemName = req.ItemName
+	loan.Quantity = req.Quantity
 	loan.AmountLent = req.AmountLent
 	loan.CurrencyID = req.CurrencyID
 	loan.LoanedAt = req.LoanedAt
+	loan.DueAt = req.DueAt
 	if err := s.db.Save(&loan).Error; err != nil {
 		return nil, err
 	}
@@ -122,8 +130,10 @@ func (s *LoanService) ToggleSettled(id uint, vaultID string) (*dto.LoanResponse,
 	if loan.Settled {
 		now := time.Now()
 		loan.SettledAt = &now
+		loan.ReturnedAt = &now
 	} else {
 		loan.SettledAt = nil
+		loan.ReturnedAt = nil
 	}
 	if err := s.db.Save(&loan).Error; err != nil {
 		return nil, err
@@ -148,18 +158,30 @@ func (s *LoanService) Delete(id uint, vaultID string) error {
 	})
 }
 
+func loanCategoryOrDefault(category string) string {
+	if category == "" {
+		return "money"
+	}
+	return category
+}
+
 func toLoanResponse(l *models.Loan) dto.LoanResponse {
 	return dto.LoanResponse{
 		ID:          l.ID,
 		VaultID:     l.VaultID,
 		Name:        l.Name,
 		Type:        l.Type,
+		Category:    loanCategoryOrDefault(l.Category),
 		Description: ptrToStr(l.Description),
+		ItemName:    l.ItemName,
+		Quantity:    l.Quantity,
 		AmountLent:  l.AmountLent,
 		CurrencyID:  l.CurrencyID,
 		LoanedAt:    l.LoanedAt,
+		DueAt:       l.DueAt,
 		Settled:     l.Settled,
 		SettledAt:   l.SettledAt,
+		ReturnedAt:  l.ReturnedAt,
 		CreatedAt:   l.CreatedAt,
 		UpdatedAt:   l.UpdatedAt,
 	}
