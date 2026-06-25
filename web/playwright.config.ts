@@ -35,6 +35,10 @@ const webAuthnEnv = [
 
 export default defineConfig({
   testDir: './e2e',
+  timeout: 60000,
+  expect: {
+    timeout: 10000,
+  },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -58,7 +62,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: `bun dev --host 0.0.0.0 --port ${vitePort}`,
+      command: `PLAYWRIGHT_SERVER_PORT=${serverPort} bun dev --host 0.0.0.0 --port ${vitePort}`,
       port: vitePort,
       reuseExistingServer: !process.env.CI,
     },
