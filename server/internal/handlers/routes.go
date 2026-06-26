@@ -613,6 +613,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	vaultScoped.GET("/lifeMetrics/:id/detail", lifeMetricHandler.GetDetail)
 
 	vaultScoped.GET("/dashboard/lifeEvents", lifeEventHandler.ListVaultTimelineEvents)
+	vaultScoped.POST("/dashboard/lifeEvents", lifeEventHandler.CreateDashboardLifeEvent, requireEditor)
+	vaultScoped.PUT("/dashboard/lifeEvents/:lifeEventId", lifeEventHandler.UpdateDashboardLifeEvent, requireEditor)
+	vaultScoped.DELETE("/dashboard/lifeEvents/:lifeEventId", lifeEventHandler.DeleteDashboardLifeEvent, requireEditor)
 	vaultScoped.GET("/dashboard/catchUp", contactHandler.ListCatchUpPrompts)
 
 	vaultScoped.PUT("/defaultTab", vaultHandler.UpdateDefaultTab, requireEditor)

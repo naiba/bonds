@@ -109,6 +109,122 @@ func (s *LifeEventService) ListVaultTimelineEvents(vaultID string, page, perPage
 	return result, meta, nil
 }
 
+func (s *LifeEventService) CreateDashboardLifeEvent(vaultID string, req dto.CreateLifeEventRequest) (*dto.TimelineEventResponse, error) {
+	participantIDs := dedupeContactIDs(req.Participants)
+	if err := validateContactsBelongToVault(s.db, participantIDs, vaultID); err != nil {
+		return nil, err
+	}
+	if err := validateLifeEventTypeBelongsToVault(s.db, req.LifeEventTypeID, vaultID); err != nil {
+		return nil, err
+	}
+
+	timelineEvent := models.TimelineEvent{
+		VaultID:   vaultID,
+		StartedAt: req.HappenedAt,
+		Label:     strPtrOrNil(req.Summary),
+		Collapsed: false,
+	}
+	lifeEvent := lifeEventFromCreateRequest(req)
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&timelineEvent).Error; err != nil {
+			return err
+		}
+		lifeEvent.TimelineEventID = timelineEvent.ID
+		if err := tx.Create(&lifeEvent).Error; err != nil {
+			return err
+		}
+		if err := replaceLifeEventParticipantsLocked(tx, lifeEvent.ID, participantIDs); err != nil {
+			return err
+		}
+		return syncTimelineParticipantsToLifeEvents(tx, timelineEvent.ID)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.db.Preload("Participants").Preload("LifeEvents.Participants").First(&timelineEvent, timelineEvent.ID).Error; err != nil {
+		return nil, err
+	}
+	resp := toTimelineEventResponse(&timelineEvent)
+	return &resp, nil
+}
+
+func (s *LifeEventService) UpdateDashboardLifeEvent(vaultID string, lifeEventID uint, req dto.UpdateLifeEventRequest) (*dto.LifeEventResponse, error) {
+	var le models.LifeEvent
+	if err := s.db.Joins("JOIN timeline_events ON timeline_events.id = life_events.timeline_event_id").
+		Where("life_events.id = ? AND timeline_events.vault_id = ?", lifeEventID, vaultID).
+		First(&le).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrLifeEventNotFound
+		}
+		return nil, err
+	}
+
+	participantIDs := []string(nil)
+	if req.Participants != nil {
+		participantIDs = dedupeContactIDs(req.Participants)
+		if err := validateContactsBelongToVault(s.db, participantIDs, vaultID); err != nil {
+			return nil, err
+		}
+	}
+	if req.LifeEventTypeID != 0 {
+		if err := validateLifeEventTypeBelongsToVault(s.db, req.LifeEventTypeID, vaultID); err != nil {
+			return nil, err
+		}
+	}
+
+	applyUpdateLifeEventRequest(&le, req)
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&le).Error; err != nil {
+			return err
+		}
+		if req.Participants != nil {
+			if err := replaceLifeEventParticipantsLocked(tx, le.ID, participantIDs); err != nil {
+				return err
+			}
+		}
+		return syncTimelineParticipantsToLifeEvents(tx, le.TimelineEventID)
+	}); err != nil {
+		return nil, err
+	}
+	if err := s.db.Preload("Participants").First(&le, le.ID).Error; err != nil {
+		return nil, err
+	}
+	resp := toLifeEventResponse(&le)
+	return &resp, nil
+}
+
+func (s *LifeEventService) DeleteDashboardLifeEvent(vaultID string, lifeEventID uint) error {
+	var le models.LifeEvent
+	if err := s.db.Joins("JOIN timeline_events ON timeline_events.id = life_events.timeline_event_id").
+		Where("life_events.id = ? AND timeline_events.vault_id = ?", lifeEventID, vaultID).
+		First(&le).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrLifeEventNotFound
+		}
+		return err
+	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("life_event_id = ?", le.ID).Delete(&models.LifeEventParticipant{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&le).Error; err != nil {
+			return err
+		}
+		var remaining int64
+		if err := tx.Model(&models.LifeEvent{}).Where("timeline_event_id = ?", le.TimelineEventID).Count(&remaining).Error; err != nil {
+			return err
+		}
+		if remaining == 0 {
+			if err := tx.Where("timeline_event_id = ?", le.TimelineEventID).Delete(&models.TimelineEventParticipant{}).Error; err != nil {
+				return err
+			}
+			return tx.Delete(&models.TimelineEvent{}, le.TimelineEventID).Error
+		}
+		return syncTimelineParticipantsToLifeEvents(tx, le.TimelineEventID)
+	})
+}
+
 func (s *LifeEventService) CreateTimelineEvent(contactID, vaultID string, req dto.CreateTimelineEventRequest) (*dto.TimelineEventResponse, error) {
 	participantIDs := mergeContactIDs([]string{contactID}, req.Participants)
 	if err := validateContactsBelongToVault(s.db, participantIDs, vaultID); err != nil {
@@ -162,24 +278,8 @@ func (s *LifeEventService) AddLifeEvent(contactID string, timelineEventID uint, 
 		return nil, err
 	}
 
-	le := models.LifeEvent{
-		TimelineEventID:   timelineEventID,
-		LifeEventTypeID:   req.LifeEventTypeID,
-		HappenedAt:        req.HappenedAt,
-		Summary:           strPtrOrNil(req.Summary),
-		Description:       strPtrOrNil(req.Description),
-		Costs:             req.Costs,
-		CurrencyID:        req.CurrencyID,
-		DurationInMinutes: req.DurationInMinutes,
-		Distance:          req.Distance,
-		DistanceUnit:      strPtrOrNil(req.DistanceUnit),
-		FromPlace:         strPtrOrNil(req.FromPlace),
-		ToPlace:           strPtrOrNil(req.ToPlace),
-		Place:             strPtrOrNil(req.Place),
-		EmotionID:         req.EmotionID,
-	}
-	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
-		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	le := lifeEventFromCreateRequest(req)
+	le.TimelineEventID = timelineEventID
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&le).Error; err != nil {
 			return err
@@ -231,25 +331,7 @@ func (s *LifeEventService) UpdateLifeEvent(contactID string, timelineEventID, li
 		return nil, err
 	}
 
-	if req.LifeEventTypeID != 0 {
-		le.LifeEventTypeID = req.LifeEventTypeID
-	}
-	if !req.HappenedAt.IsZero() {
-		le.HappenedAt = req.HappenedAt
-	}
-	le.Summary = strPtrOrNil(req.Summary)
-	le.Description = strPtrOrNil(req.Description)
-	le.Costs = req.Costs
-	le.CurrencyID = req.CurrencyID
-	le.DurationInMinutes = req.DurationInMinutes
-	le.Distance = req.Distance
-	le.DistanceUnit = strPtrOrNil(req.DistanceUnit)
-	le.FromPlace = strPtrOrNil(req.FromPlace)
-	le.ToPlace = strPtrOrNil(req.ToPlace)
-	le.Place = strPtrOrNil(req.Place)
-	le.EmotionID = req.EmotionID
-	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
-		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	applyUpdateLifeEventRequest(&le, req)
 
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&le).Error; err != nil {
@@ -343,6 +425,74 @@ func (s *LifeEventService) ToggleLifeEvent(timelineEventID, lifeEventID uint, va
 	}
 	le.Collapsed = !le.Collapsed
 	return s.db.Save(&le).Error
+}
+
+func lifeEventFromCreateRequest(req dto.CreateLifeEventRequest) models.LifeEvent {
+	le := models.LifeEvent{
+		LifeEventTypeID:   req.LifeEventTypeID,
+		HappenedAt:        req.HappenedAt,
+		Summary:           strPtrOrNil(req.Summary),
+		Description:       strPtrOrNil(req.Description),
+		Costs:             req.Costs,
+		CurrencyID:        req.CurrencyID,
+		DurationInMinutes: req.DurationInMinutes,
+		Distance:          req.Distance,
+		DistanceUnit:      strPtrOrNil(req.DistanceUnit),
+		FromPlace:         strPtrOrNil(req.FromPlace),
+		ToPlace:           strPtrOrNil(req.ToPlace),
+		Place:             strPtrOrNil(req.Place),
+		EmotionID:         req.EmotionID,
+	}
+	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
+		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	return le
+}
+
+func applyUpdateLifeEventRequest(le *models.LifeEvent, req dto.UpdateLifeEventRequest) {
+	if req.LifeEventTypeID != 0 {
+		le.LifeEventTypeID = req.LifeEventTypeID
+	}
+	if !req.HappenedAt.IsZero() {
+		le.HappenedAt = req.HappenedAt
+	}
+	le.Summary = strPtrOrNil(req.Summary)
+	le.Description = strPtrOrNil(req.Description)
+	le.Costs = req.Costs
+	le.CurrencyID = req.CurrencyID
+	le.DurationInMinutes = req.DurationInMinutes
+	le.Distance = req.Distance
+	le.DistanceUnit = strPtrOrNil(req.DistanceUnit)
+	le.FromPlace = strPtrOrNil(req.FromPlace)
+	le.ToPlace = strPtrOrNil(req.ToPlace)
+	le.Place = strPtrOrNil(req.Place)
+	le.EmotionID = req.EmotionID
+	applyTimeCalendarFields(&le.CalendarType, &le.OriginalDay, &le.OriginalMonth, &le.OriginalYear,
+		&le.HappenedAt, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+}
+
+func validateLifeEventTypeBelongsToVault(db *gorm.DB, lifeEventTypeID uint, vaultID string) error {
+	var count int64
+	if err := db.Model(&models.LifeEventType{}).
+		Joins("JOIN life_event_categories ON life_event_categories.id = life_event_types.life_event_category_id").
+		Where("life_event_types.id = ? AND life_event_categories.vault_id = ?", lifeEventTypeID, vaultID).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count != 1 {
+		return ErrLifeEventNotFound
+	}
+	return nil
+}
+
+func syncTimelineParticipantsToLifeEvents(tx *gorm.DB, timelineEventID uint) error {
+	var contactIDs []string
+	if err := tx.Model(&models.LifeEventParticipant{}).
+		Joins("JOIN life_events ON life_events.id = life_event_participants.life_event_id").
+		Where("life_events.timeline_event_id = ?", timelineEventID).
+		Pluck("DISTINCT life_event_participants.contact_id", &contactIDs).Error; err != nil {
+		return err
+	}
+	return replaceTimelineEventParticipantsLocked(tx, timelineEventID, contactIDs)
 }
 
 func toTimelineEventResponse(e *models.TimelineEvent) dto.TimelineEventResponse {

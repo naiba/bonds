@@ -357,6 +357,223 @@ func TestDeleteLifeEventRejectsTimelineFromAnotherVault(t *testing.T) {
 	}
 }
 
+func TestDashboardLifeEventCreateDoesNotForceCurrentUserAndUsesSummaryLabel(t *testing.T) {
+	svc, contactID, vaultID := setupLifeEventTest(t)
+	participantID := createLifeEventTestContact(t, svc, vaultID, "Dashboard Participant")
+	typeID := getLifeEventTypeIDForVault(t, svc, vaultID)
+	happenedAt := time.Now()
+
+	created, err := svc.CreateDashboardLifeEvent(vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: typeID,
+		HappenedAt:      happenedAt,
+		Summary:         "Dashboard summary",
+		Participants:    []string{participantID},
+	})
+	if err != nil {
+		t.Fatalf("CreateDashboardLifeEvent failed: %v", err)
+	}
+	if created.Label != "Dashboard summary" {
+		t.Fatalf("expected timeline label from summary, got %q", created.Label)
+	}
+	assertParticipantIDs(t, created.Participants, participantID)
+	if len(created.LifeEvents) != 1 {
+		t.Fatalf("expected one life event, got %+v", created.LifeEvents)
+	}
+	assertParticipantIDs(t, created.LifeEvents[0].Participants, participantID)
+	if created.Participants[0].Name == participantID {
+		t.Fatalf("expected named participant instead of raw UUID, got %+v", created.Participants[0])
+	}
+
+	currentUserEvents, _, err := svc.ListTimelineEvents(contactID, vaultID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListTimelineEvents for current contact failed: %v", err)
+	}
+	if len(currentUserEvents) != 0 {
+		t.Fatalf("expected non-participant route contact not to see dashboard timeline, got %+v", currentUserEvents)
+	}
+}
+
+func TestDashboardLifeEventAcceptsUserShadowContactParticipant(t *testing.T) {
+	svc, _, vaultID := setupLifeEventTest(t)
+	typeID := getLifeEventTypeIDForVault(t, svc, vaultID)
+
+	var userVault models.UserVault
+	if err := svc.db.First(&userVault, "vault_id = ?", vaultID).Error; err != nil {
+		t.Fatalf("load user vault failed: %v", err)
+	}
+
+	var shadowContact models.Contact
+	if err := svc.db.First(&shadowContact, "id = ?", userVault.ContactID).Error; err != nil {
+		t.Fatalf("load shadow contact failed: %v", err)
+	}
+	if shadowContact.Listed {
+		t.Fatalf("expected shadow contact to be hidden, got listed=%v", shadowContact.Listed)
+	}
+	if shadowContact.CanBeDeleted {
+		t.Fatalf("expected shadow contact to be undeletable, got can_be_deleted=%v", shadowContact.CanBeDeleted)
+	}
+
+	created, err := svc.CreateDashboardLifeEvent(vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: typeID,
+		HappenedAt:      time.Now(),
+		Summary:         "Shadow contact dashboard event",
+		Participants:    []string{userVault.ContactID},
+	})
+	if err != nil {
+		t.Fatalf("CreateDashboardLifeEvent failed: %v", err)
+	}
+	assertParticipantIDs(t, created.Participants, userVault.ContactID)
+	if len(created.LifeEvents) != 1 {
+		t.Fatalf("expected one life event, got %+v", created.LifeEvents)
+	}
+	assertParticipantIDs(t, created.LifeEvents[0].Participants, userVault.ContactID)
+
+	timelineEvents, _, err := svc.ListTimelineEvents(userVault.ContactID, vaultID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListTimelineEvents shadow contact failed: %v", err)
+	}
+	if len(timelineEvents) != 1 || timelineEvents[0].ID != created.ID {
+		t.Fatalf("expected shadow contact to see timeline %d, got %+v", created.ID, timelineEvents)
+	}
+	assertParticipantIDs(t, timelineEvents[0].Participants, userVault.ContactID)
+	if len(timelineEvents[0].LifeEvents) != 1 {
+		t.Fatalf("expected listed timeline to include life event, got %+v", timelineEvents)
+	}
+	assertParticipantIDs(t, timelineEvents[0].LifeEvents[0].Participants, userVault.ContactID)
+}
+
+func TestDashboardLifeEventUpdateReplacesParticipantsExactlyAndSyncsTimeline(t *testing.T) {
+	svc, _, vaultID := setupLifeEventTest(t)
+	firstID := createLifeEventTestContact(t, svc, vaultID, "First")
+	secondID := createLifeEventTestContact(t, svc, vaultID, "Second")
+	typeID := getLifeEventTypeIDForVault(t, svc, vaultID)
+	created, err := svc.CreateDashboardLifeEvent(vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: typeID,
+		HappenedAt:      time.Now(),
+		Summary:         "Original",
+		Participants:    []string{firstID},
+	})
+	if err != nil {
+		t.Fatalf("CreateDashboardLifeEvent failed: %v", err)
+	}
+
+	updated, err := svc.UpdateDashboardLifeEvent(vaultID, created.LifeEvents[0].ID, dto.UpdateLifeEventRequest{
+		LifeEventTypeID: typeID,
+		HappenedAt:      time.Now(),
+		Summary:         "Updated",
+		Participants:    []string{secondID},
+	})
+	if err != nil {
+		t.Fatalf("UpdateDashboardLifeEvent failed: %v", err)
+	}
+	assertParticipantIDs(t, updated.Participants, secondID)
+
+	firstEvents, _, err := svc.ListTimelineEvents(firstID, vaultID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListTimelineEvents first failed: %v", err)
+	}
+	if len(firstEvents) != 0 {
+		t.Fatalf("expected removed participant to lose timeline visibility, got %+v", firstEvents)
+	}
+	secondEvents, _, err := svc.ListTimelineEvents(secondID, vaultID, 1, 15)
+	if err != nil {
+		t.Fatalf("ListTimelineEvents second failed: %v", err)
+	}
+	if len(secondEvents) != 1 || secondEvents[0].ID != created.ID {
+		t.Fatalf("expected replacement participant to see timeline %d, got %+v", created.ID, secondEvents)
+	}
+	assertParticipantIDs(t, secondEvents[0].Participants, secondID)
+}
+
+func TestDashboardLifeEventDeleteRemovesOrphanTimeline(t *testing.T) {
+	svc, _, vaultID := setupLifeEventTest(t)
+	participantID := createLifeEventTestContact(t, svc, vaultID, "DeleteParticipant")
+	typeID := getLifeEventTypeIDForVault(t, svc, vaultID)
+	created, err := svc.CreateDashboardLifeEvent(vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: typeID,
+		HappenedAt:      time.Now(),
+		Summary:         "Delete me",
+		Participants:    []string{participantID},
+	})
+	if err != nil {
+		t.Fatalf("CreateDashboardLifeEvent failed: %v", err)
+	}
+	lifeEventID := created.LifeEvents[0].ID
+
+	if err := svc.DeleteDashboardLifeEvent(vaultID, lifeEventID); err != nil {
+		t.Fatalf("DeleteDashboardLifeEvent failed: %v", err)
+	}
+	var timelineCount int64
+	if err := svc.db.Model(&models.TimelineEvent{}).Where("id = ?", created.ID).Count(&timelineCount).Error; err != nil {
+		t.Fatalf("count timeline failed: %v", err)
+	}
+	if timelineCount != 0 {
+		t.Fatalf("expected orphan timeline deleted, got %d", timelineCount)
+	}
+	var participantCount int64
+	if err := svc.db.Model(&models.TimelineEventParticipant{}).Where("timeline_event_id = ?", created.ID).Count(&participantCount).Error; err != nil {
+		t.Fatalf("count timeline participants failed: %v", err)
+	}
+	if participantCount != 0 {
+		t.Fatalf("expected orphan timeline participants deleted, got %d", participantCount)
+	}
+}
+
+func TestDashboardLifeEventRejectsCrossVaultParticipantAndType(t *testing.T) {
+	svc, _, vaultID := setupLifeEventTest(t)
+	var sourceVault models.Vault
+	if err := svc.db.First(&sourceVault, "id = ?", vaultID).Error; err != nil {
+		t.Fatalf("load source vault failed: %v", err)
+	}
+	otherVault := models.Vault{AccountID: sourceVault.AccountID, Type: "private", Name: "Other Vault"}
+	if err := svc.db.Create(&otherVault).Error; err != nil {
+		t.Fatalf("create other vault failed: %v", err)
+	}
+	otherContactID := createLifeEventTestContact(t, svc, otherVault.ID, "Other")
+	otherCategory := models.LifeEventCategory{VaultID: otherVault.ID, Label: strPtrOrNil("Other category")}
+	if err := svc.db.Create(&otherCategory).Error; err != nil {
+		t.Fatalf("create other category failed: %v", err)
+	}
+	otherType := models.LifeEventType{LifeEventCategoryID: otherCategory.ID, Label: strPtrOrNil("Other type")}
+	if err := svc.db.Create(&otherType).Error; err != nil {
+		t.Fatalf("create other type failed: %v", err)
+	}
+	typeID := getLifeEventTypeIDForVault(t, svc, vaultID)
+
+	if _, err := svc.CreateDashboardLifeEvent(vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: typeID,
+		HappenedAt:      time.Now(),
+		Summary:         "Invalid participant",
+		Participants:    []string{otherContactID},
+	}); !errors.Is(err, ErrContactNotFound) {
+		t.Fatalf("expected ErrContactNotFound for cross-vault participant, got %v", err)
+	}
+	if _, err := svc.CreateDashboardLifeEvent(vaultID, dto.CreateLifeEventRequest{
+		LifeEventTypeID: otherType.ID,
+		HappenedAt:      time.Now(),
+		Summary:         "Invalid type",
+	}); !errors.Is(err, ErrLifeEventNotFound) {
+		t.Fatalf("expected ErrLifeEventNotFound for cross-vault type, got %v", err)
+	}
+}
+
+func getLifeEventTypeIDForVault(t *testing.T, svc *LifeEventService, vaultID string) uint {
+	t.Helper()
+	var typeID uint
+	if err := svc.db.Model(&models.LifeEventType{}).
+		Joins("JOIN life_event_categories ON life_event_categories.id = life_event_types.life_event_category_id").
+		Where("life_event_categories.vault_id = ?", vaultID).
+		Select("life_event_types.id").
+		Limit(1).
+		Scan(&typeID).Error; err != nil {
+		t.Fatalf("load life event type failed: %v", err)
+	}
+	if typeID == 0 {
+		t.Fatal("expected seeded life event type")
+	}
+	return typeID
+}
+
 func TestDeleteTimelineEventParticipantPivotsAreCleaned(t *testing.T) {
 	svc, contactID, vaultID := setupLifeEventTest(t)
 	participantID := createLifeEventTestContact(t, svc, vaultID, "Participant")

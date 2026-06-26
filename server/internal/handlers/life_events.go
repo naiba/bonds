@@ -44,6 +44,111 @@ func (h *LifeEventHandler) ListVaultTimelineEvents(c echo.Context) error {
 	return response.Paginated(c, events, meta)
 }
 
+// CreateDashboardLifeEvent godoc
+//
+//	@Summary		Create a dashboard life event
+//	@Description	Create a vault-scoped dashboard timeline event with one life event
+//	@Tags			life-events
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Vault ID"
+//	@Param			request		body		dto.CreateLifeEventRequest	true	"Life event details"
+//	@Success		201			{object}	response.APIResponse{data=dto.TimelineEventResponse}
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/dashboard/lifeEvents [post]
+func (h *LifeEventHandler) CreateDashboardLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	var req dto.CreateLifeEventRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	event, err := h.lifeEventService.CreateDashboardLifeEvent(vaultID, req)
+	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrLifeEventNotFound) {
+			return response.NotFound(c, "err.life_event_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_create_life_event")
+	}
+	return response.Created(c, event)
+}
+
+// UpdateDashboardLifeEvent godoc
+//
+//	@Summary		Update a dashboard life event
+//	@Description	Update a vault-scoped dashboard life event
+//	@Tags			life-events
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id		path		string						true	"Vault ID"
+//	@Param			lifeEventId		path		integer						true	"Life Event ID"
+//	@Param			request			body		dto.UpdateLifeEventRequest	true	"Life event details"
+//	@Success		200				{object}	response.APIResponse{data=dto.LifeEventResponse}
+//	@Failure		400				{object}	response.APIResponse
+//	@Failure		401				{object}	response.APIResponse
+//	@Failure		404				{object}	response.APIResponse
+//	@Failure		500				{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/dashboard/lifeEvents/{lifeEventId} [put]
+func (h *LifeEventHandler) UpdateDashboardLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	lifeEventID, err := strconv.ParseUint(c.Param("lifeEventId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_life_event_id", nil)
+	}
+	var req dto.UpdateLifeEventRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	event, err := h.lifeEventService.UpdateDashboardLifeEvent(vaultID, uint(lifeEventID), req)
+	if err != nil {
+		if errors.Is(err, services.ErrLifeEventNotFound) {
+			return response.NotFound(c, "err.life_event_not_found")
+		}
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_update_life_event")
+	}
+	return response.OK(c, event)
+}
+
+// DeleteDashboardLifeEvent godoc
+//
+//	@Summary		Delete a dashboard life event
+//	@Description	Delete a vault-scoped dashboard life event and remove an empty parent timeline
+//	@Tags			life-events
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			lifeEventId	path		integer	true	"Life Event ID"
+//	@Success		204			{object}	nil
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/dashboard/lifeEvents/{lifeEventId} [delete]
+func (h *LifeEventHandler) DeleteDashboardLifeEvent(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	lifeEventID, err := strconv.ParseUint(c.Param("lifeEventId"), 10, 64)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_life_event_id", nil)
+	}
+	if err := h.lifeEventService.DeleteDashboardLifeEvent(vaultID, uint(lifeEventID)); err != nil {
+		if errors.Is(err, services.ErrLifeEventNotFound) {
+			return response.NotFound(c, "err.life_event_not_found")
+		}
+		return response.InternalError(c, "err.failed_to_delete_life_event")
+	}
+	return response.NoContent(c)
+}
+
 // ListTimelineEvents godoc
 //
 //	@Summary		List timeline events for a contact

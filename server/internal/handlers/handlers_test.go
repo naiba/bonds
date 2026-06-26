@@ -5750,6 +5750,100 @@ func TestTimelineEvent_CRUD(t *testing.T) {
 	}
 }
 
+func TestDashboardLifeEvent_CreateUpdateDelete(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dashboard-life-event@example.com")
+	vault := ts.createTestVault(t, token, "Dashboard Life Vault")
+	first := ts.createTestContact(t, token, vault.ID, "DashboardFirst")
+	second := ts.createTestContact(t, token, vault.ID, "DashboardSecond")
+
+	var typeID uint
+	ts.db.Raw("SELECT life_event_types.id FROM life_event_types JOIN life_event_categories ON life_event_categories.id = life_event_types.life_event_category_id WHERE life_event_categories.vault_id = ? LIMIT 1", vault.ID).Scan(&typeID)
+	if typeID == 0 {
+		t.Fatal("no life event type found for vault")
+	}
+
+	createBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-06-20T00:00:00Z","summary":"Dashboard created","participants":[%q]}`, typeID, first.ID)
+	rec := ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/dashboard/lifeEvents", vault.ID), createBody, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create dashboard life event: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var created struct {
+		ID           uint   `json:"id"`
+		Label        string `json:"label"`
+		Participants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
+		LifeEvents []struct {
+			ID           uint `json:"id"`
+			Participants []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"participants"`
+		} `json:"life_events"`
+	}
+	if err := json.Unmarshal(resp.Data, &created); err != nil {
+		t.Fatalf("parse created dashboard life event failed: %v", err)
+	}
+	if created.Label != "Dashboard created" || len(created.LifeEvents) != 1 {
+		t.Fatalf("unexpected created dashboard response: %+v", created)
+	}
+	assertHandlerParticipantIDs(t, created.Participants, first.ID)
+	if created.Participants[0].Name == first.ID {
+		t.Fatalf("expected participant name, got raw id in %+v", created.Participants[0])
+	}
+
+	updateBody := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-07-01T00:00:00Z","summary":"Dashboard updated","participants":[%q]}`, typeID, second.ID)
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/dashboard/lifeEvents/%d", vault.ID, created.LifeEvents[0].ID), updateBody, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update dashboard life event: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updated struct {
+		Summary      string `json:"summary"`
+		Participants []struct {
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"participants"`
+	}
+	if err := json.Unmarshal(resp.Data, &updated); err != nil {
+		t.Fatalf("parse updated dashboard life event failed: %v", err)
+	}
+	if updated.Summary != "Dashboard updated" {
+		t.Fatalf("expected updated summary, got %+v", updated)
+	}
+	assertHandlerParticipantIDs(t, updated.Participants, second.ID)
+
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/dashboard/lifeEvents/%d", vault.ID, created.LifeEvents[0].ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete dashboard life event: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var timelineCount int64
+	if err := ts.db.Model(&models.TimelineEvent{}).Where("id = ?", created.ID).Count(&timelineCount).Error; err != nil {
+		t.Fatalf("count timeline failed: %v", err)
+	}
+	if timelineCount != 0 {
+		t.Fatalf("expected orphan dashboard timeline deleted, got %d", timelineCount)
+	}
+}
+
+func TestDashboardLifeEvent_RejectsCrossVaultParticipant(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "dashboard-life-event-cross@example.com")
+	vault := ts.createTestVault(t, token, "Dashboard Source Vault")
+	otherVault := ts.createTestVault(t, token, "Dashboard Other Vault")
+	otherContact := ts.createTestContact(t, token, otherVault.ID, "OtherParticipant")
+	var typeID uint
+	ts.db.Raw("SELECT life_event_types.id FROM life_event_types JOIN life_event_categories ON life_event_categories.id = life_event_types.life_event_category_id WHERE life_event_categories.vault_id = ? LIMIT 1", vault.ID).Scan(&typeID)
+	body := fmt.Sprintf(`{"life_event_type_id":%d,"happened_at":"2026-06-20T00:00:00Z","summary":"Invalid","participants":[%q]}`, typeID, otherContact.ID)
+	rec := ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/dashboard/lifeEvents", vault.ID), body, token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for cross-vault participant, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestLifeEvent_CreateWithValidType(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "life-event-type@example.com")
