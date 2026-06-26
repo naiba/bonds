@@ -2227,6 +2227,52 @@ func TestViewerCannotMoveContact(t *testing.T) {
 	}
 }
 
+func TestViewerCannotBulkMoveContacts(t *testing.T) {
+	ts, _, viewerToken, vaultID, contactID := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/contacts/move", vaultID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"contact_ids":[%q],"target_vault_id":"fake"}`, contactID), viewerToken)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for Viewer bulk moving contacts, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBulkContactMoveTargetVaultInsufficientPermissionReturns403(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "bulk-move-target-viewer-manager@example.com")
+	sourceVault := ts.createTestVault(t, token, "Bulk Move Source Vault")
+	targetVault := ts.createTestVault(t, token, "Bulk Move Target Vault")
+	contact := ts.createTestContact(t, token, sourceVault.ID, "BulkMoveTargetViewer")
+
+	editor := createSecondUser(t, ts, auth.User.AccountID, "bulk-move-target-viewer-editor@example.com", false)
+	addUserToVault(t, ts, editor.ID, sourceVault.ID, models.PermissionEditor)
+	addUserToVault(t, ts, editor.ID, targetVault.ID, models.PermissionViewer)
+	editorToken := generateJWT(editor.ID, editor.AccountID, editor.Email, false, false)
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/move", sourceVault.ID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"contact_ids":[%q],"target_vault_id":%q}`, contact.ID, targetVault.ID), editorToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for bulk move to viewer-only target vault, got %d: %s", rec.Code, rec.Body.String())
+	}
+	assertHandlerContactVault(t, ts, contact.ID, sourceVault.ID)
+}
+
+func TestBulkContactMoveCrossAccountTargetReturns403(t *testing.T) {
+	ts := setupTestServer(t)
+	sourceToken, sourceAuth := ts.registerTestUser(t, "bulk-move-cross-account-source@example.com")
+	sourceVault := ts.createTestVault(t, sourceToken, "Bulk Cross Account Source Vault")
+	contact := ts.createTestContact(t, sourceToken, sourceVault.ID, "BulkCrossAccountMove")
+	targetToken, _ := ts.registerTestUser(t, "bulk-move-cross-account-target@example.com")
+	targetVault := ts.createTestVault(t, targetToken, "Bulk Cross Account Target Vault")
+	addUserToVault(t, ts, sourceAuth.User.ID, targetVault.ID, models.PermissionEditor)
+
+	path := fmt.Sprintf("/api/vaults/%s/contacts/move", sourceVault.ID)
+	rec := ts.doRequest(http.MethodPost, path, fmt.Sprintf(`{"contact_ids":[%q],"target_vault_id":%q}`, contact.ID, targetVault.ID), sourceToken)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for cross-account bulk target vault move, got %d: %s", rec.Code, rec.Body.String())
+	}
+	assertHandlerContactVault(t, ts, contact.ID, sourceVault.ID)
+}
+
 func TestContactMoveTargetVaultForbiddenReturns403(t *testing.T) {
 	ts := setupTestServer(t)
 	token, auth := ts.registerTestUser(t, "move-target-source-manager@example.com")

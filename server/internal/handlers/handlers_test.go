@@ -5914,6 +5914,52 @@ func TestDashboardLifeEvent_RejectsCrossVaultParticipant(t *testing.T) {
 	}
 }
 
+func TestContactBulkMove_MovesSelectedContacts(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "bulk-move-handler@example.com")
+	sourceVault := ts.createTestVault(t, token, "Bulk Handler Source")
+	targetVault := ts.createTestVault(t, token, "Bulk Handler Target")
+	first := ts.createTestContact(t, token, sourceVault.ID, "BulkFirst")
+	second := ts.createTestContact(t, token, sourceVault.ID, "BulkSecond")
+
+	body := fmt.Sprintf(`{"contact_ids":[%q,%q,%q],"target_vault_id":%q}`, first.ID, second.ID, first.ID, targetVault.ID)
+	rec := ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/contacts/move", sourceVault.ID), body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("bulk move: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var moved struct {
+		MovedCount int `json:"moved_count"`
+		Contacts   []struct {
+			ID      string `json:"id"`
+			VaultID string `json:"vault_id"`
+		} `json:"contacts"`
+	}
+	if err := json.Unmarshal(resp.Data, &moved); err != nil {
+		t.Fatalf("parse bulk move response failed: %v", err)
+	}
+	if moved.MovedCount != 2 || len(moved.Contacts) != 2 {
+		t.Fatalf("expected two moved contacts, got %+v", moved)
+	}
+	for _, contact := range moved.Contacts {
+		if contact.VaultID != targetVault.ID {
+			t.Fatalf("expected moved contact response vault %s, got %+v", targetVault.ID, contact)
+		}
+		assertHandlerContactVault(t, ts, contact.ID, targetVault.ID)
+	}
+}
+
+func TestContactBulkMove_EmptyListValidation(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "bulk-move-empty-handler@example.com")
+	sourceVault := ts.createTestVault(t, token, "Bulk Empty Source")
+	targetVault := ts.createTestVault(t, token, "Bulk Empty Target")
+	rec := ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/contacts/move", sourceVault.ID), fmt.Sprintf(`{"contact_ids":[],"target_vault_id":%q}`, targetVault.ID), token)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for empty bulk move list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestLifeEvent_CreateWithValidType(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "life-event-type@example.com")

@@ -18,9 +18,63 @@ func NewContactMoveHandler(contactMoveService *services.ContactMoveService) *Con
 	return &ContactMoveHandler{contactMoveService: contactMoveService}
 }
 
+// MoveMany godoc
+//
+//	@Summary		Move contacts to another vault
+//	@ID				ContactsBulkMoveCreate
+//	@Description	Move multiple contacts from one vault to another in a single transaction
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string						true	"Source Vault ID"
+//	@Param			request		body		dto.BulkMoveContactsRequest	true	"Move details"
+//	@Success		200			{object}	response.APIResponse
+//	@Failure		400			{object}	response.APIResponse
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		403			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
+//	@Failure		422			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/move [post]
+func (h *ContactMoveHandler) MoveMany(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
+
+	var req dto.BulkMoveContactsRequest
+	if err := c.Bind(&req); err != nil {
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	}
+	if err := validateRequest(req); err != nil {
+		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+
+	contacts, err := h.contactMoveService.MoveMany(req.ContactIDs, vaultID, req.TargetVaultID, userID)
+	if err != nil {
+		if errors.Is(err, services.ErrContactMoveEmpty) {
+			return response.ValidationError(c, map[string]string{"contact_ids": "contact_ids is required"})
+		}
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrTargetVaultNotFound) {
+			return response.NotFound(c, "err.target_vault_not_found")
+		}
+		if errors.Is(err, services.ErrVaultForbidden) {
+			return response.Forbidden(c, "err.no_vault_access_short")
+		}
+		if errors.Is(err, services.ErrInsufficientPerm) {
+			return response.Forbidden(c, "err.insufficient_permissions_short")
+		}
+		return response.InternalError(c, "err.failed_to_move_contact")
+	}
+	return response.OK(c, contacts)
+}
+
 // Move godoc
 //
 //	@Summary		Move a contact to another vault
+//	@ID				ContactsMoveCreate
 //	@Description	Move a contact from one vault to another
 //	@Tags			contacts
 //	@Accept			json
