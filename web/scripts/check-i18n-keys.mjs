@@ -29,7 +29,7 @@ function flattenKeys(obj, prefix = '') {
 
 // Add or remove from this list when adding a locale bundle. SUPPORTED_LANGUAGES
 // in web/src/i18n.ts is the user-facing source of truth — keep these in sync.
-const locales = ['en', 'zh', 'es', 'fr', 'de'];
+const locales = ['en', 'zh', 'es', 'fr', 'de', 'pt-BR', 'pt-PT'];
 
 const flatByLocale = {};
 for (const locale of locales) {

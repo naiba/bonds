@@ -66,6 +66,14 @@ describe("normalizeLanguageCode", () => {
     expect(normalizeLanguageCode("zh-Hans")).toBe("zh");
     expect(normalizeLanguageCode("de-DE")).toBe("de");
   });
+  it("maps pt-BR and pt-PT to their region-specific codes", () => {
+    expect(normalizeLanguageCode("pt-BR")).toBe("pt-BR");
+    expect(normalizeLanguageCode("pt-PT")).toBe("pt-PT");
+    expect(normalizeLanguageCode("pt-br")).toBe("pt-BR");
+  });
+  it("maps bare pt to pt-PT via region fallback", () => {
+    expect(normalizeLanguageCode("pt")).toBe("pt-PT");
+  });
   it("returns en for unsupported languages", () => {
     expect(normalizeLanguageCode("ja")).toBe("en");
     expect(normalizeLanguageCode(undefined)).toBe("en");

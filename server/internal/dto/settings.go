@@ -31,7 +31,7 @@ type UpdateTimezoneRequest struct {
 // Struct tags require a literal, so the two cannot share a constant — a CI
 // guard in the i18n package's tests cross-checks them.
 type UpdateLocaleRequest struct {
-	Locale string `json:"locale" validate:"required,oneof=en zh es fr de" example:"en"`
+	Locale string `json:"locale" validate:"required,oneof=en zh es fr de pt-BR pt-PT" example:"en"`
 }
 
 type UpdatePreferencesRequest struct {

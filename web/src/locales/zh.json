@@ -524,7 +524,14 @@
       "filter_archived": "已归档",
       "filter_all": "全部",
       "filter_favorites": "收藏",
-      "filter_needs_verification": "待核实"
+      "filter_needs_verification": "待核实",
+      "bulk_move_selected": "移动选中的 {{count}} 位",
+      "bulk_move_title": "移动选中的联系人",
+      "bulk_move_count": "将移动 {{count}} 位选中的联系人。",
+      "bulk_move_select_vault": "目标 Vault",
+      "bulk_move_no_targets": "没有其他可用 Vault",
+      "bulk_move": "移动联系人",
+      "bulk_move_success": "已移动 {{count}} 位联系人"
     },
     "needs_verification": {
       "badge": "待核实",
@@ -937,6 +944,7 @@
       "no_events": "此时间线暂无事件",
       "participants": "其他参与者",
       "participants_placeholder": "选择参与者...",
+      "self_participant": "我",
       "event": "事件",
       "delete_timeline_confirm": "确定删除此时间线？",
       "delete_event_confirm": "确定删除？",

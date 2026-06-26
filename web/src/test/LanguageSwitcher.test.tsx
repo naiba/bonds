@@ -39,6 +39,10 @@ function renderSwitcher() {
   );
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 describe("LanguageSwitcher", () => {
   beforeEach(async () => {
     vi.mocked(useAuth).mockReturnValue({ user: null } as ReturnType<typeof useAuth>);
@@ -52,7 +56,7 @@ describe("LanguageSwitcher", () => {
     await user.click(screen.getByRole("button"));
     for (const lang of SUPPORTED_LANGUAGES) {
       // Each language label appears in the open dropdown menu
-      expect(await screen.findByRole("menuitem", { name: new RegExp(lang.label) })).toBeInTheDocument();
+      expect(await screen.findByRole("menuitem", { name: new RegExp(escapeRegExp(lang.label)) })).toBeInTheDocument();
     }
   });
 
