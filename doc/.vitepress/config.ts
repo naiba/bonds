@@ -145,5 +145,69 @@ export default defineConfig({
         },
       },
     },
+    'pt-BR': {
+      label: 'Português (Brasil)',
+      lang: 'pt-BR',
+      link: '/pt-BR/',
+      themeConfig: {
+        nav: [
+          { text: 'Guia', link: '/pt-BR/guide/introduction' },
+          { text: 'Funcionalidades', link: '/pt-BR/features/contacts' },
+          {
+            text: 'Links',
+            items: [
+              { text: 'GitHub', link: 'https://github.com/naiba/bonds' },
+              { text: 'Releases', link: 'https://github.com/naiba/bonds/releases' },
+            ],
+          },
+        ],
+        sidebar: {
+          '/pt-BR/guide/': [
+            {
+              text: 'Guia',
+              items: [
+                { text: 'Introdução', link: '/pt-BR/guide/introduction' },
+                { text: 'Começando', link: '/pt-BR/guide/getting-started' },
+                { text: 'Configuração', link: '/pt-BR/guide/configuration' },
+                { text: 'Desenvolvimento', link: '/pt-BR/guide/development' },
+                { text: 'Importar CSV', link: '/pt-BR/guide/csv-import' },
+              ],
+            },
+          ],
+          '/pt-BR/features/': [
+            {
+              text: 'Funcionalidades',
+              items: [
+                { text: 'Contatos', link: '/pt-BR/features/contacts' },
+                { text: 'Cofres', link: '/pt-BR/features/vaults' },
+                { text: 'Lembretes', link: '/pt-BR/features/reminders' },
+                { text: 'Pesquisa de Texto Completo', link: '/pt-BR/features/search' },
+                { text: 'Acesso para Agentes de IA', link: '/pt-BR/features/ai-agents' },
+                { text: 'CardDAV / CalDAV', link: '/pt-BR/features/dav' },
+                { text: 'Importar / Exportar', link: '/pt-BR/features/import-export' },
+                { text: 'Arquivos e Avatares', link: '/pt-BR/features/files' },
+                { text: 'Autenticação', link: '/pt-BR/features/authentication' },
+                { text: 'Admin e Configurações', link: '/pt-BR/features/admin' },
+                { text: 'Mais Funcionalidades', link: '/pt-BR/features/more' },
+              ],
+            },
+          ],
+        },
+        editLink: {
+          pattern: 'https://github.com/naiba/bonds/edit/main/doc/:path',
+          text: 'Editar esta página no GitHub',
+        },
+        lastUpdated: {
+          text: 'Última atualização',
+        },
+        outline: {
+          label: 'Navegação',
+        },
+        docFooter: {
+          prev: 'Anterior',
+          next: 'Próximo',
+        },
+      },
+    },
   },
 })
