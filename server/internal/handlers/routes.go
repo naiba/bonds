@@ -169,6 +169,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	contactService.SetSearchService(searchService)
 	contactService.SetDavPushService(davPushService)
+	contactMoveService.SetSearchService(searchService)
+	contactMoveService.SetDavPushService(davPushService)
+	contactMoveService.SetFileService(vaultFileService)
 	noteService.SetSearchService(searchService)
 	monicaImportService.SetFeedRecorder(feedRecorder)
 	monicaImportService.SetSearchEngine(searchEngine)

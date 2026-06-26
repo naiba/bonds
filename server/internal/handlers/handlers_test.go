@@ -4697,6 +4697,76 @@ func TestAvatarUploadAndGet(t *testing.T) {
 	}
 }
 
+func TestAvatarUploadMoveAndGetFromTargetVault(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "avatar-move@example.com")
+	sourceVault := ts.createTestVault(t, token, "Avatar Move Source")
+	targetVault := ts.createTestVault(t, token, "Avatar Move Target")
+	contact := ts.createTestContact(t, token, sourceVault.ID, "AvatarMove")
+
+	pngHeader := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}
+	fakeImage := make([]byte, 100)
+	copy(fakeImage, pngHeader)
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	mh := make(textproto.MIMEHeader)
+	mh.Set("Content-Disposition", `form-data; name="file"; filename="avatar.png"`)
+	mh.Set("Content-Type", "image/png")
+	part, err := mw.CreatePart(mh)
+	if err != nil {
+		t.Fatalf("create part: %v", err)
+	}
+	if _, err := part.Write(fakeImage); err != nil {
+		t.Fatalf("write multipart image: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("close multipart writer: %v", err)
+	}
+
+	avatarPath := "/api/vaults/" + sourceVault.ID + "/contacts/" + contact.ID + "/avatar"
+	req := httptest.NewRequest(http.MethodPut, avatarPath, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	ts.e.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT avatar: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	moveBody := fmt.Sprintf(`{"target_vault_id":%q}`, targetVault.ID)
+	rec = ts.doRequest(http.MethodPost, "/api/vaults/"+sourceVault.ID+"/contacts/"+contact.ID+"/move", moveBody, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("move contact: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+sourceVault.ID+"/contacts/"+contact.ID+"/avatar", "", token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("source avatar after move: expected 404, got %d: %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodGet, "/api/vaults/"+targetVault.ID+"/contacts/"+contact.ID+"/avatar", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("target avatar after move: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !bytes.Equal(rec.Body.Bytes(), fakeImage) {
+		t.Fatalf("expected target avatar body to match uploaded image, got %d bytes", rec.Body.Len())
+	}
+
+	var movedContact models.Contact
+	if err := ts.db.First(&movedContact, "id = ? AND vault_id = ?", contact.ID, targetVault.ID).Error; err != nil {
+		t.Fatalf("load moved contact failed: %v", err)
+	}
+	if movedContact.FileID == nil {
+		t.Fatal("expected moved contact to keep avatar file_id")
+	}
+	var movedAvatar models.File
+	if err := ts.db.First(&movedAvatar, *movedContact.FileID).Error; err != nil {
+		t.Fatalf("load moved avatar file failed: %v", err)
+	}
+	if movedAvatar.VaultID != targetVault.ID || movedAvatar.Type != "avatar" {
+		t.Fatalf("expected avatar file in target vault, got vault=%s type=%s", movedAvatar.VaultID, movedAvatar.Type)
+	}
+}
+
 func TestReportOverviewHandler(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "report-overview@example.com")

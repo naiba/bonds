@@ -110,6 +110,16 @@ type MoveContactRequest struct {
 	TargetVaultID string `json:"target_vault_id" validate:"required" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
+type BulkMoveContactsRequest struct {
+	ContactIDs    []string `json:"contact_ids" validate:"required,min=1" example:"[\"550e8400-e29b-41d4-a716-446655440000\"]"`
+	TargetVaultID string   `json:"target_vault_id" validate:"required" example:"550e8400-e29b-41d4-a716-446655440000"`
+}
+
+type BulkMoveContactsResponse struct {
+	MovedCount int               `json:"moved_count" example:"2"`
+	Contacts   []ContactResponse `json:"contacts"`
+}
+
 type UpdateContactTemplateRequest struct {
 	TemplateID *uint `json:"template_id" example:"1"`
 }
