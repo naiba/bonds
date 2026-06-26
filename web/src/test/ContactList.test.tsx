@@ -39,8 +39,11 @@ vi.mock("@/api", () => ({
       contactsList: vi.fn(),
       contactsLabelsDetail: vi.fn(),
       contactsSortUpdate: vi.fn(),
+      contactsBulkMoveCreate: vi.fn(),
     },
     contactLabels: { contactLabelsList: vi.fn() },
+    groups: { groupsList: vi.fn() },
+    vaults: { vaultsList: vi.fn() },
     vaultSettings: { settingsLabelsList: vi.fn() },
     vcard: { contactsExportList: vi.fn(), contactsImportCreate: vi.fn() },
   },
@@ -56,19 +59,49 @@ vi.mock("@/components/ContactAvatar", () => ({
 }));
 
 const mockUseQuery = vi.fn();
+const mockInvalidateQueries = vi.fn();
+
+type MutationOptions<TVariables> = {
+  mutationFn?: (variables: TVariables) => Promise<unknown> | unknown;
+  onSuccess?: (data: unknown, variables: TVariables, context: unknown) => void;
+  onError?: (error: Error, variables: TVariables, context: unknown) => void;
+};
+
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: <TVariables,>(options?: MutationOptions<TVariables>) => ({
+    mutate: vi.fn(async (variables: TVariables) => {
+      try {
+        const data = await options?.mutationFn?.(variables);
+        options?.onSuccess?.(data, variables, undefined);
+        return data;
+      } catch (error) {
+        options?.onError?.(error instanceof Error ? error : new Error(String(error)), variables, undefined);
+        return undefined;
+      }
+    }),
+    isPending: false,
+  }),
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
 }));
 
 let mockLabels: { id: number; name: string }[] = [];
 
-function mockContactListQuery(contacts: Contact[] = [], meta: PaginationMeta = { total: contacts.length }) {
+function mockContactListQuery(
+  contacts: Contact[] = [],
+  meta: PaginationMeta = { total: contacts.length },
+  vaults: { id: string; name: string }[] = [],
+) {
   mockUseQuery.mockImplementation((opts) => {
     const key = Array.isArray(opts?.queryKey) ? opts.queryKey : [];
     if (key.includes("labels")) {
       return { data: mockLabels, isLoading: false };
+    }
+    if (key.includes("groups")) {
+      return { data: [], isLoading: false };
+    }
+    if (key[0] === "vaults" && key[1] === "bulkMoveTargets") {
+      return { data: vaults, isLoading: false };
     }
     if (key[0] === "vaults" && key[2] === "contacts") {
       return { data: { contacts, meta }, isLoading: false };
@@ -136,6 +169,8 @@ describe("ContactList", () => {
     mockUseQuery.mockReset();
     vi.mocked(api.contacts.contactsList).mockReset();
     vi.mocked(api.contacts.contactsLabelsDetail).mockReset();
+    vi.mocked(api.contacts.contactsBulkMoveCreate).mockReset();
+    mockInvalidateQueries.mockReset();
     mockContactListQuery();
   });
 
@@ -302,5 +337,44 @@ describe("ContactList", () => {
       sort: "first_met_at",
       filter: "active",
     });
+  });
+
+  it("moves selected contacts with the bulk move API", async () => {
+    const user = userEvent.setup();
+    mockContactListQuery(
+      [{
+        id: "42",
+        first_name: "Ada",
+        last_name: "Lovelace",
+        updated_at: "2024-06-01T00:00:00Z",
+      }],
+      { total: 1 },
+      [
+        { id: "1", name: "Current Vault" },
+        { id: "2", name: "Family Vault" },
+      ],
+    );
+    vi.mocked(api.contacts.contactsBulkMoveCreate).mockResolvedValue({ data: { moved_count: 1 } });
+
+    renderContactList();
+
+    const rowCheckbox = screen.getAllByRole("checkbox")[1];
+    if (!rowCheckbox) throw new Error("Contact row checkbox was not rendered");
+    await user.click(rowCheckbox);
+
+    await user.click(screen.getByRole("button", { name: /move 1 selected/i }));
+    expect(screen.getByText("Move selected contacts")).toBeInTheDocument();
+    expect(screen.queryByText("Current Vault")).not.toBeInTheDocument();
+
+    await chooseSelectOption("bulk-move-vault-select", "Family Vault");
+    await user.click(screen.getByRole("button", { name: "Move contacts" }));
+
+    await waitFor(() => {
+      expect(api.contacts.contactsBulkMoveCreate).toHaveBeenCalledWith("1", {
+        contact_ids: ["42"],
+        target_vault_id: "2",
+      });
+    });
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["vaults", "1", "contacts"] });
   });
 });

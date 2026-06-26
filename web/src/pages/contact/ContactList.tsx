@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Table, Button, Typography, Input, Tag, Space, App, Upload, theme, Select, Checkbox, Popover } from "antd";
+import { Table, Button, Typography, Input, Tag, Space, App, Upload, theme, Select, Checkbox, Popover, Modal, Form } from "antd";
 import {
   PlusOutlined,
   SearchOutlined,
@@ -9,10 +9,11 @@ import {
   UploadOutlined,
   TeamOutlined,
   SettingOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Contact, PaginationMeta, LabelResponse } from "@/api";
+import type { APIError, Contact, Group, PaginationMeta, LabelResponse, Vault } from "@/api";
 import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { formatDateOnly } from "@/utils/dateOnlyInput";
@@ -36,6 +37,11 @@ const DEFAULT_VISIBLE_COLUMNS = ["name", "nickname", "first_met_at", "status", "
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = ["10", "20", "50", "100"];
+
+type ContactGroupSummary = {
+  id: number;
+  name: string;
+};
 
 function parsePositiveInteger(value: string | null): number | null {
   if (!value) return null;
@@ -81,10 +87,14 @@ export default function ContactList() {
   const [groupFilter, setGroupFilter] = useState<number | null>(parsePositiveInteger(searchParams.get("group")));
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadVisibleColumns);
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkMoveForm] = Form.useForm<{ target_vault_id: string }>();
   const currentPage = parsePage(searchParams.get("page"));
   const pageSize = parsePageSize(searchParams.get("per_page"));
   const contactListSearch = buildPaginationSearch(searchParams, currentPage, pageSize);
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const nameOrder = useVaultNameOrder(vaultId);
@@ -94,9 +104,15 @@ export default function ContactList() {
     queryFn: async () => (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
   });
 
-  const { data: groups = [] } = useQuery({
+  const { data: groups = [] } = useQuery<Group[]>({
     queryKey: ["vault", vaultId, "groups"],
     queryFn: async () => (await api.groups.groupsList(String(vaultId))).data ?? [],
+  });
+
+  const { data: vaults = [] } = useQuery<Vault[]>({
+    queryKey: ["vaults", "bulkMoveTargets"],
+    queryFn: async () => (await api.vaults.vaultsList()).data ?? [],
+    enabled: bulkMoveOpen,
   });
 
   const { data: contactsResponse, isLoading } = useQuery({
@@ -121,7 +137,7 @@ export default function ContactList() {
           filter: statusFilter,
           ...(search.length > 2 ? { search } : {}),
         });
-        const filtered = ((res.data ?? []) as (Contact & { groups?: { id: number; name: string }[] })[])
+        const filtered = ((res.data ?? []) as (Contact & { groups?: ContactGroupSummary[] })[])
           .filter((c) => c.groups?.some((g) => g.id === groupFilter));
         const start = (currentPage - 1) * pageSize;
         return {
@@ -149,6 +165,9 @@ export default function ContactList() {
 
   const contacts = contactsResponse?.contacts ?? [];
   const paginationMeta = contactsResponse?.meta;
+  const targetVaultOptions = (vaults as Vault[])
+    .filter((vault) => vault.id && String(vault.id) !== String(vaultId))
+    .map((vault) => ({ label: vault.name ?? vault.id!, value: String(vault.id) }));
 
   const updatePaginationParams = (page: number, size: number, replace = false) => {
     const nextPage = Number.isInteger(page) && page > 0 ? page : DEFAULT_PAGE;
@@ -185,6 +204,25 @@ export default function ContactList() {
       onSuccess: () => {
           message.success(t("contact.list.sort_updated"));
       }
+  });
+
+  const bulkMoveMutation = useMutation({
+    mutationFn: (targetVaultId: string) => api.contacts.contactsBulkMoveCreate(String(vaultId), {
+      contact_ids: selectedContactIds,
+      target_vault_id: targetVaultId,
+    }),
+    onSuccess: (res) => {
+      const result = res.data as { moved_count?: number } | undefined;
+      const movedCount = result?.moved_count ?? selectedContactIds.length;
+      setSelectedContactIds([]);
+      setBulkMoveOpen(false);
+      bulkMoveForm.resetFields();
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "contacts"] });
+      message.success(t("contact.list.bulk_move_success", { count: movedCount }));
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
   });
 
   const handleSortChange = (value: string) => {
@@ -380,6 +418,14 @@ export default function ContactList() {
             </div>
           </div>
           <Space size={8} wrap>
+            {selectedContactIds.length > 0 && (
+              <Button
+                icon={<ExportOutlined />}
+                onClick={() => setBulkMoveOpen(true)}
+              >
+                {t("contact.list.bulk_move_selected", { count: selectedContactIds.length })}
+              </Button>
+            )}
             <Upload
               accept=".vcf"
               showUploadList={false}
@@ -486,8 +532,7 @@ export default function ContactList() {
             allowClear
         >
             <Option value={null}>{t("contact.list.all_groups")}</Option>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(groups as any[]).map((g) => (
+            {groups.map((g) => (
                 <Option key={g.id} value={g.id}>{g.name}</Option>
             ))}
         </Select>
@@ -510,10 +555,18 @@ export default function ContactList() {
         columns={filteredColumns}
         dataSource={contacts}
         rowKey="id"
+        rowSelection={{
+          selectedRowKeys: selectedContactIds,
+          preserveSelectedRowKeys: true,
+          onChange: (keys) => setSelectedContactIds(keys.map(String)),
+        }}
         loading={isLoading}
         onRow={(record) => ({
-          onClick: () =>
-            navigate(`/vaults/${vaultId}/contacts/${record.id}${contactListSearch}`),
+          onClick: (event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest(".ant-checkbox")) return;
+            navigate(`/vaults/${vaultId}/contacts/${record.id}${contactListSearch}`);
+          },
           style: { cursor: "pointer" },
         })}
         style={{ borderRadius: token.borderRadius }}
@@ -530,6 +583,46 @@ export default function ContactList() {
           emptyText: search ? t("contact.list.no_match") : t("contact.list.no_contacts"),
         }}
       />
+
+      <Modal
+        title={t("contact.list.bulk_move_title")}
+        open={bulkMoveOpen}
+        onCancel={() => {
+          setBulkMoveOpen(false);
+          bulkMoveForm.resetFields();
+        }}
+        footer={null}
+        destroyOnHidden
+      >
+        <Form
+          form={bulkMoveForm}
+          layout="vertical"
+          onFinish={(values) => bulkMoveMutation.mutate(values.target_vault_id)}
+        >
+          <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+            {t("contact.list.bulk_move_count", { count: selectedContactIds.length })}
+          </Text>
+          <Form.Item
+            name="target_vault_id"
+            label={t("contact.list.bulk_move_select_vault")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select
+              data-testid="bulk-move-vault-select"
+              loading={bulkMoveOpen && !vaults.length}
+              options={targetVaultOptions}
+              placeholder={t("contact.list.bulk_move_select_vault")}
+              notFoundContent={t("contact.list.bulk_move_no_targets")}
+            />
+          </Form.Item>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <Button onClick={() => setBulkMoveOpen(false)}>{t("common.cancel")}</Button>
+            <Button type="primary" htmlType="submit" loading={bulkMoveMutation.isPending} disabled={selectedContactIds.length === 0}>
+              {t("contact.list.bulk_move")}
+            </Button>
+          </div>
+        </Form>
+      </Modal>
     </div>
   );
 }
