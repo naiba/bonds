@@ -469,18 +469,14 @@ test.describe('Vault - Feed, Calendar, Journal and Settings', () => {
     // Fill Description
     await modal.locator('#description').fill('Got my degree');
 
-    // Set up response listeners before clicking OK — two sequential API calls:
-    // 1) POST to timelineEvents, 2) POST to lifeEvents
-    const timelineResp = page.waitForResponse(
-      (resp) => resp.url().includes('/timelineEvents') && resp.request().method() === 'POST' && resp.status() < 400
+    const dashboardLifeEventResp = page.waitForResponse(
+      (resp) => resp.url().includes('/dashboard/lifeEvents') && resp.request().method() === 'POST' && resp.status() < 400
     );
 
     // Click OK button
     await modal.getByRole('button', { name: 'OK' }).click();
-    await timelineResp;
+    await dashboardLifeEventResp;
 
-    // The second call (lifeEvents) is chained in the mutation, wait for it
-    // by waiting for the modal to close (signals both calls succeeded)
     await expect(modal).not.toBeVisible({ timeout: 15000 });
 
     await expect(page.getByText('Graduated from university').first()).toBeVisible({ timeout: 10000 });

@@ -80,6 +80,12 @@ type LifeEventEditTarget = {
   le: LifeEvent;
 };
 
+type DashboardLifeEventPage = {
+  items: TimelineEvent[];
+  meta?: PaginationMeta;
+  page: number;
+};
+
 type DashboardTab = "activity" | "life_events" | "life_metrics";
 
 type VaultReminderItem = Reminder & {
@@ -96,16 +102,6 @@ function getVaultReminderContactName(reminder: VaultReminderItem): string {
     .filter(Boolean)
     .join(" ")
     .trim();
-}
-
-function getDashboardLifeEventRouteContactId(editingTarget: LifeEventEditTarget): string {
-  const timelineParticipantId = editingTarget.tl.participants?.find((participant) => participant.id)?.id;
-  if (timelineParticipantId) return timelineParticipantId;
-
-  const lifeEventParticipantId = editingTarget.le.participants?.find((participant) => participant.id)?.id;
-  if (lifeEventParticipantId) return lifeEventParticipantId;
-
-  throw new Error("Dashboard life event is missing a contact participant");
 }
 
 // ─── Main Component ──────────────────────────────────────────────
@@ -591,8 +587,6 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const queryClient = useQueryClient();
   const dateFormats = useDateFormat();
   const [page, setPage] = useState(1);
-  const [allTimelines, setAllTimelines] = useState<TimelineEvent[]>([]);
-  const [hasMore, setHasMore] = useState(true);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [addForm] = Form.useForm();
   const [editingLe, setEditingLe] = useState<LifeEventEditTarget | null>(null);
@@ -625,21 +619,22 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
     enabled: !!vaultId && (addModalOpen || !!editingLe),
   });
 
-  const getForcedParticipantIds = useCallback(() => {
-    const forced = new Set<string>();
-    forced.add(String(userContactId));
-    return forced;
-  }, [userContactId]);
-
   const contactOptions = (() => {
-    const forcedIds = getForcedParticipantIds();
-
     const optionsMap = new Map<string, { value: string; label: string }>();
 
+    const selfContactId = userContactId ? String(userContactId) : "";
+    if (selfContactId) {
+      optionsMap.set(selfContactId, {
+        value: selfContactId,
+        label: t("modules.life_events.self_participant"),
+      });
+    }
+
     contactsData.forEach((c) => {
-      if (c.id && !forcedIds.has(String(c.id))) {
-        optionsMap.set(String(c.id), {
-          value: String(c.id),
+      const contactId = c.id ? String(c.id) : "";
+      if (contactId && !optionsMap.has(contactId)) {
+        optionsMap.set(contactId, {
+          value: contactId,
           label: formatContactName(nameOrder, c),
         });
       }
@@ -647,7 +642,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
 
     editingLe?.le.participants?.forEach((participant) => {
       const participantId = participant.id ? String(participant.id) : "";
-      if (participantId && !forcedIds.has(participantId) && !optionsMap.has(participantId)) {
+      if (participantId && !optionsMap.has(participantId)) {
         optionsMap.set(participantId, {
           value: participantId,
           label: participant.name || participantId,
@@ -658,7 +653,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
     return Array.from(optionsMap.values());
   })();
 
-  const { isLoading, isFetching } = useQuery({
+  const { data: lifeEventPage, isLoading, isFetching } = useQuery({
     queryKey: ["vaults", vaultId, "dashboardLifeEvents", page],
     queryFn: async () => {
       const res = await api.lifeEvents.dashboardLifeEventsList(String(vaultId), {
@@ -667,12 +662,21 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
       });
       const newItems = (res.data ?? []) as TimelineEvent[];
       const meta = res.meta as PaginationMeta | undefined;
-      setAllTimelines((prev) => (page === 1 ? newItems : [...prev, ...newItems]));
-      setHasMore(meta ? meta.page! < meta.total_pages! : newItems.length >= 15);
-      return newItems;
+      return { items: newItems, meta, page } satisfies DashboardLifeEventPage;
     },
     enabled: !!vaultId,
   });
+
+  const allTimelines = (() => {
+    if (page === 1) return lifeEventPage?.items ?? [];
+    const cachedItems: TimelineEvent[] = [];
+    for (let loadedPage = 1; loadedPage <= page; loadedPage += 1) {
+      const cachedPage = queryClient.getQueryData<DashboardLifeEventPage>(["vaults", vaultId, "dashboardLifeEvents", loadedPage]);
+      if (cachedPage?.items) cachedItems.push(...cachedPage.items);
+    }
+    return cachedItems.length > 0 ? cachedItems : lifeEventPage?.items ?? [];
+  })();
+  const hasMore = lifeEventPage?.meta ? (lifeEventPage.meta.page ?? page) < (lifeEventPage.meta.total_pages ?? 1) : (lifeEventPage?.items.length ?? 0) >= 15;
 
   const { data: lifeEventCategories = [] } = useQuery({
     queryKey: ["vaults", vaultId, "settings", "lifeEventCategories"],
@@ -688,29 +692,17 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
   const addLifeEventMutation = useMutation({
     mutationFn: async (values: { life_event_type_id: number; happened_at: CalendarAwareDateValue; summary?: string; description?: string; participants?: string[] }) => {
       const dateStr = values.happened_at.date.toISOString();
-      const timelineRes = await api.lifeEvents.contactsTimelineEventsCreate(
-        String(vaultId),
-        userContactId!,
-        { started_at: dateStr, label: values.summary || undefined },
-      );
-      const timelineId = timelineRes.data?.id;
-      if (!timelineId) throw new Error("Failed to create timeline event");
-      await api.lifeEvents.contactsTimelineEventsLifeEventsCreate(
-        String(vaultId),
-        userContactId!,
-        timelineId,
-        {
-          life_event_type_id: values.life_event_type_id,
-          happened_at: dateStr,
-          summary: values.summary || undefined,
-          description: values.description || undefined,
-          calendar_type: values.happened_at.calendarType,
-          original_day: values.happened_at.originalDay ?? undefined,
-          original_month: values.happened_at.originalMonth ?? undefined,
-          original_year: values.happened_at.originalYear ?? undefined,
-          participants: values.participants,
-        },
-      );
+      await api.lifeEvents.dashboardLifeEventsCreate(String(vaultId), {
+        life_event_type_id: values.life_event_type_id,
+        happened_at: dateStr,
+        summary: values.summary || undefined,
+        description: values.description || undefined,
+        calendar_type: values.happened_at.calendarType,
+        original_day: values.happened_at.originalDay ?? undefined,
+        original_month: values.happened_at.originalMonth ?? undefined,
+        original_year: values.happened_at.originalYear ?? undefined,
+        participants: values.participants,
+      });
     },
     onSuccess: () => {
       message.success(t("vault.dashboard.life_event_added"));
@@ -726,30 +718,30 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
     mutationFn: async (values: LifeEventFormValues) => {
       if (!editingLe) throw new Error("No editing event");
       const dateStr = values.happened_at.date.toISOString();
-      // Dashboard events are vault-wide; using the current user's shadow contact here
-      // would make the contact-scoped update API add that user as a participant.
-      const routeContactId = getDashboardLifeEventRouteContactId(editingLe);
-      await api.lifeEvents.contactsTimelineEventsLifeEventsUpdate(
-        String(vaultId),
-        routeContactId,
-        editingLe.tl.id!,
-        editingLe.le.id!,
-        {
-          life_event_type_id: values.life_event_type_id,
-          happened_at: dateStr,
-          summary: values.summary || undefined,
-          description: values.description || undefined,
-          calendar_type: values.happened_at.calendarType,
-          original_day: values.happened_at.originalDay ?? undefined,
-          original_month: values.happened_at.originalMonth ?? undefined,
-          original_year: values.happened_at.originalYear ?? undefined,
-          participants: values.participants,
-        },
-      );
+      await api.lifeEvents.dashboardLifeEventsUpdate(String(vaultId), editingLe.le.id!, {
+        life_event_type_id: values.life_event_type_id,
+        happened_at: dateStr,
+        summary: values.summary || undefined,
+        description: values.description || undefined,
+        calendar_type: values.happened_at.calendarType,
+        original_day: values.happened_at.originalDay ?? undefined,
+        original_month: values.happened_at.originalMonth ?? undefined,
+        original_year: values.happened_at.originalYear ?? undefined,
+        participants: values.participants,
+      });
     },
     onSuccess: () => {
       message.success(t("modules.life_events.event_updated"));
       setEditingLe(null);
+      setPage(1);
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "dashboardLifeEvents"] });
+    },
+  });
+
+  const deleteLifeEventMutation = useMutation({
+    mutationFn: (lifeEventId: number) => api.lifeEvents.dashboardLifeEventsDelete(String(vaultId), lifeEventId),
+    onSuccess: () => {
+      message.success(t("modules.life_events.event_deleted"));
       setPage(1);
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "dashboardLifeEvents"] });
     },
@@ -765,26 +757,20 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
 
   return (
     <div style={{ padding: "16px 20px" }}>
-      {!userContactId ? (
-        <Text type="secondary" style={{ fontSize: 13 }}>
-          {t("vault.dashboard.life_events_not_available")}
-        </Text>
-      ) : (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              addForm.resetFields();
-              setSelectedCategoryId(null);
-              setAddModalOpen(true);
-            }}
-            size="small"
-          >
-            {t("vault.dashboard.add_life_event")}
-          </Button>
-        </div>
-      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            addForm.resetFields();
+            setSelectedCategoryId(null);
+            setAddModalOpen(true);
+          }}
+          size="small"
+        >
+          {t("vault.dashboard.add_life_event")}
+        </Button>
+      </div>
 
       {allTimelines.length === 0 ? (
         <Empty description={t("vault.dashboard.no_life_events")} style={{ padding: 16 }} />
@@ -851,6 +837,21 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
                           menu={{
                             items: [
                               { key: "edit", label: t("common.edit"), icon: <EditOutlined />, onClick: () => handleEditClick(tl, le) },
+                              {
+                                key: "delete",
+                                danger: true,
+                                label: t("common.delete"),
+                                icon: <DeleteOutlined />,
+                                onClick: () => {
+                                  Modal.confirm({
+                                    title: t("common.delete_confirm"),
+                                    okText: t("common.delete"),
+                                    okButtonProps: { danger: true },
+                                    cancelText: t("common.cancel"),
+                                    onOk: () => deleteLifeEventMutation.mutate(le.id!),
+                                  });
+                                },
+                              },
                             ],
                           }}
                           trigger={["click"]}
@@ -903,6 +904,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
             rules={[{ required: true, message: t("common.required") }]}
           >
             <Select
+              data-testid="dashboard-life-event-category-select"
               placeholder={t("vault.dashboard.select_category")}
               onChange={(v: number) => {
                 setSelectedCategoryId(v);
@@ -917,6 +919,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
             rules={[{ required: true, message: t("common.required") }]}
           >
             <Select
+              data-testid="dashboard-life-event-type-select"
               placeholder={t("vault.dashboard.select_type")}
               disabled={!selectedCategoryId}
               options={filteredTypes.map((tp) => ({ label: tp.label, value: tp.id }))}
@@ -937,6 +940,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
           </Form.Item>
           <Form.Item name="participants" label={t("modules.life_events.participants")}>
             <Select
+              data-testid="dashboard-life-event-participants-select"
               mode="multiple"
               allowClear
               placeholder={t("modules.life_events.participants_placeholder")}
@@ -954,7 +958,7 @@ function LifeEventsTab({ vaultId, userContactId }: { vaultId: string; userContac
         open={!!editingLe}
         onCancel={() => setEditingLe(null)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         {editingLe && lifeEventCategories.length === 0 && (
           <div style={{ textAlign: "center", padding: 24 }}>
@@ -1036,6 +1040,7 @@ function LifeEventEditForm({
         rules={[{ required: true, message: t("common.required") }]}
       >
         <Select
+          data-testid="dashboard-life-event-edit-category-select"
           placeholder={t("vault.dashboard.select_category")}
           onChange={(v) => {
             setSelectedCat(v);
@@ -1050,6 +1055,7 @@ function LifeEventEditForm({
         rules={[{ required: true, message: t("common.required") }]}
       >
         <Select
+          data-testid="dashboard-life-event-edit-type-select"
           placeholder={t("vault.dashboard.select_type")}
           disabled={!selectedCat}
           options={filteredTypes.map((type: LifeEventCategoryTypeResponse) => ({ label: type.label, value: type.id }))}
@@ -1070,6 +1076,7 @@ function LifeEventEditForm({
       </Form.Item>
       <Form.Item name="participants" label={t("modules.life_events.participants")}>
         <Select
+          data-testid="dashboard-life-event-edit-participants-select"
           mode="multiple"
           allowClear
           placeholder={t("modules.life_events.participants_placeholder")}
