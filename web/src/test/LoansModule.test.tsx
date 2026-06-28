@@ -3,6 +3,8 @@ import { render, screen } from "@testing-library/react";
 import { App as AntApp, ConfigProvider } from "antd";
 import LoansModule from "@/pages/contact/modules/LoansModule";
 import type { Loan, Currency } from "@/api";
+import ptBR from "@/locales/pt-BR.json";
+import ptPT from "@/locales/pt-PT.json";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -94,5 +96,17 @@ describe("LoansModule", () => {
     expect(screen.getByText("Returned")).toBeInTheDocument();
     expect(screen.getByText(/Item name: Catan/)).toBeInTheDocument();
     expect(screen.getByText(/Qty: 2/)).toBeInTheDocument();
+  });
+
+  it("keeps Portuguese loan direction labels generic", () => {
+    const directionLabels = [
+      ptBR.modules.loans.i_lent,
+      ptBR.modules.loans.i_borrowed,
+      ptPT.modules.loans.i_lent,
+      ptPT.modules.loans.i_borrowed,
+    ];
+
+    expect(directionLabels).not.toContain("Eu emprestei dinheiro");
+    expect(directionLabels).not.toContain("Eu peguei dinheiro emprestado");
   });
 });

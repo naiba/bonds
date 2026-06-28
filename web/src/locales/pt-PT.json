@@ -852,7 +852,7 @@
       "category_item": "Item",
       "name": "Nome",
       "direction": "Direção",
-      "i_lent": "Eu emprestei dinheiro",
+      "i_lent": "Eu emprestei",
       "i_borrowed": "Eu pedi emprestado",
       "amount": "Montante",
       "currency": "Moeda",
