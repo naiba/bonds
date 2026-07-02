@@ -5,14 +5,11 @@ import {
   Button,
   Modal,
   Form,
-  Input,
-  Select,
   Popconfirm,
   App,
   Tag,
   Empty,
   theme,
-  Switch,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -21,11 +18,18 @@ import type { ImportantDate, CreateImportantDateRequest, APIError, UserPreferenc
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
 import { useDateFormat } from "@/utils/dateFormat";
-import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
-import { getCalendarSystem } from "@/utils/calendar";
-import type { CalendarType } from "@/utils/calendar";
+import ImportantDatesModuleForm from "./ImportantDatesModuleForm";
 import { computeAgeAtImportantDate, computeImportantDateAge, formatImportantDateDisplay } from "@/utils/importantDateDisplay";
+import {
+  buildImportantDateRequest,
+  canScheduleImportantDateReminder,
+} from "@/utils/importantDatePrecision";
+import type { ImportantDateFormValues } from "@/utils/importantDatePrecision";
+import {
+  buildDefaultImportantDatePickerValue,
+  buildImportantDatePickerValue,
+} from "./importantDatesModuleHelpers";
 
 export default function ImportantDatesModule({
   vaultId,
@@ -64,6 +68,11 @@ export default function ImportantDatesModule({
   const selectedTypeId = Form.useWatch("contact_important_date_type_id", form);
   const selectedType = dateTypes.find((dt) => dt.id === selectedTypeId);
   const isLabelRequired = !selectedType?.internal_type;
+  const selectedCalendarDate = Form.useWatch<CalendarDatePickerValue | undefined>(
+    "calendarDate",
+    form,
+  );
+  const canScheduleReminder = canScheduleImportantDateReminder(selectedCalendarDate);
 
   const { data: dates = [], isLoading } = useQuery({
     queryKey: qk,
@@ -74,34 +83,9 @@ export default function ImportantDatesModule({
   });
 
   const saveMutation = useMutation({
-    mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; contact_important_date_type_id?: number; remind_me?: boolean }) => {
-      const { calendarDate } = values;
+    mutationFn: (values: ImportantDateFormValues) => {
       const matchedType = dateTypes.find((dt) => dt.id === values.contact_important_date_type_id);
-      const label = values.label || matchedType?.label || "";
-
-      const data: CreateImportantDateRequest = {
-        label,
-        year: calendarDate.year ?? undefined,
-        month: calendarDate.month,
-        day: calendarDate.day,
-        calendar_type: calendarDate.calendarType,
-        contact_important_date_type_id: values.contact_important_date_type_id,
-        remind_me: values.remind_me ?? false,
-      };
-
-      if (calendarDate.year !== null) {
-        const sys = getCalendarSystem(calendarDate.calendarType);
-        const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: calendarDate.year });
-        data.year = gd.year;
-        data.month = gd.month;
-        data.day = gd.day;
-      }
-
-      if (calendarDate.calendarType !== "gregorian" && calendarDate.year !== null) {
-        data.original_day = calendarDate.day;
-        data.original_month = calendarDate.month;
-        data.original_year = calendarDate.year;
-      }
+      const data: CreateImportantDateRequest = buildImportantDateRequest(values, matchedType?.label || "");
 
       if (editingId) {
         return api.importantDates.contactsDatesUpdate(String(vaultId), String(contactId), editingId, data);
@@ -127,25 +111,13 @@ export default function ImportantDatesModule({
 
   function openEdit(d: ImportantDate) {
     setEditingId(d.id ?? null);
-    const ct = (d.calendar_type || "gregorian") as CalendarType;
-    const pickerVal: CalendarDatePickerValue =
-      ct !== "gregorian" && d.original_day != null && d.original_month != null
-        ? { calendarType: ct, day: d.original_day, month: d.original_month, year: d.original_year ?? null }
-        : { calendarType: "gregorian", day: d.day ?? 1, month: d.month ?? 1, year: d.year ?? null };
-    form.setFieldsValue({ label: d.label, calendarDate: pickerVal, contact_important_date_type_id: d.contact_important_date_type_id, remind_me: (d as ImportantDate & { remind_me?: boolean }).remind_me ?? false });
+    const pickerVal = buildImportantDatePickerValue(d);
+    form.setFieldsValue({ label: d.label, calendarDate: pickerVal, contact_important_date_type_id: d.contact_important_date_type_id, remind_me: d.remind_me ?? false });
     setOpen(true);
   }
 
   function openAdd() {
-    const today = dayjs();
-    const defaultCalendarDate: CalendarDatePickerValue = {
-      calendarType: "gregorian",
-      day: today.date(),
-      month: today.month() + 1,
-      year: today.year(),
-    };
-
-    // CalendarDatePicker renders today's date by default without emitting onChange.
+    const defaultCalendarDate = buildDefaultImportantDatePickerValue(dayjs());
     form.setFieldsValue({ calendarDate: defaultCalendarDate, remind_me: false });
     setOpen(true);
   }
@@ -239,42 +211,21 @@ export default function ImportantDatesModule({
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
       >
-        <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}>
-          <Form.Item name="contact_important_date_type_id" label={t("modules.important_dates.date_type")}>
-            <Select
-              allowClear
-              placeholder={t("modules.important_dates.select_type")}
-              options={dateTypes.map((dt) => ({
-                label: dt.label,
-                value: dt.id,
-              }))}
-              onChange={(value: number | undefined) => {
-                if (value) {
-                  const matched = dateTypes.find((dt) => dt.id === value);
-                  if (matched?.internal_type) {
-                    form.setFieldValue("label", matched.label);
-                  }
-                  if (matched?.internal_type === "birthdate") {
-                    form.setFieldValue("remind_me", true);
-                  }
-                }
-              }}
-            />
-          </Form.Item>
-          <Form.Item
-            name="label"
-            label={t("modules.important_dates.label")}
-            rules={[{ required: isLabelRequired }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item name="calendarDate" label={t("modules.important_dates.date")} rules={[{ required: true }]}>
-             <CalendarDatePicker enableAlternativeCalendar={altCalendar} enableNoYear />
-          </Form.Item>
-          <Form.Item name="remind_me" label={t("modules.important_dates.remind_me")} valuePropName="checked">
-            <Switch />
-          </Form.Item>
-        </Form>
+        <ImportantDatesModuleForm
+          form={form}
+          dateTypes={dateTypes}
+          isLabelRequired={isLabelRequired}
+          altCalendar={altCalendar}
+          canScheduleReminder={canScheduleReminder}
+          labels={{
+            dateType: t("modules.important_dates.date_type"),
+            selectType: t("modules.important_dates.select_type"),
+            label: t("modules.important_dates.label"),
+            date: t("modules.important_dates.date"),
+            remindMe: t("modules.important_dates.remind_me"),
+          }}
+          onSubmit={(values) => saveMutation.mutate(values)}
+        />
       </Modal>
     </Card>
   );

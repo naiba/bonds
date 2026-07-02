@@ -34,7 +34,7 @@ export default function CalendarAwareDatePicker({
   const pickerValue = useMemo<CalendarDatePickerValue>(() => {
     if (!value) {
       const now = dayjs();
-      return { calendarType: "gregorian", day: now.date(), month: now.month() + 1, year: now.year() };
+      return { calendarType: "gregorian", day: now.date(), month: now.month() + 1, year: now.year(), datePrecision: "full" };
     }
     if (value.calendarType !== "gregorian" && value.originalDay != null && value.originalMonth != null) {
       return {
@@ -42,6 +42,7 @@ export default function CalendarAwareDatePicker({
         day: value.originalDay,
         month: value.originalMonth,
         year: value.originalYear ?? value.date.year(),
+        datePrecision: "full",
       };
     }
     return {
@@ -49,6 +50,7 @@ export default function CalendarAwareDatePicker({
       day: value.date.date(),
       month: value.date.month() + 1,
       year: value.date.year(),
+      datePrecision: "full",
     };
   }, [value]);
 
@@ -86,11 +88,17 @@ export default function CalendarAwareDatePicker({
       enableAlternativeCalendar
       value={pickerValue}
       onChange={(next) => {
+        if (next.day == null || next.month == null) {
+          return;
+        }
+
         // year is non-null on this code path because we never expose enableNoYear
         // here — but be defensive: fall back to current year if it ever is.
         const year = next.year ?? dayjs().year();
+        const month = next.month;
+        const day = next.day;
         const sys = getCalendarSystem(next.calendarType);
-        const gd = sys.toGregorian({ day: next.day, month: next.month, year });
+        const gd = sys.toGregorian({ day, month, year });
         // Preserve the time-of-day from the previous value so editing the
         // date doesn't silently reset the hour/minute (relevant for tasks
         // sync'd via CalDAV that carry a real DUE time).
@@ -106,12 +114,11 @@ export default function CalendarAwareDatePicker({
         onChange?.({
           date: merged,
           calendarType: next.calendarType,
-          originalDay: next.calendarType === "gregorian" ? null : next.day,
-          originalMonth: next.calendarType === "gregorian" ? null : next.month,
+          originalDay: next.calendarType === "gregorian" ? null : day,
+          originalMonth: next.calendarType === "gregorian" ? null : month,
           originalYear: next.calendarType === "gregorian" ? null : year,
         });
       }}
     />
   );
 }
-

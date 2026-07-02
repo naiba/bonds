@@ -97,9 +97,15 @@ export default function RemindersModule({
   const saveMutation = useMutation({
     mutationFn: (values: { label: string; calendarDate: CalendarDatePickerValue; frequency: string }) => {
       const { calendarDate } = values;
+      if (calendarDate.day == null || calendarDate.month == null) {
+        throw new Error("reminder date requires month and day");
+      }
+
       const y = calendarDate.year ?? new Date().getFullYear();
+      const month = calendarDate.month;
+      const day = calendarDate.day;
       const sys = getCalendarSystem(calendarDate.calendarType);
-      const gd = sys.toGregorian({ day: calendarDate.day, month: calendarDate.month, year: y });
+      const gd = sys.toGregorian({ day, month, year: y });
 
       const data: CreateReminderRequest = {
         label: values.label,
@@ -111,8 +117,8 @@ export default function RemindersModule({
       };
 
       if (calendarDate.calendarType !== "gregorian") {
-        data.original_day = calendarDate.day;
-        data.original_month = calendarDate.month;
+        data.original_day = day;
+        data.original_month = month;
         data.original_year = y;
       }
 
@@ -143,8 +149,8 @@ export default function RemindersModule({
     const ct = (r.calendar_type || "gregorian") as CalendarType;
     const pickerVal: CalendarDatePickerValue =
       ct !== "gregorian" && r.original_day != null && r.original_month != null
-        ? { calendarType: ct, day: r.original_day, month: r.original_month, year: r.original_year ?? new Date().getFullYear() }
-        : { calendarType: "gregorian", day: r.day ?? 1, month: r.month ?? 1, year: r.year ?? new Date().getFullYear() };
+        ? { calendarType: ct, day: r.original_day, month: r.original_month, year: r.original_year ?? new Date().getFullYear(), datePrecision: "full" }
+        : { calendarType: "gregorian", day: r.day ?? 1, month: r.month ?? 1, year: r.year ?? new Date().getFullYear(), datePrecision: "full" };
     form.setFieldsValue({ label: r.label, calendarDate: pickerVal, frequency: r.type });
     setOpen(true);
   }
