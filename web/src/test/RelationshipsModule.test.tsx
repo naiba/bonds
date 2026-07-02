@@ -145,4 +145,19 @@ describe("RelationshipsModule", () => {
     });
     expect(mutateArgs.request.external_contact_name).toBeUndefined();
   }, 10000);
+
+  it("shows relationship direction guidance in the modal", async () => {
+    const user = userEvent.setup();
+    renderModule();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Relationships/i)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Add"));
+
+    expect(
+      await screen.findByText(/Choose the relationship from this contact's perspective/i),
+    ).toBeInTheDocument();
+  });
 });

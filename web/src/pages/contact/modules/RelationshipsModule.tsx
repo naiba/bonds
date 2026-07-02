@@ -348,13 +348,16 @@ export default function RelationshipsModule({
               {t("modules.relationships.one_way_hint")}
             </div>
           )}
-          <Form.Item name="relationship_type_id" label={t("modules.relationships.relationship_type")} rules={[{ required: true }]}>
+          <Form.Item name="relationship_type_id" label={t("modules.relationships.relationship_type")} rules={[{ required: true }]}> 
             <Select
               showSearch
               options={typeSelectOptions}
               filterOption={(input, option) => String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
             />
           </Form.Item>
+          <div style={{ fontSize: 12, color: token.colorTextSecondary, marginTop: -16, marginBottom: 12 }}>
+            {t("modules.relationships.direction_hint")}
+          </div>
           <div style={{ marginTop: -12, marginBottom: 24 }}>
             <a onClick={() => window.open("/settings/personalize", "_blank")} style={{ fontSize: 12, color: token.colorPrimary }}>
               {t("modules.relationships.manage_types")}
