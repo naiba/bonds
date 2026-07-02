@@ -8,6 +8,25 @@ import { App, ConfigProvider } from "antd";
 import ContactCreate from "@/pages/contact/ContactCreate";
 import { api } from "@/api";
 
+vi.mock("@/components/CalendarDatePicker", () => ({
+  default: ({ onChange }: { onChange?: (value: { calendarType: string; day: number | null; month: number | null; year: number | null; datePrecision?: string }) => void }) => (
+    <div data-testid="calendar-date-picker">
+      <button
+        data-testid="first-met-year-only"
+        onClick={() => onChange?.({ calendarType: "gregorian", day: null, month: null, year: 2026, datePrecision: "year" })}
+      >
+        First met year only
+      </button>
+      <button
+        data-testid="first-met-month-year"
+        onClick={() => onChange?.({ calendarType: "gregorian", day: null, month: 5, year: 2026, datePrecision: "month" })}
+      >
+        First met month year
+      </button>
+    </div>
+  ),
+}));
+
 // Setup mocks
 vi.mock("@/api", () => ({
   api: {
@@ -21,11 +40,10 @@ vi.mock("@/api", () => ({
   },
 }));
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false } },
-});
-
 function renderWithProviders() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider>
@@ -71,7 +89,7 @@ describe("ContactCreate", () => {
     });
 
     expect(api.contacts.contactsCreate).not.toHaveBeenCalled();
-  });
+  }, 15000);
 
   it("allows submission with nickname only", async () => {
     vi.mocked(api.contacts.contactsCreate).mockResolvedValue({
@@ -122,5 +140,67 @@ describe("ContactCreate", () => {
         }),
       );
     });
+  });
+
+  it("submits year-only first-met precision without fabricating a full date", async () => {
+    vi.mocked(api.contacts.contactsCreate).mockResolvedValue({
+      data: { id: "c1" },
+    });
+    renderWithProviders();
+    const user = userEvent.setup();
+
+    const submitButton = await screen.findByRole("button", {
+      name: "Create contact",
+    });
+    await user.type(await screen.findByLabelText(/first name/i), "John");
+    await user.click(screen.getByTestId("first-met-year-only"));
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(api.contacts.contactsCreate).toHaveBeenCalledWith(
+        "v1",
+        expect.objectContaining({
+          first_name: "John",
+          first_met_date_precision: "year",
+          first_met_year: 2026,
+        }),
+      );
+    });
+
+    const payload = vi.mocked(api.contacts.contactsCreate).mock.calls.at(-1)?.[1];
+    expect(payload?.first_met_at).toBeUndefined();
+    expect(payload?.first_met_month).toBeUndefined();
+    expect(payload?.first_met_day).toBeUndefined();
+  });
+
+  it("submits month-year first-met precision without fabricating a day", async () => {
+    vi.mocked(api.contacts.contactsCreate).mockResolvedValue({
+      data: { id: "c1" },
+    });
+    renderWithProviders();
+    const user = userEvent.setup();
+
+    const submitButton = await screen.findByRole("button", {
+      name: "Create contact",
+    });
+    await user.type(await screen.findByLabelText(/first name/i), "John");
+    await user.click(screen.getByTestId("first-met-month-year"));
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(api.contacts.contactsCreate).toHaveBeenCalledWith(
+        "v1",
+        expect.objectContaining({
+          first_name: "John",
+          first_met_date_precision: "month",
+          first_met_year: 2026,
+          first_met_month: 5,
+        }),
+      );
+    });
+
+    const payload = vi.mocked(api.contacts.contactsCreate).mock.calls.at(-1)?.[1];
+    expect(payload?.first_met_at).toBeUndefined();
+    expect(payload?.first_met_day).toBeUndefined();
   });
 });

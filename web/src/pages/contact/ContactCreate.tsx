@@ -8,22 +8,29 @@ import type { CreateContactRequest, APIError, Contact } from "@/api";
 import { useTranslation } from "react-i18next";
 import { dateInputToTimestamp } from "@/utils/dateOnlyInput";
 import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
+import CalendarDatePicker from "@/components/CalendarDatePicker";
+import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
+import { buildContactFirstMetRequest } from "@/utils/contactFirstMet";
 
 const { Title, Text } = Typography;
 
-type ContactCreateFormValues = Omit<CreateContactRequest, "last_talked_to" | "first_met_at"> & {
+type ContactCreateFormValues = Omit<CreateContactRequest, "last_talked_to" | "first_met_at" | "first_met_date_precision" | "first_met_year" | "first_met_month" | "first_met_day"> & {
   last_talked_to?: string;
-  first_met_at?: string;
+  first_met?: CalendarDatePickerValue;
 };
 
 function buildCreateContactRequest(values: ContactCreateFormValues): CreateContactRequest {
   const request: CreateContactRequest = {
     ...values,
     last_talked_to: dateInputToTimestamp(values.last_talked_to),
-    first_met_at: dateInputToTimestamp(values.first_met_at),
+    ...buildContactFirstMetRequest(values.first_met),
   };
   if (!request.last_talked_to) delete request.last_talked_to;
   if (!request.first_met_at) delete request.first_met_at;
+  if (!request.first_met_date_precision) delete request.first_met_date_precision;
+  if (request.first_met_year == null) delete request.first_met_year;
+  if (request.first_met_month == null) delete request.first_met_month;
+  if (request.first_met_day == null) delete request.first_met_day;
   if (!request.first_met_through_contact_id) delete request.first_met_through_contact_id;
   if (request.stay_in_touch_frequency_days == null) delete request.stay_in_touch_frequency_days;
   return request;
@@ -229,12 +236,12 @@ export default function ContactCreate() {
             </Text>
             <div style={{ display: "flex", gap: 16 }}>
               <Form.Item
-                name="first_met_at"
+                name="first_met"
                 label={t("contact.meeting.first_met_at")}
                 extra={t("contact.meeting.first_met_at_help")}
                 style={{ flex: 1 }}
               >
-                <Input type="date" />
+                <CalendarDatePicker enableDatePrecision allowedDatePrecisions={["full", "month", "year"]} />
               </Form.Item>
               <Form.Item
                 name="first_met_through_contact_id"
