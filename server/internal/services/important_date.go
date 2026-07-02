@@ -48,6 +48,7 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 	date := models.ContactImportantDate{
 		ContactID:                  contactID,
 		Label:                      label,
+		DatePrecision:              req.DatePrecision,
 		Day:                        req.Day,
 		Month:                      req.Month,
 		Year:                       req.Year,
@@ -56,11 +57,14 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 	applyCalendarFields(&date.CalendarType, &date.OriginalDay, &date.OriginalMonth, &date.OriginalYear,
 		&date.Day, &date.Month, &date.Year,
 		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	if err := applyImportantDatePrecision(&date, req.DatePrecision); err != nil {
+		return nil, err
+	}
 	if err := s.db.Create(&date).Error; err != nil {
 		return nil, err
 	}
 
-	if req.RemindMe != nil && *req.RemindMe {
+	if req.RemindMe != nil && *req.RemindMe && importantDateCanScheduleReminder(&date) {
 		date.RemindMe = true
 		s.db.Model(&date).Update("remind_me", true)
 		s.ensureReminder(contactID, &date)
@@ -90,6 +94,7 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 		return nil, ErrImportantDateLabelRequired
 	}
 	date.Label = label
+	date.DatePrecision = req.DatePrecision
 	date.Day = req.Day
 	date.Month = req.Month
 	date.Year = req.Year
@@ -97,12 +102,21 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 	applyCalendarFields(&date.CalendarType, &date.OriginalDay, &date.OriginalMonth, &date.OriginalYear,
 		&date.Day, &date.Month, &date.Year,
 		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	if err := applyImportantDatePrecision(&date, req.DatePrecision); err != nil {
+		return nil, err
+	}
 	if err := s.db.Save(&date).Error; err != nil {
 		return nil, err
 	}
 
-	if req.RemindMe != nil {
-		newRemindMe := *req.RemindMe
+	if !importantDateCanScheduleReminder(&date) {
+		if date.RemindMe {
+			s.db.Model(&date).Update("remind_me", false)
+			date.RemindMe = false
+		}
+		s.removeReminder(contactID, date.ID)
+	} else if req.RemindMe != nil {
+		newRemindMe := *req.RemindMe && importantDateCanScheduleReminder(&date)
 		if newRemindMe != oldRemindMe {
 			s.db.Model(&date).Update("remind_me", newRemindMe)
 			date.RemindMe = newRemindMe
@@ -112,6 +126,8 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 		} else {
 			s.removeReminder(contactID, date.ID)
 		}
+	} else if date.RemindMe {
+		s.ensureReminder(contactID, &date)
 	}
 
 	resp := toImportantDateResponse(&date)
@@ -142,6 +158,9 @@ func (s *ImportantDateService) resolveTypeLabel(typeID uint) string {
 }
 
 func (s *ImportantDateService) ensureReminder(contactID string, date *models.ContactImportantDate) error {
+	if !importantDateCanScheduleReminder(date) {
+		return nil
+	}
 	var existing models.ContactReminder
 	err := s.db.Where("contact_id = ? AND important_date_id = ?", contactID, date.ID).First(&existing).Error
 	if err == nil {
@@ -189,6 +208,7 @@ func toImportantDateResponse(d *models.ContactImportantDate) dto.ImportantDateRe
 		ID:                         d.ID,
 		ContactID:                  d.ContactID,
 		Label:                      d.Label,
+		DatePrecision:              responseImportantDatePrecision(d),
 		Day:                        d.Day,
 		Month:                      d.Month,
 		Year:                       d.Year,

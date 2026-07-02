@@ -4,6 +4,7 @@ import "time"
 
 type CreateImportantDateRequest struct {
 	Label                      string `json:"label" example:"Birthday"`
+	DatePrecision              string `json:"date_precision" example:"full"`
 	Day                        *int   `json:"day" example:"15"`
 	Month                      *int   `json:"month" example:"6"`
 	Year                       *int   `json:"year" example:"1990"`
@@ -17,6 +18,7 @@ type CreateImportantDateRequest struct {
 
 type UpdateImportantDateRequest struct {
 	Label                      string `json:"label" example:"Birthday"`
+	DatePrecision              string `json:"date_precision" example:"full"`
 	Day                        *int   `json:"day" example:"15"`
 	Month                      *int   `json:"month" example:"6"`
 	Year                       *int   `json:"year" example:"1990"`
@@ -32,6 +34,7 @@ type ImportantDateResponse struct {
 	ID                         uint      `json:"id" example:"1"`
 	ContactID                  string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Label                      string    `json:"label" example:"Birthday"`
+	DatePrecision              string    `json:"date_precision" example:"full"`
 	Day                        *int      `json:"day" example:"15"`
 	Month                      *int      `json:"month" example:"6"`
 	Year                       *int      `json:"year" example:"1990"`

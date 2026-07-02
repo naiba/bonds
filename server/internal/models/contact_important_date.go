@@ -34,6 +34,7 @@ type ContactImportantDate struct {
 	DistantURI                 *string        `json:"distant_uri" gorm:"size:2096"`
 	ContactImportantDateTypeID *uint          `json:"contact_important_date_type_id" gorm:"index"`
 	Label                      string         `json:"label" gorm:"not null"`
+	DatePrecision              string         `json:"date_precision" gorm:"size:32"`
 	Day                        *int           `json:"day"`
 	Month                      *int           `json:"month"`
 	Year                       *int           `json:"year"`
