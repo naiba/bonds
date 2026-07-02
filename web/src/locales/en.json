@@ -535,7 +535,9 @@
     },
     "needs_verification": {
       "badge": "To verify",
-      "field_label": "Needs verification (flag for later review)"
+      "field_label": "Needs verification (flag for later review)",
+      "promote_action": "Add to contacts",
+      "promoted": "Contact added to your contacts"
     },
     "meeting": {
       "title": "How you met",
@@ -932,6 +934,7 @@
       "contact": "Contact",
       "select_contact": "Select a contact",
       "relationship_type": "Relationship Type",
+      "direction_hint": "Choose the relationship from this contact's perspective. For example, select Parent if this contact is the parent of the selected person.",
       "manage_types": "Manage Types",
       "manage_types_hint": "Configure relationship types, degrees and reverse relationships in Settings",
       "graph_title": "Relationship Network",

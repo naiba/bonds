@@ -535,7 +535,9 @@
     },
     "needs_verification": {
       "badge": "待核实",
-      "field_label": "标记为待核实（稍后再确认）"
+      "field_label": "标记为待核实（稍后再确认）",
+      "promote_action": "加入联系人",
+      "promoted": "联系人已加入你的联系人列表"
     },
     "meeting": {
       "title": "相识信息",
@@ -932,6 +934,7 @@
       "contact": "联系人",
       "select_contact": "选择联系人",
       "relationship_type": "关系类型",
+      "direction_hint": "请从当前联系人的视角选择关系类型。例如：如果当前联系人是对方的父母，就选择“父母”。",
       "manage_types": "管理类型",
       "manage_types_hint": "在设置中配置关系类型、亲属层级和反向关系",
       "graph_title": "关系网络",

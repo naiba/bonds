@@ -535,7 +535,9 @@
     },
     "needs_verification": {
       "badge": "Por verificar",
-      "field_label": "Necesita verificación (revisar más tarde)"
+      "field_label": "Necesita verificación (revisar más tarde)",
+      "promote_action": "Añadir a contactos",
+      "promoted": "El contacto se añadió a tus contactos"
     },
     "meeting": {
       "title": "Cómo se conocieron",
@@ -932,6 +934,7 @@
       "contact": "Contacto",
       "select_contact": "Selecciona un contacto",
       "relationship_type": "Tipo de relación",
+      "direction_hint": "Elige la relación desde la perspectiva de este contacto. Por ejemplo, selecciona Padre/Madre si este contacto es el padre o la madre de la persona seleccionada.",
       "manage_types": "Gestionar tipos",
       "manage_types_hint": "Configura los tipos de relación, grados y relaciones inversas en Ajustes",
       "graph_title": "Red de relaciones",

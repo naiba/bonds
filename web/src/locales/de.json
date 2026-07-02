@@ -535,7 +535,9 @@
     },
     "needs_verification": {
       "badge": "Zu überprüfen",
-      "field_label": "Zur Überprüfung markieren (für spätere Kontrolle)"
+      "field_label": "Zur Überprüfung markieren (für spätere Kontrolle)",
+      "promote_action": "Zu Kontakten hinzufügen",
+      "promoted": "Der Kontakt wurde zu Ihren Kontakten hinzugefügt"
     },
     "meeting": {
       "title": "Wie Sie sich kennengelernt haben",
@@ -932,6 +934,7 @@
       "contact": "Kontakt",
       "select_contact": "Kontakt auswählen",
       "relationship_type": "Beziehungstyp",
+      "direction_hint": "Wählen Sie die Beziehung aus der Perspektive dieses Kontakts. Wählen Sie zum Beispiel Elternteil, wenn dieser Kontakt das Elternteil der ausgewählten Person ist.",
       "manage_types": "Typen verwalten",
       "manage_types_hint": "Beziehungstypen, Verwandtschaftsgrade und Umkehrbeziehungen in den Einstellungen konfigurieren",
       "graph_title": "Beziehungsnetzwerk",
