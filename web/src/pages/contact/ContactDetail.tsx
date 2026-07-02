@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { formatContactName, formatContactInitials, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { dateInputToTimestamp, formatDateOnly, timestampToDateInput } from "@/utils/dateOnlyInput";
+import CalendarDatePicker from "@/components/CalendarDatePicker";
+import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
+import { buildContactFirstMetRequest, contactFirstMetToCalendarDate, formatContactFirstMetDisplay } from "@/utils/contactFirstMet";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Card,
@@ -81,19 +84,23 @@ function buildContactListUrl(vaultId: string, search: string): string {
   return `/vaults/${vaultId}/contacts${query ? `?${query}` : ""}`;
 }
 
-type ContactEditFormValues = Omit<UpdateContactRequest, "last_talked_to" | "first_met_at"> & {
+type ContactEditFormValues = Omit<UpdateContactRequest, "last_talked_to" | "first_met_at" | "first_met_date_precision" | "first_met_year" | "first_met_month" | "first_met_day"> & {
   last_talked_to?: string;
-  first_met_at?: string;
+  first_met?: CalendarDatePickerValue;
 };
 
 function buildUpdateContactRequest(values: ContactEditFormValues): UpdateContactRequest {
   const request: UpdateContactRequest = {
     ...values,
     last_talked_to: dateInputToTimestamp(values.last_talked_to),
-    first_met_at: dateInputToTimestamp(values.first_met_at),
+    ...buildContactFirstMetRequest(values.first_met),
   };
   if (!request.last_talked_to) delete request.last_talked_to;
   if (!request.first_met_at) delete request.first_met_at;
+  if (!request.first_met_date_precision) delete request.first_met_date_precision;
+  if (request.first_met_year == null) delete request.first_met_year;
+  if (request.first_met_month == null) delete request.first_met_month;
+  if (request.first_met_day == null) delete request.first_met_day;
   if (!request.first_met_through_contact_id) delete request.first_met_through_contact_id;
   if (request.stay_in_touch_frequency_days == null) delete request.stay_in_touch_frequency_days;
   return request;
@@ -210,6 +217,22 @@ export default function ContactDetail() {
       });
       message.success(t("contact.detail.edit_success"));
       setIsEditModalOpen(false);
+    },
+    onError: (err: APIError) => {
+      message.error(err.message || t("common.error"));
+    },
+  });
+
+  const promoteRelationshipContactMutation = useMutation({
+    mutationFn: (request: UpdateContactRequest) => api.contacts.contactsUpdate(String(vaultId), String(cId), request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts", cId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts"],
+      });
+      message.success(t("contact.needs_verification.promoted"));
     },
     onError: (err: APIError) => {
       message.error(err.message || t("common.error"));
@@ -363,7 +386,10 @@ export default function ContactDetail() {
     contact.suffix && { label: t("contact.detail.suffix"), value: contact.suffix },
     contact.nickname && { label: t("contact.detail.nickname"), value: `\u201C${contact.nickname}\u201D` },
     contact.maiden_name && { label: t("contact.detail.maiden_name"), value: contact.maiden_name },
-    contact.first_met_at && { label: t("contact.meeting.first_met_at"), value: formatDateOnly(contact.first_met_at, dateFormats) },
+    (() => {
+      const firstMetLabel = formatContactFirstMetDisplay(contact, dateFormats);
+      return firstMetLabel ? { label: t("contact.meeting.first_met_at"), value: firstMetLabel } : null;
+    })(),
   ].filter(Boolean) as { label: string; value: string }[];
 
   const metThroughContact = contact.first_met_through_contact;
@@ -581,6 +607,7 @@ export default function ContactDetail() {
   ];
 
   const tabItems = tabsData ? buildDynamicTabs(tabsData) : fallbackTabItems;
+  const isRelationshipOnlyHiddenContact = contact.needs_verification && !contact.listed;
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto" }}>
@@ -650,6 +677,32 @@ export default function ContactDetail() {
                   </Tag>
                 )}
                 {contact.is_archived && <Tag color="default">{t("common.archived")}</Tag>}
+                {isRelationshipOnlyHiddenContact && (
+                  <Button
+                    size="small"
+                    onClick={() => promoteRelationshipContactMutation.mutate({
+                      first_name: contact.first_name ?? "",
+                      last_name: contact.last_name,
+                      middle_name: contact.middle_name,
+                      nickname: contact.nickname,
+                      maiden_name: contact.maiden_name,
+                      prefix: contact.prefix,
+                      suffix: contact.suffix,
+                      gender_id: contact.gender_id,
+                      pronoun_id: contact.pronoun_id,
+                      template_id: contact.template_id,
+                      listed: true,
+                      needs_verification: false,
+                      first_met_through_contact_id: contact.first_met_through_contact_id,
+                      ...buildContactFirstMetRequest(contactFirstMetToCalendarDate(contact)),
+                      last_talked_to: dateInputToTimestamp(timestampToDateInput(contact.last_talked_to)),
+                      stay_in_touch_frequency_days: contact.stay_in_touch_frequency_days,
+                    })}
+                    loading={promoteRelationshipContactMutation.isPending}
+                  >
+                    {t("contact.needs_verification.promote_action")}
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -680,7 +733,7 @@ export default function ContactDetail() {
                 maiden_name: contact.maiden_name,
                 gender_id: contact.gender_id,
                 pronoun_id: contact.pronoun_id,
-                first_met_at: timestampToDateInput(contact.first_met_at),
+                first_met: contactFirstMetToCalendarDate(contact),
                 first_met_through_contact_id: contact.first_met_through_contact_id,
                 last_talked_to: timestampToDateInput(contact.last_talked_to),
                 stay_in_touch_frequency_days: contact.stay_in_touch_frequency_days,
@@ -927,12 +980,12 @@ export default function ContactDetail() {
             </Text>
             <div style={{ display: "flex", gap: 16 }}>
               <Form.Item
-                name="first_met_at"
+                name="first_met"
                 label={t("contact.meeting.first_met_at")}
                 extra={t("contact.meeting.first_met_at_help")}
                 style={{ flex: 1 }}
               >
-                <Input type="date" />
+                <CalendarDatePicker enableDatePrecision allowedDatePrecisions={["full", "month", "year"]} />
               </Form.Item>
               <Form.Item
                 name="first_met_through_contact_id"

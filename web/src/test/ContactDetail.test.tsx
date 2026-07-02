@@ -83,6 +83,26 @@ vi.mock("@/pages/contact/modules/ContactSummaryCard", () => ({
   default: ({ readOnly }: { readOnly?: boolean }) => <div>ContactSummaryCard:{readOnly ? "read" : "edit"}</div>,
 }));
 
+vi.mock("@/components/CalendarDatePicker", () => ({
+  default: ({ value, onChange }: { value?: unknown; onChange?: (next: unknown) => void }) => (
+    <div data-testid="calendar-date-picker">
+      <output data-testid="calendar-picker-value">{JSON.stringify(value ?? null)}</output>
+      <button
+        data-testid="contact-detail-first-met-year"
+        onClick={() => onChange?.({ calendarType: "gregorian", day: null, month: null, year: 2026, datePrecision: "year" })}
+      >
+        Contact detail first met year
+      </button>
+      <button
+        data-testid="contact-detail-first-met-month"
+        onClick={() => onChange?.({ calendarType: "gregorian", day: null, month: 5, year: 2026, datePrecision: "month" })}
+      >
+        Contact detail first met month
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock("@/api/contacts", () => ({
   contactsApi: {
     get: vi.fn(),
@@ -214,6 +234,27 @@ describe("ContactDetail", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows a promote action for hidden relationship-only contacts", async () => {
+    const user = userEvent.setup();
+    mockContactQuery.mockReturnValue({
+      data: {
+        ...mockContact,
+        listed: false,
+        needs_verification: true,
+      },
+      isLoading: false,
+    });
+
+    renderContactDetail();
+
+    await user.click(screen.getByRole("button", { name: /add to contacts/i }));
+
+    expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
+      listed: true,
+      needs_verification: false,
+    }));
+  });
+
   it("defaults to read view mode and allows toggling to edit view", async () => {
     const user = userEvent.setup();
     mockContactQuery.mockReturnValue({ data: mockContact, isLoading: false });
@@ -322,9 +363,10 @@ describe("ContactDetail", () => {
     fireEvent.click(screen.getByRole("button", { name: /edit/i }));
 
     await waitFor(() => {
-      const dateInput = document.querySelector<HTMLInputElement>("#first_met_at");
-      expect(dateInput?.value).toBe("2026-01-15");
+      expect(screen.getByTestId("calendar-date-picker")).toBeInTheDocument();
     });
+
+    expect(screen.getByTestId("calendar-picker-value")).toHaveTextContent('"datePrecision":"full"');
 
     const editForm = document.querySelector<HTMLFormElement>(".ant-modal form");
     expect(editForm).toBeInTheDocument();
@@ -337,5 +379,87 @@ describe("ContactDetail", () => {
         first_met_through_contact_id: "3",
       }));
     });
+  });
+
+  it("prefills and submits year-only first-met precision without fabricating a full date", async () => {
+    mockMeetingContacts = [{ id: "3", first_name: "Mary", last_name: "Host" }];
+    mockContactQuery.mockReturnValue({
+      data: {
+        ...mockContact,
+        first_met_at: undefined,
+        first_met_year: 2026,
+        first_met_month: undefined,
+        first_met_day: undefined,
+        first_met_date_precision: "year",
+        first_met_through_contact_id: "3",
+      },
+      isLoading: false,
+    });
+
+    renderContactDetail();
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("calendar-date-picker")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("calendar-picker-value")).toHaveTextContent('"datePrecision":"year"');
+
+    const editForm = document.querySelector<HTMLFormElement>(".ant-modal form");
+    expect(editForm).toBeInTheDocument();
+    if (!editForm) throw new Error("Edit form was not rendered");
+    fireEvent.submit(editForm);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
+        first_met_date_precision: "year",
+        first_met_year: 2026,
+      }));
+    });
+
+    const request = mockMutate.mock.calls.at(-1)?.[0];
+    expect(request.first_met_at).toBeUndefined();
+    expect(request.first_met_month).toBeUndefined();
+    expect(request.first_met_day).toBeUndefined();
+  });
+
+  it("prefills and submits month-year first-met precision without fabricating a day", async () => {
+    mockContactQuery.mockReturnValue({
+      data: {
+        ...mockContact,
+        first_met_at: undefined,
+        first_met_year: 2026,
+        first_met_month: 5,
+        first_met_day: undefined,
+        first_met_date_precision: "month",
+      },
+      isLoading: false,
+    });
+
+    renderContactDetail();
+    fireEvent.click(screen.getByRole("button", { name: /edit/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("calendar-date-picker")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("calendar-picker-value")).toHaveTextContent('"datePrecision":"month"');
+
+    const editForm = document.querySelector<HTMLFormElement>(".ant-modal form");
+    expect(editForm).toBeInTheDocument();
+    if (!editForm) throw new Error("Edit form was not rendered");
+    fireEvent.submit(editForm);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
+        first_met_date_precision: "month",
+        first_met_year: 2026,
+        first_met_month: 5,
+      }));
+    });
+
+    const request = mockMutate.mock.calls.at(-1)?.[0];
+    expect(request.first_met_at).toBeUndefined();
+    expect(request.first_met_day).toBeUndefined();
   });
 });
