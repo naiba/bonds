@@ -7,7 +7,7 @@ import CalendarDatePickerControls from "./CalendarDatePickerControls";
 import { createCalendarDatePickerHandlers } from "./calendarDatePickerHandlers";
 import { formatCalendarDatePickerPreview } from "./calendarDatePickerPreview";
 import { inferPrecisionFromValue } from "./calendarDatePickerValue";
-import type { CalendarDatePickerValue } from "./calendarDatePickerValue";
+import type { CalendarDatePickerValue, ImportantDatePrecision } from "./calendarDatePickerValue";
 
 export type { CalendarDatePickerValue, ImportantDatePrecision } from "./calendarDatePickerValue";
 
@@ -20,6 +20,7 @@ interface CalendarDatePickerProps {
   enableAlternativeCalendar?: boolean;
   enableNoYear?: boolean;
   enableDatePrecision?: boolean;
+  allowedDatePrecisions?: readonly ImportantDatePrecision[];
 }
 
 function buildDayOptions(totalDays: number): Array<{ value: number; label: string }> {
@@ -47,12 +48,16 @@ export default function CalendarDatePicker({
   enableAlternativeCalendar = false,
   enableNoYear = false,
   enableDatePrecision = false,
+  allowedDatePrecisions = ["full", "month", "year", "month_day"],
 }: CalendarDatePickerProps) {
   const { t } = useTranslation();
   const now = dayjs();
 
   const calendarType = value?.calendarType ?? "gregorian";
-  const datePrecision = inferPrecisionFromValue(value);
+  const inferredPrecision = inferPrecisionFromValue(value);
+  const datePrecision = allowedDatePrecisions.includes(inferredPrecision)
+    ? inferredPrecision
+    : allowedDatePrecisions[0] ?? "full";
   const usesPrecisionLayout = enableDatePrecision;
   const selectedYear = value?.year ?? now.year();
   const selectedMonth = value?.month ?? now.month() + 1;
@@ -116,6 +121,7 @@ export default function CalendarDatePicker({
   const fieldControls = (
     <CalendarDatePickerControls
       showPrecisionSelector={enableDatePrecision}
+      availablePrecisions={allowedDatePrecisions}
       usesPrecisionLayout={usesPrecisionLayout}
       datePrecision={datePrecision}
       displayYear={displayYear}

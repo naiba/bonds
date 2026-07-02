@@ -55,6 +55,19 @@ describe("CalendarDatePicker", () => {
     });
   });
 
+  it("can hide unsupported precision options for narrower consumers", () => {
+    renderPicker({
+      enableDatePrecision: true,
+      allowedDatePrecisions: ["full", "month", "year"],
+      value: { calendarType: "gregorian", day: 15, month: 8, year: 2025, datePrecision: "full" },
+    });
+
+    expect(screen.queryByText("Month & day")).not.toBeInTheDocument();
+    expect(screen.getByText("Full date")).toBeInTheDocument();
+    expect(screen.getByText("Month & year")).toBeInTheDocument();
+    expect(screen.getByText("Year only")).toBeInTheDocument();
+  });
+
   it("renders plain date picker when alternative calendar disabled", () => {
     renderPicker();
     expect(document.querySelector(".ant-picker")).toBeInTheDocument();

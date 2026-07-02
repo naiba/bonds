@@ -7,9 +7,10 @@ type SelectOption = {
 };
 
 interface CalendarDatePickerControlsProps {
-  readonly showPrecisionSelector: boolean;
-  readonly usesPrecisionLayout: boolean;
-  readonly datePrecision: ImportantDatePrecision;
+	readonly showPrecisionSelector: boolean;
+	readonly availablePrecisions: readonly ImportantDatePrecision[];
+	readonly usesPrecisionLayout: boolean;
+	readonly datePrecision: ImportantDatePrecision;
   readonly displayYear: number | null;
   readonly selectedMonth: number;
   readonly selectedDay: number;
@@ -33,8 +34,9 @@ interface CalendarDatePickerControlsProps {
 }
 
 export default function CalendarDatePickerControls({
-  showPrecisionSelector,
-  usesPrecisionLayout,
+	showPrecisionSelector,
+	availablePrecisions,
+	usesPrecisionLayout,
   datePrecision,
   displayYear,
   selectedMonth,
@@ -52,19 +54,23 @@ export default function CalendarDatePickerControls({
   onMonthChange,
   onDayChange,
 }: CalendarDatePickerControlsProps) {
-  return (
-    <>
-      {showPrecisionSelector && (
-        <Segmented
-          options={[
-            { value: "full", label: precisionLabels.full },
-            { value: "month", label: precisionLabels.month },
-            { value: "year", label: precisionLabels.year },
-            { value: "month_day", label: precisionLabels.monthDay },
-          ]}
-          value={datePrecision}
-          onChange={onPrecisionChange}
-          style={{ marginBottom: 8 }}
+	return (
+		<>
+		  {showPrecisionSelector && (
+			<Segmented
+			  options={availablePrecisions.map((precision) => ({
+				value: precision,
+				label: precision === "full"
+					? precisionLabels.full
+					: precision === "month"
+						? precisionLabels.month
+						: precision === "year"
+							? precisionLabels.year
+							: precisionLabels.monthDay,
+			  }))}
+			  value={datePrecision}
+			  onChange={onPrecisionChange}
+			  style={{ marginBottom: 8 }}
           block
         />
       )}
