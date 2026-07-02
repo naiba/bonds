@@ -9,6 +9,16 @@ class ResizeObserverStub {
 }
 window.ResizeObserver = window.ResizeObserver || ResizeObserverStub;
 
+class MutationObserverStub {
+  constructor() {}
+  observe() {}
+  disconnect() {}
+  takeRecords(): MutationRecord[] {
+    return [];
+  }
+}
+window.MutationObserver = window.MutationObserver || MutationObserverStub;
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({

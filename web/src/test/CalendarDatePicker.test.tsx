@@ -23,6 +23,38 @@ function renderPicker(props: Parameters<typeof CalendarDatePicker>[0] = {}) {
 }
 
 describe("CalendarDatePicker", () => {
+  it("emits backend precision values when precision selector changes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderPicker({
+      enableNoYear: true,
+      enableDatePrecision: true,
+      value: { calendarType: "gregorian", day: 15, month: 8, year: 2025, datePrecision: "full" },
+      onChange,
+    });
+
+    await user.click(screen.getByText("Month & year"));
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ day: null, month: 8, year: 2025, datePrecision: "month" }),
+      );
+    });
+
+    await user.click(screen.getByText("Year only"));
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ day: null, month: null, year: 2025, datePrecision: "year" }),
+      );
+    });
+
+    await user.click(screen.getByText("Month & day"));
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ day: 15, month: 8, year: null, datePrecision: "month_day" }),
+      );
+    });
+  });
+
   it("renders plain date picker when alternative calendar disabled", () => {
     renderPicker();
     expect(document.querySelector(".ant-picker")).toBeInTheDocument();
@@ -46,6 +78,30 @@ describe("CalendarDatePicker", () => {
     expect(document.querySelector(".ant-picker")).not.toBeInTheDocument();
     const selects = document.querySelectorAll(".ant-select");
     expect(selects.length).toBe(3);
+  });
+
+  it("falls back to gregorian when switching a lunar full date to partial precision", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderPicker({
+      enableAlternativeCalendar: true,
+      enableDatePrecision: true,
+      value: { calendarType: "lunar", day: 15, month: 1, year: 2025, datePrecision: "full" },
+      onChange,
+    });
+
+    await user.click(screen.getByText("Month & year"));
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          calendarType: "gregorian",
+          datePrecision: "month",
+          day: null,
+          month: 2,
+          year: 2025,
+        }),
+      );
+    });
   });
 
   it("shows preview text when alternative calendar enabled", () => {
@@ -82,7 +138,7 @@ describe("CalendarDatePicker", () => {
     renderPicker({
       enableAlternativeCalendar: true,
       enableNoYear: true,
-      value: { calendarType: "lunar", day: 15, month: 1, year: null } as never,
+      value: { calendarType: "lunar", day: 15, month: 1, year: null, datePrecision: "month_day" },
     });
     const yearSelect = document.querySelector(".ant-select");
     expect(yearSelect).toBeTruthy();
@@ -127,7 +183,7 @@ describe("CalendarDatePicker", () => {
     await user.click(screen.getByText("Not set"));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ year: null }),
+        expect.objectContaining({ year: null, datePrecision: "month_day" }),
       );
     });
   });

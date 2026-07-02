@@ -123,4 +123,22 @@ describe("RemindersModule", () => {
     const recurringTags = screen.getAllByText("Yearly");
     expect(recurringTags.length).toBeGreaterThanOrEqual(1);
   });
+
+  it("renders year-null yearly reminders without a year in the display", () => {
+    mockRemindersReturn = {
+      data: [{
+        ...mockReminders[0],
+        year: null,
+      }],
+      isLoading: false,
+    };
+    renderModule();
+    expect(screen.getByText(/Mar 15/)).toBeInTheDocument();
+  });
+
+  it("keeps the calendar picker mounted for full-date reminder consumers", () => {
+    renderModule();
+    expect(screen.queryByTestId("calendar-date-picker")).not.toBeInTheDocument();
+    expect(screen.getByText("Add")).toBeInTheDocument();
+  });
 });
