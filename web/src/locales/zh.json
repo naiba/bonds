@@ -924,6 +924,11 @@
       "removed": "关系已移除",
       "edit": "编辑",
       "modal_title": "添加关系",
+      "target_kind": "关系对象",
+      "target_existing": "已有联系人",
+      "target_external": "外部联系人",
+      "external_contact": "外部联系人",
+      "external_contact_placeholder": "输入外部联系人姓名",
       "contact": "联系人",
       "select_contact": "选择联系人",
       "relationship_type": "关系类型",
@@ -1297,7 +1302,13 @@
     "year": "年",
     "month": "月",
     "day": "日",
-    "no_year": "未设置"
+    "no_year": "未设置",
+    "date_precision": {
+      "full": "完整日期",
+      "month": "年月",
+      "year": "仅年份",
+      "month_day": "月日"
+    }
   },
   "theme": {
     "light": "浅色",

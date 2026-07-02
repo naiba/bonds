@@ -924,6 +924,11 @@
       "removed": "Relationship removed",
       "edit": "Edit",
       "modal_title": "Add Relationship",
+      "target_kind": "Relationship target",
+      "target_existing": "Existing contact",
+      "target_external": "External contact",
+      "external_contact": "External contact",
+      "external_contact_placeholder": "Enter an external contact name",
       "contact": "Contact",
       "select_contact": "Select a contact",
       "relationship_type": "Relationship Type",
@@ -1297,7 +1302,13 @@
     "year": "Year",
     "month": "Month",
     "day": "Day",
-    "no_year": "Not set"
+    "no_year": "Not set",
+    "date_precision": {
+      "full": "Full date",
+      "month": "Month & year",
+      "year": "Year only",
+      "month_day": "Month & day"
+    }
   },
   "theme": {
     "light": "Light",

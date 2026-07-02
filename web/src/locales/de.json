@@ -924,6 +924,11 @@
       "removed": "Beziehung entfernt",
       "edit": "Bearbeiten",
       "modal_title": "Beziehung hinzufügen",
+      "target_kind": "Beziehungsziel",
+      "target_existing": "Bestehender Kontakt",
+      "target_external": "Externer Kontakt",
+      "external_contact": "Externer Kontakt",
+      "external_contact_placeholder": "Name eines externen Kontakts eingeben",
       "contact": "Kontakt",
       "select_contact": "Kontakt auswählen",
       "relationship_type": "Beziehungstyp",
@@ -1297,7 +1302,13 @@
     "year": "Jahr",
     "month": "Monat",
     "day": "Tag",
-    "no_year": "Nicht angegeben"
+    "no_year": "Nicht angegeben",
+    "date_precision": {
+      "full": "Vollständiges Datum",
+      "month": "Monat & Jahr",
+      "year": "Nur Jahr",
+      "month_day": "Monat & Tag"
+    }
   },
   "theme": {
     "light": "Hell",
