@@ -80,6 +80,9 @@ func (h *RelationshipHandler) Create(c echo.Context) error {
 
 	relationship, err := h.relationshipService.Create(contactID, vaultID, userID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrRelationshipRelatedContactInvalid) {
+			return response.ValidationError(c, map[string]string{"related_contact_id": err.Error()})
+		}
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}

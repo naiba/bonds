@@ -4,13 +4,17 @@ import (
 	"container/heap"
 	"errors"
 	"math"
+	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
 
-var ErrRelationshipNotFound = errors.New("relationship not found")
+var (
+	ErrRelationshipNotFound              = errors.New("relationship not found")
+	ErrRelationshipRelatedContactInvalid = errors.New("relationship requires either related contact or external contact name")
+)
 
 type RelationshipService struct {
 	db           *gorm.DB
@@ -71,17 +75,33 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 		return nil, err
 	}
 
-	relatedContact, err := validateAccessibleRelatedContact(s.db, userID, req.RelatedContactID)
-	if err != nil {
-		return nil, ErrContactNotFound
+	relatedContactID := strings.TrimSpace(req.RelatedContactID)
+	externalContactName := strings.TrimSpace(req.ExternalContactName)
+	if (relatedContactID == "") == (externalContactName == "") {
+		return nil, ErrRelationshipRelatedContactInvalid
 	}
+
+	relatedContact, err := resolveRelationshipRelatedContact(s.db, userID, vaultID, relatedContactID, externalContactName)
+	if err != nil {
+		return nil, err
+	}
+	relatedContactID = relatedContact.ID
 
 	var relationship models.Relationship
 	transactionErr := s.db.Transaction(func(tx *gorm.DB) error {
+		if relatedContact.ID == "" {
+			createdContact, err := createExternalRelationshipContact(tx, vaultID, externalContactName)
+			if err != nil {
+				return err
+			}
+			relatedContact = createdContact
+			relatedContactID = createdContact.ID
+		}
+
 		relationship = models.Relationship{
 			ContactID:          contactID,
 			RelationshipTypeID: req.RelationshipTypeID,
-			RelatedContactID:   req.RelatedContactID,
+			RelatedContactID:   relatedContactID,
 		}
 		if err := tx.Create(&relationship).Error; err != nil {
 			return err
@@ -94,7 +114,7 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 		reverseTypeID, found := findReverseTypeID(tx, req.RelationshipTypeID)
 		if found && hasEditorPermission(tx, userID, relatedContact.VaultID) {
 			reverse := models.Relationship{
-				ContactID:          req.RelatedContactID,
+				ContactID:          relatedContactID,
 				RelationshipTypeID: reverseTypeID,
 				RelatedContactID:   contactID,
 			}
@@ -103,7 +123,7 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 			}
 			if s.feedRecorder != nil {
 				entityType := "Relationship"
-				s.feedRecorder.Record(req.RelatedContactID, "", ActionRelationshipAdded, "Added a relationship", &reverse.ID, &entityType)
+				s.feedRecorder.Record(relatedContactID, "", ActionRelationshipAdded, "Added a relationship", &reverse.ID, &entityType)
 			}
 		}
 
@@ -508,6 +528,33 @@ func validateAccessibleRelatedContact(db *gorm.DB, userID, relatedContactID stri
 		return nil, ErrContactNotFound
 	}
 	return &relatedContact, nil
+}
+
+func resolveRelationshipRelatedContact(db *gorm.DB, userID, vaultID, relatedContactID, externalContactName string) (*models.Contact, error) {
+	if relatedContactID != "" {
+		return validateAccessibleRelatedContact(db, userID, relatedContactID)
+	}
+	if externalContactName == "" {
+		return nil, ErrRelationshipRelatedContactInvalid
+	}
+	return &models.Contact{VaultID: vaultID, FirstName: &externalContactName}, nil
+}
+
+func createExternalRelationshipContact(tx *gorm.DB, vaultID, externalContactName string) (*models.Contact, error) {
+	contact := models.Contact{
+		VaultID:           vaultID,
+		FirstName:         &externalContactName,
+		NeedsVerification: true,
+		CanBeDeleted:      true,
+	}
+	if err := tx.Create(&contact).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Model(&contact).Update("listed", false).Error; err != nil {
+		return nil, err
+	}
+	contact.Listed = false
+	return &contact, nil
 }
 
 // accessibleVaultIDSet returns all vault IDs the user can read.

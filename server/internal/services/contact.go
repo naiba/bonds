@@ -277,6 +277,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	contact.StayInTouchFrequencyDays = req.StayInTouchFrequencyDays
 	contact.StayInTouchTriggerDate = calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays)
 	contact.LastUpdatedAt = &now
+	if req.Listed != nil {
+		contact.Listed = *req.Listed
+	}
 	if req.NeedsVerification != nil {
 		contact.NeedsVerification = *req.NeedsVerification
 	}

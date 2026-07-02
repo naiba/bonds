@@ -34,6 +34,7 @@ type UpdateContactRequest struct {
 	GenderID                 *uint      `json:"gender_id" example:"1"`
 	PronounID                *uint      `json:"pronoun_id" example:"1"`
 	TemplateID               *uint      `json:"template_id" example:"1"`
+	Listed                   *bool      `json:"listed" example:"true"`
 	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
 	FirstMetAt               *time.Time `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
 	FirstMetThroughContactID *string    `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
