@@ -3,9 +3,11 @@ import {
   Card,
   List,
   Button,
+  Input,
   Modal,
   Form,
   Select,
+  Radio,
   Popconfirm,
   App,
   Tag,
@@ -19,10 +21,26 @@ import { Link } from "react-router-dom";
 import NetworkGraph from "@/components/NetworkGraph";
 import type { Relationship, APIError } from "@/api";
 import type {
+  GithubComNaibaBondsInternalDtoCreateRelationshipRequest,
   GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse,
   GithubComNaibaBondsInternalDtoCrossVaultContactItem,
+  GithubComNaibaBondsInternalDtoUpdateRelationshipRequest,
 } from "@/api";
 import { useTranslation } from "react-i18next";
+
+const RELATIONSHIP_TARGET_KINDS = {
+  existing: "existing",
+  external: "external",
+} as const;
+
+type RelationshipTargetKind = (typeof RELATIONSHIP_TARGET_KINDS)[keyof typeof RELATIONSHIP_TARGET_KINDS];
+
+type RelationshipFormValues = {
+  readonly target_kind?: RelationshipTargetKind;
+  readonly related_contact_id?: string;
+  readonly external_contact_name?: string;
+  readonly relationship_type_id?: number;
+};
 
 export default function RelationshipsModule({
   vaultId,
@@ -40,6 +58,7 @@ export default function RelationshipsModule({
   const { token } = theme.useToken();
   // Cross-vault contacts query: returns contacts from ALL accessible vaults
   const qk = ["vaults", vaultId, "contacts", contactId, "relationships"];
+  const selectedTargetKind = Form.useWatch("target_kind", form) ?? RELATIONSHIP_TARGET_KINDS.existing;
 
   const { data: relationships = [], isLoading } = useQuery({
     queryKey: qk,
@@ -51,9 +70,9 @@ export default function RelationshipsModule({
 
   const { data: crossVaultContacts = [] } = useQuery({
     queryKey: ["relationships", "contacts"],
-    queryFn: async () => {
+    queryFn: async (): Promise<GithubComNaibaBondsInternalDtoCrossVaultContactItem[]> => {
       const res = await api.relationships.contactsList();
-      return (res.data ?? []) as GithubComNaibaBondsInternalDtoCrossVaultContactItem[];
+      return res.data ?? [];
     },
   });
 
@@ -64,27 +83,33 @@ export default function RelationshipsModule({
   // Now fetches all actual RelationshipType records with group names for grouped select.
   const { data: relationshipTypes = [] } = useQuery({
     queryKey: ["personalize", "relationship-types", "all"],
-    queryFn: async () => {
+    queryFn: async (): Promise<GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse[]> => {
       const res = await api.relationshipTypes.personalizeRelationshipTypesAllList();
-      return (res.data ?? []) as GithubComNaibaBondsInternalDtoRelationshipTypeWithGroupResponse[];
+      return res.data ?? [];
     },
   });
 
   // Track whether the selected contact lacks editor permission (one-way only)
   const selectedContactId = Form.useWatch("related_contact_id", form);
   const selectedContactOneWay = useMemo(() => {
-    if (!selectedContactId) return false;
+    if (selectedTargetKind !== RELATIONSHIP_TARGET_KINDS.existing || !selectedContactId) return false;
     const c = crossVaultContacts.find((x) => x.contact_id === selectedContactId);
     return c ? c.has_editor === false : false;
-  }, [selectedContactId, crossVaultContacts]);
+  }, [selectedTargetKind, selectedContactId, crossVaultContacts]);
 
   // Build grouped options for the relationship type Select (OptGroup by group name).
   const typeSelectOptions = useMemo(() => {
     const groups = new Map<string, { value: number; label: string }[]>();
     for (const rt of relationshipTypes) {
+      if (rt.id == null) continue;
       const groupName = rt.group_name ?? "";
-      if (!groups.has(groupName)) groups.set(groupName, []);
-      groups.get(groupName)!.push({ value: rt.id!, label: rt.name ?? "" });
+      const option = { value: rt.id, label: rt.name ?? "" };
+      const existingOptions = groups.get(groupName);
+      if (existingOptions) {
+        existingOptions.push(option);
+      } else {
+        groups.set(groupName, [option]);
+      }
     }
     return Array.from(groups.entries()).map(([group, options]) => ({
       label: group,
@@ -93,20 +118,27 @@ export default function RelationshipsModule({
   }, [relationshipTypes]);
 
   const createMutation = useMutation({
-    mutationFn: (values: { related_contact_id: string; relationship_type_id: number }) => {
-      if (editingId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return api.relationships.contactsRelationshipsUpdate(String(vaultId), String(contactId), editingId, values as any);
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return api.relationships.contactsRelationshipsCreate(String(vaultId), String(contactId), values as any);
-    },
+    mutationFn: (request: GithubComNaibaBondsInternalDtoCreateRelationshipRequest) =>
+      api.relationships.contactsRelationshipsCreate(String(vaultId), String(contactId), request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       setOpen(false);
       setEditingId(null);
       form.resetFields();
       message.success(editingId ? t("modules.relationships.updated") : t("modules.relationships.added"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, request }: { readonly id: number; readonly request: GithubComNaibaBondsInternalDtoUpdateRelationshipRequest }) =>
+      api.relationships.contactsRelationshipsUpdate(String(vaultId), String(contactId), id, request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk });
+      setOpen(false);
+      setEditingId(null);
+      form.resetFields();
+      message.success(t("modules.relationships.updated"));
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -122,19 +154,56 @@ export default function RelationshipsModule({
 
   // Group contacts by vault for OptGroup display, append one-way suffix for non-editor contacts
   const contactOptions = useMemo(() => {
-    const groups = new Map<string, { value: string | undefined; label: string }[]>();
+    const groups = new Map<string, { value: string; label: string }[]>();
     for (const c of crossVaultContacts) {
-      if (c.contact_id === contactId) continue;
+      if (!c.contact_id || c.contact_id === String(contactId)) continue;
       const vaultName = c.vault_name ?? "";
-      if (!groups.has(vaultName)) groups.set(vaultName, []);
       const suffix = c.has_editor === false ? ` · ${t("modules.relationships.one_way_only")}` : "";
-      groups.get(vaultName)!.push({ value: c.contact_id, label: `${c.contact_name ?? ""}${suffix}` });
+      const option = { value: c.contact_id, label: `${c.contact_name ?? ""}${suffix}` };
+      const existingOptions = groups.get(vaultName);
+      if (existingOptions) {
+        existingOptions.push(option);
+      } else {
+        groups.set(vaultName, [option]);
+      }
     }
     return Array.from(groups.entries()).map(([group, options]) => ({
       label: group,
       options,
     }));
   }, [crossVaultContacts, contactId, t]);
+
+  function handleRelationshipSubmit(values: RelationshipFormValues) {
+    if (values.relationship_type_id == null) return;
+
+    if (editingId != null) {
+      if (!values.related_contact_id) return;
+      const request: GithubComNaibaBondsInternalDtoUpdateRelationshipRequest = {
+        relationship_type_id: values.relationship_type_id,
+        related_contact_id: values.related_contact_id,
+      };
+      updateMutation.mutate({ id: editingId, request });
+      return;
+    }
+
+    if (selectedTargetKind === RELATIONSHIP_TARGET_KINDS.external) {
+      const externalName = values.external_contact_name?.trim();
+      if (!externalName) return;
+      const request: GithubComNaibaBondsInternalDtoCreateRelationshipRequest = {
+        relationship_type_id: values.relationship_type_id,
+        external_contact_name: externalName,
+      };
+      createMutation.mutate(request);
+      return;
+    }
+
+    if (!values.related_contact_id) return;
+    const request: GithubComNaibaBondsInternalDtoCreateRelationshipRequest = {
+      relationship_type_id: values.relationship_type_id,
+      related_contact_id: values.related_contact_id,
+    };
+    createMutation.mutate(request);
+  }
 
   return (
     <>
@@ -148,11 +217,16 @@ export default function RelationshipsModule({
         <Button
           type="text"
           icon={<PlusOutlined />}
-          onClick={() => {
-            setEditingId(null);
-            form.resetFields();
-            setOpen(true);
-          }}
+           onClick={() => {
+             setEditingId(null);
+             form.setFieldsValue({
+               target_kind: RELATIONSHIP_TARGET_KINDS.existing,
+               related_contact_id: undefined,
+               external_contact_name: undefined,
+               relationship_type_id: undefined,
+             });
+             setOpen(true);
+           }}
           style={{ color: token.colorPrimary }}
         >
           {t("modules.relationships.add")}
@@ -181,15 +255,24 @@ export default function RelationshipsModule({
                 size="small"
                 icon={<EditOutlined />}
                 onClick={() => {
-                  setEditingId(r.id!);
+                  if (r.id == null) return;
+                  setEditingId(r.id);
                   form.setFieldsValue({
+                    target_kind: RELATIONSHIP_TARGET_KINDS.existing,
                     related_contact_id: r.related_contact_id,
                     relationship_type_id: r.relationship_type_id,
+                    external_contact_name: undefined,
                   });
                   setOpen(true);
                 }}
               />,
-              <Popconfirm key="d" title={t("modules.relationships.remove_confirm")} onConfirm={() => deleteMutation.mutate(r.id!)}>
+              <Popconfirm
+                key="d"
+                title={t("modules.relationships.remove_confirm")}
+                onConfirm={() => {
+                  if (r.id != null) deleteMutation.mutate(r.id);
+                }}
+              >
                 <Button type="text" size="small" danger icon={<DeleteOutlined />} />
               </Popconfirm>,
             ]}
@@ -224,19 +307,42 @@ export default function RelationshipsModule({
         open={open}
         onCancel={() => { setOpen(false); setEditingId(null); form.resetFields(); }}
         onOk={() => form.submit()}
-        confirmLoading={createMutation.isPending}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
       >
-        <Form form={form} layout="vertical" onFinish={(v) => createMutation.mutate(v)}>
-          <Form.Item name="related_contact_id" label={t("modules.relationships.contact")} rules={[{ required: true }]}>
-            <Select
-              showSearch
-              options={contactOptions}
-              filterOption={(input, option) =>
-                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-              }
-              placeholder={t("modules.relationships.select_contact")}
-            />
-          </Form.Item>
+        <Form form={form} layout="vertical" onFinish={handleRelationshipSubmit}>
+          {!editingId && (
+            <Form.Item name="target_kind" label={t("modules.relationships.target_kind")} initialValue={RELATIONSHIP_TARGET_KINDS.existing}>
+              <Radio.Group
+                optionType="button"
+                buttonStyle="solid"
+                onChange={() => {
+                  form.setFieldsValue({ related_contact_id: undefined, external_contact_name: undefined });
+                }}
+              >
+                <Radio.Button value={RELATIONSHIP_TARGET_KINDS.existing}>{t("modules.relationships.target_existing")}</Radio.Button>
+                <Radio.Button value={RELATIONSHIP_TARGET_KINDS.external}>{t("modules.relationships.target_external")}</Radio.Button>
+              </Radio.Group>
+            </Form.Item>
+          )}
+          {(editingId || selectedTargetKind === RELATIONSHIP_TARGET_KINDS.existing) && (
+            <Form.Item name="related_contact_id" label={t("modules.relationships.contact")} rules={[{ required: true }]}>
+              <Select
+                showSearch
+                options={contactOptions}
+                filterOption={(input, option) => String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
+                placeholder={t("modules.relationships.select_contact")}
+              />
+            </Form.Item>
+          )}
+          {!editingId && selectedTargetKind === RELATIONSHIP_TARGET_KINDS.external && (
+            <Form.Item
+              name="external_contact_name"
+              label={t("modules.relationships.external_contact")}
+              rules={[{ required: true, whitespace: true }]}
+            >
+              <Input placeholder={t("modules.relationships.external_contact_placeholder")} />
+            </Form.Item>
+          )}
           {selectedContactOneWay && (
             <div style={{ fontSize: 12, color: token.colorWarningText, marginTop: -16, marginBottom: 12 }}>
               {t("modules.relationships.one_way_hint")}
@@ -246,9 +352,7 @@ export default function RelationshipsModule({
             <Select
               showSearch
               options={typeSelectOptions}
-              filterOption={(input, option) =>
-                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
-              }
+              filterOption={(input, option) => String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())}
             />
           </Form.Item>
           <div style={{ marginTop: -12, marginBottom: 24 }}>
