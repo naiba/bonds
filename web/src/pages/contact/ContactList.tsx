@@ -16,7 +16,7 @@ import { api } from "@/api";
 import type { APIError, Contact, Group, PaginationMeta, LabelResponse, Vault } from "@/api";
 import { formatContactName, useVaultNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
-import { formatDateOnly } from "@/utils/dateOnlyInput";
+import { formatContactFirstMetDisplay } from "@/utils/contactFirstMet";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
@@ -349,8 +349,10 @@ export default function ContactList() {
       dataIndex: "first_met_at",
       key: "first_met_at",
       responsive: ["md"] as Breakpoint[],
-      render: (val: string | undefined) => (
-        val ? <Text type="secondary">{formatDateOnly(val, dateFormats)}</Text> : <Text type="secondary">—</Text>
+      render: (_val: string | undefined, record) => (
+        formatContactFirstMetDisplay(record, dateFormats)
+          ? <Text type="secondary">{formatContactFirstMetDisplay(record, dateFormats)}</Text>
+          : <Text type="secondary">—</Text>
       ),
       sorter: (a, b) =>
         dayjs(a.first_met_at ?? 0).unix() - dayjs(b.first_met_at ?? 0).unix(),

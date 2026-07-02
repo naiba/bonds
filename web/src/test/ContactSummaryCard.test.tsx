@@ -184,6 +184,57 @@ describe("ContactSummaryCard — Family Summary (Issue #77)", () => {
     expect(screen.getByRole("link", { name: "Mary Host" })).toHaveAttribute("href", "/vaults/v1/contacts/c2");
   });
 
+  it("shows imprecise first-met month-year metadata in read mode", () => {
+    resetMocks();
+
+    renderCard({
+      readOnly: true,
+      contact: {
+        id: "c1",
+        first_met_date_precision: "month",
+        first_met_year: 2026,
+        first_met_month: 5,
+      } as Contact,
+    });
+
+    expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
+    expect(screen.getByText("How you met")).toBeInTheDocument();
+    expect(screen.getByText("First met: May 2026")).toBeInTheDocument();
+  });
+
+  it("shows imprecise first-met year-only metadata in read mode", () => {
+    resetMocks();
+
+    renderCard({
+      readOnly: true,
+      contact: {
+        id: "c1",
+        first_met_date_precision: "year",
+        first_met_year: 2026,
+      } as Contact,
+    });
+
+    expect(screen.getByText("First met: 2026")).toBeInTheDocument();
+  });
+
+  it("shows imprecise first-met metadata in read mode", () => {
+    resetMocks();
+
+    renderCard({
+      readOnly: true,
+      contact: {
+        id: "c1",
+        first_met_date_precision: "month",
+        first_met_year: 2026,
+        first_met_month: 5,
+      } as Contact,
+    });
+
+    expect(screen.getByTestId("contact-summary-card")).toBeInTheDocument();
+    expect(screen.getByText("How you met")).toBeInTheDocument();
+    expect(screen.getByText("First met: May 2026")).toBeInTheDocument();
+  });
+
   it("shows birthdate with age in summary mode", () => {
     resetMocks();
     mockImportantDateTypes = [

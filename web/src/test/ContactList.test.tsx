@@ -292,6 +292,26 @@ describe("ContactList", () => {
     expect(screen.getByText("Jan 15, 2026")).toBeInTheDocument();
   });
 
+  it("renders imprecise first-met dates in the default visible columns", () => {
+    mockContactListQuery(
+      [{
+        id: "42",
+        first_name: "Ada",
+        last_name: "Lovelace",
+        first_met_date_precision: "month",
+        first_met_year: 2026,
+        first_met_month: 5,
+        updated_at: "2026-01-20T00:00:00Z",
+      } as Contact],
+      { total: 1 },
+    );
+
+    renderContactList();
+
+    expect(screen.getByText("First met")).toBeInTheDocument();
+    expect(screen.getByText("May 2026")).toBeInTheDocument();
+  });
+
   it("uses first_met_at when the first-met sort option is selected", async () => {
     mockContactListQuery();
 

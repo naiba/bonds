@@ -9,8 +9,8 @@ import { getReadableLabelTagColors } from "@/utils/labelColor";
 import NetworkGraph from "@/components/NetworkGraph";
 import type { ImportantDate, ImportantDateTypeResponse } from "@/api";
 import { useDateFormat } from "@/utils/dateFormat";
-import { formatDateOnly } from "@/utils/dateOnlyInput";
 import { computeAgeAtImportantDate, computeImportantDateAge, formatImportantDateDisplay } from "@/utils/importantDateDisplay";
+import { formatContactFirstMetDisplay, hasContactFirstMetValue } from "@/utils/contactFirstMet";
 
 const { Text } = Typography;
 
@@ -242,7 +242,7 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
   const hasReligion = !!religionLabel;
   const hasAddress = !!primaryAddress;
   const metThroughContact = contact.first_met_through_contact;
-  const hasMeetingMetadata = !!contact.first_met_at || !!metThroughContact?.id;
+  const hasMeetingMetadata = hasContactFirstMetValue(contact) || !!metThroughContact?.id;
   const getImportantDateByInternalType = (internalType: string): ImportantDate | undefined => (
     importantDates.find((date) => {
       const dateType = importantDateTypes.find((type) => type.id === date.contact_important_date_type_id);
@@ -327,9 +327,9 @@ export default function ContactSummaryCard({ vaultId, contactId, contact, readOn
             {t("contact.meeting.title")}
           </Text>
           <Space direction="vertical" size={2}>
-            {contact.first_met_at && (
+            {hasContactFirstMetValue(contact) && (
               <Text style={{ fontSize: 13 }}>
-                {t("contact.meeting.first_met_at")}: {formatDateOnly(contact.first_met_at, dateFormats)}
+                {t("contact.meeting.first_met_at")}: {formatContactFirstMetDisplay(contact, dateFormats)}
               </Text>
             )}
             {metThroughContact?.id && metThroughContact.name && (
