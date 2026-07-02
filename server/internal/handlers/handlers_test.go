@@ -941,6 +941,23 @@ func TestContactCreate_ValidationError(t *testing.T) {
 	}
 }
 
+func TestContactCreate_InvalidFirstMetPrecisionReturnsValidationError(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "cval-first-met@example.com")
+	vault := ts.createTestVault(t, token, "Validation First Met Vault")
+
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts",
+		`{"first_name":"John","first_met_date_precision":"month_day","first_met_month":5,"first_met_day":15}`, token)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Errorf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
 func TestContactCreate_Unauthorized(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "cunauth@example.com")
@@ -1077,6 +1094,40 @@ func TestContactUpdate_BlankFirstNameAndNicknameValidationError(t *testing.T) {
 	resp := parseResponse(t, rec)
 	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
 		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestContactUpdate_InvalidFirstMetPrecisionReturnsValidationError(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "cupdate-invalid-first-met@example.com")
+	vault := ts.createTestVault(t, token, "Update Invalid First Met Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "OldName")
+
+	rec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+contact.ID,
+		`{"first_name":"OldName","first_met_date_precision":"month_day","first_met_month":5,"first_met_day":15}`, token)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR, got %+v", resp.Error)
+	}
+
+	var userVault models.UserVault
+	if err := ts.db.Where("vault_id = ? AND user_id = ?", vault.ID, auth.User.ID).First(&userVault).Error; err != nil {
+		t.Fatalf("load user vault: %v", err)
+	}
+
+	rec = ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+userVault.ContactID,
+		`{"first_name":"Shadow","listed":true,"needs_verification":false}`, token)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for forbidden promotion, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	if resp.Error == nil || resp.Error.Code != "VALIDATION_ERROR" {
+		t.Fatalf("expected VALIDATION_ERROR for forbidden promotion, got %+v", resp.Error)
 	}
 }
 
