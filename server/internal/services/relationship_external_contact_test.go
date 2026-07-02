@@ -96,6 +96,53 @@ func TestUpdateContact_PromotesExternalRelationshipContact(t *testing.T) {
 	}
 }
 
+func TestUpdateContact_RejectsPromotingVaultShadowContact(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+
+	var userVault models.UserVault
+	if err := ctx.db.Where("vault_id = ? AND user_id = ?", ctx.vaultID, ctx.userID).First(&userVault).Error; err != nil {
+		t.Fatalf("Load user vault failed: %v", err)
+	}
+
+	listed := true
+	needsVerification := false
+	contactSvc := NewContactService(ctx.db)
+	_, err := contactSvc.UpdateContact(userVault.ContactID, ctx.vaultID, ctx.userID, dto.UpdateContactRequest{
+		FirstName:         "Shadow",
+		Listed:            &listed,
+		NeedsVerification: &needsVerification,
+	})
+	if err != ErrContactPromotionNotAllowed {
+		t.Fatalf("expected ErrContactPromotionNotAllowed, got %v", err)
+	}
+}
+
+func TestUpdateContact_AllowsClearingVerificationOnListedContact(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+
+	contactSvc := NewContactService(ctx.db)
+	needsVerification := true
+	created, err := contactSvc.CreateContact(ctx.vaultID, ctx.userID, dto.CreateContactRequest{
+		FirstName:         "Review Me",
+		NeedsVerification: &needsVerification,
+	})
+	if err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+
+	clearedVerification := false
+	updated, err := contactSvc.UpdateContact(created.ID, ctx.vaultID, ctx.userID, dto.UpdateContactRequest{
+		FirstName:         "Review Me",
+		NeedsVerification: &clearedVerification,
+	})
+	if err != nil {
+		t.Fatalf("Clear verification failed: %v", err)
+	}
+	if updated.NeedsVerification {
+		t.Fatalf("expected listed contact to allow clearing needs_verification")
+	}
+}
+
 func relationshipListContainsContact(relationships []dto.RelationshipResponse, contactID, contactName string) bool {
 	for _, relationship := range relationships {
 		if relationship.RelatedContactID == contactID && relationship.RelatedContactName == contactName {

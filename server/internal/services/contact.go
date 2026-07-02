@@ -136,6 +136,9 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	if err := validateContactName(req.FirstName, req.Nickname); err != nil {
 		return nil, err
 	}
+	if err := validateContactFirstMetRequest(req.FirstMetAt, req.FirstMetDatePrecision, req.FirstMetYear, req.FirstMetMonth, req.FirstMetDay); err != nil {
+		return nil, err
+	}
 	if req.FirstMetThroughContactID != nil {
 		if err := validateContactBelongsToVault(s.db, *req.FirstMetThroughContactID, vaultID); err != nil {
 			return nil, err
@@ -161,6 +164,9 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 		StayInTouchFrequencyDays: req.StayInTouchFrequencyDays,
 		StayInTouchTriggerDate:   calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays),
 		LastUpdatedAt:            &now,
+	}
+	if err := applyContactFirstMet(req.FirstMetAt, req.FirstMetDatePrecision, req.FirstMetYear, req.FirstMetMonth, req.FirstMetDay, &contact); err != nil {
+		return nil, err
 	}
 	if req.NeedsVerification != nil {
 		contact.NeedsVerification = *req.NeedsVerification
@@ -246,6 +252,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	if err := validateContactName(req.FirstName, req.Nickname); err != nil {
 		return nil, err
 	}
+	if err := validateContactFirstMetRequest(req.FirstMetAt, req.FirstMetDatePrecision, req.FirstMetYear, req.FirstMetMonth, req.FirstMetDay); err != nil {
+		return nil, err
+	}
 
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
@@ -258,6 +267,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 		if err := validateContactBelongsToVault(s.db, *req.FirstMetThroughContactID, vaultID); err != nil {
 			return nil, err
 		}
+	}
+	if err := validateContactPromotionRequest(s.db, &contact, req); err != nil {
+		return nil, err
 	}
 
 	now := time.Now()
@@ -272,11 +284,13 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	contact.PronounID = req.PronounID
 	contact.TemplateID = req.TemplateID
 	contact.LastTalkedTo = req.LastTalkedTo
-	contact.FirstMetAt = req.FirstMetAt
 	contact.FirstMetThroughContactID = req.FirstMetThroughContactID
 	contact.StayInTouchFrequencyDays = req.StayInTouchFrequencyDays
 	contact.StayInTouchTriggerDate = calculateStayInTouchTriggerDate(req.LastTalkedTo, req.StayInTouchFrequencyDays)
 	contact.LastUpdatedAt = &now
+	if err := applyContactFirstMet(req.FirstMetAt, req.FirstMetDatePrecision, req.FirstMetYear, req.FirstMetMonth, req.FirstMetDay, &contact); err != nil {
+		return nil, err
+	}
 	if req.Listed != nil {
 		contact.Listed = *req.Listed
 	}
@@ -645,7 +659,7 @@ func contactSortOrder(sort string) string {
 	case "created_at":
 		return "created_at DESC, first_name ASC, last_name ASC"
 	case "first_met_at":
-		return "CASE WHEN first_met_at IS NULL THEN 1 ELSE 0 END ASC, first_met_at DESC, first_name ASC, last_name ASC"
+		return "CASE WHEN first_met_at IS NOT NULL OR first_met_year IS NOT NULL THEN 0 ELSE 1 END ASC, CASE WHEN first_met_at IS NOT NULL THEN 1 ELSE 0 END DESC, first_met_at DESC, first_met_year DESC, first_met_month DESC, first_met_day DESC, first_name ASC, last_name ASC"
 	default:
 		return "updated_at DESC, first_name ASC, last_name ASC"
 	}
@@ -685,6 +699,10 @@ func toContactResponse(c *models.Contact, isFavorite bool, formatter *contactNam
 		JobPosition:              ptrToStr(c.JobPosition),
 		LastTalkedTo:             c.LastTalkedTo,
 		FirstMetAt:               c.FirstMetAt,
+		FirstMetDatePrecision:    responseContactFirstMetPrecision(c),
+		FirstMetYear:             c.FirstMetYear,
+		FirstMetMonth:            c.FirstMetMonth,
+		FirstMetDay:              c.FirstMetDay,
 		FirstMetThroughContactID: firstMetThroughContactID,
 		FirstMetThroughContact:   firstMetThroughContact,
 		StayInTouchFrequencyDays: c.StayInTouchFrequencyDays,
@@ -705,6 +723,22 @@ func calculateStayInTouchTriggerDate(lastTalkedTo *time.Time, frequencyDays *int
 	}
 	triggerDate := lastTalkedTo.AddDate(0, 0, *frequencyDays)
 	return &triggerDate
+}
+
+func validateContactFirstMetRequest(firstMetAt *time.Time, precision *string, year *int, month *int, day *int) error {
+	if firstMetAt != nil {
+		if precision != nil || year != nil || month != nil || day != nil {
+			return ErrContactInvalidFirstMetPrecision
+		}
+		return nil
+	}
+	if precision == nil {
+		if year != nil || month != nil || day != nil {
+			return ErrContactInvalidFirstMetPrecision
+		}
+		return nil
+	}
+	return nil
 }
 
 func resolveStayInTouchTriggerDate(contact *models.Contact) *time.Time {

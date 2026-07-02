@@ -16,6 +16,10 @@ type CreateContactRequest struct {
 	Listed                   *bool      `json:"listed" example:"true"`
 	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
 	FirstMetAt               *time.Time `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetDatePrecision    *string    `json:"first_met_date_precision" example:"year"`
+	FirstMetYear             *int       `json:"first_met_year" example:"2026"`
+	FirstMetMonth            *int       `json:"first_met_month" example:"5"`
+	FirstMetDay              *int       `json:"first_met_day" example:"15"`
 	FirstMetThroughContactID *string    `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
 	// NeedsVerification flags a contact as needing later review (e.g. captured quickly
@@ -37,6 +41,10 @@ type UpdateContactRequest struct {
 	Listed                   *bool      `json:"listed" example:"true"`
 	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
 	FirstMetAt               *time.Time `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetDatePrecision    *string    `json:"first_met_date_precision" example:"year"`
+	FirstMetYear             *int       `json:"first_met_year" example:"2026"`
+	FirstMetMonth            *int       `json:"first_met_month" example:"5"`
+	FirstMetDay              *int       `json:"first_met_day" example:"15"`
 	FirstMetThroughContactID *string    `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
 	NeedsVerification        *bool      `json:"needs_verification" example:"false"`
@@ -61,6 +69,10 @@ type ContactResponse struct {
 	JobPosition              string              `json:"job_position" example:"Software Engineer"`
 	LastTalkedTo             *time.Time          `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
 	FirstMetAt               *time.Time          `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetDatePrecision    string              `json:"first_met_date_precision,omitempty" example:"year"`
+	FirstMetYear             *int                `json:"first_met_year,omitempty" example:"2026"`
+	FirstMetMonth            *int                `json:"first_met_month,omitempty" example:"5"`
+	FirstMetDay              *int                `json:"first_met_day,omitempty" example:"15"`
 	FirstMetThroughContactID *string             `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	FirstMetThroughContact   *ContactSearchItem  `json:"first_met_through_contact,omitempty"`
 	StayInTouchFrequencyDays *int                `json:"stay_in_touch_frequency_days" example:"30"`

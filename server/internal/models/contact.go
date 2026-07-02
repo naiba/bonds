@@ -28,6 +28,10 @@ type Contact struct {
 	FoodPreferences          *string        `json:"food_preferences" gorm:"type:text"`
 	LastTalkedTo             *time.Time     `json:"last_talked_to"`
 	FirstMetAt               *time.Time     `json:"first_met_at"`
+	FirstMetDatePrecision    *string        `json:"first_met_date_precision"`
+	FirstMetYear             *int           `json:"first_met_year"`
+	FirstMetMonth            *int           `json:"first_met_month"`
+	FirstMetDay              *int           `json:"first_met_day"`
 	FirstMetThroughContactID *string        `json:"first_met_through_contact_id" gorm:"type:text;index"`
 	StayInTouchFrequencyDays *int           `json:"stay_in_touch_frequency_days"`
 	StayInTouchTriggerDate   *time.Time     `json:"stay_in_touch_trigger_date"`

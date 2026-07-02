@@ -338,6 +338,110 @@ func TestUpdateContactFirstMetFieldsChangesAndClears(t *testing.T) {
 	}
 }
 
+func TestCreateContactFirstMetPrecisionVariants(t *testing.T) {
+    svc, vaultID, userID, _ := setupContactTest(t)
+
+    yearOnly, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+        FirstName:             "YearOnly",
+        FirstMetDatePrecision: strPtr("year"),
+        FirstMetYear:          intPtr(2026),
+    })
+    if err != nil {
+        t.Fatalf("CreateContact year-only failed: %v", err)
+    }
+    if yearOnly.FirstMetAt != nil {
+        t.Fatalf("expected first_met_at nil for year-only, got %v", yearOnly.FirstMetAt)
+    }
+    if yearOnly.FirstMetDatePrecision != "year" {
+        t.Fatalf("expected year precision, got %q", yearOnly.FirstMetDatePrecision)
+    }
+    if yearOnly.FirstMetYear == nil || *yearOnly.FirstMetYear != 2026 {
+        t.Fatalf("expected first_met_year 2026, got %+v", yearOnly.FirstMetYear)
+    }
+
+    monthOnly, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+        FirstName:             "MonthYear",
+        FirstMetDatePrecision: strPtr("month"),
+        FirstMetYear:          intPtr(2026),
+        FirstMetMonth:         intPtr(5),
+    })
+    if err != nil {
+        t.Fatalf("CreateContact month-year failed: %v", err)
+    }
+    if monthOnly.FirstMetAt != nil {
+        t.Fatalf("expected first_met_at nil for month precision, got %v", monthOnly.FirstMetAt)
+    }
+    if monthOnly.FirstMetDatePrecision != "month" {
+        t.Fatalf("expected month precision, got %q", monthOnly.FirstMetDatePrecision)
+    }
+    if monthOnly.FirstMetYear == nil || *monthOnly.FirstMetYear != 2026 {
+        t.Fatalf("expected first_met_year 2026, got %+v", monthOnly.FirstMetYear)
+    }
+    if monthOnly.FirstMetMonth == nil || *monthOnly.FirstMetMonth != 5 {
+        t.Fatalf("expected first_met_month 5, got %+v", monthOnly.FirstMetMonth)
+    }
+}
+
+func TestUpdateContactFirstMetPrecisionClearsStaleFields(t *testing.T) {
+    svc, vaultID, userID, _ := setupContactTest(t)
+    created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
+    if err != nil {
+        t.Fatalf("CreateContact failed: %v", err)
+    }
+
+    fullDate := time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC)
+    if _, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
+        FirstName:   "Original",
+        FirstMetAt:  &fullDate,
+    }); err != nil {
+        t.Fatalf("UpdateContact full date failed: %v", err)
+    }
+
+    updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{
+        FirstName:             "Original",
+        FirstMetDatePrecision: strPtr("year"),
+        FirstMetYear:          intPtr(2026),
+    })
+    if err != nil {
+        t.Fatalf("UpdateContact year precision failed: %v", err)
+    }
+    if updated.FirstMetAt != nil {
+        t.Fatalf("expected first_met_at cleared, got %v", updated.FirstMetAt)
+    }
+	if updated.FirstMetMonth != nil || updated.FirstMetDay != nil {
+		t.Fatalf("expected first_met month/day cleared, got month=%v day=%v", updated.FirstMetMonth, updated.FirstMetDay)
+	}
+}
+
+func TestCreateContactFirstMetPrecisionRejectsImpossibleFullDate(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:             "ImpossibleDate",
+		FirstMetDatePrecision: strPtr("full"),
+		FirstMetYear:          intPtr(2026),
+		FirstMetMonth:         intPtr(2),
+		FirstMetDay:           intPtr(31),
+	})
+	if err != ErrContactInvalidFirstMetPrecision {
+		t.Fatalf("expected ErrContactInvalidFirstMetPrecision, got %v", err)
+	}
+}
+
+func TestCreateContactFirstMetPrecisionRejectsImpossibleMonth(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName:             "ImpossibleMonth",
+		FirstMetDatePrecision: strPtr("month"),
+		FirstMetYear:          intPtr(2026),
+		FirstMetMonth:         intPtr(13),
+	})
+	if err != ErrContactInvalidFirstMetPrecision {
+		t.Fatalf("expected ErrContactInvalidFirstMetPrecision, got %v", err)
+	}
+}
+
 func TestUpdateContactFirstMetThroughRejectsDifferentVault(t *testing.T) {
 	svc, vaultID, userID, accountID := setupContactTest(t)
 	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Original"})
