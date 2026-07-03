@@ -71,6 +71,71 @@ func TestCreateReminder(t *testing.T) {
 	}
 }
 
+func TestCreateReminder_AllowsMonthDayWithoutYear(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+
+	reminder, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Anniversary",
+		Day:   intPtr(15),
+		Month: intPtr(6),
+		Type:  "recurring_year",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if reminder.Year != nil {
+		t.Fatalf("expected yearless reminder, got %v", reminder.Year)
+	}
+	if reminder.Day == nil || *reminder.Day != 15 {
+		t.Fatalf("expected day 15, got %v", reminder.Day)
+	}
+	if reminder.Month == nil || *reminder.Month != 6 {
+		t.Fatalf("expected month 6, got %v", reminder.Month)
+	}
+}
+
+func TestCreateReminder_RejectsYearWithoutMonthDay(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+
+	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Bad Reminder",
+		Year:  intPtr(2026),
+		Type:  "recurring_year",
+	})
+	if err != ErrReminderInvalidDate {
+		t.Fatalf("expected ErrReminderInvalidDate, got %v", err)
+	}
+}
+
+func TestCreateReminder_RejectsImpossibleDay(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+
+	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Bad Reminder",
+		Day:   intPtr(31),
+		Month: intPtr(2),
+		Year:  intPtr(2026),
+		Type:  "one_time",
+	})
+	if err != ErrReminderInvalidDate {
+		t.Fatalf("expected ErrReminderInvalidDate, got %v", err)
+	}
+}
+
+func TestCreateReminder_RejectsImpossibleDayWithoutYear(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+
+	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Bad Yearless Reminder",
+		Day:   intPtr(31),
+		Month: intPtr(2),
+		Type:  "recurring_year",
+	})
+	if err != ErrReminderInvalidDate {
+		t.Fatalf("expected ErrReminderInvalidDate, got %v", err)
+	}
+}
+
 func TestCreateReminderSchedulesActiveChannelsAtPreferredTime(t *testing.T) {
 	svc, contactID, vaultID := setupReminderTest(t)
 	db := svc.db
@@ -148,11 +213,15 @@ func TestCreateReminderSchedulesActiveChannelsAtPreferredTime(t *testing.T) {
 func TestListReminders(t *testing.T) {
 	svc, contactID, vaultID := setupReminderTest(t)
 
-	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Reminder 1", Type: "one_time"})
+	dayOne := 1
+	monthOne := 1
+	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Reminder 1", Day: &dayOne, Month: &monthOne, Type: "one_time"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
-	_, err = svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Reminder 2", Type: "recurring"})
+	dayTwo := 2
+	monthTwo := 2
+	_, err = svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Reminder 2", Day: &dayTwo, Month: &monthTwo, Type: "recurring"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -169,7 +238,9 @@ func TestListReminders(t *testing.T) {
 func TestUpdateReminder(t *testing.T) {
 	svc, contactID, vaultID := setupReminderTest(t)
 
-	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Original", Type: "one_time"})
+	day := 1
+	month := 1
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Original", Day: &day, Month: &month, Type: "one_time"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -191,10 +262,127 @@ func TestUpdateReminder(t *testing.T) {
 	}
 }
 
+func TestUpdateReminder_AllowsMonthDayWithoutYear(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Original", Type: "one_time", Day: intPtr(1), Month: intPtr(1), Year: intPtr(2026)})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
+		Label: "Month Day",
+		Day:   intPtr(15),
+		Month: intPtr(6),
+		Type:  "recurring_year",
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.Year != nil {
+		t.Fatalf("expected yearless updated reminder, got %v", updated.Year)
+	}
+}
+
+func TestUpdateReminder_RejectsImpossibleDayWithoutYear(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "Original", Type: "one_time", Day: intPtr(1), Month: intPtr(1), Year: intPtr(2026)})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	_, err = svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
+		Label: "Bad Month Day",
+		Day:   intPtr(31),
+		Month: intPtr(2),
+		Type:  "recurring_year",
+	})
+	if err != ErrReminderInvalidDate {
+		t.Fatalf("expected ErrReminderInvalidDate, got %v", err)
+	}
+}
+
+func TestUpdateReminder_RebuildsPendingSchedulesWhenDateChanges(t *testing.T) {
+	svc, contactID, vaultID := setupReminderTest(t)
+	db := svc.db
+
+	var contact models.Contact
+	if err := db.First(&contact, "id = ?", contactID).Error; err != nil {
+		t.Fatalf("Load contact failed: %v", err)
+	}
+	var userVault models.UserVault
+	if err := db.Where("vault_id = ?", contact.VaultID).First(&userVault).Error; err != nil {
+		t.Fatalf("Load user vault failed: %v", err)
+	}
+	preferredTime := "07:30"
+	if err := db.Model(&models.UserNotificationChannel{}).Where("user_id = ?", userVault.UserID).
+		Update("active", false).Error; err != nil {
+		t.Fatalf("Deactivate seeded channels failed: %v", err)
+	}
+	channel := models.UserNotificationChannel{
+		UserID:        &userVault.UserID,
+		Type:          "email",
+		Content:       "refresh@example.com",
+		PreferredTime: &preferredTime,
+		Active:        true,
+	}
+	if err := db.Create(&channel).Error; err != nil {
+		t.Fatalf("Create channel failed: %v", err)
+	}
+
+	nextYear := time.Now().Year() + 1
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Original",
+		Day:   intPtr(2),
+		Month: intPtr(1),
+		Year:  intPtr(nextYear),
+		Type:  "one_time",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	var originalScheduled models.ContactReminderScheduled
+	if err := db.Where("contact_reminder_id = ? AND user_notification_channel_id = ?", created.ID, channel.ID).
+		First(&originalScheduled).Error; err != nil {
+		t.Fatalf("Load original scheduled reminder failed: %v", err)
+	}
+	originalScheduledAt := originalScheduled.ScheduledAt
+
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
+		Label: "Updated",
+		Day:   intPtr(20),
+		Month: intPtr(12),
+		Year:  intPtr(nextYear + 1),
+		Type:  "one_time",
+	})
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	var pendingSchedules []models.ContactReminderScheduled
+	if err := db.Where("contact_reminder_id = ? AND triggered_at IS NULL", updated.ID).
+		Order("id ASC").Find(&pendingSchedules).Error; err != nil {
+		t.Fatalf("Load pending schedules failed: %v", err)
+	}
+	if len(pendingSchedules) != 1 {
+		t.Fatalf("expected exactly 1 pending schedule after update, got %d", len(pendingSchedules))
+	}
+	if pendingSchedules[0].ScheduledAt.Equal(originalScheduledAt) {
+		t.Fatalf("expected rebuilt schedule to differ from original %s", originalScheduledAt.Format(time.RFC3339))
+	}
+	if pendingSchedules[0].ScheduledAt.Year() != nextYear+1 || pendingSchedules[0].ScheduledAt.Month() != time.December || pendingSchedules[0].ScheduledAt.Day() != 20 {
+		t.Fatalf("expected rebuilt schedule on %d-12-20, got %s", nextYear+1, pendingSchedules[0].ScheduledAt.Format(time.RFC3339))
+	}
+}
+
 func TestDeleteReminder(t *testing.T) {
 	svc, contactID, vaultID := setupReminderTest(t)
 
-	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "To delete", Type: "one_time"})
+	day := 10
+	month := 7
+	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{Label: "To delete", Day: &day, Month: &month, Type: "one_time"})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}

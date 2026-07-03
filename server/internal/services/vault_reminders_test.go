@@ -111,6 +111,33 @@ func TestListVaultReminders_OrderedByUpcomingDate(t *testing.T) {
 	}
 }
 
+func TestListVaultReminders_RendersMonthDayReminderWithoutYear(t *testing.T) {
+	vrSvc, rSvc, contactID, vaultID, userID := setupVaultReminderTest(t)
+
+	day := 15
+	month := 3
+	_, err := rSvc.Create(contactID, vaultID, dto.CreateReminderRequest{
+		Label: "Yearless reminder",
+		Day:   &day,
+		Month: &month,
+		Type:  "recurring_year",
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	reminders, err := vrSvc.List(vaultID, userID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(reminders) != 1 {
+		t.Fatalf("expected 1 reminder, got %d", len(reminders))
+	}
+	if reminders[0].Year != nil {
+		t.Fatalf("expected vault reminder to remain yearless, got %v", reminders[0].Year)
+	}
+}
+
 func TestListVaultRemindersUsesVaultNameOrderForContactName(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	authSvc := NewAuthService(db, testutil.TestJWTConfig())

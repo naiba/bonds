@@ -54,9 +54,10 @@ func (s *ReminderService) Create(contactID, vaultID string, req dto.CreateRemind
 		Type:            req.Type,
 		FrequencyNumber: req.FrequencyNumber,
 	}
-	applyCalendarFields(&reminder.CalendarType, &reminder.OriginalDay, &reminder.OriginalMonth, &reminder.OriginalYear,
-		&reminder.Day, &reminder.Month, &reminder.Year,
-		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	if err := validateAndApplyReminderDate(&reminder.Day, &reminder.Month, &reminder.Year, &reminder.CalendarType, &reminder.OriginalDay, &reminder.OriginalMonth, &reminder.OriginalYear,
+		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear); err != nil {
+		return nil, err
+	}
 	if err := s.db.Create(&reminder).Error; err != nil {
 		return nil, err
 	}
@@ -89,12 +90,14 @@ func (s *ReminderService) Update(id uint, contactID, vaultID string, req dto.Upd
 	reminder.Year = req.Year
 	reminder.Type = req.Type
 	reminder.FrequencyNumber = req.FrequencyNumber
-	applyCalendarFields(&reminder.CalendarType, &reminder.OriginalDay, &reminder.OriginalMonth, &reminder.OriginalYear,
-		&reminder.Day, &reminder.Month, &reminder.Year,
-		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	if err := validateAndApplyReminderDate(&reminder.Day, &reminder.Month, &reminder.Year, &reminder.CalendarType, &reminder.OriginalDay, &reminder.OriginalMonth, &reminder.OriginalYear,
+		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear); err != nil {
+		return nil, err
+	}
 	if err := s.db.Save(&reminder).Error; err != nil {
 		return nil, err
 	}
+	s.reschedulePendingReminder(&reminder)
 	resp := toReminderResponse(&reminder)
 	return &resp, nil
 }
@@ -122,6 +125,12 @@ func (s *ReminderService) Delete(id uint, contactID, vaultID string) error {
 
 func (s *ReminderService) scheduleReminder(reminder *models.ContactReminder) {
 	scheduleReminderForVaultUsers(s.db, reminder)
+}
+
+func (s *ReminderService) reschedulePendingReminder(reminder *models.ContactReminder) {
+	s.db.Where("contact_reminder_id = ? AND triggered_at IS NULL", reminder.ID).
+		Delete(&models.ContactReminderScheduled{})
+	s.scheduleReminder(reminder)
 }
 
 // BackfillImportantDateReminderSchedules finds ContactReminder rows linked to
@@ -195,13 +204,11 @@ func calcInitialSchedule(reminder *models.ContactReminder, preferredTime *string
 	if ct != "" && ct != calendarPkg.Gregorian && reminder.OriginalMonth != nil && reminder.OriginalDay != nil {
 		converter, ok := calendarPkg.Get(ct)
 		if ok {
-			origDate := calendarPkg.DateInfo{
-				Day:   *reminder.OriginalDay,
-				Month: *reminder.OriginalMonth,
-			}
+			origDate := calendarPkg.DateInfo{}
 			if reminder.OriginalYear != nil {
-				origDate.Year = *reminder.OriginalYear
+				reminderOriginalDateForScheduling(&origDate, *reminder.OriginalMonth, *reminder.OriginalDay, reminder.OriginalYear)
 			} else {
+				reminderOriginalDateForScheduling(&origDate, *reminder.OriginalMonth, *reminder.OriginalDay, nil)
 				afterSolar := calendarPkg.GregorianDate{Day: now.Day(), Month: int(now.Month()), Year: now.Year()}
 				if fromG, err := converter.FromGregorian(afterSolar); err == nil {
 					origDate.Year = fromG.Year

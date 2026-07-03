@@ -80,6 +80,9 @@ func (h *ReminderHandler) Create(c echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
+		if errors.Is(err, services.ErrReminderInvalidDate) {
+			return response.ValidationError(c, map[string]string{"validation": err.Error()})
+		}
 		return response.InternalError(c, "err.failed_to_create_reminder")
 	}
 	return response.Created(c, reminder)
@@ -127,6 +130,9 @@ func (h *ReminderHandler) Update(c echo.Context) error {
 		}
 		if errors.Is(err, services.ErrReminderNotFound) {
 			return response.NotFound(c, "err.reminder_not_found")
+		}
+		if errors.Is(err, services.ErrReminderInvalidDate) {
+			return response.ValidationError(c, map[string]string{"validation": err.Error()})
 		}
 		return response.InternalError(c, "err.failed_to_update_reminder")
 	}
