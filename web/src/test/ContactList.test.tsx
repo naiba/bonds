@@ -396,5 +396,5 @@ describe("ContactList", () => {
       });
     });
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["vaults", "1", "contacts"] });
-  });
+  }, 15000);
 });

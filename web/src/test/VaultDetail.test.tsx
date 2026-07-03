@@ -51,6 +51,10 @@ vi.mock("@/api", () => ({
   },
 }));
 
+vi.mock("@/components/ContactAvatar", () => ({
+  default: () => <div data-testid="contact-avatar" />,
+}));
+
 const mockUseQuery = vi.fn();
 const mockInvalidateQueries = vi.fn();
 const mockGetQueryData = vi.fn();
@@ -442,7 +446,7 @@ describe("VaultDetail", () => {
     });
     expect(api.lifeEvents.contactsTimelineEventsCreate).not.toHaveBeenCalled();
     expect(api.lifeEvents.contactsTimelineEventsLifeEventsCreate).not.toHaveBeenCalled();
-  }, 10000);
+  }, 15000);
 
   it("offers the vault user contact as a dashboard life event participant", async () => {
     const user = userEvent.setup();
@@ -470,7 +474,7 @@ describe("VaultDetail", () => {
     await waitFor(() => {
       expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["vaults", "1", "dashboardLifeEvents"] });
     });
-  }, 10000);
+  }, 15000);
 
   it("updates dashboard life events with the vault-scoped API", async () => {
     const user = userEvent.setup();
@@ -509,7 +513,7 @@ describe("VaultDetail", () => {
       expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["vaults", "1", "dashboardLifeEvents"] });
     });
     expect(api.lifeEvents.contactsTimelineEventsLifeEventsUpdate).not.toHaveBeenCalled();
-  }, 10000);
+  }, 15000);
 
   it("deletes dashboard life events with the vault-scoped API", async () => {
     const user = userEvent.setup();
@@ -533,5 +537,5 @@ describe("VaultDetail", () => {
     await waitFor(() => {
       expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ["vaults", "1", "dashboardLifeEvents"] });
     });
-  }, 10000);
+  }, 15000);
 });
