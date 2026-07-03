@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import RemindersModule from "@/pages/contact/modules/RemindersModule";
+import { api } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -12,28 +14,58 @@ beforeAll(() => {
   };
 });
 
-vi.mock("@/api/reminders", () => ({
-  remindersApi: {
-    list: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
+vi.mock("@/components/CalendarDatePicker", () => ({
+  default: ({ onChange, allowedDatePrecisions }: { onChange?: (value: { calendarType: string; day: number | null; month: number | null; year: number | null; datePrecision?: string }) => void; allowedDatePrecisions?: readonly string[] }) => (
+    <div data-testid="calendar-date-picker">
+      <output data-testid="allowed-date-precisions">{JSON.stringify(allowedDatePrecisions ?? [])}</output>
+      <button
+        data-testid="reminder-full-date"
+        onClick={() => onChange?.({ calendarType: "gregorian", day: 15, month: 3, year: 2026, datePrecision: "full" })}
+      >
+        Reminder full date
+      </button>
+      <button
+        data-testid="reminder-month-day"
+        onClick={() => onChange?.({ calendarType: "gregorian", day: 15, month: 3, year: null, datePrecision: "month_day" })}
+      >
+        Reminder month day
+      </button>
+    </div>
+  ),
 }));
 
-vi.mock("@/components/CalendarDatePicker", () => ({
-  default: () => <div data-testid="calendar-date-picker" />,
+vi.mock("@/api", () => ({
+  api: {
+    reminders: {
+      contactsRemindersList: vi.fn(),
+      contactsRemindersCreate: vi.fn(),
+      contactsRemindersUpdate: vi.fn(),
+      contactsRemindersDelete: vi.fn(),
+    },
+    preferences: {
+      preferencesList: vi.fn(),
+    },
+  },
 }));
 
 let mockRemindersReturn: unknown = { data: [], isLoading: false };
 let mockPrefsReturn: unknown = { data: undefined };
+const mutationMock = vi.hoisted(() => ({
+  mutate: vi.fn(),
+}));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] }) => {
     const key = JSON.stringify(opts.queryKey);
     if (key.includes("preferences")) return mockPrefsReturn;
     return mockRemindersReturn;
   },
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useMutation: (options?: { mutationFn?: (variables: unknown) => unknown }) => ({
+    mutate: vi.fn(async (variables: unknown) => {
+      mutationMock.mutate(variables);
+      return options?.mutationFn?.(variables);
+    }),
+    isPending: false,
+  }),
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
 
@@ -89,6 +121,18 @@ const mockReminders = [
 ];
 
 describe("RemindersModule", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mutationMock.mutate.mockReset();
+    mockRemindersReturn = { data: [], isLoading: false };
+    mockPrefsReturn = { data: undefined };
+    vi.mocked(api.reminders.contactsRemindersList).mockResolvedValue({ data: [] });
+    vi.mocked(api.reminders.contactsRemindersCreate).mockResolvedValue({ data: {} });
+    vi.mocked(api.reminders.contactsRemindersUpdate).mockResolvedValue({ data: {} });
+    vi.mocked(api.reminders.contactsRemindersDelete).mockResolvedValue({ data: {} });
+    vi.mocked(api.preferences.preferencesList).mockResolvedValue({ data: undefined });
+  });
+
   it("renders title and add button", () => {
     mockRemindersReturn = { data: [], isLoading: false };
     renderModule();
@@ -134,6 +178,43 @@ describe("RemindersModule", () => {
     };
     renderModule();
     expect(screen.getByText(/Mar 15/)).toBeInTheDocument();
+  });
+
+  it("passes only full and month_day precision options to reminder date picker", async () => {
+    const user = userEvent.setup();
+    renderModule();
+
+    await user.click(screen.getByText("Add"));
+
+    expect(await screen.findByTestId("allowed-date-precisions")).toHaveTextContent('["full","month_day"]');
+  });
+
+  it("submits a yearless month_day reminder without fabricating a year", async () => {
+    const user = userEvent.setup();
+    renderModule();
+
+    await user.click(screen.getByText("Add"));
+    await user.type(await screen.findByRole("textbox", { name: /label/i }), "Yearless Reminder");
+    await user.click(screen.getByTestId("reminder-month-day"));
+    await user.click(screen.getByRole("combobox", { name: /frequency/i }));
+    await user.click(await screen.findByTitle("Yearly"));
+    await user.click(screen.getByRole("button", { name: /ok|save/i }));
+
+    await waitFor(() => {
+      expect(api.reminders.contactsRemindersCreate).toHaveBeenCalledWith(
+        "v1",
+        "c1",
+        expect.objectContaining({
+          label: "Yearless Reminder",
+          day: 15,
+          month: 3,
+          type: "recurring_year",
+        }),
+      );
+    });
+
+    const payload = vi.mocked(api.reminders.contactsRemindersCreate).mock.calls.at(-1)?.[2];
+    expect(payload?.year).toBeUndefined();
   });
 
   it("keeps the calendar picker mounted for full-date reminder consumers", () => {

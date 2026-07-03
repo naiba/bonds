@@ -25,6 +25,8 @@ import type { CalendarType } from "@/utils/calendar";
 import { useDateFormat, formatDate, formatShortDate } from "@/utils/dateFormat";
 import type { DateFormatVariants } from "@/utils/dateFormat";
 
+const CONTACT_REMINDER_ALLOWED_DATE_PRECISIONS = ["full", "month_day"] as const;
+
 const freqColor: Record<string, string> = {
   one_time: "blue",
   recurring_week: "green",
@@ -101,25 +103,35 @@ export default function RemindersModule({
         throw new Error("reminder date requires month and day");
       }
 
-      const y = calendarDate.year ?? new Date().getFullYear();
+      const precision = calendarDate.datePrecision ?? "full";
       const month = calendarDate.month;
       const day = calendarDate.day;
-      const sys = getCalendarSystem(calendarDate.calendarType);
-      const gd = sys.toGregorian({ day, month, year: y });
 
       const data: CreateReminderRequest = {
         label: values.label,
-        day: gd.day,
-        month: gd.month,
-        year: gd.year,
         type: values.frequency,
         calendar_type: calendarDate.calendarType,
       };
 
-      if (calendarDate.calendarType !== "gregorian") {
-        data.original_day = day;
-        data.original_month = month;
-        data.original_year = y;
+      if (precision === "month_day") {
+        data.day = day;
+        data.month = month;
+      } else {
+        if (calendarDate.year == null) {
+          throw new Error("full reminder date requires year");
+        }
+        const year = calendarDate.year;
+        const sys = getCalendarSystem(calendarDate.calendarType);
+        const gd = sys.toGregorian({ day, month, year });
+        data.day = gd.day;
+        data.month = gd.month;
+        data.year = gd.year;
+
+        if (calendarDate.calendarType !== "gregorian") {
+          data.original_day = day;
+          data.original_month = month;
+          data.original_year = year;
+        }
       }
 
       if (editingId) {
@@ -149,8 +161,20 @@ export default function RemindersModule({
     const ct = (r.calendar_type || "gregorian") as CalendarType;
     const pickerVal: CalendarDatePickerValue =
       ct !== "gregorian" && r.original_day != null && r.original_month != null
-        ? { calendarType: ct, day: r.original_day, month: r.original_month, year: r.original_year ?? new Date().getFullYear(), datePrecision: "full" }
-        : { calendarType: "gregorian", day: r.day ?? 1, month: r.month ?? 1, year: r.year ?? new Date().getFullYear(), datePrecision: "full" };
+        ? {
+            calendarType: ct,
+            day: r.original_day,
+            month: r.original_month,
+            year: r.original_year ?? null,
+            datePrecision: r.original_year == null ? "month_day" : "full",
+          }
+        : {
+            calendarType: "gregorian",
+            day: r.day ?? 1,
+            month: r.month ?? 1,
+            year: r.year ?? null,
+            datePrecision: r.year == null ? "month_day" : "full",
+          };
     form.setFieldsValue({ label: r.label, calendarDate: pickerVal, frequency: r.type });
     setOpen(true);
   }
@@ -226,7 +250,7 @@ export default function RemindersModule({
             <Input />
           </Form.Item>
           <Form.Item name="calendarDate" label={t("modules.reminders.date")} rules={[{ required: true }]}>
-            <CalendarDatePicker enableAlternativeCalendar={altCalendar} />
+            <CalendarDatePicker enableAlternativeCalendar={altCalendar} enableDatePrecision allowedDatePrecisions={CONTACT_REMINDER_ALLOWED_DATE_PRECISIONS} />
           </Form.Item>
           <Form.Item name="frequency" label={t("modules.reminders.frequency")} rules={[{ required: true }]}>
             <Select options={frequencyOptions} />
