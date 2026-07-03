@@ -935,6 +935,7 @@
       "select_contact": "Sélectionnez un contact",
       "relationship_type": "Type de relation",
       "direction_hint": "Choisissez la relation du point de vue de ce contact. Par exemple, sélectionnez Parent si ce contact est le parent de la personne sélectionnée.",
+      "direction_hint_named": "{{currentContactName}} est le/la {{relationshipTypeName}} de {{selectedContactName}}.",
       "manage_types": "Gérer les types",
       "manage_types_hint": "Configurez les types de relations, les diplômes et les relations inversées dans Paramètres",
       "graph_title": "Réseau relationnel",

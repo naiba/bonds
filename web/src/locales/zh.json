@@ -935,6 +935,7 @@
       "select_contact": "选择联系人",
       "relationship_type": "关系类型",
       "direction_hint": "请从当前联系人的视角选择关系类型。例如：如果当前联系人是对方的父母，就选择“父母”。",
+      "direction_hint_named": "{{currentContactName}} 是 {{selectedContactName}} 的{{relationshipTypeName}}。",
       "manage_types": "管理类型",
       "manage_types_hint": "在设置中配置关系类型、亲属层级和反向关系",
       "graph_title": "关系网络",

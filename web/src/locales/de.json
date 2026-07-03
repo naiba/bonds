@@ -935,6 +935,7 @@
       "select_contact": "Kontakt auswählen",
       "relationship_type": "Beziehungstyp",
       "direction_hint": "Wählen Sie die Beziehung aus der Perspektive dieses Kontakts. Wählen Sie zum Beispiel Elternteil, wenn dieser Kontakt das Elternteil der ausgewählten Person ist.",
+      "direction_hint_named": "{{currentContactName}} ist {{relationshipTypeName}} von {{selectedContactName}}.",
       "manage_types": "Typen verwalten",
       "manage_types_hint": "Beziehungstypen, Verwandtschaftsgrade und Umkehrbeziehungen in den Einstellungen konfigurieren",
       "graph_title": "Beziehungsnetzwerk",
