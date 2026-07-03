@@ -60,6 +60,9 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 	if err := applyImportantDatePrecision(&date, req.DatePrecision); err != nil {
 		return nil, err
 	}
+	if err := validateImportantDateCalendarDay(&date); err != nil {
+		return nil, err
+	}
 	if err := s.db.Create(&date).Error; err != nil {
 		return nil, err
 	}
@@ -103,6 +106,9 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 		&date.Day, &date.Month, &date.Year,
 		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	if err := applyImportantDatePrecision(&date, req.DatePrecision); err != nil {
+		return nil, err
+	}
+	if err := validateImportantDateCalendarDay(&date); err != nil {
 		return nil, err
 	}
 	if err := s.db.Save(&date).Error; err != nil {
@@ -172,7 +178,11 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 		existing.OriginalDay = date.OriginalDay
 		existing.OriginalMonth = date.OriginalMonth
 		existing.OriginalYear = date.OriginalYear
-		return s.db.Save(&existing).Error
+		if err := s.db.Save(&existing).Error; err != nil {
+			return err
+		}
+		NewReminderService(s.db).reschedulePendingReminder(&existing)
+		return nil
 	}
 	reminder := models.ContactReminder{
 		ContactID:       contactID,
@@ -221,4 +231,23 @@ func toImportantDateResponse(d *models.ContactImportantDate) dto.ImportantDateRe
 		CreatedAt:                  d.CreatedAt,
 		UpdatedAt:                  d.UpdatedAt,
 	}
+}
+
+func validateImportantDateCalendarDay(date *models.ContactImportantDate) error {
+	if date.Day == nil || date.Month == nil {
+		return nil
+	}
+	if !isValidReminderMonth(*date.Month) {
+		return ErrImportantDateInvalidPrecision
+	}
+	if date.Year == nil {
+		if !isValidReminderMonthDay(*date.Month, *date.Day) {
+			return ErrImportantDateInvalidPrecision
+		}
+		return nil
+	}
+	if !isValidReminderDay(*date.Year, *date.Month, *date.Day) {
+		return ErrImportantDateInvalidPrecision
+	}
+	return nil
 }

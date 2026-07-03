@@ -388,6 +388,39 @@ func TestImportantDate_RemindMe(t *testing.T) {
 	}
 }
 
+func TestImportantDate_RemindMe_RejectsImpossibleMonthDayWithoutYear(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	day, month := 31, 2
+	remindTrue := true
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:         "Impossible Nameday",
+		DatePrecision: importantDatePrecisionMonthDay,
+		Day:           &day,
+		Month:         &month,
+		RemindMe:      &remindTrue,
+	})
+	if !errors.Is(err, ErrImportantDateInvalidPrecision) {
+		t.Fatalf("expected ErrImportantDateInvalidPrecision, got %v", err)
+	}
+
+	var reminderCount int64
+	if err := ctx.db.Model(&models.ContactReminder{}).Where("contact_id = ?", ctx.contactID).Count(&reminderCount).Error; err != nil {
+		t.Fatalf("Count reminders failed: %v", err)
+	}
+	if reminderCount != 0 {
+		t.Fatalf("expected 0 reminders after rejected create, got %d", reminderCount)
+	}
+
+	var scheduledCount int64
+	if err := ctx.db.Model(&models.ContactReminderScheduled{}).Count(&scheduledCount).Error; err != nil {
+		t.Fatalf("Count scheduled reminders failed: %v", err)
+	}
+	if scheduledCount != 0 {
+		t.Fatalf("expected 0 scheduled reminders after rejected create, got %d", scheduledCount)
+	}
+}
+
 func TestImportantDate_DeleteRemovesReminder(t *testing.T) {
 	ctx := setupImportantDateTest(t)
 
