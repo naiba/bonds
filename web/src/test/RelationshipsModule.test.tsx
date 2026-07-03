@@ -62,7 +62,7 @@ function renderModule(props = {}) {
       <ConfigProvider>
         <AntApp>
           <MemoryRouter>
-            <RelationshipsModule vaultId="v1" contactId="c1" {...props} />
+            <RelationshipsModule vaultId="v1" contactId="c1" currentContactName="Alice Johnson" {...props} />
           </MemoryRouter>
         </AntApp>
       </ConfigProvider>
@@ -146,7 +146,7 @@ describe("RelationshipsModule", () => {
     expect(mutateArgs.request.external_contact_name).toBeUndefined();
   }, 10000);
 
-  it("shows relationship direction guidance in the modal", async () => {
+  it("shows relationship direction guidance with dynamic contact names in the modal", async () => {
     const user = userEvent.setup();
     renderModule();
 
@@ -156,8 +156,16 @@ describe("RelationshipsModule", () => {
 
     await user.click(screen.getByText("Add"));
 
+    const contactSelect = await screen.findByLabelText(/^Contact$/i);
+    await user.click(contactSelect);
+    await user.click(await screen.findByTitle("Jane Doe"));
+
+    const relationshipTypeSelect = await screen.findByLabelText(/^Relationship Type$/i);
+    await user.click(relationshipTypeSelect);
+    await user.click(await screen.findByTitle("Parent"));
+
     expect(
-      await screen.findByText(/Choose the relationship from this contact's perspective/i),
+      await screen.findByText(/Alice Johnson is the Parent of Jane Doe\./i),
     ).toBeInTheDocument();
   });
 });

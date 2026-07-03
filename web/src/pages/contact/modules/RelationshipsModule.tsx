@@ -45,9 +45,11 @@ type RelationshipFormValues = {
 export default function RelationshipsModule({
   vaultId,
   contactId,
+  currentContactName,
 }: {
   vaultId: string | number;
   contactId: string | number;
+  currentContactName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -59,6 +61,7 @@ export default function RelationshipsModule({
   // Cross-vault contacts query: returns contacts from ALL accessible vaults
   const qk = ["vaults", vaultId, "contacts", contactId, "relationships"];
   const selectedTargetKind = Form.useWatch("target_kind", form) ?? RELATIONSHIP_TARGET_KINDS.existing;
+  const selectedRelationshipTypeId = Form.useWatch("relationship_type_id", form) as number | undefined;
 
   const { data: relationships = [], isLoading } = useQuery({
     queryKey: qk,
@@ -96,6 +99,29 @@ export default function RelationshipsModule({
     const c = crossVaultContacts.find((x) => x.contact_id === selectedContactId);
     return c ? c.has_editor === false : false;
   }, [selectedTargetKind, selectedContactId, crossVaultContacts]);
+
+  const selectedRelationshipTypeName = useMemo(() => {
+    if (selectedRelationshipTypeId == null) return "";
+    const selectedRelationshipType = relationshipTypes.find((relationshipType) => relationshipType.id === selectedRelationshipTypeId);
+    return selectedRelationshipType?.name ?? "";
+  }, [relationshipTypes, selectedRelationshipTypeId]);
+
+  const selectedContactName = useMemo(() => {
+    if (selectedTargetKind !== RELATIONSHIP_TARGET_KINDS.existing || !selectedContactId) return "";
+    const selectedContact = crossVaultContacts.find((contact) => contact.contact_id === selectedContactId);
+    return selectedContact?.contact_name ?? "";
+  }, [crossVaultContacts, selectedContactId, selectedTargetKind]);
+
+  const relationshipDirectionHint = useMemo(() => {
+    if (!currentContactName || !selectedRelationshipTypeName || !selectedContactName) {
+      return t("modules.relationships.direction_hint");
+    }
+    return t("modules.relationships.direction_hint_named", {
+      currentContactName,
+      relationshipTypeName: selectedRelationshipTypeName,
+      selectedContactName,
+    });
+  }, [currentContactName, selectedContactName, selectedRelationshipTypeName, t]);
 
   // Build grouped options for the relationship type Select (OptGroup by group name).
   const typeSelectOptions = useMemo(() => {
@@ -356,7 +382,7 @@ export default function RelationshipsModule({
             />
           </Form.Item>
           <div style={{ fontSize: 12, color: token.colorTextSecondary, marginTop: -16, marginBottom: 12 }}>
-            {t("modules.relationships.direction_hint")}
+            {relationshipDirectionHint}
           </div>
           <div style={{ marginTop: -12, marginBottom: 24 }}>
             <a onClick={() => window.open("/settings/personalize", "_blank")} style={{ fontSize: 12, color: token.colorPrimary }}>

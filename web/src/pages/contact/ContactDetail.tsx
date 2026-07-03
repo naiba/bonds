@@ -374,7 +374,11 @@ export default function ContactDetail() {
   if (!contact) return null;
 
   const initials = formatContactInitials(nameOrder, contact);
-  const moduleProps = { vaultId, contactId: cId };
+  const moduleProps = {
+    vaultId,
+    contactId: cId,
+    currentContactName: formatContactName(nameOrder, contact),
+  };
 
   // Compact overview card — only shows fields that have values,
   // timestamps rendered as subtle footer text to save vertical space.
