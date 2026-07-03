@@ -100,13 +100,34 @@ async function selectRelType(
 ) {
   const selects = modal.locator('.ant-select');
   const typeSelect = selects.nth(1);
-  // Click to open the dropdown, then type to filter
+  await expect(typeSelect).toBeVisible({ timeout: 5000 });
   await typeSelect.click();
-  await page.waitForTimeout(200);
+  const dropdown = page.locator('.ant-select-dropdown:visible');
+  await expect(dropdown).toBeVisible({ timeout: 5000 });
   await typeSelect.locator('input').fill(typeName);
   await page.waitForTimeout(500);
-  // Use getByTitle with exact match to avoid partial matches (e.g. "parent" vs "grand parent")
-  await page.locator('.ant-select-dropdown:visible').getByTitle(typeName, { exact: true }).click();
+  const option = dropdown.getByTitle(typeName, { exact: true });
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
+  await expect(typeSelect).toContainText(typeName, { timeout: 5000 });
+}
+
+async function selectRelationshipContact(
+  page: import('@playwright/test').Page,
+  modal: import('@playwright/test').Locator,
+  contactName: string,
+) {
+  const contactSelect = modal.locator('.ant-select').first();
+  await expect(contactSelect).toBeVisible({ timeout: 5000 });
+  await contactSelect.click();
+  const dropdown = page.locator('.ant-select-dropdown:visible');
+  await expect(dropdown).toBeVisible({ timeout: 5000 });
+  await contactSelect.locator('input').fill(contactName);
+  await page.waitForTimeout(500);
+  const option = dropdown.locator('.ant-select-item-option').filter({ hasText: contactName }).first();
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
+  await expect(contactSelect).toContainText(contactName, { timeout: 5000 });
 }
 
 /**
@@ -119,11 +140,7 @@ async function addRelationship(
   contactName: string,
   typeName: string,
 ) {
-  const selects = modal.locator('.ant-select');
-
-  // Select contact
-  await selects.first().click();
-  await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: contactName }).click();
+  await selectRelationshipContact(page, modal, contactName);
 
   // Dismiss first dropdown by clicking modal header
   await modal.locator('.ant-modal-header').click();
@@ -157,26 +174,11 @@ test.describe('Relationship type selection shows both directions', () => {
 
     await navigateToTab(page, 'Social');
     const modal = await openRelationshipModal(page);
-    const typeSelect = modal.locator('.ant-select').nth(1);
-
-    // Search "parent" in the type dropdown
-    await typeSelect.click();
-    await page.waitForTimeout(200);
-    await typeSelect.locator('input').fill('parent');
-    await page.waitForTimeout(500);
-    const dropdown = page.locator('.ant-select-dropdown:visible');
-    await expect(dropdown.getByTitle('parent', { exact: true })).toBeVisible({ timeout: 5000 });
-    await dropdown.getByTitle('parent', { exact: true }).click();
+    await selectRelType(page, modal, 'parent');
 
     // Select the visible option to close the AntD dropdown before reopening it.
     // Clicking outside can be intercepted by the virtualized option overlay.
-    await typeSelect.click();
-    await page.waitForTimeout(200);
-    await typeSelect.locator('input').fill('child');
-    await page.waitForTimeout(500);
-    const dropdown2 = page.locator('.ant-select-dropdown:visible');
-    await expect(dropdown2.getByTitle('child', { exact: true })).toBeVisible({ timeout: 5000 });
-    await dropdown2.getByTitle('child', { exact: true }).click();
+    await selectRelType(page, modal, 'child');
 
     await modal.getByRole('button', { name: /cancel/i }).click();
   });
