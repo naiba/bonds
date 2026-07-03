@@ -561,12 +561,23 @@ test.describe('Vault Reminders Page', () => {
 
     await modal.locator('input#label').fill('Test Vault Reminder');
 
-    await modal.locator('.ant-picker').click();
-    const dateCell = page.locator('.ant-picker-dropdown:visible .ant-picker-cell:not(.ant-picker-cell-disabled):not(.ant-picker-cell-today)').first();
-    await dateCell.click();
+    await modal.getByText('Month & day', { exact: true }).click();
 
-    await modal.locator('.ant-select').click();
-    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').first().click();
+    const compactSelects = modal.locator('.ant-space-compact .ant-select');
+    await expect(compactSelects).toHaveCount(2, { timeout: 5000 });
+
+    await compactSelects.nth(0).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
+    await modal.locator('.ant-modal-header').click();
+
+    await compactSelects.nth(1).click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').first().click();
+    await modal.locator('.ant-modal-header').click();
+
+    const freqFormItem = modal.locator('.ant-form-item').filter({ hasText: /frequency/i });
+    await freqFormItem.locator('.ant-select').click();
+    await page.locator('.ant-select-dropdown').last().locator('.ant-select-item-option').filter({ hasText: /yearly/i }).click();
+    await modal.locator('.ant-modal-header').click();
 
     const reminderResp = page.waitForResponse(
       (resp) => resp.url().includes('/reminders') && resp.request().method() === 'POST'
