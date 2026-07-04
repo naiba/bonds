@@ -103,4 +103,6 @@ Bonds 支持通用 OIDC 提供商，用于企业 SSO：
 | **Discovery URL** | 提供商的发现 URL |
 | **显示名** | 登录页按钮标签（默认：「SSO」） |
 
+请将 IdP 回调 URL 配置为 `https://{your-bonds-url}/api/auth/{provider-name}/callback`。其中 `{provider-name}` 是在 Bonds 中配置的提供商 **Name** / slug，而不是登录页显示的显示名。例如，如果你的 Bonds 地址是 `https://bonds.domain.com`，提供商 Name 配置为 `nextcloud-sso`，那么回调 URL 应为 `https://bonds.domain.com/api/auth/nextcloud-sso/callback`。
+
 兼容 Authentik、Keycloak、Azure AD、Okta 等 OIDC 标准提供商。在管理面板中配置。

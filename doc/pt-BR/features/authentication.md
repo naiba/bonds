@@ -101,4 +101,6 @@ Bonds suporta provedores OIDC genéricos para SSO empresarial:
 | **Discovery URL** | URL de descoberta do provedor |
 | **Display Name** | Rótulo do botão na página de login (padrão: "SSO") |
 
+Configure a URL de callback do seu IdP como `https://{your-bonds-url}/api/auth/{provider-name}/callback`. O segmento `{provider-name}` é o **Name** / slug do provedor configurado no Bonds, e não o nome de exibição mostrado na página de login. Por exemplo, se a URL do seu Bonds for `https://bonds.domain.com` e o Name do provedor estiver configurado como `nextcloud-sso`, a URL de callback deve ser `https://bonds.domain.com/api/auth/nextcloud-sso/callback`.
+
 Compatível com Authentik, Keycloak, Azure AD, Okta e outros provedores compatíveis com OIDC. Configure no painel de administração.
