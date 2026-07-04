@@ -311,3 +311,17 @@ func TestCreateGothProvider(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildOAuthCallbackURL(t *testing.T) {
+	provider := models.OAuthProvider{
+		Name:        "nextcloud-sso",
+		DisplayName: "Nextcloud",
+	}
+
+	got := buildOAuthCallbackURL("https://bonds.example.com", provider)
+	want := "https://bonds.example.com/api/auth/nextcloud-sso/callback"
+
+	if got != want {
+		t.Fatalf("expected callback URL %q, got %q", want, got)
+	}
+}

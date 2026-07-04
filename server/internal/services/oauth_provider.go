@@ -209,7 +209,7 @@ func (s *OAuthProviderService) ReloadProviders() {
 }
 
 func createGothProvider(p models.OAuthProvider, appURL string) (goth.Provider, error) {
-	callback := appURL + "/api/auth/" + p.Name + "/callback"
+	callback := buildOAuthCallbackURL(appURL, p)
 	switch p.Type {
 	case "github":
 		return github.New(p.ClientID, p.ClientSecret, callback), nil
@@ -236,6 +236,10 @@ func createGothProvider(p models.OAuthProvider, appURL string) (goth.Provider, e
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", p.Type)
 	}
+}
+
+func buildOAuthCallbackURL(appURL string, provider models.OAuthProvider) string {
+	return appURL + "/api/auth/" + provider.Name + "/callback"
 }
 
 // MigratePlaintextSecrets re-encrypts plaintext client_secret rows. Idempotent.
