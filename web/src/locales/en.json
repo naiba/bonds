@@ -226,6 +226,8 @@
       "due": "Due {{date}}",
       "view_list": "List",
       "view_kanban": "Kanban",
+      "sort_custom": "Custom order",
+      "sort_due_date": "Due date",
       "col_todo": "Todo",
       "col_in_progress": "In progress",
       "col_done": "Done",

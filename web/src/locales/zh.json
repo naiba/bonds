@@ -226,6 +226,8 @@
       "due": "截止 {{date}}",
       "view_list": "列表",
       "view_kanban": "看板",
+      "sort_custom": "自定义顺序",
+      "sort_due_date": "按截止日期",
       "col_todo": "待办",
       "col_in_progress": "进行中",
       "col_done": "已完成",

@@ -226,6 +226,8 @@
       "due": "Fällig {{date}}",
       "view_list": "Liste",
       "view_kanban": "Kanban",
+      "sort_custom": "Benutzerdefinierte Reihenfolge",
+      "sort_due_date": "Fälligkeitsdatum",
       "col_todo": "Offen",
       "col_in_progress": "In Bearbeitung",
       "col_done": "Erledigt",
