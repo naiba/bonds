@@ -226,6 +226,8 @@
       "due": "À faire pour le {{date}}",
       "view_list": "Liste",
       "view_kanban": "Kanban",
+      "sort_custom": "Ordre personnalisé",
+      "sort_due_date": "Date d'échéance",
       "col_todo": "À Faire",
       "col_in_progress": "En cours",
       "col_done": "Fait",

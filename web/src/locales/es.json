@@ -226,6 +226,8 @@
       "due": "Vence el {{date}}",
       "view_list": "Lista",
       "view_kanban": "Kanban",
+      "sort_custom": "Orden personalizado",
+      "sort_due_date": "Fecha límite",
       "col_todo": "Por hacer",
       "col_in_progress": "En progreso",
       "col_done": "Hecho",
