@@ -5965,6 +5965,74 @@ func TestDashboardLifeEvent_RejectsCrossVaultParticipant(t *testing.T) {
 	}
 }
 
+func TestVaultSettingsLifeEventTypeCRUDViaTypesRoutes(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "life-event-types-routes@example.com")
+	vault := ts.createTestVault(t, token, "Life Event Types Routes Vault")
+
+	categoryBody := `{"label":"Route Category"}`
+	rec := ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories", vault.ID), categoryBody, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create life event category: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var category struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(resp.Data, &category); err != nil {
+		t.Fatalf("parse created category failed: %v", err)
+	}
+	if category.ID == 0 {
+		t.Fatal("expected created category ID")
+	}
+
+	createTypeBody := `{"label":"Route Type"}`
+	rec = ts.doRequest(http.MethodPost, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories/%d/types", vault.ID, category.ID), createTypeBody, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create life event type via /types route: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var createdType struct {
+		ID    uint   `json:"id"`
+		Label string `json:"label"`
+	}
+	if err := json.Unmarshal(resp.Data, &createdType); err != nil {
+		t.Fatalf("parse created type failed: %v", err)
+	}
+	if createdType.Label != "Route Type" {
+		t.Fatalf("expected created type label Route Type, got %+v", createdType)
+	}
+
+	updateTypeBody := `{"label":"Route Type Updated"}`
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories/%d/types/%d", vault.ID, category.ID, createdType.ID), updateTypeBody, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update life event type via /types route: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp = parseResponse(t, rec)
+	var updatedType struct {
+		Label string `json:"label"`
+	}
+	if err := json.Unmarshal(resp.Data, &updatedType); err != nil {
+		t.Fatalf("parse updated type failed: %v", err)
+	}
+	if updatedType.Label != "Route Type Updated" {
+		t.Fatalf("expected updated type label Route Type Updated, got %+v", updatedType)
+	}
+
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories/%d/types/%d", vault.ID, category.ID, createdType.ID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete life event type via /types route: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var deletedCount int64
+	if err := ts.db.Model(&models.LifeEventType{}).Where("id = ?", createdType.ID).Count(&deletedCount).Error; err != nil {
+		t.Fatalf("count deleted life event type failed: %v", err)
+	}
+	if deletedCount != 0 {
+		t.Fatalf("expected deleted life event type count 0, got %d", deletedCount)
+	}
+}
+
 func TestContactBulkMove_MovesSelectedContacts(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "bulk-move-handler@example.com")
