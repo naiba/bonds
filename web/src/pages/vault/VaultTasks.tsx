@@ -1,30 +1,31 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
   Typography,
   Button,
-  List,
-  Checkbox,
-  Tag,
   Spin,
-  Divider,
   Segmented,
   theme,
 } from "antd";
-import { Virtuoso } from "react-virtuoso";
 import {
   ArrowLeftOutlined,
   CheckSquareOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { VaultTask } from "@/api";
 import { useTranslation } from "react-i18next";
-import { useDateFormat, formatShortDate } from "@/utils/dateFormat";
+import { useDateFormat } from "@/utils/dateFormat";
 import TasksKanban from "./TasksKanban";
 import TaskEditModal from "./TaskEditModal";
+import { VaultTaskList } from "./VaultTaskList";
+import {
+  loadTaskSortMode,
+  persistTaskSortMode,
+  sortTasksForListView,
+  type TaskSortMode,
+} from "./taskSort";
 
 const { Title } = Typography;
 
@@ -50,6 +51,7 @@ export default function VaultTasks() {
   const { token } = theme.useToken();
   const dateFormats = useDateFormat();
   const [view, setView] = useState<ViewMode>(loadView);
+  const [sortMode, setSortMode] = useState<TaskSortMode>(loadTaskSortMode);
 
   const updateView = (next: ViewMode) => {
     setView(next);
@@ -58,6 +60,11 @@ export default function VaultTasks() {
     } catch {
       // Ignore storage errors in private mode or restricted environments.
     }
+  };
+
+  const updateSortMode = (next: TaskSortMode) => {
+    setSortMode(next);
+    persistTaskSortMode(next);
   };
 
   // Modal state owned by VaultTasks for the list view's row clicks. The
@@ -81,6 +88,15 @@ export default function VaultTasks() {
     enabled: !!vaultId,
   });
 
+  const pending = useMemo(
+    () => sortTasksForListView(tasks.filter((task) => !task.completed), sortMode),
+    [sortMode, tasks],
+  );
+  const completed = useMemo(
+    () => sortTasksForListView(tasks.filter((task) => task.completed), sortMode),
+    [sortMode, tasks],
+  );
+
   if (isLoading) {
     return (
       <div style={{ textAlign: "center", padding: 80 }}>
@@ -88,40 +104,6 @@ export default function VaultTasks() {
       </div>
     );
   }
-
-  const pending = tasks.filter((t) => !t.completed);
-  const completed = tasks.filter((t) => t.completed);
-
-  const stop = (e: React.MouseEvent | React.SyntheticEvent) => e.stopPropagation();
-
-  // Contact links in a row need to navigate without triggering the row's
-  // edit-modal-open click. stopPropagation on each button's click bubble.
-  const renderContactLink = (task: VaultTask) => {
-    const contacts = task.contacts ?? [];
-    if (contacts.length === 0) return null;
-    return (
-      <div
-        style={{ marginLeft: 24, marginTop: 4, display: "flex", flexWrap: "wrap", gap: 8 }}
-        onClick={stop}
-      >
-        {contacts.map((c) => (
-          <Button
-            key={c.id}
-            type="link"
-            size="small"
-            icon={<UserOutlined />}
-            style={{ padding: 0, height: "auto", fontSize: 12, color: token.colorTextSecondary }}
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/vaults/${vaultId}/contacts/${c.id}`);
-            }}
-          >
-            {c.name || c.id}
-          </Button>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div style={{ width: "100%", margin: "0 auto" }}>
@@ -152,6 +134,16 @@ export default function VaultTasks() {
             { label: t("vault.tasks.view_kanban"), value: "kanban" },
           ]}
         />
+        {view === "list" && (
+          <Segmented
+            value={sortMode}
+            onChange={(value) => updateSortMode(value as TaskSortMode)}
+            options={[
+              { label: t("vault.tasks.sort_custom"), value: "custom" },
+              { label: t("vault.tasks.sort_due_date"), value: "due_date" },
+            ]}
+          />
+        )}
       </div>
 
       {view === "kanban" ? (
@@ -163,125 +155,13 @@ export default function VaultTasks() {
             borderRadius: token.borderRadiusLG,
           }}
         >
-          {pending.length === 0 ? (
-            <div className="bonds-empty-hero">
-              <div
-                className="bonds-empty-hero-icon"
-                style={{ background: token.colorPrimaryBg }}
-              >
-                <CheckSquareOutlined style={{ fontSize: 32, color: token.colorPrimary }} />
-              </div>
-              <div className="bonds-empty-hero-title">{t("vault.tasks.no_pending")}</div>
-              <div
-                className="bonds-empty-hero-desc"
-                style={{ color: token.colorTextSecondary }}
-              >
-                {t("empty.tasks")}
-              </div>
-            </div>
-          ) : (
-            <Virtuoso
-              useWindowScroll
-              data={pending}
-              itemContent={(_, task) => (
-                <List.Item
-                  onClick={() => setEditTask(task)}
-                  style={{
-                    borderLeft: `3px solid ${token.colorSuccess}`,
-                    marginBottom: 4,
-                    paddingLeft: 12,
-                    borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
-                    background: token.colorFillQuaternary,
-                    display: "block",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {/* Stop click on the checkbox itself from opening the modal —
-                        checkbox-toggle UX should be separate from edit. */}
-                    <span onClick={stop} style={{ minWidth: 0, flex: 1 }}>
-                      <Checkbox checked={false} style={{ display: "flex", alignItems: "flex-start" }}>
-                        <span style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}>
-                          {task.label}
-                        </span>
-                      </Checkbox>
-                    </span>
-                    {task.due_at && (
-                      <Tag color="orange" style={{ marginLeft: "auto", borderRadius: 12, flexShrink: 0 }}>
-                        {t("vault.tasks.due", { date: formatShortDate(task.due_at, dateFormats) })}
-                      </Tag>
-                    )}
-                  </div>
-                  {renderContactLink(task)}
-                  {task.description && (
-                    <div
-                      style={{
-                        marginLeft: 24,
-                        marginTop: 4,
-                        fontSize: 13,
-                        color: token.colorTextSecondary,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                      }}
-                    >
-                      {task.description}
-                    </div>
-                  )}
-                </List.Item>
-              )}
-            />
-          )}
-
-          {completed.length > 0 && (
-            <>
-              <Divider
-                orientationMargin={0}
-                plain
-                style={{
-                  fontSize: 12,
-                  color: token.colorTextSecondary,
-                  borderColor: token.colorBorderSecondary,
-                }}
-              >
-                {t("vault.tasks.completed", { count: completed.length })}
-              </Divider>
-              <Virtuoso
-                useWindowScroll
-                data={completed}
-                itemContent={(_, task) => (
-                  <List.Item
-                    onClick={() => setEditTask(task)}
-                    style={{
-                      borderLeft: `3px solid ${token.colorBorder}`,
-                      marginBottom: 4,
-                      paddingLeft: 12,
-                      borderRadius: `0 ${token.borderRadius}px ${token.borderRadius}px 0`,
-                      opacity: 0.6,
-                      display: "block",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span onClick={stop} style={{ minWidth: 0, flex: 1 }}>
-                        <Checkbox checked style={{ display: "flex", alignItems: "flex-start" }}>
-                          <span
-                            style={{
-                              textDecoration: "line-through",
-                              overflowWrap: "anywhere",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {task.label}
-                          </span>
-                        </Checkbox>
-                      </span>
-                    </div>
-                    {renderContactLink(task)}
-                  </List.Item>
-                )}
-              />
-            </>
-          )}
+          <VaultTaskList
+            pendingTasks={pending}
+            completedTasks={completed}
+            dateFormats={dateFormats}
+            onSelectTask={(task) => setEditTask(task)}
+            onNavigateToContact={(contactId) => navigate(`/vaults/${vaultId}/contacts/${contactId}`)}
+          />
         </Card>
       )}
 
