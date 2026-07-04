@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
@@ -144,6 +144,34 @@ describe("RelationshipsModule", () => {
       relationship_type_id: 10,
     });
     expect(mutateArgs.request.external_contact_name).toBeUndefined();
+  }, 10000);
+
+  it("shows external contact name instead of raw id when editing a hidden relationship contact", async () => {
+    const user = userEvent.setup();
+    const relationshipListResponse = [{
+      id: 23,
+      related_contact_id: "hidden-external-uuid",
+      related_contact_name: "Aunt Mary",
+      relationship_type_id: 10,
+      relationship_type_name: "Parent",
+      related_vault_id: "v1",
+      related_vault_name: "Main",
+    }];
+
+    vi.mocked((await import("@/api")).api.relationships.contactsRelationshipsList)
+      .mockResolvedValueOnce({ success: true, data: relationshipListResponse });
+
+    renderModule();
+
+    await waitFor(() => {
+      expect(screen.getByText("Aunt Mary")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "edit" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Aunt Mary")).toBeInTheDocument();
+    expect(within(dialog).queryByText("hidden-external-uuid")).not.toBeInTheDocument();
   }, 10000);
 
   it("shows relationship direction guidance with dynamic contact names in the modal", async () => {
