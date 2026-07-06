@@ -81,6 +81,9 @@ func main() {
 	if err := models.BackfillHowWeMetQuickFactTemplates(db); err != nil {
 		log.Printf("WARNING: failed to backfill how-we-met quick fact templates: %v", err)
 	}
+	if err := models.BackfillLifeEventDefaultDeletability(db); err != nil {
+		log.Printf("WARNING: failed to backfill life event default deletability: %v", err)
+	}
 	if err := models.BackfillGiftContactModules(db); err != nil {
 		log.Printf("WARNING: failed to backfill gift contact modules: %v", err)
 	}

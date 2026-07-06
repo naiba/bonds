@@ -123,25 +123,30 @@ func seedLifeEventCategoriesAndTypes(tx *gorm.DB, vaultID, locale string) error 
 		}},
 	}
 
-	for _, cat := range categories {
-		pos := cat.position
-		category := LifeEventCategory{
-			VaultID:             vaultID,
-			Label:               strPtr(i18n.T(locale, cat.key)),
-			LabelTranslationKey: strPtr(cat.key),
-			Position:            &pos,
-		}
+		for _, cat := range categories {
+			pos := cat.position
+			// Life event seed defaults are editable in Settings, so persist them as
+			// deletable here. Older vaults seeded before this flag was set are
+			// repaired by BackfillLifeEventDefaultDeletability on boot.
+			category := LifeEventCategory{
+				VaultID:             vaultID,
+				Label:               strPtr(i18n.T(locale, cat.key)),
+				LabelTranslationKey: strPtr(cat.key),
+				Position:            &pos,
+				CanBeDeleted:        true,
+			}
 		if err := tx.Create(&category).Error; err != nil {
 			return err
 		}
 		for idx, typeKey := range cat.types {
 			typePos := idx + 1
-			lifeEventType := LifeEventType{
-				LifeEventCategoryID: category.ID,
-				Label:               strPtr(i18n.T(locale, typeKey)),
-				LabelTranslationKey: strPtr(typeKey),
-				Position:            &typePos,
-			}
+				lifeEventType := LifeEventType{
+					LifeEventCategoryID: category.ID,
+					Label:               strPtr(i18n.T(locale, typeKey)),
+					LabelTranslationKey: strPtr(typeKey),
+					Position:            &typePos,
+					CanBeDeleted:        true,
+				}
 			if err := tx.Create(&lifeEventType).Error; err != nil {
 				return err
 			}
