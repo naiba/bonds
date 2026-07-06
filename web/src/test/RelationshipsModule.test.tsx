@@ -196,4 +196,30 @@ describe("RelationshipsModule", () => {
       await screen.findByText(/Alice Johnson is the Parent of Jane Doe\./i),
     ).toBeInTheDocument();
   });
+
+	it("shows one-way hint when the selected contact is viewer-only", async () => {
+		const user = userEvent.setup();
+		vi.mocked((await import("@/api")).api.relationships.contactsList).mockResolvedValueOnce({
+			success: true,
+			data: [
+				{ contact_id: "viewer-only-uuid", contact_name: "Viewer Vault Contact", vault_id: "v2", vault_name: "Shared", has_editor: false },
+			],
+		});
+
+		renderModule();
+
+		await waitFor(() => {
+			expect(screen.getByText(/Relationships/i)).toBeInTheDocument();
+		});
+
+		await user.click(screen.getByText("Add"));
+
+		const contactSelect = await screen.findByLabelText(/^Contact$/i);
+		await user.click(contactSelect);
+		await user.click(await screen.findByTitle(/Viewer Vault Contact.*one-way only/i));
+
+		expect(
+			await screen.findByText(/Only a one-way relationship will be created\./i),
+		).toBeInTheDocument();
+	});
 });
