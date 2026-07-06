@@ -11,6 +11,10 @@ function uniqueEmail(prefix: string): string {
   return `${prefix}-${Date.now()}-${++counter}-${Math.random().toString(36).slice(2, 6)}@example.com`;
 }
 
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function setupVault(page: import('@playwright/test').Page, prefix: string) {
   const email = uniqueEmail(prefix);
   await page.goto('/register');
@@ -104,12 +108,13 @@ async function selectRelType(
   await typeSelect.click();
   const dropdown = page.locator('.ant-select-dropdown:visible');
   await expect(dropdown).toBeVisible({ timeout: 5000 });
-  await typeSelect.locator('input').fill(typeName);
-  await page.waitForTimeout(500);
-  const option = dropdown.getByTitle(typeName, { exact: true });
+  const searchTerm = typeName.includes('/') ? typeName.split('/')[0] : typeName;
+  await typeSelect.locator('input').fill(searchTerm);
+  const option = dropdown.locator('.ant-select-item-option').filter({ hasText: new RegExp(escapeRegExp(typeName), 'i') }).first();
   await expect(option).toBeVisible({ timeout: 5000 });
   await option.click();
-  await expect(typeSelect).toContainText(typeName, { timeout: 5000 });
+  await modal.locator('.ant-modal-header').click();
+  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
 }
 
 async function selectRelationshipContact(
@@ -123,11 +128,11 @@ async function selectRelationshipContact(
   const dropdown = page.locator('.ant-select-dropdown:visible');
   await expect(dropdown).toBeVisible({ timeout: 5000 });
   await contactSelect.locator('input').fill(contactName);
-  await page.waitForTimeout(500);
   const option = dropdown.locator('.ant-select-item-option').filter({ hasText: contactName }).first();
   await expect(option).toBeVisible({ timeout: 5000 });
   await option.click();
-  await expect(contactSelect).toContainText(contactName, { timeout: 5000 });
+  await modal.locator('.ant-modal-header').click();
+  await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
 }
 
 /**
@@ -141,12 +146,6 @@ async function addRelationship(
   typeName: string,
 ) {
   await selectRelationshipContact(page, modal, contactName);
-
-  // Dismiss first dropdown by clicking modal header
-  await modal.locator('.ant-modal-header').click();
-  await page.waitForTimeout(300);
-
-  // Select relationship type via search-filter
   await selectRelType(page, modal, typeName);
 
   // Submit
@@ -378,15 +377,15 @@ test.describe('Custom relationship type reverse linking', () => {
     // Expand the "Relationship Group Types" section
     const relSection = page.locator('.ant-collapse-item').filter({ hasText: /Relationship/i });
     await relSection.locator('.ant-collapse-header').click();
-    await page.waitForTimeout(500);
+    await expect(relSection.locator('.ant-list-item').first()).toBeVisible({ timeout: 5000 });
 
     // Expand the first group (Love) to see its sub-items
     const firstGroup = relSection.locator('.ant-list-item').first();
     await firstGroup.locator('button').filter({ has: page.locator('.anticon-right, .anticon-down') }).click();
-    await page.waitForTimeout(500);
 
     // Click "Add Type" button to create a new custom type
     const subPanel = relSection.locator('[style*="border-left"]').first();
+    await expect(subPanel).toBeVisible({ timeout: 5000 });
     await subPanel.getByRole('button', { name: /Add/i }).click();
 
     // Fill in the custom type: "teacher" with reverse "student"
@@ -404,7 +403,6 @@ test.describe('Custom relationship type reverse linking', () => {
 
     // The list should now show both "teacher ↔ student" AND "student ↔ teacher"
     // (auto-created reverse)
-    await page.waitForTimeout(500);
     await expect(subPanel.getByText('teacher ↔ student')).toBeVisible({ timeout: 5000 });
     await expect(subPanel.getByText('student ↔ teacher')).toBeVisible({ timeout: 5000 });
 
@@ -451,13 +449,13 @@ test.describe('Custom relationship type reverse linking', () => {
 
     const relSection = page.locator('.ant-collapse-item').filter({ hasText: /Relationship/i });
     await relSection.locator('.ant-collapse-header').click();
-    await page.waitForTimeout(500);
+    await expect(relSection.locator('.ant-list-item').first()).toBeVisible({ timeout: 5000 });
 
     const firstGroup = relSection.locator('.ant-list-item').first();
     await firstGroup.locator('button').filter({ has: page.locator('.anticon-right, .anticon-down') }).click();
-    await page.waitForTimeout(500);
 
     const subPanel = relSection.locator('[style*="border-left"]').first();
+    await expect(subPanel).toBeVisible({ timeout: 5000 });
     await subPanel.getByRole('button', { name: /Add/i }).click();
 
     const inputs = subPanel.locator('input');
@@ -472,7 +470,6 @@ test.describe('Custom relationship type reverse linking', () => {
     expect(resp.status()).toBeLessThan(400);
 
     // Symmetric type: only ONE entry should appear (not two)
-    await page.waitForTimeout(500);
     const roommateEntries = subPanel.locator('.ant-list-item').filter({ hasText: 'roommate ↔ roommate' });
     await expect(roommateEntries.first()).toBeVisible({ timeout: 5000 });
     await expect(roommateEntries).toHaveCount(1);

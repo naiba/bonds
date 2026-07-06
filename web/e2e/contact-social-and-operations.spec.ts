@@ -503,15 +503,17 @@ test.describe('Relationship Contact Name Navigation', () => {
     await selectDropdowns.first().click();
     await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Parent Navigator' }).click();
     await relationshipModal.locator('.ant-modal-header').click();
-    await page.waitForTimeout(300);
+    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
 
     // Select relationship type "parent" via search
     const relationshipTypeSelect = selectDropdowns.nth(1);
     await relationshipTypeSelect.click();
-    await page.waitForTimeout(200);
     await relationshipTypeSelect.locator('input').fill('parent');
-    await page.waitForTimeout(500);
-    await page.locator('.ant-select-dropdown:visible').getByTitle('parent', { exact: true }).click();
+    const parentOption = page.locator('.ant-select-dropdown:visible').getByTitle('parent', { exact: true });
+    await expect(parentOption).toBeVisible({ timeout: 5000 });
+    await parentOption.click();
+    await relationshipModal.locator('.ant-modal-header').click();
+    await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
 
     // Submit the relationship
     const createRelationshipResponse = page.waitForResponse(
