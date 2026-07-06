@@ -68,6 +68,7 @@ type userData struct {
 	LastName  string `json:"last_name"`
 	Email     string `json:"email"`
 	IsAdmin   bool   `json:"is_admin"`
+	IsInstanceAdministrator bool `json:"is_instance_administrator"`
 }
 
 type vaultData struct {

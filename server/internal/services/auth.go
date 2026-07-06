@@ -126,6 +126,14 @@ func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.Aut
 	if err != nil {
 		return nil, err
 	}
+	if isFirstUser {
+		// Persist the bootstrap instance-admin bit explicitly because follow-up
+		// auth reads reload the user from the database rather than this struct.
+		if err := s.db.Model(&user).Update("is_instance_administrator", true).Error; err != nil {
+			return nil, err
+		}
+		user.IsInstanceAdministrator = true
+	}
 
 	if isFirstUser || !s.isEmailVerificationRequired() {
 		now := time.Now()
