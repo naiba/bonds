@@ -22,8 +22,8 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-const serverPort = readPortEnv('PLAYWRIGHT_SERVER_PORT', 8080);
-const vitePort = readPortEnv('PLAYWRIGHT_VITE_PORT', 5173);
+const serverPort = readPortEnv('PLAYWRIGHT_SERVER_PORT', 18080);
+const vitePort = readPortEnv('PLAYWRIGHT_VITE_PORT', 15173);
 const webAuthnRpID = process.env.WEBAUTHN_RP_ID ?? 'localhost';
 const webAuthnRpOrigins = process.env.WEBAUTHN_RP_ORIGINS ?? `http://localhost:${vitePort}`;
 const webAuthnRpDisplayName = process.env.WEBAUTHN_RP_DISPLAY_NAME ?? 'Bonds E2E';
@@ -57,7 +57,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -f ../server/bonds.db ../server/bonds.db-shm ../server/bonds.db-wal && cd ../server && SERVER_PORT=${serverPort} ${webAuthnEnv} go run -ldflags="-X main.Version=e2e-test" cmd/server/main.go`,
+      command: `tmp_bleve=$(mktemp -d /tmp/bonds-e2e-bleve-XXXXXX) && rm -f ../server/bonds.db ../server/bonds.db-shm ../server/bonds.db-wal && cd ../server && SERVER_PORT=${serverPort} BLEVE_INDEX_PATH="$tmp_bleve/index.bleve" ${webAuthnEnv} go run -ldflags="-X main.Version=e2e-test" cmd/server/main.go`,
       port: serverPort,
       reuseExistingServer: !process.env.CI,
     },
