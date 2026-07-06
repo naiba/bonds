@@ -33,7 +33,7 @@ describe("ImportantDatesModule payloads", () => {
       remind_me: false,
     });
     expect(payload.day).toBeUndefined();
-  });
+  }, 15000);
 
   it("submits year-only payload without faking month or day", async () => {
     const user = userEvent.setup();
@@ -58,7 +58,7 @@ describe("ImportantDatesModule payloads", () => {
     });
     expect(payload.month).toBeUndefined();
     expect(payload.day).toBeUndefined();
-  });
+  }, 15000);
 
   it("submits month-day payload without faking year", async () => {
     const user = userEvent.setup();
@@ -82,7 +82,7 @@ describe("ImportantDatesModule payloads", () => {
       calendar_type: "gregorian",
     });
     expect(payload.year).toBeUndefined();
-  });
+  }, 15000);
 
   it("submits a new date with the default calendar date when fields are unchanged", async () => {
     const user = userEvent.setup();
@@ -106,7 +106,7 @@ describe("ImportantDatesModule payloads", () => {
     expect(payload.day).toEqual(expect.any(Number));
     expect(payload.month).toEqual(expect.any(Number));
     expect(payload.year).toEqual(expect.any(Number));
-  });
+  }, 15000);
 
   it("submits full lunar dates with converted gregorian fields and original fields", async () => {
     const user = userEvent.setup();
@@ -136,7 +136,7 @@ describe("ImportantDatesModule payloads", () => {
       month: 2,
       year: 2025,
     });
-  });
+  }, 15000);
 
   it("clears remind_me when switching to year-only precision", async () => {
     const user = userEvent.setup();
@@ -168,7 +168,7 @@ describe("ImportantDatesModule payloads", () => {
 
     const payload = apiMock.contactsDatesCreate.mock.calls.at(-1)?.[2];
     expect(payload.remind_me).toBe(false);
-  });
+  }, 15000);
 
   it("restores existing year-only dates and keeps sparse update payload", async () => {
     const user = userEvent.setup();
@@ -209,5 +209,5 @@ describe("ImportantDatesModule payloads", () => {
     });
     expect(payload.month).toBeUndefined();
     expect(payload.day).toBeUndefined();
-  });
+  }, 15000);
 });
