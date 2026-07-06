@@ -115,6 +115,7 @@ async function selectRelType(
   await option.click();
   await modal.locator('.ant-modal-header').click();
   await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
+  await expect(typeSelect).toContainText(typeName, { timeout: 5000 });
 }
 
 async function selectRelationshipContact(
@@ -133,6 +134,7 @@ async function selectRelationshipContact(
   await option.click();
   await modal.locator('.ant-modal-header').click();
   await expect(page.locator('.ant-select-dropdown:visible')).toHaveCount(0, { timeout: 5000 });
+  await expect(contactSelect).toContainText(contactName, { timeout: 5000 });
 }
 
 /**
