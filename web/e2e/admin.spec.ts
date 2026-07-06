@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { apiUrl } from './api-base-url';
 
 // fullyParallel + workers>1 时，不同 describe 块可能被分配到不同 worker，
 // 导致 serial 的 "Admin Features" 中 adminEmail 闭包变量为 undefined。
@@ -6,6 +7,18 @@ import { test, expect } from '@playwright/test';
 test.describe.configure({ mode: 'serial' });
 
 const PASSWORD = 'password123';
+
+type LoginResponse = {
+  data?: {
+    token?: string;
+  };
+};
+
+type CurrentUserResponse = {
+  data?: {
+    is_instance_administrator?: boolean;
+  };
+};
 
 async function registerUser(page: import('@playwright/test').Page, email: string, firstName = 'Test', lastName = 'User') {
   await page.goto('/register');
@@ -17,12 +30,45 @@ async function registerUser(page: import('@playwright/test').Page, email: string
   await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
 }
 
-async function loginUser(page: import('@playwright/test').Page, email: string) {
+async function loginUser(
+  page: import('@playwright/test').Page,
+  email: string,
+  expectedInstanceAdmin = true,
+) {
+  await page.context().clearCookies();
   await page.goto('/login');
-  await page.getByPlaceholder('Email').fill(email);
-  await page.getByPlaceholder('Password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.evaluate(() => {
+    window.localStorage.removeItem('token');
+    window.sessionStorage.clear();
+  });
+
+  const loginResponse = await page.request.post(apiUrl('/auth/login'), {
+    headers: { 'Content-Type': 'application/json' },
+    data: {
+      email,
+      password: PASSWORD,
+    },
+  });
+  expect(loginResponse.ok()).toBeTruthy();
+  const loginBody = (await loginResponse.json()) as LoginResponse;
+  const token = loginBody.data?.token;
+  if (!token) {
+    throw new Error('Login response missing token');
+  }
+
+  await page.evaluate((authToken: string) => {
+    window.localStorage.setItem('token', authToken);
+  }, token);
+
+  const meResponse = page.waitForResponse(
+    (resp) => resp.url().includes('/api/auth/me') && resp.request().method() === 'GET' && resp.status() < 400,
+    { timeout: 10000 },
+  );
+  await page.goto('/vaults');
+  const meBody = (await (await meResponse).json()) as CurrentUserResponse;
+  expect(meBody.data?.is_instance_administrator).toBe(expectedInstanceAdmin);
   await expect(page).toHaveURL(/\/vaults/, { timeout: 10000 });
+  await page.waitForLoadState('networkidle');
 }
 
 test.describe('Login Page Improvements', () => {
@@ -61,6 +107,7 @@ test.describe('Admin Features', () => {
   test('admin menu is visible in user dropdown', async ({ page }) => {
     await loginUser(page, adminEmail!);
 
+    await expect(page.locator('.ant-avatar')).toBeVisible({ timeout: 5000 });
     await page.locator('.ant-avatar').click();
     await expect(page.getByText('Administration')).toBeVisible({ timeout: 5000 });
   });
@@ -369,7 +416,7 @@ test.describe('Admin Features', () => {
   });
 
   test('non-admin user cannot access admin users page', async ({ page }) => {
-    await loginUser(page, secondUserEmail);
+    await loginUser(page, secondUserEmail, false);
 
     await page.goto('/admin/users');
     await page.waitForLoadState('networkidle');
@@ -378,7 +425,7 @@ test.describe('Admin Features', () => {
   });
 
   test('non-admin user cannot access admin settings page', async ({ page }) => {
-    await loginUser(page, secondUserEmail);
+    await loginUser(page, secondUserEmail, false);
 
     await page.goto('/admin/settings');
     await page.waitForLoadState('networkidle');
