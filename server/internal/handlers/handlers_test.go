@@ -6710,6 +6710,60 @@ func TestCompanyEmployee_AddAndRemove(t *testing.T) {
 	}
 }
 
+func TestContactsSelectable_IncludesArchivedAndExcludesShadow(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "contacts-selectable@example.com")
+	vault := ts.createTestVault(t, token, "Selectable Contacts Vault")
+	active := ts.createTestContact(t, token, vault.ID, "Active")
+	archived := ts.createTestContact(t, token, vault.ID, "Archived")
+
+	archiveRec := ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+archived.ID+"/archive", "", token)
+	if archiveRec.Code != http.StatusOK {
+		t.Fatalf("archive contact: expected 200, got %d: %s", archiveRec.Code, archiveRec.Body.String())
+	}
+
+	rec := ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/selectable", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list selectable contacts: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var selectable []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(resp.Data, &selectable); err != nil {
+		t.Fatalf("failed to parse selectable contacts: %v", err)
+	}
+	if len(selectable) != 2 {
+		t.Fatalf("expected 2 selectable contacts (active + archived, no shadow), got %d", len(selectable))
+	}
+	selectableIDs := map[string]bool{}
+	for _, item := range selectable {
+		selectableIDs[item.ID] = true
+	}
+	if !selectableIDs[active.ID] {
+		t.Fatalf("expected active contact %s in selectable list", active.ID)
+	}
+	if !selectableIDs[archived.ID] {
+		t.Fatalf("expected archived contact %s in selectable list", archived.ID)
+	}
+
+	searchRec := ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/selectable?search=Archived", "", token)
+	if searchRec.Code != http.StatusOK {
+		t.Fatalf("search selectable contacts: expected 200, got %d: %s", searchRec.Code, searchRec.Body.String())
+	}
+	searchResp := parseResponse(t, searchRec)
+	var filtered []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(searchResp.Data, &filtered); err != nil {
+		t.Fatalf("failed to parse filtered selectable contacts: %v", err)
+	}
+	if len(filtered) != 1 || filtered[0].ID != archived.ID {
+		t.Fatalf("expected archived contact search result, got %+v", filtered)
+	}
+}
+
 func (ts *testServer) doRequestWithLocale(method, path, body, token, locale string) *httptest.ResponseRecorder {
 	var req *http.Request
 	if body != "" {

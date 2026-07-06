@@ -29,7 +29,7 @@ import {
 } from "@ant-design/icons";
 import ContactAvatar from "@/components/ContactAvatar";
 import { api } from "@/api";
-import type { Company, APIError } from "@/api";
+import type { Company, APIError, SearchResult } from "@/api";
 
 const { Title, Text } = Typography;
 
@@ -51,6 +51,7 @@ export default function VaultCompanies({ vaultId }: { vaultId: string }) {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isAddEmployeeModalOpen, setIsAddEmployeeModalOpen] = useState(false);
   const [employeeForm] = Form.useForm();
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState("");
 
   const { data: companies = [], isLoading } = useQuery({
     queryKey: ["vaults", vaultId, "companies"],
@@ -75,15 +76,14 @@ export default function VaultCompanies({ vaultId }: { vaultId: string }) {
     enabled: !!selectedCompany?.id,
   });
 
-  // Contacts list for the add-employee select dropdown
-  const { data: contacts = [] } = useQuery({
-    queryKey: ["vaults", vaultId, "contacts", "list-for-employee"],
-    queryFn: async () => {
-      const res = await api.contacts.contactsList(String(vaultId));
-      return res.data ?? [];
-    },
-    enabled: isAddEmployeeModalOpen,
-  });
+  const { data: selectableContacts = [] } = useQuery({
+	  queryKey: ["vaults", vaultId, "contacts", "selectable-for-employee", employeeSearchTerm],
+	  queryFn: async (): Promise<SearchResult[]> => {
+	    const res = await api.contacts.contactsSelectableList(String(vaultId), employeeSearchTerm ? { search: employeeSearchTerm } : {});
+	    return res.data ?? [];
+	  },
+	  enabled: isAddEmployeeModalOpen,
+	});
 
   const employees = companyDetails?.contacts ?? selectedCompany?.contacts ?? [];
 
@@ -125,6 +125,7 @@ export default function VaultCompanies({ vaultId }: { vaultId: string }) {
     onSuccess: () => {
       message.success(t("vault.companies.employee_added"));
       setIsAddEmployeeModalOpen(false);
+      setEmployeeSearchTerm("");
       employeeForm.resetFields();
       invalidateCompanyQueries();
     },
@@ -335,6 +336,7 @@ export default function VaultCompanies({ vaultId }: { vaultId: string }) {
                 size="small"
                 icon={<PlusOutlined />}
                 onClick={() => {
+                  setEmployeeSearchTerm("");
                   employeeForm.resetFields();
                   setIsAddEmployeeModalOpen(true);
                 }}
@@ -399,6 +401,7 @@ export default function VaultCompanies({ vaultId }: { vaultId: string }) {
         open={isAddEmployeeModalOpen}
         onCancel={() => {
           setIsAddEmployeeModalOpen(false);
+          setEmployeeSearchTerm("");
           employeeForm.resetFields();
         }}
         footer={null}
@@ -416,14 +419,12 @@ export default function VaultCompanies({ vaultId }: { vaultId: string }) {
           >
             <Select
               showSearch
-              filterOption={(input, option) =>
-                String(option?.label ?? "").toLowerCase().includes(input.toLowerCase())
-              }
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              options={contacts.map((c: any) => ({
-                label: formatContactName(nameOrder, c),
-                value: c.id,
-              }))}
+	              filterOption={false}
+	              onSearch={setEmployeeSearchTerm}
+	              options={selectableContacts.map((contact) => ({
+	                label: contact.name ?? "",
+	                value: contact.id,
+	              }))}
               placeholder={t("vault.companies.select_contact")}
             />
           </Form.Item>

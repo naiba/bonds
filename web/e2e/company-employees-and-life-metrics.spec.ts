@@ -1,6 +1,19 @@
 import { test, expect } from '@playwright/test';
+import { apiUrl } from './api-base-url';
 
 let counter = 0;
+
+type RegisterResponse = {
+	data?: {
+		token?: string;
+	};
+};
+
+type CreateVaultResponse = {
+	data?: {
+		id?: string;
+	};
+};
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${Date.now()}-${++counter}-${Math.random().toString(36).slice(2, 6)}@example.com`;
@@ -8,25 +21,93 @@ function uniqueEmail(prefix: string): string {
 
 async function registerAndCreateVault(page: import('@playwright/test').Page, prefix: string) {
   const email = uniqueEmail(prefix);
-  await page.goto('/register');
-  await page.getByPlaceholder('First name').fill('Test');
-  await page.getByPlaceholder('Last name').fill('User');
-  await page.getByPlaceholder('Email').fill(email);
-  await page.getByPlaceholder(/password/i).fill('password123');
-  await page.getByRole('button', { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/vaults/, { timeout: 15000 });
+  const registerResp = await page.request.post(apiUrl('/auth/register'), {
+		headers: { 'Content-Type': 'application/json' },
+		data: {
+			first_name: 'Test',
+			last_name: 'User',
+			email,
+			password: 'password123',
+		},
+	});
+  expect(registerResp.ok()).toBeTruthy();
+  const registerBody = (await registerResp.json()) as RegisterResponse;
+  const token = registerBody.data?.token;
+  if (!token) {
+		throw new Error('Registration response missing token');
+	}
 
-  await page.getByRole('button', { name: /new vault/i }).click();
-  await page.getByPlaceholder(/e\.g\. family/i).fill('Test Vault');
-  await page.getByPlaceholder(/what is this vault/i).fill('For testing');
-  await page.getByRole('button', { name: /create vault/i }).click();
-  await expect(page).toHaveURL(/\/vaults\/[a-f0-9-]{36}$/, { timeout: 20000 });
+  const createVaultResp = await page.request.post(apiUrl('/vaults'), {
+		headers: {
+			Authorization: `Bearer ${token}`,
+			'Content-Type': 'application/json',
+		},
+		data: {
+			name: 'Test Vault',
+			description: 'For testing',
+		},
+	});
+  expect(createVaultResp.ok()).toBeTruthy();
+  const createVaultBody = (await createVaultResp.json()) as CreateVaultResponse;
+  const vaultId = createVaultBody.data?.id;
+  if (!vaultId) {
+		throw new Error('Create vault response missing id');
+	}
+
+  await page.goto('/');
+  await page.evaluate((authToken) => {
+		window.localStorage.setItem('token', authToken);
+	}, token);
+  await page.goto(`/vaults/${vaultId}`);
   await page.waitForLoadState('networkidle');
   await expect(page.getByRole('heading', { name: 'Test Vault' })).toBeVisible({ timeout: 10000 });
 }
 
 function getVaultUrl(page: import('@playwright/test').Page): string {
   return page.url();
+}
+
+function getVaultId(page: import('@playwright/test').Page): string {
+	const match = page.url().match(/\/vaults\/([a-f0-9-]{36})/);
+	if (!match) {
+		throw new Error(`Could not extract vault ID from URL: ${page.url()}`);
+	}
+	return match[1];
+}
+
+async function getAuthToken(page: import('@playwright/test').Page): Promise<string> {
+	const token = await page.evaluate(() => localStorage.getItem('token'));
+	if (!token) {
+		throw new Error('No auth token found in localStorage');
+	}
+	return token;
+}
+
+async function createContactViaAPI(
+	page: import('@playwright/test').Page,
+	vaultId: string,
+	token: string,
+	firstName: string,
+	lastName: string,
+): Promise<void> {
+	const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/contacts`), {
+		headers: { Authorization: `Bearer ${token}` },
+		data: { first_name: firstName, last_name: lastName },
+	});
+	expect(resp.ok()).toBeTruthy();
+}
+
+async function createCompanyViaAPI(
+	page: import('@playwright/test').Page,
+	vaultId: string,
+	token: string,
+	name: string,
+): Promise<void> {
+	const resp = await page.request.post(apiUrl(`/vaults/${vaultId}/companies`), {
+		headers: { Authorization: `Bearer ${token}` },
+		data: { name, type: 'Technology' },
+	});
+	expect(resp.ok()).toBeTruthy();
 }
 
 async function createContact(page: import('@playwright/test').Page, vaultUrl: string, firstName: string, lastName: string) {
@@ -86,11 +167,11 @@ test.describe('Company employees display in list', () => {
     // 6. Select the contact from dropdown (it should list all vault contacts)
     const select = employeeModal.locator('.ant-select');
     await select.click();
-    await page.waitForTimeout(1000); // Wait for dropdown options to load
     // Type to filter — the contact should show "Alice Johnson" or "Johnson Alice"
     await select.locator('input').fill('Alice');
-    await page.waitForTimeout(500);
-    await page.locator('.ant-select-item-option').filter({ hasText: /Alice/ }).first().click();
+    const aliceOption = page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /Alice/ }).first();
+    await expect(aliceOption).toBeVisible({ timeout: 10000 });
+    await aliceOption.click();
 
     // 7. Optionally fill job position
     await employeeModal.locator('input#job_position').fill('Engineer');
@@ -115,6 +196,56 @@ test.describe('Company employees display in list', () => {
     const companyRow = page.getByRole('row').filter({ hasText: 'Bug55 Corp' });
     await expect(companyRow.locator('.ant-tag').filter({ hasText: /Alice/ })).toBeVisible({ timeout: 10000 });
   });
+
+	test('should include contacts beyond the default first page in the add employee dialog', async ({ page }) => {
+		await registerAndCreateVault(page, 'co-employees-overflow');
+		const vaultId = getVaultId(page);
+		const token = await getAuthToken(page);
+
+		await createContactViaAPI(page, vaultId, token, 'Outlier', 'Employee');
+		for (let i = 2; i <= 16; i++) {
+			await createContactViaAPI(page, vaultId, token, `Recent${String(i).padStart(2, '0')}`, 'Employee');
+		}
+		await createCompanyViaAPI(page, vaultId, token, 'Overflow Corp');
+
+		await page.goto(`/vaults/${vaultId}/settings`);
+		await page.waitForLoadState('networkidle');
+		await page.getByRole('tab', { name: /Companies/i }).click();
+		await expect(page.getByText('Overflow Corp')).toBeVisible({ timeout: 15000 });
+
+		await page.getByRole('row').filter({ hasText: 'Overflow Corp' }).click();
+		const drawer = page.locator('.ant-drawer');
+		await expect(drawer).toBeVisible({ timeout: 10000 });
+
+		const contactsResponse = page.waitForResponse(
+			(resp) => resp.url().includes(`/vaults/${vaultId}/contacts/selectable`) && resp.request().method() === 'GET'
+		);
+		await drawer.getByRole('button', { name: /add employee/i }).click();
+		await contactsResponse;
+
+		const employeeModal = page.locator('.ant-modal').filter({ hasText: /add employee|select contact/i });
+		await expect(employeeModal).toBeVisible({ timeout: 10000 });
+
+		const select = employeeModal.locator('.ant-select');
+		await select.click();
+		const searchResponse = page.waitForResponse(
+			(resp) => resp.url().includes(`/vaults/${vaultId}/contacts/selectable`) && resp.url().includes('search=Outlier') && resp.request().method() === 'GET',
+		);
+		await select.locator('input').fill('Outlier');
+		await searchResponse;
+
+		const targetOption = page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: /Outlier/ }).first();
+		await expect(targetOption).toBeVisible({ timeout: 10000 });
+		await targetOption.click();
+
+		const addResp = page.waitForResponse(
+			(resp) => resp.url().includes('/employees') && resp.request().method() === 'POST'
+		);
+		await employeeModal.getByRole('button', { name: /save/i }).click();
+		await addResp;
+
+		await expect(drawer.getByText(/Outlier/)).toBeVisible({ timeout: 10000 });
+	});
 });
 
 // =====================================================================================

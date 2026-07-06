@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import VaultCompanies from "@/pages/vault/VaultCompanies";
-import type { Company } from "@/api";
+import { api, type Company } from "@/api";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -13,12 +13,21 @@ beforeAll(() => {
   };
 });
 
-vi.mock("@/api/companies", () => ({
-  companiesApi: {
-    list: vi.fn(),
-    get: vi.fn(),
-    listForContact: vi.fn(),
-  },
+vi.mock("@/api", () => ({
+	api: {
+		contacts: {
+			contactsSelectableList: vi.fn().mockResolvedValue({ data: [] }),
+		},
+		companies: {
+			companiesList: vi.fn().mockResolvedValue({ data: [] }),
+			companiesDetail: vi.fn().mockResolvedValue({ data: null }),
+			companiesCreate: vi.fn(),
+			companiesUpdate: vi.fn(),
+			companiesDelete: vi.fn(),
+			companiesEmployeesCreate: vi.fn(),
+			companiesEmployeesDelete: vi.fn(),
+		},
+	},
 }));
 
 vi.mock("@/components/ContactAvatar", () => ({
@@ -54,9 +63,15 @@ function renderVaultCompanies() {
 }
 
 describe("VaultCompanies", () => {
-  it("renders loading state", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: true });
-    renderVaultCompanies();
+	beforeEach(() => {
+		mockUseQuery.mockReset();
+		vi.clearAllMocks();
+		vi.mocked(api.contacts.contactsSelectableList).mockResolvedValue({ data: [] });
+	});
+
+	it("renders loading state", () => {
+		mockUseQuery.mockReturnValue({ data: [], isLoading: true });
+		renderVaultCompanies();
     expect(document.querySelector(".ant-spin")).toBeInTheDocument();
   }, 15000);
 
@@ -122,9 +137,47 @@ describe("VaultCompanies", () => {
     expect(screen.getByText("Zephyr, Alice (Ace)")).toBeInTheDocument();
     expect(screen.queryByText("Alice Zephyr")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Acme Corp"));
+		fireEvent.click(screen.getByText("Acme Corp"));
 
-    expect(await screen.findByText("Yellow, Bob (Bee)")).toBeInTheDocument();
-    expect(screen.queryByText("Bob Yellow")).not.toBeInTheDocument();
-  });
+		expect(await screen.findByText("Yellow, Bob (Bee)")).toBeInTheDocument();
+		expect(screen.queryByText("Bob Yellow")).not.toBeInTheDocument();
+	});
+
+	it("requests all contacts when opening the add employee dialog", async () => {
+		const companies: Company[] = [{ id: 1, name: "Acme Corp", contacts: [] }];
+		const companyDetails: Company = { id: 1, name: "Acme Corp", contacts: [] };
+
+		vi.mocked(api.contacts.contactsSelectableList).mockResolvedValue({
+			data: [{ id: "contact-16", name: "Outlier Employee" }],
+		});
+
+		mockUseQuery.mockImplementation((opts: { queryKey?: unknown[]; queryFn?: () => Promise<unknown>; enabled?: boolean }) => {
+			const key = Array.isArray(opts.queryKey) ? opts.queryKey : [];
+			if (key[0] === "vaults" && key[2] === "companies" && key.length === 3) {
+				return { data: companies, isLoading: false };
+			}
+			if (key[0] === "vaults" && key[2] === "companies" && key[3] === 1) {
+				return { data: companyDetails, isLoading: false };
+			}
+			if (key[0] === "vaults" && key[2] === "contacts" && key[3] === "selectable-for-employee") {
+				if (opts.enabled && opts.queryFn) {
+					void opts.queryFn();
+				}
+				return {
+					data: [{ id: "contact-16", name: "Outlier Employee" }],
+					isLoading: false,
+				};
+			}
+			return { data: [], isLoading: false };
+		});
+
+		renderVaultCompanies();
+
+		fireEvent.click(screen.getByText("Acme Corp"));
+		fireEvent.click(await screen.findByRole("button", { name: /add employee/i }));
+
+		await waitFor(() => {
+			expect(api.contacts.contactsSelectableList).toHaveBeenCalledWith("test-vault-id", {});
+		});
+	});
 });
