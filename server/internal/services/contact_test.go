@@ -1295,6 +1295,44 @@ func TestQuickSearch(t *testing.T) {
 	}
 }
 
+func TestListSelectableContacts(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+
+	active, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Alice", LastName: "Active"})
+	if err != nil {
+		t.Fatalf("CreateContact active failed: %v", err)
+	}
+	archived, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Bob", LastName: "Archived"})
+	if err != nil {
+		t.Fatalf("CreateContact archived failed: %v", err)
+	}
+	if err := svc.db.Model(&models.Contact{}).Where("id = ?", archived.ID).Update("listed", false).Error; err != nil {
+		t.Fatalf("Archive contact failed: %v", err)
+	}
+
+	items, err := svc.ListSelectableContacts(vaultID, userID, "")
+	if err != nil {
+		t.Fatalf("ListSelectableContacts failed: %v", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("expected 2 selectable contacts, got %d", len(items))
+	}
+	if items[0].ID != active.ID {
+		t.Fatalf("expected active contact first, got %q", items[0].ID)
+	}
+
+	filtered, err := svc.ListSelectableContacts(vaultID, userID, "Archived")
+	if err != nil {
+		t.Fatalf("ListSelectableContacts with search failed: %v", err)
+	}
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 filtered selectable contact, got %d", len(filtered))
+	}
+	if filtered[0].ID != archived.ID {
+		t.Fatalf("expected archived contact match, got %q", filtered[0].ID)
+	}
+}
+
 func TestListContacts_BirthdayAgeGroups(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()

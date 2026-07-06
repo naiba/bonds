@@ -6051,6 +6051,88 @@ func TestVaultSettingsLifeEventTypeCRUDViaTypesRoutes(t *testing.T) {
 	}
 }
 
+func TestVaultSettingsDeleteSeededLifeEventTypeViaTypesRoutes(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "seeded-life-event-type-delete@example.com")
+	vault := ts.createTestVault(t, token, "Seeded Life Event Types Vault")
+
+	rec := ts.doRequest(http.MethodGet, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories", vault.ID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list life event categories: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var categories []struct {
+		ID    uint `json:"id"`
+		Types []struct {
+			ID uint `json:"id"`
+		} `json:"types"`
+	}
+	if err := json.Unmarshal(resp.Data, &categories); err != nil {
+		t.Fatalf("parse seeded categories failed: %v", err)
+	}
+	if len(categories) == 0 || len(categories[0].Types) == 0 {
+		t.Fatal("expected seeded life event category and type")
+	}
+	targetCategoryID := categories[0].ID
+	targetTypeID := categories[0].Types[0].ID
+
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories/%d/types/%d", vault.ID, targetCategoryID, targetTypeID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete seeded life event type via /types route: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var deletedCount int64
+	if err := ts.db.Model(&models.LifeEventType{}).Where("id = ?", targetTypeID).Count(&deletedCount).Error; err != nil {
+		t.Fatalf("count deleted seeded life event type failed: %v", err)
+	}
+	if deletedCount != 0 {
+		t.Fatalf("expected deleted seeded life event type count 0, got %d", deletedCount)
+	}
+}
+
+func TestVaultSettingsDeleteSeededLifeEventCategory(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "seeded-life-event-category-delete@example.com")
+	vault := ts.createTestVault(t, token, "Seeded Life Event Categories Vault")
+
+	rec := ts.doRequest(http.MethodGet, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories", vault.ID), "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list life event categories: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var categories []struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(resp.Data, &categories); err != nil {
+		t.Fatalf("parse seeded categories failed: %v", err)
+	}
+	if len(categories) == 0 {
+		t.Fatal("expected seeded life event category")
+	}
+	targetCategoryID := categories[0].ID
+
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/settings/lifeEventCategories/%d", vault.ID, targetCategoryID), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete seeded life event category: expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var deletedCategoryCount int64
+	if err := ts.db.Model(&models.LifeEventCategory{}).Where("id = ?", targetCategoryID).Count(&deletedCategoryCount).Error; err != nil {
+		t.Fatalf("count deleted seeded life event category failed: %v", err)
+	}
+	if deletedCategoryCount != 0 {
+		t.Fatalf("expected deleted seeded life event category count 0, got %d", deletedCategoryCount)
+	}
+
+	var orphanTypeCount int64
+	if err := ts.db.Model(&models.LifeEventType{}).Where("life_event_category_id = ?", targetCategoryID).Count(&orphanTypeCount).Error; err != nil {
+		t.Fatalf("count seeded category child types failed: %v", err)
+	}
+	if orphanTypeCount != 0 {
+		t.Fatalf("expected seeded category child types deleted, got %d", orphanTypeCount)
+	}
+}
+
 func TestContactBulkMove_MovesSelectedContacts(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "bulk-move-handler@example.com")

@@ -622,6 +622,44 @@ func (s *ContactService) QuickSearch(vaultID, term, userID string) ([]dto.Contac
 	return result, nil
 }
 
+func (s *ContactService) ListSelectableContacts(vaultID, userID, search string) ([]dto.ContactSearchItem, error) {
+	query := s.db.Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false)
+	if search != "" {
+		likeTerm := "%" + strings.ToLower(search) + "%"
+		query = query.Where(
+			s.db.Where("LOWER(first_name) LIKE ?", likeTerm).
+				Or("LOWER(last_name) LIKE ?", likeTerm).
+				Or("LOWER(nickname) LIKE ?", likeTerm).
+				Or("LOWER(maiden_name) LIKE ?", likeTerm).
+				Or("LOWER(middle_name) LIKE ?", likeTerm),
+		)
+	}
+
+	var contacts []models.Contact
+	if err := query.Order("listed DESC, first_name ASC, last_name ASC").Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+
+	formatter, err := newContactNameFormatter(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]dto.ContactSearchItem, len(contacts))
+	for i := range contacts {
+		name, err := formatter.format(&contacts[i], "")
+		if err != nil {
+			return nil, err
+		}
+		result[i] = dto.ContactSearchItem{
+			ID:   contacts[i].ID,
+			Name: name,
+		}
+	}
+
+	return result, nil
+}
+
 // validateContactBelongsToVault checks that a contact exists and belongs to the given vault.
 // Returns ErrContactNotFound if the contact does not exist or belongs to a different vault.
 func validateContactBelongsToVault(db *gorm.DB, contactID, vaultID string) error {

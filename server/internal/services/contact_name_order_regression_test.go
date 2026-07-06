@@ -180,6 +180,21 @@ func TestContactQuickSearchUsesVaultNameOrder(t *testing.T) {
 	}
 }
 
+func TestListSelectableContactsUsesVaultNameOrder(t *testing.T) {
+	ctx := setupNameOrderRegressionTest(t, "name-order-selectable@example.com")
+
+	items, err := NewContactService(ctx.db).ListSelectableContacts(ctx.vaultID, ctx.userID, "Alice")
+	if err != nil {
+		t.Fatalf("ListSelectableContacts failed: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 selectable contact, got %d", len(items))
+	}
+	if items[0].Name != "Zephyr, Alice (Ace)" {
+		t.Fatalf("selectable contact name = %q, want %q", items[0].Name, "Zephyr, Alice (Ace)")
+	}
+}
+
 func TestFirstMetThroughContactNameUsesVaultNameOrder(t *testing.T) {
 	ctx := setupNameOrderRegressionTest(t, "name-order-met-through@example.com")
 

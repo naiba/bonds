@@ -353,6 +353,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	contacts := protected.Group("/vaults/:vault_id/contacts", VaultPermissionMiddleware(vaultService, models.PermissionViewer))
 	contacts.GET("", contactHandler.List)
+	contacts.GET("/selectable", contactHandler.ListSelectable)
 	contacts.GET("/labels/:labelId", contactHandler.ListByLabel)
 	contacts.POST("/move", contactMoveHandler.MoveMany, requireEditor)
 	contacts.POST("", contactHandler.Create, requireEditor)

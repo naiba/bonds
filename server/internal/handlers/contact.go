@@ -52,6 +52,31 @@ func (h *ContactHandler) List(c echo.Context) error {
 	return response.Paginated(c, contacts, meta)
 }
 
+// ListSelectable godoc
+//
+//	@Summary		List selectable contacts
+//	@Description	Return the full selectable contact set for a vault, excluding shadow contacts and optionally filtering by search term.
+//	@Tags			contacts
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			vault_id	path		string	true	"Vault ID"
+//	@Param			search		query		string	false	"Optional search term"
+//	@Success		200			{object}	response.APIResponse{data=[]dto.ContactSearchItem}
+//	@Failure		401			{object}	response.APIResponse
+//	@Failure		500			{object}	response.APIResponse
+//	@Router			/vaults/{vault_id}/contacts/selectable [get]
+func (h *ContactHandler) ListSelectable(c echo.Context) error {
+	vaultID := c.Param("vault_id")
+	userID := middleware.GetUserID(c)
+	search := c.QueryParam("search")
+
+	contacts, err := h.contactService.ListSelectableContacts(vaultID, userID, search)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_list_contacts")
+	}
+	return response.OK(c, contacts)
+}
+
 // ListCatchUpPrompts godoc
 //
 //	@Summary		List due catch-up prompts
