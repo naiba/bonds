@@ -446,6 +446,24 @@ func TestMe_WithValidToken(t *testing.T) {
 	}
 }
 
+func TestMe_FirstUserIncludesInstanceAdministrator(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "me-instance-admin@example.com")
+
+	rec := ts.doRequest(http.MethodGet, "/api/auth/me", "", token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var data userData
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		t.Fatalf("failed to parse user data: %v", err)
+	}
+	if !data.IsInstanceAdministrator {
+		t.Fatal("expected first user to include is_instance_administrator=true in /auth/me response")
+	}
+}
+
 func TestMe_WithoutToken(t *testing.T) {
 	ts := setupTestServer(t)
 

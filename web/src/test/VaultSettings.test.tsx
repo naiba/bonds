@@ -1,6 +1,6 @@
 import * as nameFormat from "@/utils/nameFormat";
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
@@ -216,4 +216,57 @@ describe("VaultSettings", () => {
     expect(screen.getByText("Ask before cooking")).toBeInTheDocument();
     expect(screen.getByText(/Vegetarian, No preference/)).toBeInTheDocument();
   });
+
+	it("renders seeded life event categories and types in settings", async () => {
+		const user = userEvent.setup();
+		mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+			if (Array.isArray(opts.queryKey) && opts.queryKey[0] === "vault" && opts.queryKey[2] === "lifeEventCategories") {
+				return {
+					data: [
+						{
+							id: 1,
+							label: "Transportation",
+							can_be_deleted: true,
+							types: [
+								{ id: 10, label: "Rode a bike", can_be_deleted: true },
+							],
+						},
+					],
+					isLoading: false,
+				};
+			}
+			if (Array.isArray(opts.queryKey) && opts.queryKey[0] === "vault") {
+				return {
+					data: {
+						name: "My Vault",
+						description: "desc",
+						default_template_id: 1,
+						show_group_tab: true,
+						show_tasks_tab: true,
+						show_files_tab: true,
+						show_journal_tab: true,
+						show_companies_tab: true,
+						show_reports_tab: true,
+						show_calendar_tab: true,
+					},
+					isLoading: false,
+				};
+			}
+			return { data: [], isLoading: false };
+		});
+
+		renderVaultSettings();
+
+		await user.click(screen.getByRole("tab", { name: /life events/i }));
+		const categoryPanel = await screen.findByText("Transportation");
+		expect(categoryPanel).toBeInTheDocument();
+		expect(screen.getAllByTitle("Move Up")[0]).toBeDisabled();
+
+		await user.click(categoryPanel);
+		const panel = categoryPanel.closest(".ant-collapse-item");
+		if (!(panel instanceof HTMLElement)) {
+			throw new Error("seeded category panel not found");
+		}
+		expect(await within(panel).findByText("Rode a bike")).toBeInTheDocument();
+	});
 });

@@ -284,6 +284,50 @@ test.describe('Vault Settings - Life Events', () => {
     await expect(firstTypeUpArrow).toBeDisabled({ timeout: 5000 });
   });
 
+	test('should delete a seeded life event type from settings', async ({ page }) => {
+		await setupVault(page);
+		await navigateToLifeEventsTab(page);
+
+		const lifeEventsCard = page.locator('.ant-card').filter({ hasText: 'Life Events' });
+		await expect(lifeEventsCard).toBeVisible({ timeout: 30000 });
+		const firstPanel = lifeEventsCard.locator('.ant-collapse-item').first();
+		await expect(firstPanel).toBeVisible({ timeout: 30000 });
+		await firstPanel.locator('.ant-collapse-header').click();
+
+		const typeItems = firstPanel.locator('.ant-list-item');
+		await expect(typeItems.first()).toBeVisible({ timeout: 15000 });
+		const initialCount = await typeItems.count();
+		expect(initialCount).toBeGreaterThan(0);
+
+		const deleteResp = page.waitForResponse(
+			(resp) => resp.url().includes('/settings/lifeEventCategories/') && resp.url().includes('/types/') && resp.request().method() === 'DELETE' && resp.status() < 400,
+		);
+		await typeItems.first().locator('button').filter({ has: page.locator('.anticon-delete') }).click();
+		await page.locator('.ant-popconfirm-buttons').getByRole('button', { name: 'OK' }).click();
+		await deleteResp;
+
+		await expect(firstPanel.locator('.ant-list-item')).toHaveCount(initialCount - 1, { timeout: 10000 });
+	});
+
+	test('should delete a seeded life event category from settings', async ({ page }) => {
+		await setupVault(page);
+		await navigateToLifeEventsTab(page);
+
+		const categoryPanels = page.locator('.ant-collapse-item');
+		await expect(categoryPanels.first()).toBeVisible({ timeout: 30000 });
+		const initialCount = await categoryPanels.count();
+		expect(initialCount).toBeGreaterThan(0);
+
+		const deleteResp = page.waitForResponse(
+			(resp) => resp.url().includes('/settings/lifeEventCategories/') && !resp.url().includes('/types/') && resp.request().method() === 'DELETE' && resp.status() < 400,
+		);
+		await categoryPanels.first().locator('.anticon-delete').first().click();
+		await page.locator('.ant-popconfirm').getByRole('button', { name: /ok|yes/i }).click();
+		await deleteResp;
+
+		await expect(page.locator('.ant-collapse-item')).toHaveCount(initialCount - 1, { timeout: 10000 });
+	});
+
   test('should show participant life events on each participant contact timeline', async ({ page }) => {
     await setupVault(page);
     const vaultId = await getVaultId(page);
