@@ -126,7 +126,8 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, _ *c
 	}
 
 	var contact models.Contact
-	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contactID).Error; err != nil {
+	// CardDAV should not expose archived contacts or internal shadow contacts.
+	if err := preloadContactForCardDAV(b.db).Where("id = ? AND listed = ?", contactID, true).First(&contact).Error; err != nil {
 		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 	}
 
@@ -153,9 +154,10 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, _ 
 	}
 
 	var contacts []models.Contact
-	// Exclude shadow contacts (can_be_deleted=false AND listed=false) — internal UserVault self-contacts
+	// Sync only listed contacts so archived entries stay off DAV clients while
+	// shadow self-contacts remain hidden.
 	if err := preloadContactForCardDAV(b.db).
-		Where("vault_id = ? AND NOT (can_be_deleted = ? AND listed = ?)", vaultID, false, false).Find(&contacts).Error; err != nil {
+		Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 

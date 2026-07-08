@@ -231,6 +231,37 @@ func TestListAddressObjects(t *testing.T) {
 	}
 }
 
+func TestListAddressObjects_ExcludesArchivedContacts(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+
+	activeContact := createTestContact(t, db, vaultID, userID, "Active", "Person")
+	archivedContact := createTestContact(t, db, vaultID, userID, "Archived", "Person")
+	if err := db.Model(&models.Contact{}).Where("id = ?", archivedContact.ID).Update("listed", false).Error; err != nil {
+		t.Fatalf("archive contact: %v", err)
+	}
+
+	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/"
+
+	// Given an active contact and an archived contact in the same vault.
+	// When CardDAV lists the address book.
+	objects, err := backend.ListAddressObjects(ctx, path, &carddav.AddressDataRequest{AllProp: true})
+	if err != nil {
+		t.Fatalf("ListAddressObjects failed: %v", err)
+	}
+
+	// Then only the active contact should be synced.
+	if len(objects) != 1 {
+		t.Fatalf("expected 1 address object after excluding archived contacts, got %d", len(objects))
+	}
+	card := mustDecodeAddressObjectCard(t, objects[0])
+	if got := card.Value(vcard.FieldUID); got != activeContact.ID {
+		t.Fatalf("expected active contact UID %q, got %q", activeContact.ID, got)
+	}
+	if got := card.Value(vcard.FieldFormattedName); got != "Active Person" {
+		t.Fatalf("expected active contact FN, got %q", got)
+	}
+}
+
 func TestGetAddressObject(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
 
@@ -291,6 +322,26 @@ func TestGetAddressObject(t *testing.T) {
 	}
 	if name.FamilyName != "Brown" {
 		t.Errorf("Expected family name 'Brown', got '%s'", name.FamilyName)
+	}
+}
+
+func TestGetAddressObject_ReturnsNotFoundForArchivedContact(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+
+	archivedContact := createTestContact(t, db, vaultID, userID, "Archived", "Person")
+	if err := db.Model(&models.Contact{}).Where("id = ?", archivedContact.ID).Update("listed", false).Error; err != nil {
+		t.Fatalf("archive contact: %v", err)
+	}
+
+	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/" + archivedContact.ID + ".vcf"
+
+	// Given an archived contact path.
+	// When CardDAV fetches the address object directly.
+	obj, err := backend.GetAddressObject(ctx, path, &carddav.AddressDataRequest{AllProp: true})
+
+	// Then archived contacts should not be exposed through direct DAV fetches.
+	if err == nil {
+		t.Fatalf("expected archived contact fetch to fail, got object %+v", obj)
 	}
 }
 
