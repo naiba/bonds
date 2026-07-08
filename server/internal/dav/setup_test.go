@@ -1,14 +1,17 @@
 package dav
 
 import (
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/naiba/bonds/internal/dto"
 	appMiddleware "github.com/naiba/bonds/internal/middleware"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
 	"gorm.io/gorm"
@@ -132,6 +135,41 @@ func TestDAVPrincipalPropfindAdvertisesCardDAVAndCalDAVHomeSets(t *testing.T) {
 	assertBodyContains(t, body, "principal")
 }
 
+func TestDAVGetAddressObject_SetsUTF8ContentType(t *testing.T) {
+	e, db := setupDAVHTTPTestWithDB(t)
+	userID, email, password := createDAVHTTPTestUser(t, db)
+	vaultID, contactID := createDAVHTTPTestContact(t, db, userID, "Róisín", "Ní")
+
+	req := httptest.NewRequest(http.MethodGet, "/dav/addressbooks/"+userID+"/"+vaultID+"/"+contactID+".vcf", nil)
+	req.SetBasicAuth(email, password)
+	rec := httptest.NewRecorder()
+
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	assertVCardUTF8ContentType(t, rec.Header().Get("Content-Type"))
+	assertBodyContains(t, rec.Body.String(), "Róisín Ní")
+}
+
+func TestDAVHeadAddressObject_SetsUTF8ContentType(t *testing.T) {
+	e, db := setupDAVHTTPTestWithDB(t)
+	userID, email, password := createDAVHTTPTestUser(t, db)
+	vaultID, contactID := createDAVHTTPTestContact(t, db, userID, "Raúl", "García")
+
+	req := httptest.NewRequest(http.MethodHead, "/dav/addressbooks/"+userID+"/"+vaultID+"/"+contactID+".vcf", nil)
+	req.SetBasicAuth(email, password)
+	rec := httptest.NewRecorder()
+
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	assertVCardUTF8ContentType(t, rec.Header().Get("Content-Type"))
+}
+
 func setupDAVHTTPTest(t *testing.T) *echo.Echo {
 	t.Helper()
 	e, _ := setupDAVHTTPTestWithDB(t)
@@ -163,6 +201,36 @@ func createDAVHTTPTestUser(t *testing.T, db *gorm.DB) (string, string, string) {
 	return resp.User.ID, email, password
 }
 
+func createDAVHTTPTestContact(t *testing.T, db *gorm.DB, userID, firstName, lastName string) (string, string) {
+	t.Helper()
+
+	var user models.User
+	if err := db.First(&user, "id = ?", userID).Error; err != nil {
+		t.Fatalf("load user: %v", err)
+	}
+
+	vault, err := services.NewVaultService(db).CreateVault(user.AccountID, user.ID, dto.CreateVaultRequest{Name: "DAV HTTP Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	now := time.Now()
+	contact := models.Contact{
+		VaultID:       vault.ID,
+		FirstName:     &firstName,
+		LastName:      &lastName,
+		LastUpdatedAt: &now,
+	}
+	if err := db.Create(&contact).Error; err != nil {
+		t.Fatalf("create contact: %v", err)
+	}
+	if err := db.Create(&models.ContactVaultUser{ContactID: contact.ID, UserID: userID, VaultID: vault.ID}).Error; err != nil {
+		t.Fatalf("create contact vault user: %v", err)
+	}
+
+	return vault.ID, contact.ID
+}
+
 func assertHeaderContains(t *testing.T, header http.Header, name, want string) {
 	t.Helper()
 	if got := header.Get(name); !strings.Contains(got, want) {
@@ -174,5 +242,19 @@ func assertBodyContains(t *testing.T, body, want string) {
 	t.Helper()
 	if !strings.Contains(body, want) {
 		t.Errorf("expected response body to contain %q, got %s", want, body)
+	}
+}
+
+func assertVCardUTF8ContentType(t *testing.T, contentType string) {
+	t.Helper()
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		t.Fatalf("parse Content-Type %q: %v", contentType, err)
+	}
+	if mediaType != "text/vcard" {
+		t.Fatalf("expected media type text/vcard, got %q", mediaType)
+	}
+	if params["charset"] != "utf-8" {
+		t.Fatalf("expected charset=utf-8, got %q in %q", params["charset"], contentType)
 	}
 }
