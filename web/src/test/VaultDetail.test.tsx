@@ -7,6 +7,47 @@ import VaultDetail from "@/pages/vault/VaultDetail";
 import { api } from "@/api";
 import type { Contact, TimelineEvent, LifeEventCategoryResponse } from "@/api";
 
+const mockAppMessage = {
+  info: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  loading: vi.fn(),
+  open: vi.fn(),
+  destroy: vi.fn(),
+};
+
+const mockAppNotification = {
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  warning: vi.fn(),
+  open: vi.fn(),
+  destroy: vi.fn(),
+};
+
+const mockAppModal = {
+  info: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn(),
+  warning: vi.fn(),
+  confirm: vi.fn(),
+};
+
+vi.mock("antd", async () => {
+  const actual = await vi.importActual<typeof import("antd")>("antd");
+  return {
+    ...actual,
+    App: Object.assign(actual.App, {
+      useApp: () => ({
+        message: mockAppMessage,
+        notification: mockAppNotification,
+        modal: mockAppModal,
+      }),
+    }),
+  };
+});
+
 beforeAll(() => {
   globalThis.ResizeObserver = class {
     observe() {}
@@ -203,6 +244,9 @@ describe("VaultDetail", () => {
     mockUseQuery.mockReset();
     mockInvalidateQueries.mockReset();
     mockGetQueryData.mockReset();
+    Object.values(mockAppMessage).forEach((mockFn) => mockFn.mockReset());
+    Object.values(mockAppNotification).forEach((mockFn) => mockFn.mockReset());
+    Object.values(mockAppModal).forEach((mockFn) => mockFn.mockReset());
     vi.mocked(api.lifeEvents.dashboardLifeEventsCreate).mockReset();
     vi.mocked(api.lifeEvents.dashboardLifeEventsUpdate).mockReset();
     vi.mocked(api.lifeEvents.dashboardLifeEventsDelete).mockReset();
