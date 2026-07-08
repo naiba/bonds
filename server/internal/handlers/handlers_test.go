@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -62,13 +63,13 @@ type authData struct {
 }
 
 type userData struct {
-	ID        string `json:"id"`
-	AccountID string `json:"account_id"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-	Email     string `json:"email"`
-	IsAdmin   bool   `json:"is_admin"`
-	IsInstanceAdministrator bool `json:"is_instance_administrator"`
+	ID                      string `json:"id"`
+	AccountID               string `json:"account_id"`
+	FirstName               string `json:"first_name"`
+	LastName                string `json:"last_name"`
+	Email                   string `json:"email"`
+	IsAdmin                 bool   `json:"is_admin"`
+	IsInstanceAdministrator bool   `json:"is_instance_administrator"`
 }
 
 type vaultData struct {
@@ -2475,8 +2476,15 @@ func TestVCard_ExportContact(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	contentType := rec.Header().Get("Content-Type")
-	if !strings.Contains(contentType, "text/vcard") {
-		t.Errorf("expected Content-Type containing text/vcard, got %s", contentType)
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		t.Fatalf("parse Content-Type %q: %v", contentType, err)
+	}
+	if mediaType != "text/vcard" {
+		t.Errorf("expected Content-Type text/vcard, got %s", contentType)
+	}
+	if params["charset"] != "utf-8" {
+		t.Errorf("expected charset=utf-8, got %s", contentType)
 	}
 	body := rec.Body.String()
 	if !strings.Contains(body, "BEGIN:VCARD") {
@@ -2497,8 +2505,15 @@ func TestVCard_ExportVault(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	contentType := rec.Header().Get("Content-Type")
-	if !strings.Contains(contentType, "text/vcard") {
-		t.Errorf("expected Content-Type containing text/vcard, got %s", contentType)
+	mediaType, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		t.Fatalf("parse Content-Type %q: %v", contentType, err)
+	}
+	if mediaType != "text/vcard" {
+		t.Errorf("expected Content-Type text/vcard, got %s", contentType)
+	}
+	if params["charset"] != "utf-8" {
+		t.Errorf("expected charset=utf-8, got %s", contentType)
 	}
 }
 

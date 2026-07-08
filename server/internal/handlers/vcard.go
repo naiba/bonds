@@ -5,11 +5,13 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/services"
-	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/pkg/response"
 )
+
+const vCardUTF8ContentType = "text/vcard; charset=utf-8"
 
 var _ dto.VCardImportResponse
 
@@ -46,9 +48,10 @@ func (h *VCardHandler) ExportContact(c echo.Context) error {
 		return response.InternalError(c, "err.failed_to_export_vcard")
 	}
 
-	c.Response().Header().Set("Content-Type", "text/vcard")
+	// Explicit UTF-8 keeps non-ASCII contact names interoperable on iOS.
+	c.Response().Header().Set("Content-Type", vCardUTF8ContentType)
 	c.Response().Header().Set("Content-Disposition", "attachment; filename=contact.vcf")
-	return c.Blob(http.StatusOK, "text/vcard", data)
+	return c.Blob(http.StatusOK, vCardUTF8ContentType, data)
 }
 
 // ExportVault godoc
@@ -70,9 +73,11 @@ func (h *VCardHandler) ExportVault(c echo.Context) error {
 		return response.InternalError(c, "err.failed_to_export_vcard")
 	}
 
-	c.Response().Header().Set("Content-Type", "text/vcard")
+	// Match DAV export headers so manual exports and DAV sync use the same
+	// UTF-8 declaration for contact names.
+	c.Response().Header().Set("Content-Type", vCardUTF8ContentType)
 	c.Response().Header().Set("Content-Disposition", "attachment; filename=contacts.vcf")
-	return c.Blob(http.StatusOK, "text/vcard", data)
+	return c.Blob(http.StatusOK, vCardUTF8ContentType, data)
 }
 
 // ImportVCard godoc
