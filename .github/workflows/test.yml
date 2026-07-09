@@ -95,9 +95,37 @@ jobs:
       - name: Build final Docker image
         run: docker build -t bonds-runtime-smoke .
 
-      - name: Verify PostgreSQL backup tools
+      - name: Start PostgreSQL 18 for compatibility check
         run: |
-          docker run --rm bonds-runtime-smoke sh -c 'pg_dump --version && psql --version'
+          docker run -d --rm \
+            --name bonds-postgres-18 \
+            -e POSTGRES_PASSWORD=bonds \
+            -e POSTGRES_DB=bonds \
+            -p 55432:5432 \
+            postgres:18
+
+          until docker exec bonds-postgres-18 pg_isready -U postgres -d bonds; do
+            sleep 1
+          done
+
+      - name: Seed PostgreSQL 18 test data
+        run: |
+          docker exec bonds-postgres-18 psql -U postgres -d bonds -c 'CREATE TABLE issue_203_probe(id integer primary key, note text);'
+          docker exec bonds-postgres-18 psql -U postgres -d bonds -c "INSERT INTO issue_203_probe(id, note) VALUES (1, 'pg18 compatibility');"
+
+      - name: Verify packaged pg_dump against PostgreSQL 18
+        run: |
+          docker run --rm --network host bonds-runtime-smoke sh -c \
+            'PGPASSWORD=bonds pg_dump --host 127.0.0.1 --port 55432 --username postgres --dbname bonds --file /tmp/issue-203.sql && grep -q issue_203_probe /tmp/issue-203.sql'
+
+      - name: Verify packaged psql against PostgreSQL 18
+        run: |
+          docker run --rm --network host bonds-runtime-smoke sh -c \
+            'PGPASSWORD=bonds psql --host 127.0.0.1 --port 55432 --username postgres --dbname bonds -c "SELECT note FROM issue_203_probe WHERE id = 1" | grep -q "pg18 compatibility"'
+
+      - name: Stop PostgreSQL 18 test container
+        if: always()
+        run: docker rm -f bonds-postgres-18 || true
 
   e2e-test:
     name: E2E Tests
