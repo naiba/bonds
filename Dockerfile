@@ -36,7 +36,13 @@ RUN CGO_ENABLED=1 go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}"
 
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates sqlite-libs tzdata
+# PostgreSQL backup/restore shells out to pg_dump/psql in BackupService.
+# Keep the client tools in the final runtime image so issue #202 does not regress.
+RUN apk add --no-cache \
+    ca-certificates \
+    postgresql17-client \
+    sqlite-libs \
+    tzdata
 WORKDIR /app
 COPY --from=backend /build/bonds-server .
 RUN mkdir -p /app/data
