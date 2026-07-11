@@ -192,7 +192,10 @@ export default function VaultSettings() {
       api.vaultSettings.settingsVisibilityUpdate(String(vaultId), data),
     onSuccess: () => {
       message.success(t("common.saved"));
-      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+      // Layout reads Viewer-accessible vault detail while this form reads settings;
+      // invalidate both caches so visibility changes apply immediately and stay controlled.
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId, "settings"] });
     },
     onError: (e: APIError) => message.error(e.message),
   });
@@ -419,7 +422,6 @@ export default function VaultSettings() {
       { key: "show_tasks_tab", label: t("vault_settings.tab_tasks") },
       { key: "show_files_tab", label: t("vault_settings.tab_files") },
       { key: "show_journal_tab", label: t("vault_settings.tab_journal") },
-      { key: "show_companies_tab", label: t("vault_settings.tab_companies") },
       { key: "show_reports_tab", label: t("vault_settings.tab_reports") },
       { key: "show_calendar_tab", label: t("vault_settings.tab_calendar") },
     ];

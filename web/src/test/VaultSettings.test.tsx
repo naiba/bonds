@@ -167,6 +167,40 @@ describe("VaultSettings", () => {
     expect(screen.getByText("Labels")).toBeInTheDocument();
   });
 
+  it("does not offer visibility controls for tabs that are no longer in the top navigation", async () => {
+    const user = userEvent.setup();
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      if (Array.isArray(opts.queryKey) && opts.queryKey[0] === "vault") {
+        return {
+          data: {
+            name: "My Vault",
+            description: "desc",
+            default_template_id: 1,
+            show_group_tab: true,
+            show_tasks_tab: true,
+            show_files_tab: true,
+            show_journal_tab: true,
+            show_companies_tab: true,
+            show_reports_tab: true,
+            show_calendar_tab: true,
+          },
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    });
+
+    // Given: Companies remains available as a Vault Settings management tab.
+    renderVaultSettings();
+    expect(screen.getByRole("tab", { name: "Companies" })).toBeInTheDocument();
+
+    // When: the user opens visibility controls for the top navigation.
+    await user.click(screen.getByRole("tab", { name: "Tab Visibility" }));
+
+    // Then: the obsolete top-level Companies control is not offered.
+    expect(screen.queryByText("Show Companies tab")).not.toBeInTheDocument();
+  });
+
   it("renders typed quick fact templates", async () => {
     const user = userEvent.setup();
     mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
