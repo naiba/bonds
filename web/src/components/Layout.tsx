@@ -73,58 +73,6 @@ export default function Layout() {
 
   const isInVault = !!location.pathname.match(/^\/vaults\/[^/]+(\/|$)/);
 
-  const vaultNavItems: { key: string; icon: React.ReactNode; label: string }[] = vaultId
-    ? [
-        { key: `/vaults/${vaultId}`, icon: <DashboardOutlined />, label: t("nav.dashboard") },
-        { key: `/vaults/${vaultId}/contacts`, icon: <TeamOutlined />, label: t("nav.contacts") },
-        { key: `/vaults/${vaultId}/journals`, icon: <EditOutlined />, label: t("nav.journal") },
-        { key: `/vaults/${vaultId}/groups`, icon: <UsergroupAddOutlined />, label: t("nav.groups") },
-        { key: `/vaults/${vaultId}/calendar`, icon: <CalendarOutlined />, label: t("nav.calendar") },
-        { key: `/vaults/${vaultId}/tasks`, icon: <CheckSquareOutlined />, label: t("nav.tasks") },
-        { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
-        { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
-        { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
-        { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
-        { key: `/vaults/${vaultId}/settings`, icon: <SettingOutlined />, label: t("nav.settings") },
-      ]
-    : [];
-
-  // Grouped nav: Core | Content | Management | Activity
-  // Groups separated by thin dividers for visual hierarchy
-  const vaultNavGroups: { key: string; icon: React.ReactNode; label: string }[][] = vaultId
-    ? [
-        // Core
-        [
-          { key: `/vaults/${vaultId}`, icon: <DashboardOutlined />, label: t("nav.dashboard") },
-          { key: `/vaults/${vaultId}/contacts`, icon: <TeamOutlined />, label: t("nav.contacts") },
-        ],
-        // Content
-        [
-          { key: `/vaults/${vaultId}/journals`, icon: <EditOutlined />, label: t("nav.journal") },
-          { key: `/vaults/${vaultId}/groups`, icon: <UsergroupAddOutlined />, label: t("nav.groups") },
-          { key: `/vaults/${vaultId}/calendar`, icon: <CalendarOutlined />, label: t("nav.calendar") },
-        ],
-        // Management
-        [
-          { key: `/vaults/${vaultId}/tasks`, icon: <CheckSquareOutlined />, label: t("nav.tasks") },
-          { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports") },
-          { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files") },
-        ],
-        // Activity
-        [
-          { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
-          { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
-          { key: `/vaults/${vaultId}/settings`, icon: <SettingOutlined />, label: t("nav.settings") },
-        ],
-      ]
-    : [];
-
-  const activeVaultKey = vaultNavItems
-    .slice()
-    .sort((a, b) => b.key.length - a.key.length)
-    .find((item) => location.pathname.startsWith(item.key))?.key ?? "";
-
-  
   const { data: currentVault } = useQuery({
     queryKey: ["vaults", vaultId],
     queryFn: async () => {
@@ -133,6 +81,46 @@ export default function Layout() {
     },
     enabled: !!vaultId,
   });
+
+  // Grouped nav: Core | Content | Management | Activity
+  // Groups separated by thin dividers for visual hierarchy
+  const vaultNavGroups = vaultId
+    ? [
+        // Core
+        [
+          { key: `/vaults/${vaultId}`, icon: <DashboardOutlined />, label: t("nav.dashboard") },
+          { key: `/vaults/${vaultId}/contacts`, icon: <TeamOutlined />, label: t("nav.contacts") },
+        ],
+        // Content
+        [
+          { key: `/vaults/${vaultId}/journals`, icon: <EditOutlined />, label: t("nav.journal"), visible: currentVault?.show_journal_tab },
+          { key: `/vaults/${vaultId}/groups`, icon: <UsergroupAddOutlined />, label: t("nav.groups"), visible: currentVault?.show_group_tab },
+          { key: `/vaults/${vaultId}/calendar`, icon: <CalendarOutlined />, label: t("nav.calendar"), visible: currentVault?.show_calendar_tab },
+        ],
+        // Management
+        [
+          { key: `/vaults/${vaultId}/tasks`, icon: <CheckSquareOutlined />, label: t("nav.tasks"), visible: currentVault?.show_tasks_tab },
+          { key: `/vaults/${vaultId}/reports`, icon: <BarChartOutlined />, label: t("nav.reports"), visible: currentVault?.show_reports_tab },
+          { key: `/vaults/${vaultId}/files`, icon: <FileOutlined />, label: t("nav.files"), visible: currentVault?.show_files_tab },
+        ],
+        // Activity
+        [
+          { key: `/vaults/${vaultId}/reminders`, icon: <BellOutlined />, label: t("nav.reminders") },
+          { key: `/vaults/${vaultId}/dav-subscriptions`, icon: <CloudServerOutlined />, label: t("nav.davSubscriptions") },
+          { key: `/vaults/${vaultId}/settings`, icon: <SettingOutlined />, label: t("nav.settings") },
+        ],
+      ]
+        // The duplicated static lists ignored vault visibility; only explicit false hides an entry during loading.
+        .map((group) => group.filter((item) => !("visible" in item) || item.visible !== false))
+        .filter((group) => group.length > 0)
+    : [];
+
+  const vaultNavItems = vaultNavGroups.flat();
+
+  const activeVaultKey = vaultNavItems
+    .slice()
+    .sort((a, b) => b.key.length - a.key.length)
+    .find((item) => location.pathname.startsWith(item.key))?.key ?? "";
 
   const userMenuItems: MenuProps["items"] = [
     { key: "/settings", icon: <SettingOutlined />, label: t("nav.account") },
