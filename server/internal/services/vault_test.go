@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -82,6 +83,71 @@ func TestCreateVault(t *testing.T) {
 	}
 	if len(qfTemplates) != 3 || qfTemplates[0].LabelTranslationKey == nil || *qfTemplates[0].LabelTranslationKey != "seed.quick_facts.how_we_met" {
 		t.Fatalf("expected first quick fact template to be how we met, got %+v", qfTemplates)
+	}
+}
+
+// Regression for #205: navigation visibility configured on a vault must be
+// returned to Viewer-accessible layout consumers.
+func TestGetVault_ReturnsNavigationTabVisibility(t *testing.T) {
+	svc, accountID, userID := setupVaultTest(t)
+
+	// Given: a vault persists a mixed visibility pattern across all navigation tabs.
+	vault, err := svc.CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Visibility Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	if err := svc.db.Model(&models.Vault{}).Where("id = ?", vault.ID).
+		Select("show_group_tab", "show_tasks_tab", "show_files_tab", "show_journal_tab", "show_companies_tab", "show_reports_tab", "show_calendar_tab").
+		Updates(models.Vault{
+			ShowGroupTab:     true,
+			ShowTasksTab:     false,
+			ShowFilesTab:     true,
+			ShowJournalTab:   false,
+			ShowCompaniesTab: true,
+			ShowReportsTab:   false,
+			ShowCalendarTab:  true,
+		}).Error; err != nil {
+		t.Fatalf("Update navigation visibility failed: %v", err)
+	}
+
+	// When: the vault is retrieved for the user.
+	response, err := svc.GetVault(vault.ID, userID)
+
+	// Then: every persisted visibility field is present in and matches the response.
+	if err != nil {
+		t.Fatalf("GetVault failed: %v", err)
+	}
+	encodedResponse, err := json.Marshal(response)
+	if err != nil {
+		t.Fatalf("Marshal VaultResponse failed: %v", err)
+	}
+	var responseFields map[string]json.RawMessage
+	if err := json.Unmarshal(encodedResponse, &responseFields); err != nil {
+		t.Fatalf("Unmarshal VaultResponse failed: %v", err)
+	}
+	expectedVisibility := map[string]bool{
+		"show_group_tab":     true,
+		"show_tasks_tab":     false,
+		"show_files_tab":     true,
+		"show_journal_tab":   false,
+		"show_companies_tab": true,
+		"show_reports_tab":   false,
+		"show_calendar_tab":  true,
+	}
+	for field, expected := range expectedVisibility {
+		rawValue, ok := responseFields[field]
+		if !ok {
+			t.Errorf("Expected VaultResponse to include %q", field)
+			continue
+		}
+		var actual bool
+		if err := json.Unmarshal(rawValue, &actual); err != nil {
+			t.Errorf("Unmarshal %q failed: %v", field, err)
+			continue
+		}
+		if actual != expected {
+			t.Errorf("Expected %s=%t, got %t", field, expected, actual)
+		}
 	}
 }
 

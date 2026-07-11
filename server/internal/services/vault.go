@@ -599,7 +599,15 @@ func toVaultResponse(v *models.Vault, userContactID, userNameOrder string) dto.V
 		EffectiveNameOrder: effectiveVaultNameOrder(v, userNameOrder),
 		DefaultActivityTab: v.DefaultActivityTab,
 		UserContactID:      userContactID,
-		CreatedAt:          v.CreatedAt,
-		UpdatedAt:          v.UpdatedAt,
+		// Layout reads the Viewer-accessible vault detail, not Manager-only settings.
+		ShowGroupTab:     v.ShowGroupTab,
+		ShowTasksTab:     v.ShowTasksTab,
+		ShowFilesTab:     v.ShowFilesTab,
+		ShowJournalTab:   v.ShowJournalTab,
+		ShowCompaniesTab: v.ShowCompaniesTab,
+		ShowReportsTab:   v.ShowReportsTab,
+		ShowCalendarTab:  v.ShowCalendarTab,
+		CreatedAt:        v.CreatedAt,
+		UpdatedAt:        v.UpdatedAt,
 	}
 }
