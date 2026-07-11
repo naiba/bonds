@@ -2,6 +2,7 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -481,5 +482,74 @@ func TestCompanyList_WithEmployees(t *testing.T) {
 	}
 	if companies[0].Contacts[0].JobPosition != "Manager" {
 		t.Errorf("Expected job position 'Manager', got '%s'", companies[0].Contacts[0].JobPosition)
+	}
+}
+
+// Regression for #204: retained job rows whose contacts were soft-deleted
+// must not make listing the company fail.
+func TestCompanyList_SoftDeletedEmployeeIsExcluded(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	// Given: a company has an employee through a retained ContactCompany row.
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("Deleted"),
+		LastName:  strPtrOrNil("Employee"),
+	}
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+	job := models.ContactCompany{ContactID: contact.ID, CompanyID: ctx.company.ID}
+	if err := ctx.db.Create(&job).Error; err != nil {
+		t.Fatalf("Create ContactCompany failed: %v", err)
+	}
+	if err := ctx.db.Model(&models.Contact{}).Where("id = ?", contact.ID).Update("deleted_at", time.Now()).Error; err != nil {
+		t.Fatalf("Soft-delete contact failed: %v", err)
+	}
+
+	// When: companies are listed after the employee contact is soft-deleted.
+	companies, err := ctx.svc.List(ctx.vaultID, ctx.userID)
+
+	// Then: the company remains visible and has no employees rather than returning a formatter error.
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	if len(companies) != 1 {
+		t.Fatalf("Expected 1 company, got %d", len(companies))
+	}
+	if len(companies[0].Contacts) != 0 {
+		t.Errorf("Expected 0 employees after soft delete, got %d", len(companies[0].Contacts))
+	}
+}
+
+func TestCompanyGet_SoftDeletedEmployeeIsExcluded(t *testing.T) {
+	ctx := setupCompanyTest(t)
+
+	// Given: a company detail has an employee association whose contact was soft-deleted.
+	contact := models.Contact{
+		VaultID:   ctx.vaultID,
+		FirstName: strPtrOrNil("Deleted"),
+		LastName:  strPtrOrNil("Employee"),
+	}
+	if err := ctx.db.Create(&contact).Error; err != nil {
+		t.Fatalf("Create contact failed: %v", err)
+	}
+	job := models.ContactCompany{ContactID: contact.ID, CompanyID: ctx.company.ID}
+	if err := ctx.db.Create(&job).Error; err != nil {
+		t.Fatalf("Create ContactCompany failed: %v", err)
+	}
+	if err := ctx.db.Delete(&contact).Error; err != nil {
+		t.Fatalf("Soft-delete contact failed: %v", err)
+	}
+
+	// When: the company detail is retrieved.
+	company, err := ctx.svc.Get(ctx.company.ID, ctx.vaultID, ctx.userID)
+
+	// Then: the company remains readable without emitting the deleted employee.
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if len(company.Contacts) != 0 {
+		t.Errorf("Expected 0 employees after soft delete, got %d", len(company.Contacts))
 	}
 }

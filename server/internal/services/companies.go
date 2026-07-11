@@ -27,7 +27,10 @@ func (s *CompanyService) List(vaultID, userID string) ([]dto.CompanyResponse, er
 	var companies []models.Company
 	// BUG FIX (#55): Must Preload ContactCompanies+Contact so the Employees column
 	// in the frontend list is populated, not just in the single-Get detail view.
-	if err := s.db.Preload("ContactCompanies").Preload("ContactCompanies.Contact").Where("vault_id = ?", vaultID).Order("name ASC").Find(&companies).Error; err != nil {
+	// GORM retains join rows but omits soft-deleted contacts; filter them before employee formatting.
+	if err := s.db.Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB {
+		return db.Joins("JOIN contacts ON contacts.id = contact_companies.contact_id AND contacts.deleted_at IS NULL")
+	}).Preload("ContactCompanies.Contact").Where("vault_id = ?", vaultID).Order("name ASC").Find(&companies).Error; err != nil {
 		return nil, err
 	}
 	result := make([]dto.CompanyResponse, len(companies))
@@ -75,8 +78,11 @@ func (s *CompanyService) Get(id uint, vaultID, userID string) (*dto.CompanyRespo
 	}
 
 	var company models.Company
+	// GORM retains join rows but omits soft-deleted contacts; filter them before employee formatting.
 	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).
-		Preload("ContactCompanies").Preload("ContactCompanies.Contact").
+		Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB {
+			return db.Joins("JOIN contacts ON contacts.id = contact_companies.contact_id AND contacts.deleted_at IS NULL")
+		}).Preload("ContactCompanies.Contact").
 		First(&company).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrCompanyNotFound
