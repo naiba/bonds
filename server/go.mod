@@ -28,6 +28,10 @@ require (
 	gorm.io/gorm v1.31.1
 )
 
+// Temporary fork: expose CardDAV address-data capabilities and request format
+// metadata until the equivalent upstream go-webdav change is released.
+replace github.com/emersion/go-webdav => github.com/naiba/go-webdav v0.7.1-0.20260712181604-d25a52275364
+
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
