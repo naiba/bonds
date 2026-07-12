@@ -35,7 +35,9 @@ When you enable 2FA, any DAV clients using your password will stop syncing. Upda
 
 ## What Gets Synced
 
-### CardDAV (Contacts to vCard 4.0)
+### CardDAV (Contacts to compatibility vCard 3.0)
+
+The CardDAV server uses UTF-8 vCard 3.0 for broad compatibility with Apple Contacts and other DAV clients. Manual and REST vCard exports remain vCard 4.0.
 
 | Bonds Field | vCard Property |
 |-------------|---------------|
@@ -83,4 +85,4 @@ The well-known URLs (`/.well-known/carddav`, `/.well-known/caldav`) enable autom
 
 ## ETags
 
-Bonds uses the `UpdatedAt` timestamp (Unix epoch) as the ETag for all DAV resources. Clients use ETags to detect changes and sync efficiently.
+CardDAV address objects use an ETag derived from the complete serialized vCard, so changes to phone numbers, email addresses, and other related data trigger synchronization. Other DAV resources continue to use their `UpdatedAt` timestamp. Clients use these ETags to detect changes and sync efficiently.
