@@ -35,7 +35,9 @@ Quando você ativa o 2FA, quaisquer clientes DAV usando sua senha pararão de si
 
 ## O Que é Sincronizado
 
-### CardDAV (Contatos para vCard 4.0)
+### CardDAV (Contatos para vCard 3.0 compatível)
+
+O servidor CardDAV usa vCard 3.0 em UTF-8 para maior compatibilidade com o Apple Contatos e outros clientes DAV. As exportações manuais e pela API REST continuam usando vCard 4.0.
 
 | Campo Bonds | Propriedade vCard |
 |-------------|-------------------|
@@ -83,4 +85,4 @@ As URLs well-known (`/.well-known/carddav`, `/.well-known/caldav`) permitem desc
 
 ## ETags
 
-Bonds usa o timestamp `UpdatedAt` (época Unix) como ETag para todos os recursos DAV. Clientes usam ETags para detectar alterações e sincronizar eficientemente.
+Os objetos de endereço CardDAV usam um ETag derivado do vCard serializado completo, portanto alterações em números de telefone, endereços de e-mail e outros dados relacionados acionam a sincronização. Os demais recursos DAV continuam usando o timestamp `UpdatedAt`. Os clientes usam esses ETags para detectar alterações e sincronizar com eficiência.
