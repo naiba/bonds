@@ -1,7 +1,10 @@
 package dav
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -61,13 +64,10 @@ func (b *CardDAVBackend) ListAddressBooks(ctx context.Context) ([]carddav.Addres
 			continue
 		}
 		books = append(books, carddav.AddressBook{
-			Path:        "/dav/addressbooks/" + userID + "/" + vault.ID + "/",
-			Name:        vault.Name,
-			Description: ptrToStr(vault.Description),
-			SupportedAddressData: []carddav.AddressDataType{
-				{ContentType: "text/vcard", Version: "3.0"},
-				{ContentType: "text/vcard", Version: "4.0"},
-			},
+			Path:                 "/dav/addressbooks/" + userID + "/" + vault.ID + "/",
+			Name:                 vault.Name,
+			Description:          ptrToStr(vault.Description),
+			SupportedAddressData: cardDAVSupportedAddressData(),
 		})
 	}
 	return books, nil
@@ -96,13 +96,10 @@ func (b *CardDAVBackend) GetAddressBook(ctx context.Context, path string) (*card
 	}
 
 	return &carddav.AddressBook{
-		Path:        "/dav/addressbooks/" + userID + "/" + vault.ID + "/",
-		Name:        vault.Name,
-		Description: ptrToStr(vault.Description),
-		SupportedAddressData: []carddav.AddressDataType{
-			{ContentType: "text/vcard", Version: "3.0"},
-			{ContentType: "text/vcard", Version: "4.0"},
-		},
+		Path:                 "/dav/addressbooks/" + userID + "/" + vault.ID + "/",
+		Name:                 vault.Name,
+		Description:          ptrToStr(vault.Description),
+		SupportedAddressData: cardDAVSupportedAddressData(),
 	}, nil
 }
 
@@ -114,7 +111,11 @@ func (b *CardDAVBackend) DeleteAddressBook(_ context.Context, _ string) error {
 	return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("deleting address books is not supported"))
 }
 
-func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, _ *carddav.AddressDataRequest) (*carddav.AddressObject, error) {
+func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, request *carddav.AddressDataRequest) (*carddav.AddressObject, error) {
+	if err := validateCardDAVAddressDataRequest(request); err != nil {
+		return nil, err
+	}
+
 	userID := UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, fmt.Errorf("no user in context")
@@ -135,10 +136,14 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, _ *c
 		return nil, err
 	}
 
-	return contactToAddressObject(&contact, userID), nil
+	return contactToAddressObject(&contact, userID)
 }
 
-func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, _ *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
+func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
+	if err := validateCardDAVAddressDataRequest(request); err != nil {
+		return nil, err
+	}
+
 	userID := UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, fmt.Errorf("no user in context")
@@ -163,14 +168,22 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, _ 
 
 	objects := make([]carddav.AddressObject, 0, len(contacts))
 	for i := range contacts {
-		objects = append(objects, *contactToAddressObject(&contacts[i], userID))
+		object, err := contactToAddressObject(&contacts[i], userID)
+		if err != nil {
+			return nil, err
+		}
+		objects = append(objects, *object)
 	}
 	return objects, nil
 }
 
 func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
 	// For simplicity, list all and filter
-	objects, err := b.ListAddressObjects(ctx, path, &carddav.AddressDataRequest{AllProp: true})
+	request := &carddav.AddressDataRequest{AllProp: true}
+	if query != nil {
+		request = &query.DataRequest
+	}
+	objects, err := b.ListAddressObjects(ctx, path, request)
 	if err != nil {
 		return nil, err
 	}
@@ -189,6 +202,11 @@ func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, q
 }
 
 func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, _ *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
+	// Keep PUT input aligned with the vCard 3.0 representation advertised by this address book.
+	if card.Value(vcard.FieldVersion) != "3.0" {
+		return nil, carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
+	}
+
 	userID := UserIDFromContext(ctx)
 	if userID == "" {
 		return nil, fmt.Errorf("no user in context")
@@ -245,7 +263,7 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 			if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 				return nil, err
 			}
-			return contactToAddressObject(&contact, userID), nil
+			return contactToAddressObject(&contact, userID)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
@@ -280,7 +298,7 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
-	return contactToAddressObject(&contact, userID), nil
+	return contactToAddressObject(&contact, userID)
 }
 
 func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) error {
@@ -318,15 +336,38 @@ func (b *CardDAVBackend) verifyVaultAccess(userID, vaultID string) error {
 	return nil
 }
 
+func cardDAVSupportedAddressData() []carddav.AddressDataType {
+	return []carddav.AddressDataType{{ContentType: vcard.MIMEType, Version: "3.0"}}
+}
+
+func validateCardDAVAddressDataRequest(request *carddav.AddressDataRequest) error {
+	if request == nil {
+		return nil
+	}
+	if request.ContentType != "" && request.ContentType != vcard.MIMEType {
+		return carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
+	}
+	if request.Version != "" && request.Version != "3.0" {
+		return carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
+	}
+	return nil
+}
+
 // contactToAddressObject converts a Contact model to a CardDAV AddressObject.
-func contactToAddressObject(c *models.Contact, userID string) *carddav.AddressObject {
-	card := services.BuildContactVCard(c)
+func contactToAddressObject(c *models.Contact, userID string) (*carddav.AddressObject, error) {
+	card := services.BuildContactCardDAVV3(c)
+	var encoded bytes.Buffer
+	if err := vcard.NewEncoder(&encoded).Encode(card); err != nil {
+		return nil, fmt.Errorf("encode CardDAV v3 card: %w", err)
+	}
+	// Content-derived ETags keep DAV caches coherent when related fields change.
+	hash := sha256.Sum256(encoded.Bytes())
 	return &carddav.AddressObject{
 		Path:    "/dav/addressbooks/" + userID + "/" + c.VaultID + "/" + c.ID + ".vcf",
 		ModTime: c.UpdatedAt,
-		ETag:    fmt.Sprintf("%d", c.UpdatedAt.Unix()),
+		ETag:    "v3-" + hex.EncodeToString(hash[:]),
 		Card:    card,
-	}
+	}, nil
 }
 
 func preloadContactForCardDAV(db *gorm.DB) *gorm.DB {

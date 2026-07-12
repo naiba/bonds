@@ -2,6 +2,7 @@ package dav
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -176,11 +177,11 @@ func TestListAddressObjects(t *testing.T) {
 	foundBob := false
 	for _, obj := range objects {
 		card := mustDecodeAddressObjectCard(t, obj)
-		if card.Value(vcard.FieldVersion) != "4.0" {
-			t.Fatalf("expected VERSION 4.0, got %q", card.Value(vcard.FieldVersion))
+		if card.Value(vcard.FieldVersion) != "3.0" {
+			t.Fatalf("expected VERSION 3.0, got %q", card.Value(vcard.FieldVersion))
 		}
-		if card.Kind() != vcard.KindIndividual {
-			t.Fatalf("expected KIND individual, got %q", card.Kind())
+		if card.Value(vcard.FieldKind) != "" {
+			t.Fatalf("expected KIND to be absent, got %q", card.Value(vcard.FieldKind))
 		}
 		if card.Value(vcard.FieldUID) == "" {
 			t.Fatal("expected UID to be set")
@@ -218,6 +219,9 @@ func TestListAddressObjects(t *testing.T) {
 		}
 		if obj.ETag == "" {
 			t.Error("Expected non-empty ETag")
+		}
+		if !strings.HasPrefix(obj.ETag, "v3-") {
+			t.Errorf("Expected v3 ETag marker, got %q", obj.ETag)
 		}
 		if obj.Path == "" {
 			t.Error("Expected non-empty Path")
@@ -290,11 +294,11 @@ func TestGetAddressObject(t *testing.T) {
 		t.Fatalf("GetAddressObject failed: %v", err)
 	}
 	card := mustDecodeAddressObjectCard(t, *obj)
-	if got := card.Value(vcard.FieldVersion); got != "4.0" {
-		t.Fatalf("expected VERSION 4.0, got %q", got)
+	if got := card.Value(vcard.FieldVersion); got != "3.0" {
+		t.Fatalf("expected VERSION 3.0, got %q", got)
 	}
-	if card.Kind() != vcard.KindIndividual {
-		t.Fatalf("expected KIND individual, got %q", card.Kind())
+	if got := card.Value(vcard.FieldKind); got != "" {
+		t.Fatalf("expected KIND to be absent, got %q", got)
 	}
 	if got := card.Value(vcard.FieldUID); got != contact.ID {
 		t.Fatalf("expected UID %q, got %q", contact.ID, got)
@@ -349,7 +353,7 @@ func TestPutAddressObject(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
 
 	card := make(vcard.Card)
-	card.SetValue(vcard.FieldVersion, "4.0")
+	card.SetValue(vcard.FieldVersion, "3.0")
 	card.SetValue(vcard.FieldFormattedName, "Dave Wilson")
 	card.SetName(&vcard.Name{
 		GivenName:  "Dave",
