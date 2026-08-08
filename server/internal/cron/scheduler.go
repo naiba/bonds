@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/naiba/bonds/internal/models"
@@ -19,22 +20,45 @@ const minRunInterval = 55 * time.Second
 type Scheduler struct {
 	cron *robfigcron.Cron
 	db   *gorm.DB
+	mu   sync.Mutex
+	jobs map[string]robfigcron.EntryID
 }
 
 func NewScheduler(db *gorm.DB) *Scheduler {
 	return &Scheduler{
 		cron: robfigcron.New(robfigcron.WithSeconds()),
 		db:   db,
+		jobs: make(map[string]robfigcron.EntryID),
 	}
 }
 
+// RegisterJob registers a new cron job.
 func (s *Scheduler) RegisterJob(spec string, name string, fn func()) error {
-	_, err := s.cron.AddFunc(spec, func() {
+	return s.UpsertJob(spec, name, fn)
+}
+
+// UpsertJob registers a job, replacing any previously registered job with the
+// same name. An empty spec removes the job. This allows settings changes to
+// take effect at runtime without a restart.
+func (s *Scheduler) UpsertJob(spec string, name string, fn func()) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if id, ok := s.jobs[name]; ok {
+		s.cron.Remove(id)
+		delete(s.jobs, name)
+	}
+	if spec == "" {
+		return nil
+	}
+
+	id, err := s.cron.AddFunc(spec, func() {
 		s.runJob(name, fn)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to register cron job %q: %w", name, err)
 	}
+	s.jobs[name] = id
 	log.Printf("[cron] Registered job %q with spec %q", name, spec)
 	return nil
 }

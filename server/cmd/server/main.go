@@ -130,9 +130,12 @@ func main() {
 
 	backupService := services.NewBackupService(db, cfg)
 	backupService.SetSystemSettings(systemSettingService)
-	backupCron := systemSettingService.GetWithDefault("backup.cron", cfg.Backup.Cron)
-	if backupCron != "" {
-		if err := scheduler.RegisterJob(backupCron, "create_backup", func() {
+	// reloadBackup keeps the backup cron job in sync with the backup.cron
+	// system setting. It is invoked at startup and registered as a reloader so
+	// that changing the schedule in the admin panel takes effect immediately.
+	reloadBackup := func() {
+		backupCron := systemSettingService.GetWithDefault("backup.cron", cfg.Backup.Cron)
+		if err := scheduler.UpsertJob(backupCron, "create_backup", func() {
 			if _, err := backupService.Create(); err != nil {
 				log.Printf("WARNING: Backup cron failed: %v", err)
 			}
@@ -143,6 +146,7 @@ func main() {
 			log.Printf("WARNING: Failed to register backup cron job: %v", err)
 		}
 	}
+	reloadBackup()
 
 	e := echo.New()
 	e.HideBanner = true
@@ -153,7 +157,7 @@ func main() {
 	e.Use(echoMiddleware.Recover())
 	e.Use(appMiddleware.Locale())
 
-	handlers.RegisterRoutes(e, db, cfg, Version)
+	handlers.RegisterRoutes(e, db, cfg, Version, reloadBackup)
 
 	dav.SetupDAVRoutes(e, db)
 

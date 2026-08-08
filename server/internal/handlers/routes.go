@@ -19,7 +19,7 @@ import (
 	_ "github.com/naiba/bonds/docs"
 )
 
-func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string) {
+func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string, backupReloader func()) {
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret, db)
 
 	systemSettingService := services.NewSystemSettingServiceWithCipher(db, cfg.Security.SettingsEncKey)
@@ -263,6 +263,9 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 			log.Printf("WARNING: WebAuthn reload failed: %v", err)
 		}
 	})
+	if backupReloader != nil {
+		adminHandler.RegisterReloader(backupReloader)
+	}
 	oauthProviderHandler := NewOAuthProviderHandler(oauthProviderService)
 	instanceHandler := NewInstanceHandler(systemSettingService, oauthService, webauthnService, version)
 
