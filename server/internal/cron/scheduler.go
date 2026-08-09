@@ -44,11 +44,11 @@ func (s *Scheduler) UpsertJob(spec string, name string, fn func()) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if id, ok := s.jobs[name]; ok {
-		s.cron.Remove(id)
-		delete(s.jobs, name)
-	}
 	if spec == "" {
+		if id, ok := s.jobs[name]; ok {
+			s.cron.Remove(id)
+			delete(s.jobs, name)
+		}
 		return nil
 	}
 
@@ -57,6 +57,9 @@ func (s *Scheduler) UpsertJob(spec string, name string, fn func()) error {
 	})
 	if err != nil {
 		return fmt.Errorf("failed to register cron job %q: %w", name, err)
+	}
+	if previousID, ok := s.jobs[name]; ok {
+		s.cron.Remove(previousID)
 	}
 	s.jobs[name] = id
 	log.Printf("[cron] Registered job %q with spec %q", name, spec)

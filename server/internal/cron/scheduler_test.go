@@ -117,6 +117,28 @@ func TestUpsertJobReplacesSpec(t *testing.T) {
 	}
 }
 
+func TestUpsertJobInvalidSpecKeepsExistingJob(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	s := NewScheduler(db)
+
+	if err := s.UpsertJob("@every 1h", "upsert-test", func() {}); err != nil {
+		t.Fatalf("UpsertJob failed: %v", err)
+	}
+	originalID := s.jobs["upsert-test"]
+
+	if err := s.UpsertJob("invalid-spec", "upsert-test", func() {}); err == nil {
+		t.Fatal("Expected error for invalid cron spec")
+	}
+
+	entries := s.cron.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("Expected existing cron entry to remain after failed reschedule, got %d entries", len(entries))
+	}
+	if entries[0].ID != originalID || s.jobs["upsert-test"] != originalID {
+		t.Fatal("Existing cron entry was replaced after failed reschedule")
+	}
+}
+
 func TestUpsertJobRemovesOnEmptySpec(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	s := NewScheduler(db)
