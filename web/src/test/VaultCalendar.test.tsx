@@ -82,4 +82,72 @@ describe("VaultCalendar", () => {
     renderCalendar();
     expect(document.body.textContent).toContain("John Doe - Lunar Birthday");
   });
+
+  it("renders yearly recurring reminders on every year, not only the stored year", () => {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      const key = opts.queryKey;
+      if (Array.isArray(key) && key.includes("month")) {
+        return {
+          data: {
+            important_dates: [],
+            reminders: [
+              {
+                id: 2,
+                contact_id: "c1",
+                contact_name: "Jane Doe",
+                label: "Anniversary Reminder",
+                day: 15,
+                month: currentMonth,
+                year: 2000,
+                type: "recurring_year",
+              },
+            ],
+          },
+          isLoading: false,
+        };
+      }
+      if (Array.isArray(key) && key.includes("day")) {
+        return { data: undefined, isLoading: false };
+      }
+      return { data: undefined, isLoading: false };
+    });
+    renderCalendar();
+    expect(document.body.textContent).toContain("Jane Doe - Anniversary Reminder");
+  });
+
+  it("does not render one-time reminders from other years on the current panel", () => {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
+      const key = opts.queryKey;
+      if (Array.isArray(key) && key.includes("month")) {
+        return {
+          data: {
+            important_dates: [],
+            reminders: [
+              {
+                id: 3,
+                contact_id: "c1",
+                contact_name: "John Doe",
+                label: "One Time Old Reminder",
+                day: 15,
+                month: currentMonth,
+                year: 2000,
+                type: "one_time",
+              },
+            ],
+          },
+          isLoading: false,
+        };
+      }
+      if (Array.isArray(key) && key.includes("day")) {
+        return { data: undefined, isLoading: false };
+      }
+      return { data: undefined, isLoading: false };
+    });
+    renderCalendar();
+    expect(document.body.textContent).not.toContain("One Time Old Reminder");
+  });
 });

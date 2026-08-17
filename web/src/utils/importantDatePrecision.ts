@@ -2,6 +2,8 @@ import type { CreateImportantDateRequest, ImportantDate } from "@/api";
 import type { CalendarDatePickerValue, ImportantDatePrecision } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 
+const MONTH_DAY_REFERENCE_YEAR = 2000;
+
 export type ImportantDateFormValues = {
   label: string;
   calendarDate: CalendarDatePickerValue;
@@ -58,8 +60,27 @@ export function buildImportantDateRequest(values: ImportantDateFormValues, fallb
     return data;
   }
   if (precision === "month_day") {
-    data.month = calendarDate.month ?? undefined;
-    data.day = calendarDate.day ?? undefined;
+    if (
+      calendarDate.calendarType !== "gregorian" &&
+      calendarDate.month != null &&
+      calendarDate.day != null
+    ) {
+      const sys = getCalendarSystem(calendarDate.calendarType);
+      const gd = sys.toGregorian({
+        day: calendarDate.day,
+        month: calendarDate.month,
+        year: MONTH_DAY_REFERENCE_YEAR,
+      });
+      data.calendar_type = calendarDate.calendarType;
+      data.original_day = calendarDate.day;
+      data.original_month = calendarDate.month;
+      data.year = gd.year;
+      data.month = gd.month;
+      data.day = gd.day;
+    } else {
+      data.month = calendarDate.month ?? undefined;
+      data.day = calendarDate.day ?? undefined;
+    }
     return data;
   }
   if (precision !== "full") {

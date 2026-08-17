@@ -159,7 +159,11 @@ export default function VaultCalendar() {
         });
       }
       for (const r of reminders) {
-        const key = dateKey(r.year ?? null, r.month ?? null, r.day ?? null);
+        const key = dateKey(
+          r.type === "recurring_year" ? null : (r.year ?? null),
+          r.month ?? null,
+          r.day ?? null,
+        );
         if (!key) continue;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push({
