@@ -18,7 +18,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Popconfirm,
   App,
   List,
   Tag,
@@ -95,7 +94,7 @@ export default function VaultDetail() {
   const nameOrder = useNameOrder();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [form] = Form.useForm();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const queryClient = useQueryClient();
 
   // ─── Core Queries ──────────────────────────────────────────────
@@ -215,18 +214,16 @@ export default function VaultDetail() {
       key: "delete",
       danger: true,
       icon: <DeleteOutlined />,
-      label: (
-        <Popconfirm
-          title={t("vault.detail.delete_confirm")}
-          onConfirm={() => deleteMutation.mutate()}
-          okText={t("common.delete")}
-          cancelText={t("common.cancel")}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-            {t("vault.detail.delete")}
-          </div>
-        </Popconfirm>
-      ),
+      label: t("vault.detail.delete"),
+      onClick: () => {
+        modal.confirm({
+          title: t("vault.detail.delete_confirm"),
+          okText: t("common.delete"),
+          cancelText: t("common.cancel"),
+          okButtonProps: { danger: true },
+          onOk: () => deleteMutation.mutate(),
+        });
+      },
     },
   ];
 
@@ -248,13 +245,19 @@ export default function VaultDetail() {
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: 12,
           marginBottom: 20,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Title level={4} style={{ margin: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <Title
+            level={4}
+            ellipsis={{ rows: 1, tooltip: vault.name }}
+            style={{ margin: 0, maxWidth: "min(60vw, 480px)" }}
+          >
             {vault.name}
           </Title>
           {vault.current_user_permission === 100 && (

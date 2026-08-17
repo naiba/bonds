@@ -149,6 +149,7 @@ export default function CalendarDatePicker({
 
   const handleDatePickerChange = (nextDate: Dayjs | null) => {
     if (!nextDate) {
+      handlers.handleClear();
       return;
     }
     handlers.handleGregorianChange(
@@ -158,6 +159,11 @@ export default function CalendarDatePicker({
     );
   };
 
+  const hasSelection = value?.day != null && value?.month != null;
+  const pickerValue = hasSelection
+    ? dayjs(`${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`)
+    : null;
+
   if (!enableAlternativeCalendar) {
     if (enableNoYear || enableDatePrecision) {
       return fieldControls;
@@ -165,7 +171,7 @@ export default function CalendarDatePicker({
 
     return (
       <DatePicker
-        value={dayjs(`${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`)}
+        value={pickerValue}
         onChange={handleDatePickerChange}
         style={{ width: "100%" }}
       />
@@ -185,7 +191,7 @@ export default function CalendarDatePicker({
 
       {calendarType === "gregorian" && !enableNoYear && !enableDatePrecision ? (
         <DatePicker
-          value={dayjs(`${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`)}
+          value={pickerValue}
           onChange={handleDatePickerChange}
           style={{ width: "100%" }}
         />

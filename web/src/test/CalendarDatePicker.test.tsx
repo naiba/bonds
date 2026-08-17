@@ -75,6 +75,36 @@ describe("CalendarDatePicker", () => {
     expect(screen.queryByText("Chinese Lunar")).not.toBeInTheDocument();
   });
 
+  it("shows an empty input instead of today's date when value is missing", () => {
+    renderPicker();
+    const input = document.querySelector(".ant-picker-input input") as HTMLInputElement;
+    expect(input).toBeInTheDocument();
+    expect(input.value).toBe("");
+  });
+
+  it("clears the value when the clear button is clicked", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderPicker({
+      value: { calendarType: "gregorian", day: 15, month: 8, year: 2025 },
+      onChange,
+    });
+
+    const clearButton = document.querySelector(".ant-picker-clear");
+    expect(clearButton).not.toBeNull();
+    await user.click(clearButton as Element);
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({
+        calendarType: "gregorian",
+        day: null,
+        month: null,
+        year: null,
+        datePrecision: "full",
+      });
+    });
+  });
+
   it("renders with segmented calendar switcher when enabled", () => {
     renderPicker({ enableAlternativeCalendar: true });
     expect(screen.getByText("Gregorian")).toBeInTheDocument();

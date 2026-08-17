@@ -118,5 +118,15 @@ export function createCalendarDatePickerHandlers({
     handleDayChange(nextDay: number) {
       emit(calendarType, displayYear, selectedMonth, nextDay);
     },
+
+    handleClear() {
+      onChange?.({
+        calendarType,
+        day: null,
+        month: null,
+        year: null,
+        datePrecision,
+      });
+    },
   };
 }
