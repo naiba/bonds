@@ -144,7 +144,10 @@ export default function GroupsModule({ vaultId, contactId }: GroupsModuleProps) 
       <Modal
         title={t("contact.detail.groups.add")}
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          setIsModalOpen(false);
+          form.resetFields();
+        }}
         footer={null}
         destroyOnClose={true}
       >
@@ -174,7 +177,14 @@ export default function GroupsModule({ vaultId, contactId }: GroupsModuleProps) 
             </Text>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Button onClick={() => setIsModalOpen(false)}>{t("common.cancel")}</Button>
+            <Button
+            onClick={() => {
+              setIsModalOpen(false);
+              form.resetFields();
+            }}
+          >
+            {t("common.cancel")}
+          </Button>
             <Button
               type="primary"
               htmlType="submit"

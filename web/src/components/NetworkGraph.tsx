@@ -120,7 +120,8 @@ export default function NetworkGraph({
     svg.selectAll("*").remove();
     svg.attr("viewBox", `0 0 ${width} ${height}`);
 
-    const isDark = document.documentElement.classList.contains("dark");
+    const isDark =
+      document.documentElement.getAttribute("data-theme") === "dark";
     const textColor = isDark ? "#e5e7eb" : "#374151";
     const edgeColor = isDark ? "#4b5563" : "#d1d5db";
     const centerColor = token.colorPrimary;
@@ -351,7 +352,8 @@ export default function NetworkGraph({
     if (!svgRef.current || !graphData) return;
     const svg = d3.select(svgRef.current);
 
-    const isDark = document.documentElement.classList.contains("dark");
+    const isDark =
+      document.documentElement.getAttribute("data-theme") === "dark";
     const edgeColor = isDark ? "#4b5563" : "#d1d5db";
     const centerColor = token.colorPrimary;
     const nodeColor = isDark ? "#6b7280" : "#9ca3af";

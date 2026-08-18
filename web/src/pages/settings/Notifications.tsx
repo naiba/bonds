@@ -17,6 +17,7 @@ import {
   theme,
   Drawer,
   Space,
+  Grid,
 } from "antd";
 import {
   PlusOutlined,
@@ -78,6 +79,7 @@ export default function Notifications() {
   const { message } = App.useApp();
   const { t } = useTranslation();
   const { token } = theme.useToken();
+  const screens = Grid.useBreakpoint();
   const dateFormats = useDateFormat();
   const qk = ["settings", "notifications"];
 
@@ -449,7 +451,7 @@ export default function Notifications() {
         title={t("settings.notifications.logs_title")}
         open={logsChannelId !== null}
         onClose={() => setLogsChannelId(null)}
-        width={480}
+        size={screens.md ? 480 : "100%"}
       >
         {logs.length === 0 ? (
           <Empty description={t("settings.notifications.no_logs")} />

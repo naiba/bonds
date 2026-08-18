@@ -904,7 +904,12 @@ export default function ContactList() {
             />
           </Form.Item>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-            <Button onClick={() => setBulkMoveOpen(false)}>
+            <Button
+              onClick={() => {
+                setBulkMoveOpen(false);
+                bulkMoveForm.resetFields();
+              }}
+            >
               {t("common.cancel")}
             </Button>
             <Button

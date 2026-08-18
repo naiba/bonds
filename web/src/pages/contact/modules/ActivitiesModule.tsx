@@ -236,6 +236,7 @@ export default function ActivitiesModule({
   const startCreate = () => {
     setEditing(null);
     setDescription("");
+    form.resetFields();
     form.setFieldsValue({
       start_calendar: {
         calendarType: "gregorian",
@@ -445,6 +446,9 @@ export default function ActivitiesModule({
         open={open}
         onCancel={() => {
           setOpen(false);
+          setEditing(null);
+          setDescription("");
+          form.resetFields();
           onModalClose?.();
         }}
         onOk={() => form.submit()}

@@ -21,6 +21,7 @@ import {
   Tooltip,
   Empty,
   Card,
+  Grid,
 } from "antd";
 import {
   ArrowLeftOutlined,
@@ -77,6 +78,7 @@ export default function DavSubscriptions() {
   const { message } = App.useApp();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const screens = Grid.useBreakpoint();
   const [form] = Form.useForm();
   const dateFormats = useDateFormat();
   const davUserPathSegment = user?.id ?? "";
@@ -554,7 +556,7 @@ export default function DavSubscriptions() {
       <Drawer
         title={`${t("vault.dav_subscriptions.sync_logs")} - ${logsSubscription?.uri ?? ""}`}
         placement="right"
-        width={700}
+        size={screens.md ? 700 : "100%"}
         open={logsDrawerOpen}
         onClose={() => {
           setLogsDrawerOpen(false);
