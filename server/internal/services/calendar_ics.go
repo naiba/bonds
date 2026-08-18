@@ -155,11 +155,10 @@ func icsImportantDateEvent(d *models.ContactImportantDate, contactName string) *
 		event.Props.SetText(ical.PropDescription, desc)
 	} else {
 		setDateValue(event, ical.PropDateTimeStart, dtStart)
-		// Only year-unknown dates (e.g. birthdays that repeat every year)
-		// recur. A date recorded with a known year is a single occurrence.
-		if d.IsYearUnknown {
-			setYearlyRecurrence(event)
-		}
+		// Important dates (especially birthdays) repeat every year regardless
+		// of the stored year — the year field is only used for display, not
+		// filtering (see CalendarService.GetCalendar). Matches CalDAV export.
+		setYearlyRecurrence(event)
 	}
 
 	return event

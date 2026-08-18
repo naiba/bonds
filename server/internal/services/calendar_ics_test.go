@@ -268,7 +268,8 @@ func TestExportVaultICSRecurrenceRules(t *testing.T) {
 		t.Fatalf("CreateContact failed: %v", err)
 	}
 
-	// A date recorded WITH a year is a single occurrence → no RRULE.
+	// A date recorded WITH a year still repeats yearly — the year is display-only
+	// (see CalendarService.GetCalendar), so the subscription must not stop at it.
 	day, month, year := 15, 3, 2025
 	if err := db.Create(&models.ContactImportantDate{
 		ContactID: contact.ID,
@@ -328,11 +329,8 @@ func TestExportVaultICSRecurrenceRules(t *testing.T) {
 	}
 	out := string(data)
 
-	if !strings.Contains(out, "DTSTART;VALUE=DATE:20250315\r\nSUMMARY:Jane - Anniversary\r\n") {
-		t.Errorf("expected dated important date to be a single occurrence without RRULE\n---\n%s", out)
-	}
-	if strings.Contains(out, "DTSTART;VALUE=DATE:20250315\r\nSUMMARY:Jane - Anniversary\r\nRRULE") {
-		t.Errorf("expected dated important date to carry no RRULE\n---\n%s", out)
+	if !strings.Contains(out, "DTSTART;VALUE=DATE:20250315\r\nRRULE:FREQ=YEARLY\r\nSUMMARY:Jane - Anniversary") {
+		t.Errorf("expected dated important date to keep yearly recurrence (year is display-only)\n---\n%s", out)
 	}
 	if !strings.Contains(out, "DTSTART;VALUE=DATE:"+time.Now().Format("2006")+"0315\r\nRRULE:FREQ=YEARLY\r\nSUMMARY:Jane - Birthday") {
 		t.Errorf("expected year-unknown date projected onto the current year with RRULE:FREQ=YEARLY\n---\n%s", out)
