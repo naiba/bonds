@@ -31,6 +31,7 @@ import type {
 import ContactMentionEditor from "@/components/journal/ContactMentionEditor";
 import ContactMentionText from "@/components/journal/ContactMentionText";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
+import { dateInputToTimestamp } from "@/utils/dateOnlyInput";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 import { formatDate, formatMonthYear, useDateFormat } from "@/utils/dateFormat";
@@ -179,9 +180,9 @@ export default function ActivitiesModule({
         title: values.title,
         description,
         start_date: gregorianStart
-          ? dayjs(
+          ? dateInputToTimestamp(
               `${gregorianStart.year}-${String(gregorianStart.month).padStart(2, "0")}-${String(gregorianStart.day).padStart(2, "0")}`,
-            ).toISOString()
+            )
           : undefined,
         start_precision: startPrecision as Precision,
         calendar_type: start.calendarType,
@@ -199,8 +200,8 @@ export default function ActivitiesModule({
             : (start.year ?? undefined),
         end_status: values.end_status,
         end_date:
-          values.end_status === "known"
-            ? values.end_date?.toISOString()
+          values.end_status === "known" && values.end_date
+            ? dateInputToTimestamp(values.end_date.format("YYYY-MM-DD"))
             : undefined,
         end_precision:
           values.end_status === "known" ? values.end_precision : undefined,

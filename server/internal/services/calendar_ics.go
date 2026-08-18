@@ -138,12 +138,15 @@ func icsImportantDateEvent(d *models.ContactImportantDate, contactName string) *
 
 	year, month, day := dateParts(d.Year, d.Month, d.Day)
 	dtStart := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-	setDateValue(event, ical.PropDateTimeStart, dtStart)
 
 	isAlternative := d.CalendarType != "" && d.CalendarType != "gregorian" && d.OriginalMonth != nil && d.OriginalDay != nil
 	if isAlternative {
 		if converter, ok := calendarPkg.Get(calendarPkg.CalendarType(d.CalendarType)); ok {
+			dtStart = projectLunarDtStart(converter, d.OriginalDay, d.OriginalMonth, d.OriginalYear, dtStart)
+			setDateValue(event, ical.PropDateTimeStart, dtStart)
 			emitLunarRecurrence(event, converter, d.OriginalDay, d.OriginalMonth, d.OriginalYear, dtStart)
+		} else {
+			setDateValue(event, ical.PropDateTimeStart, dtStart)
 		}
 		desc := fmt.Sprintf("Calendar: %s, Original date: %d/%d", d.CalendarType, *d.OriginalMonth, *d.OriginalDay)
 		if d.OriginalYear != nil {
@@ -151,7 +154,12 @@ func icsImportantDateEvent(d *models.ContactImportantDate, contactName string) *
 		}
 		event.Props.SetText(ical.PropDescription, desc)
 	} else {
-		setYearlyRecurrence(event)
+		setDateValue(event, ical.PropDateTimeStart, dtStart)
+		// Only year-unknown dates (e.g. birthdays that repeat every year)
+		// recur. A date recorded with a known year is a single occurrence.
+		if d.IsYearUnknown {
+			setYearlyRecurrence(event)
+		}
 	}
 
 	return event
@@ -174,15 +182,29 @@ func icsReminderEvent(r *models.ContactReminder) *ical.Component {
 
 	year, month, day := dateParts(r.Year, r.Month, r.Day)
 	dtStart := time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-	setDateValue(event, ical.PropDateTimeStart, dtStart)
 
 	isAlternative := r.CalendarType != "" && r.CalendarType != "gregorian" && r.OriginalMonth != nil && r.OriginalDay != nil
 	if isAlternative {
 		if converter, ok := calendarPkg.Get(calendarPkg.CalendarType(r.CalendarType)); ok {
+			dtStart = projectLunarDtStart(converter, r.OriginalDay, r.OriginalMonth, r.OriginalYear, dtStart)
+			setDateValue(event, ical.PropDateTimeStart, dtStart)
 			emitLunarRecurrence(event, converter, r.OriginalDay, r.OriginalMonth, r.OriginalYear, dtStart)
+		} else {
+			setDateValue(event, ical.PropDateTimeStart, dtStart)
 		}
-	} else {
-		setYearlyRecurrence(event)
+		return event
+	}
+
+	setDateValue(event, ical.PropDateTimeStart, dtStart)
+	// Map the reminder recurrence type onto an RRULE. one_time reminders are
+	// single occurrences and get no recurrence rule at all.
+	switch r.Type {
+	case "recurring_week":
+		setRecurrence(event, "FREQ=WEEKLY", r.FrequencyNumber)
+	case "recurring_month":
+		setRecurrence(event, "FREQ=MONTHLY", r.FrequencyNumber)
+	case "recurring_year":
+		setRecurrence(event, "FREQ=YEARLY", r.FrequencyNumber)
 	}
 
 	return event
@@ -265,6 +287,38 @@ func setYearlyRecurrence(c *ical.Component) {
 	prop := ical.NewProp(ical.PropRecurrenceRule)
 	prop.Value = "FREQ=YEARLY"
 	c.Props.Set(prop)
+}
+
+func setRecurrence(c *ical.Component, freq string, frequency *int) {
+	value := freq
+	if frequency != nil && *frequency > 1 {
+		value = fmt.Sprintf("%s;INTERVAL=%d", freq, *frequency)
+	}
+	prop := ical.NewProp(ical.PropRecurrenceRule)
+	prop.Value = value
+	c.Props.Set(prop)
+}
+
+// projectLunarDtStart returns the Gregorian date of the first projected
+// occurrence. For month+day-only lunar dates (Year is nil) the Gregorian
+// projection is only valid for the current year, so the DTSTART must coincide
+// with the first RDATE instead of the stored (nil) fields.
+func projectLunarDtStart(converter calendarPkg.Converter, origDay, origMonth, origYear *int, fallback time.Time) time.Time {
+	if origDay == nil || origMonth == nil {
+		return fallback
+	}
+	year := fallback.Year()
+	if origYear != nil {
+		year = *origYear
+	}
+	if gd, err := converter.ToGregorian(calendarPkg.DateInfo{
+		Day:   *origDay,
+		Month: *origMonth,
+		Year:  year,
+	}); err == nil {
+		return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 0, 0, 0, 0, time.UTC)
+	}
+	return fallback
 }
 
 // emitLunarRecurrence mirrors the CalDAV backend: non-Gregorian dates drift

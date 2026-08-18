@@ -287,11 +287,18 @@ export default function VaultReports() {
                   {
                     title: t("vault.reports.col_date"),
                     key: "date",
-                    render: (_, r) => (
-                      <span>
-                        {r.year ? r.year + "-" : ""}{String(r.month).padStart(2, '0')}-{String(r.day).padStart(2, '0')}
-                      </span>
-                    ),
+                    render: (_, r) => {
+                      const date = [
+                        r.year != null ? String(r.year) : null,
+                        r.month != null
+                          ? String(r.month).padStart(2, "0")
+                          : null,
+                        r.day != null ? String(r.day).padStart(2, "0") : null,
+                      ]
+                        .filter((part): part is string => part != null)
+                        .join("-");
+                      return <span>{date || "—"}</span>;
+                    },
                   },
                   {
                     title: t("vault.reports.col_calendar"),

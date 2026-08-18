@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
@@ -6,7 +7,7 @@ import { Typography, Button, Table, theme, Tag } from "antd";
 import { BellOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { api } from "@/api";
 import type { Reminder } from "@/api";
-import { useDateFormat, formatDate, formatShortDate } from "@/utils/dateFormat";
+import { useDateFormat } from "@/utils/dateFormat";
 import { queryKeyPrefixes } from "@/utils/queryInvalidation";
 
 const { Title, Text } = Typography;
@@ -140,9 +141,12 @@ export default function VaultReminders() {
               const mm = String(record.month).padStart(2, "0");
               const dd = String(record.day).padStart(2, "0");
               const probe = `${record.year ?? 2000}-${mm}-${dd}`;
+              // Format the date components directly: year/month/day are
+              // timezone-free, so applyTz (user timezone preference) would
+              // shift them by a day on either side of UTC.
               return record.year != null
-                ? formatDate(probe, dateFormats)
-                : formatShortDate(probe, dateFormats);
+                ? dayjs(probe).format(dateFormats.full)
+                : dayjs(probe).format(dateFormats.short);
             },
             sorter: (a, b) => {
               if (!a.year) return -1;
