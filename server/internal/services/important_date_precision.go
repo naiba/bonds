@@ -15,6 +15,16 @@ const (
 
 var ErrImportantDateInvalidPrecision = errors.New("invalid important date precision")
 
+func clearYearlessAlternativeCalendarProjectionYear(date *models.ContactImportantDate, requestedPrecision string) {
+	if requestedPrecision == importantDatePrecisionMonthDay &&
+		date.CalendarType != "" && date.CalendarType != "gregorian" &&
+		date.OriginalYear == nil {
+		// applyCalendarFields needs a concrete year to produce the canonical
+		// Gregorian month/day, but month_day precision must persist without one.
+		date.Year = nil
+	}
+}
+
 func applyImportantDatePrecision(date *models.ContactImportantDate, requestedPrecision string) error {
 	precision := requestedPrecision
 	if precision == "" {

@@ -57,6 +57,7 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 	applyCalendarFields(&date.CalendarType, &date.OriginalDay, &date.OriginalMonth, &date.OriginalYear,
 		&date.Day, &date.Month, &date.Year,
 		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	clearYearlessAlternativeCalendarProjectionYear(&date, req.DatePrecision)
 	if err := applyImportantDatePrecision(&date, req.DatePrecision); err != nil {
 		return nil, err
 	}
@@ -105,6 +106,7 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 	applyCalendarFields(&date.CalendarType, &date.OriginalDay, &date.OriginalMonth, &date.OriginalYear,
 		&date.Day, &date.Month, &date.Year,
 		req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
+	clearYearlessAlternativeCalendarProjectionYear(&date, req.DatePrecision)
 	if err := applyImportantDatePrecision(&date, req.DatePrecision); err != nil {
 		return nil, err
 	}

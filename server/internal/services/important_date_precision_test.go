@@ -54,6 +54,38 @@ func TestCreateImportantDate_StoresDatePrecisionVariants(t *testing.T) {
 	}
 }
 
+func TestCreateImportantDate_StoresYearlessLunarLeapMonth(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+
+	originalDay, originalMonth := 30, -6
+	date, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:         "Leap-month anniversary",
+		DatePrecision: importantDatePrecisionMonthDay,
+		Day:           &originalDay,
+		Month:         &originalMonth,
+		CalendarType:  "lunar",
+		OriginalDay:   &originalDay,
+		OriginalMonth: &originalMonth,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if date.CalendarType != "lunar" {
+		t.Fatalf("Expected lunar calendar type, got %q", date.CalendarType)
+	}
+	assertOptionalInt(t, "original day", date.OriginalDay, &originalDay)
+	assertOptionalInt(t, "original month", date.OriginalMonth, &originalMonth)
+	if date.OriginalYear != nil {
+		t.Fatalf("Expected no original year, got %v", date.OriginalYear)
+	}
+	if date.Year != nil {
+		t.Fatalf("Expected month_day precision to clear projected year, got %v", date.Year)
+	}
+	if date.Month == nil || *date.Month < 1 || *date.Month > 12 || date.Day == nil || *date.Day < 1 || *date.Day > 31 {
+		t.Fatalf("Expected a valid Gregorian storage projection, got month=%v day=%v", date.Month, date.Day)
+	}
+}
+
 func TestCreateImportantDate_RejectsPrecisionFieldMismatch(t *testing.T) {
 	ctx := setupImportantDateTest(t)
 

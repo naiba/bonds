@@ -262,6 +262,98 @@ func TestCalendarWithLunarDates(t *testing.T) {
 	}
 }
 
+func TestCalendarProjectsYearlessLunarDatesForRequestedYear(t *testing.T) {
+	svc, vaultID, userID, contactID := setupCalendarTest(t)
+
+	storedDay, storedMonth := 19, 2 // Canonical 2000 projection; not the requested-year occurrence.
+	originalDay, originalMonth := 15, 1
+	if err := svc.db.Create(&models.ContactImportantDate{
+		ContactID:     contactID,
+		Label:         "Yearless lunar date",
+		DatePrecision: importantDatePrecisionMonthDay,
+		Day:           &storedDay,
+		Month:         &storedMonth,
+		CalendarType:  "lunar",
+		OriginalDay:   &originalDay,
+		OriginalMonth: &originalMonth,
+	}).Error; err != nil {
+		t.Fatalf("Create important date failed: %v", err)
+	}
+	if err := svc.db.Create(&models.ContactReminder{
+		ContactID:     contactID,
+		Label:         "Yearless lunar reminder",
+		Day:           &storedDay,
+		Month:         &storedMonth,
+		CalendarType:  "lunar",
+		OriginalDay:   &originalDay,
+		OriginalMonth: &originalMonth,
+		Type:          "recurring_year",
+	}).Error; err != nil {
+		t.Fatalf("Create reminder failed: %v", err)
+	}
+
+	calendar2026, err := svc.GetCalendar(vaultID, userID, 3, 2026, "en")
+	if err != nil {
+		t.Fatalf("GetCalendar 2026 failed: %v", err)
+	}
+	if len(calendar2026.ImportantDates) != 1 || calendar2026.ImportantDates[0].Day == nil || *calendar2026.ImportantDates[0].Day != 3 {
+		t.Fatalf("Expected lunar 1/15 on 2026-03-03, got %+v", calendar2026.ImportantDates)
+	}
+	if len(calendar2026.Reminders) != 1 || calendar2026.Reminders[0].Day == nil || *calendar2026.Reminders[0].Day != 3 {
+		t.Fatalf("Expected recurring lunar reminder on 2026-03-03, got %+v", calendar2026.Reminders)
+	}
+
+	wrongMonth2026, err := svc.GetCalendar(vaultID, userID, 2, 2026, "en")
+	if err != nil {
+		t.Fatalf("GetCalendar wrong month failed: %v", err)
+	}
+	if len(wrongMonth2026.ImportantDates) != 0 || len(wrongMonth2026.Reminders) != 0 {
+		t.Fatalf("Expected canonical projection month to be ignored in 2026, got dates=%d reminders=%d", len(wrongMonth2026.ImportantDates), len(wrongMonth2026.Reminders))
+	}
+
+	calendar2027, err := svc.GetCalendar(vaultID, userID, 2, 2027, "en")
+	if err != nil {
+		t.Fatalf("GetCalendar 2027 failed: %v", err)
+	}
+	if len(calendar2027.ImportantDates) != 1 || calendar2027.ImportantDates[0].Day == nil || *calendar2027.ImportantDates[0].Day != 20 {
+		t.Fatalf("Expected lunar 1/15 on 2027-02-20, got %+v", calendar2027.ImportantDates)
+	}
+	if len(calendar2027.Reminders) != 1 || calendar2027.Reminders[0].Day == nil || *calendar2027.Reminders[0].Day != 20 {
+		t.Fatalf("Expected recurring lunar reminder on 2027-02-20, got %+v", calendar2027.Reminders)
+	}
+}
+
+func TestCalendarDayFiltersOneTimeRemindersByYear(t *testing.T) {
+	svc, vaultID, userID, contactID := setupCalendarTest(t)
+	day, month, year := 15, 3, 2025
+	if err := svc.db.Create(&models.ContactReminder{
+		ContactID: contactID,
+		Label:     "Only in 2025",
+		Day:       &day,
+		Month:     &month,
+		Year:      &year,
+		Type:      "one_time",
+	}).Error; err != nil {
+		t.Fatalf("Create reminder failed: %v", err)
+	}
+
+	wrongYear, err := svc.GetCalendarDay(vaultID, userID, 2026, month, day, "en")
+	if err != nil {
+		t.Fatalf("GetCalendarDay wrong year failed: %v", err)
+	}
+	if len(wrongYear.Reminders) != 0 {
+		t.Fatalf("Expected no one-time reminders in 2026, got %+v", wrongYear.Reminders)
+	}
+
+	matchingYear, err := svc.GetCalendarDay(vaultID, userID, year, month, day, "en")
+	if err != nil {
+		t.Fatalf("GetCalendarDay matching year failed: %v", err)
+	}
+	if len(matchingYear.Reminders) != 1 {
+		t.Fatalf("Expected one reminder in 2025, got %+v", matchingYear.Reminders)
+	}
+}
+
 func TestCalendarUsesVaultNameOrderOverride(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	cfg := testutil.TestJWTConfig()

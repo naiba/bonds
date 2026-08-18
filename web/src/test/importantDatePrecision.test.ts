@@ -87,7 +87,7 @@ describe("important date precision helpers", () => {
     ).toMatchObject({ date_precision: "month", calendar_type: "gregorian", month: 8, year: 2025 });
   });
 
-  it("builds a lunar month_day request with original and converted gregorian fields", () => {
+  it("builds a lunar month_day request without inventing a Gregorian reference year", () => {
     const request = buildImportantDateRequest(
       buildValues({
         calendarType: "lunar",
@@ -104,12 +104,35 @@ describe("important date precision helpers", () => {
       calendar_type: "lunar",
       original_day: 15,
       original_month: 1,
-      day: 19,
-      month: 2,
-      year: 2000,
+      day: 15,
+      month: 1,
       remind_me: true,
     });
     expect(request.original_year).toBeUndefined();
+    expect(request.year).toBeUndefined();
+  });
+
+  it("preserves a yearless lunar leap month without converting through an incompatible year", () => {
+    const request = buildImportantDateRequest(
+      buildValues({
+        calendarType: "lunar",
+        day: 30,
+        month: -6,
+        year: null,
+        datePrecision: "month_day",
+      }),
+      "Fallback",
+    );
+
+    expect(request).toMatchObject({
+      date_precision: "month_day",
+      calendar_type: "lunar",
+      original_day: 30,
+      original_month: -6,
+      day: 30,
+      month: -6,
+    });
+    expect(request.year).toBeUndefined();
   });
 
   it("keeps gregorian month_day requests unconverted", () => {

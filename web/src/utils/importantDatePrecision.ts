@@ -2,8 +2,6 @@ import type { CreateImportantDateRequest, ImportantDate } from "@/api";
 import type { CalendarDatePickerValue, ImportantDatePrecision } from "@/components/CalendarDatePicker";
 import { getCalendarSystem } from "@/utils/calendar";
 
-const MONTH_DAY_REFERENCE_YEAR = 2000;
-
 export type ImportantDateFormValues = {
   label: string;
   calendarDate: CalendarDatePickerValue;
@@ -65,18 +63,16 @@ export function buildImportantDateRequest(values: ImportantDateFormValues, fallb
       calendarDate.month != null &&
       calendarDate.day != null
     ) {
-      const sys = getCalendarSystem(calendarDate.calendarType);
-      const gd = sys.toGregorian({
-        day: calendarDate.day,
-        month: calendarDate.month,
-        year: MONTH_DAY_REFERENCE_YEAR,
-      });
       data.calendar_type = calendarDate.calendarType;
       data.original_day = calendarDate.day;
       data.original_month = calendarDate.month;
-      data.year = gd.year;
-      data.month = gd.month;
-      data.day = gd.day;
+      // A yearless alternative-calendar date has no single Gregorian
+      // projection: lunar dates move every Gregorian year, and a leap month
+      // may not even exist in an arbitrary reference year. Send the original
+      // month/day and let the server choose a safe storage projection while
+      // projecting the occurrence for each requested calendar year.
+      data.month = calendarDate.month;
+      data.day = calendarDate.day;
     } else {
       data.month = calendarDate.month ?? undefined;
       data.day = calendarDate.day ?? undefined;

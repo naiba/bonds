@@ -1,11 +1,26 @@
 package services
 
 import (
+	"fmt"
 	"log"
 	"time"
 
 	calendarPkg "github.com/naiba/bonds/internal/calendar"
 )
+
+const calendarProjectionReferenceYear = 2000
+
+func calendarOccurrenceInYear(converter calendarPkg.Converter, original calendarPkg.DateInfo, year int) (calendarPkg.GregorianDate, error) {
+	after := time.Date(year-1, time.December, 31, 23, 59, 59, 0, time.UTC)
+	gd, err := converter.NextOccurrence(original, after)
+	if err != nil {
+		return calendarPkg.GregorianDate{}, err
+	}
+	if gd.Year != year {
+		return calendarPkg.GregorianDate{}, fmt.Errorf("calendar occurrence fell outside requested year %d: %+v", year, gd)
+	}
+	return gd, nil
+}
 
 func applyCalendarFields(
 	modelCalType *string, modelOrigDay, modelOrigMonth, modelOrigYear **int,
@@ -36,20 +51,27 @@ func applyCalendarFields(
 		return
 	}
 
-	year := 0
-	if reqOrigYear != nil {
-		year = *reqOrigYear
-	} else if *modelYear != nil {
-		year = **modelYear
-	}
-
-	gd, err := converter.ToGregorian(calendarPkg.DateInfo{
+	original := calendarPkg.DateInfo{
 		Day:   *reqOrigDay,
 		Month: *reqOrigMonth,
-		Year:  year,
-	})
+	}
+	var gd calendarPkg.GregorianDate
+	var err error
+	conversionYear := calendarProjectionReferenceYear
+	if reqOrigYear == nil {
+		// Partial alternative-calendar dates recur yearly. Converting them
+		// through an arbitrary year with ToGregorian is unsafe: leap months
+		// can be absent and a day 30 can fall in a 29-day month. NextOccurrence
+		// applies the converter's recurrence/clamping rules and gives us a
+		// deterministic projection for storage.
+		gd, err = calendarOccurrenceInYear(converter, original, calendarProjectionReferenceYear)
+	} else {
+		original.Year = *reqOrigYear
+		conversionYear = *reqOrigYear
+		gd, err = converter.ToGregorian(original)
+	}
 	if err != nil {
-		log.Printf("[calendar] conversion failed for %s date %d/%d/%d: %v", reqCalType, year, *reqOrigMonth, *reqOrigDay, err)
+		log.Printf("[calendar] conversion failed for %s date %d/%d/%d: %v", reqCalType, conversionYear, *reqOrigMonth, *reqOrigDay, err)
 		return
 	}
 
