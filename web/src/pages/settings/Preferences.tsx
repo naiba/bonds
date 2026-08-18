@@ -122,15 +122,16 @@ export default function Preferences() {
     onError: (e: APIError) => message.error(e.message),
   });
 
-  const initialNameOrder = prefs?.name_order || "%first_name% %last_name%";
-  const isPreset = (NAME_ORDER_PRESETS as readonly string[]).includes(initialNameOrder);
+  // The radio/custom state derives from the loaded preference and only
+  // overrides it while the user is editing: a cold load therefore always
+  // reflects the saved value (and a plain "Save" can never silently reset it).
+  const [overrideRadio, setOverrideRadio] = useState<string | undefined>(undefined);
+  const [overrideCustom, setOverrideCustom] = useState<string | undefined>(undefined);
 
-  const [radioValue, setRadioValue] = useState<string>(
-    isPreset ? initialNameOrder : CUSTOM_SENTINEL,
-  );
-  const [customTemplate, setCustomTemplate] = useState<string>(
-    isPreset ? "" : initialNameOrder,
-  );
+  const savedNameOrder = prefs?.name_order || NAME_ORDER_PRESETS[0];
+  const savedIsPreset = (NAME_ORDER_PRESETS as readonly string[]).includes(savedNameOrder);
+  const radioValue = overrideRadio ?? (savedIsPreset ? savedNameOrder : CUSTOM_SENTINEL);
+  const customTemplate = overrideCustom ?? (savedIsPreset ? "" : savedNameOrder);
   const activeTemplate = radioValue === CUSTOM_SENTINEL ? customTemplate : radioValue;
 
   if (isLoading) {
@@ -185,7 +186,7 @@ export default function Preferences() {
             <Radio.Group
               value={radioValue}
               onChange={(e) => {
-                setRadioValue(e.target.value as string);
+                setOverrideRadio(e.target.value as string);
               }}
               style={{ display: "flex", flexDirection: "column", gap: 8 }}
             >
@@ -208,7 +209,7 @@ export default function Preferences() {
               <div style={{ marginTop: 12, paddingLeft: 24 }}>
                 <Input
                   value={customTemplate}
-                  onChange={(e) => setCustomTemplate(e.target.value)}
+                  onChange={(e) => setOverrideCustom(e.target.value)}
                   placeholder="%first_name% %last_name%"
                   style={{ marginBottom: 8 }}
                 />

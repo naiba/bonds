@@ -37,6 +37,7 @@ import {
   InboxOutlined,
 } from "@ant-design/icons";
 import type { TabsProps } from "antd";
+import type { UseMutationResult } from "@tanstack/react-query";
 import { api } from "@/api";
 import type {
   APIError,
@@ -54,6 +55,7 @@ import type {
   GithubComNaibaBondsInternalDtoUpdateMoodTrackingParameterRequest,
   GithubComNaibaBondsInternalDtoUpdateTagRequest,
   QuickFactTemplateResponse,
+  GithubComNaibaBondsInternalDtoVaultSettingsResponse,
 } from "@/api";
 import type {
   GithubComNaibaBondsInternalDtoMonicaImportResponse,
@@ -129,137 +131,47 @@ interface QuickFactTemplateFormValues {
   select_options?: string;
 }
 
-export default function VaultSettings() {
-  const { id } = useParams<{ id: string }>();
-  const vaultId = id!;
-  const { t } = useTranslation();
-  const { message } = App.useApp();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const nameOrder = useNameOrder();
-  const { token } = theme.useToken();
-  const screens = useBreakpoint();
-  // Import responses contain counts, not contact IDs, so refresh vault prefixes without inventing contact scopes.
-  const importInvalidationScopes = {
-    vaultIds: [String(vaultId)],
-    contacts: [],
-  } as const;
-
-  const [activeTab, setActiveTab] = useState("general");
-  const [deleteVaultOpen, setDeleteVaultOpen] = useState(false);
-  const [deleteVaultConfirmation, setDeleteVaultConfirmation] = useState("");
-
-  const { data: vaultSettings } = useQuery({
-    queryKey: ["vault", vaultId, "settings"],
-    queryFn: async () => {
-      const res = await api.vaultSettings.settingsList(String(vaultId));
-      return res.data;
-    },
-    enabled: !!vaultId,
-  });
-
-  const updateSettingsMutation = useMutation({
-    mutationFn: (data: UpdateVaultSettingsRequest) =>
-      api.vaultSettings.settingsUpdate(String(vaultId), data),
-    onSuccess: () => {
-      message.success(t("common.saved"));
-      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
-    },
-    onError: (e: APIError) => message.error(e.message),
-  });
-
-  const deleteVaultMutation = useMutation({
-    mutationFn: () => api.vaults.vaultsDelete(String(vaultId)),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["vaults"] });
-      setDeleteVaultOpen(false);
-      setDeleteVaultConfirmation("");
-      message.success(t("vault.detail.deleted"));
-      navigate("/vaults");
-    },
-    onError: (e: APIError) => message.error(e.message || t("common.error")),
-  });
-
-  const updateTabVisibilityMutation = useMutation({
-    mutationFn: (data: Record<string, boolean>) =>
-      api.vaultSettings.settingsVisibilityUpdate(String(vaultId), data),
-    onSuccess: () => {
-      message.success(t("common.saved"));
-      // Layout reads Viewer-accessible vault detail while this form reads settings;
-      // invalidate both caches so visibility changes apply immediately and stay controlled.
-      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
-      queryClient.invalidateQueries({
-        queryKey: ["vault", vaultId, "settings"],
-      });
-    },
-    onError: (e: APIError) => message.error(e.message),
-  });
-
-  const positionMutation = useMutation({
-    mutationFn: async ({
-      entityType,
-      id,
-      position,
-      categoryId,
-    }: {
-      entityType: string;
-      id: number;
-      position: number;
-      categoryId?: number;
-    }): Promise<void> => {
-      const vid = String(vaultId);
-      switch (entityType) {
-        case "activityCategories":
-          await api.vaultSettings.settingsActivityCategoriesPositionCreate(
-            vid,
-            id,
-            { position },
-          );
-          break;
-        case "activityTypes":
-          await api.vaultSettings.settingsActivityCategoriesActivityTypesPositionCreate(
-            vid,
-            categoryId!,
-            id,
-            { position },
-          );
-          break;
-        case "moodParams":
-          await api.vaultSettings.settingsMoodParamsPositionCreate(vid, id, {
-            position,
-          });
-          break;
-        case "quickFactTemplates":
-          await api.vaultSettings.settingsQuickFactTemplatesPositionCreate(
-            vid,
-            id,
-            { position },
-          );
-          break;
-      }
-    },
-    onSuccess: (_, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
-      if (
-        vars.entityType === "activityCategories" ||
-        vars.entityType === "activityTypes"
-      ) {
-        queryClient.invalidateQueries({
-          queryKey: ["vault", vaultId, "activityCategories"],
-        });
-      } else {
-        queryClient.invalidateQueries({
-          queryKey: ["vault", vaultId, vars.entityType],
-        });
-      }
-    },
-    onError: (e: APIError) => message.error(e.message),
-  });
-
   // --- Components for each tab ---
 
-  const GeneralTab = () => {
+  type PositionMutation = UseMutationResult<
+    void,
+    unknown,
+    { entityType: string; id: number; position: number; categoryId?: number }
+  >;
+
+  function GeneralTab({
+    vaultSettings,
+    updateSettingsMutation,
+  }: {
+    vaultSettings?: GithubComNaibaBondsInternalDtoVaultSettingsResponse;
+    updateSettingsMutation: UseMutationResult<
+      unknown,
+      unknown,
+      UpdateVaultSettingsRequest
+    >;
+  }) {
+    const { t } = useTranslation();
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const navigate = useNavigate();
+    const { token } = theme.useToken();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
     const [form] = Form.useForm();
+    const [deleteVaultOpen, setDeleteVaultOpen] = useState(false);
+    const [deleteVaultConfirmation, setDeleteVaultConfirmation] = useState("");
+
+    const deleteVaultMutation = useMutation({
+      mutationFn: () => api.vaults.vaultsDelete(String(vaultId)),
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: ["vaults"] });
+        setDeleteVaultOpen(false);
+        setDeleteVaultConfirmation("");
+        message.success(t("vault.detail.deleted"));
+        navigate("/vaults");
+      },
+      onError: (e: APIError) => message.error(e.message || t("common.error")),
+    });
 
     if (!vaultSettings) return null;
 
@@ -363,7 +275,19 @@ export default function VaultSettings() {
     );
   };
 
-  const TabsTab = () => {
+  function TabsTab({
+    vaultSettings,
+    updateTabVisibilityMutation,
+  }: {
+    vaultSettings?: GithubComNaibaBondsInternalDtoVaultSettingsResponse;
+    updateTabVisibilityMutation: UseMutationResult<
+      unknown,
+      unknown,
+      Record<string, boolean>
+    >;
+  }) {
+    const { t } = useTranslation();
+
     if (!vaultSettings) return null;
 
     const tabs = [
@@ -406,7 +330,14 @@ export default function VaultSettings() {
     );
   };
 
-  const UsersTab = () => {
+  function UsersTab() {
+    const { t } = useTranslation();
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const nameOrder = useNameOrder();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+
     const { data: users = [], isLoading } = useQuery({
       queryKey: ["vault", vaultId, "users"],
       queryFn: async () => {
@@ -568,7 +499,13 @@ export default function VaultSettings() {
     );
   };
 
-  const LabelsTab = () => {
+  function LabelsTab() {
+    const { t } = useTranslation();
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+
     const queryKey = ["vault", vaultId, "labels"];
     const { data: items = [], isLoading } = useQuery({
       queryKey,
@@ -747,7 +684,7 @@ export default function VaultSettings() {
     initialValue?: string;
     rules?: { required?: boolean }[];
   }
-  const SimpleCrudTab = <
+  function SimpleCrudTab<
     T extends {
       id: number;
       label?: string;
@@ -769,6 +706,7 @@ export default function VaultSettings() {
     itemNameKey = "label",
     extraFields = [],
     positionEntityType,
+    positionMutation,
   }: {
     queryKeySuffix: string;
     apiList: (vid: string) => Promise<{ data?: T[] }>;
@@ -785,7 +723,14 @@ export default function VaultSettings() {
     itemNameKey?: "label" | "name";
     extraFields?: ExtraField[];
     positionEntityType?: string;
-  }) => {
+    positionMutation: PositionMutation;
+  }) {
+    const { t } = useTranslation();
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+
     const queryKey = ["vault", vaultId, queryKeySuffix];
     const { data: items = [], isLoading } = useQuery({
       queryKey,
@@ -963,7 +908,17 @@ export default function VaultSettings() {
     );
   };
 
-  const QuickFactTemplatesTab = () => {
+  function QuickFactTemplatesTab({
+    positionMutation,
+  }: {
+    positionMutation: PositionMutation;
+  }) {
+    const { t } = useTranslation();
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+
     const queryKey = ["vault", vaultId, "quickFactTemplates"];
     const { data: items = [], isLoading } = useQuery({
       queryKey,
@@ -1312,7 +1267,14 @@ export default function VaultSettings() {
   };
 
   // Activity Categories - Nested CRUD
-  const ActivitiesTab = () => {
+  function ActivitiesTab({ positionMutation }: { positionMutation: PositionMutation }) {
+    const { t } = useTranslation();
+    const { message } = App.useApp();
+    const queryClient = useQueryClient();
+    const { token } = theme.useToken();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+
     const queryKey = ["vault", vaultId, "activityCategories"];
     const { data: categories = [] } = useQuery({
       queryKey,
@@ -1727,49 +1689,6 @@ export default function VaultSettings() {
   };
 
   // ── CSV Import ──────────────────────────────────────────────────────────
-  const CSV_FIELDS: { key: string; label: string }[] = [
-    {
-      key: "first_name",
-      label: t("vault_settings.csv_import.field_first_name"),
-    },
-    { key: "last_name", label: t("vault_settings.csv_import.field_last_name") },
-    {
-      key: "middle_name",
-      label: t("vault_settings.csv_import.field_middle_name"),
-    },
-    { key: "nickname", label: t("vault_settings.csv_import.field_nickname") },
-    { key: "prefix", label: t("vault_settings.csv_import.field_prefix") },
-    { key: "suffix", label: t("vault_settings.csv_import.field_suffix") },
-    { key: "gender", label: t("vault_settings.csv_import.field_gender") },
-    { key: "birthday", label: t("vault_settings.csv_import.field_birthday") },
-    { key: "email", label: t("vault_settings.csv_import.field_email") },
-    { key: "phone", label: t("vault_settings.csv_import.field_phone") },
-    { key: "company", label: t("vault_settings.csv_import.field_company") },
-    { key: "job_title", label: t("vault_settings.csv_import.field_job_title") },
-    { key: "tags", label: t("vault_settings.csv_import.field_tags") },
-    { key: "groups", label: t("vault_settings.csv_import.field_groups") },
-    { key: "notes", label: t("vault_settings.csv_import.field_notes") },
-    {
-      key: "address_street",
-      label: t("vault_settings.csv_import.field_address_street"),
-    },
-    {
-      key: "address_city",
-      label: t("vault_settings.csv_import.field_address_city"),
-    },
-    {
-      key: "address_state",
-      label: t("vault_settings.csv_import.field_address_state"),
-    },
-    {
-      key: "address_postal_code",
-      label: t("vault_settings.csv_import.field_address_postal_code"),
-    },
-    {
-      key: "address_country",
-      label: t("vault_settings.csv_import.field_address_country"),
-    },
-  ];
 
   // Parse CSV header row in the browser (handles basic quoting).
   function parseCSVHeaders(text: string): string[] {
@@ -1837,7 +1756,72 @@ export default function VaultSettings() {
     return mapping;
   }
 
-  const CSVImportTab = () => {
+  function CSVImportTab() {
+    const { t } = useTranslation();
+    const queryClient = useQueryClient();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+    const importInvalidationScopes = {
+      vaultIds: [String(vaultId)],
+      contacts: [],
+    } as const;
+
+    const CSV_FIELDS: { key: string; label: string }[] = [
+      {
+        key: "first_name",
+        label: t("vault_settings.csv_import.field_first_name"),
+      },
+      {
+        key: "last_name",
+        label: t("vault_settings.csv_import.field_last_name"),
+      },
+      {
+        key: "middle_name",
+        label: t("vault_settings.csv_import.field_middle_name"),
+      },
+      {
+        key: "nickname",
+        label: t("vault_settings.csv_import.field_nickname"),
+      },
+      { key: "prefix", label: t("vault_settings.csv_import.field_prefix") },
+      { key: "suffix", label: t("vault_settings.csv_import.field_suffix") },
+      { key: "gender", label: t("vault_settings.csv_import.field_gender") },
+      {
+        key: "birthday",
+        label: t("vault_settings.csv_import.field_birthday"),
+      },
+      { key: "email", label: t("vault_settings.csv_import.field_email") },
+      { key: "phone", label: t("vault_settings.csv_import.field_phone") },
+      { key: "company", label: t("vault_settings.csv_import.field_company") },
+      {
+        key: "job_title",
+        label: t("vault_settings.csv_import.field_job_title"),
+      },
+      { key: "tags", label: t("vault_settings.csv_import.field_tags") },
+      { key: "groups", label: t("vault_settings.csv_import.field_groups") },
+      { key: "notes", label: t("vault_settings.csv_import.field_notes") },
+      {
+        key: "address_street",
+        label: t("vault_settings.csv_import.field_address_street"),
+      },
+      {
+        key: "address_city",
+        label: t("vault_settings.csv_import.field_address_city"),
+      },
+      {
+        key: "address_state",
+        label: t("vault_settings.csv_import.field_address_state"),
+      },
+      {
+        key: "address_postal_code",
+        label: t("vault_settings.csv_import.field_address_postal_code"),
+      },
+      {
+        key: "address_country",
+        label: t("vault_settings.csv_import.field_address_country"),
+      },
+    ];
+
     const [step, setStep] = useState<"upload" | "map" | "done">("upload");
     const [csvFile, setCsvFile] = useState<File | null>(null);
     const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -1976,7 +1960,7 @@ export default function VaultSettings() {
             )}
             <Space>
               <Button onClick={reset}>
-                ← {t("vault_settings.csv_import.step_upload")}
+                �?{t("vault_settings.csv_import.step_upload")}
               </Button>
               <Button type="primary" onClick={handleImport} loading={importing}>
                 {t("vault_settings.csv_import.import_button")}
@@ -2013,7 +1997,7 @@ export default function VaultSettings() {
               showIcon
             />
             <Button onClick={reset}>
-              ← {t("vault_settings.csv_import.step_upload")}
+              �?{t("vault_settings.csv_import.step_upload")}
             </Button>
           </Space>
         )}
@@ -2021,7 +2005,16 @@ export default function VaultSettings() {
     );
   };
 
-  const MonicaImportTab = () => {
+  function MonicaImportTab() {
+    const { t } = useTranslation();
+    const queryClient = useQueryClient();
+    const { id } = useParams<{ id: string }>();
+    const vaultId = id!;
+    const importInvalidationScopes = {
+      vaultIds: [String(vaultId)],
+      contacts: [],
+    } as const;
+
     const [importing, setImporting] = useState(false);
     const [importResult, setImportResult] =
       useState<GithubComNaibaBondsInternalDtoMonicaImportResponse | null>(null);
@@ -2153,13 +2146,135 @@ export default function VaultSettings() {
     );
   };
 
+export default function VaultSettings() {
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const { token } = theme.useToken();
+  const screens = useBreakpoint();
+
+  const [activeTab, setActiveTab] = useState("general");
+
+  const { data: vaultSettings } = useQuery({
+    queryKey: ["vault", vaultId, "settings"],
+    queryFn: async () => {
+      const res = await api.vaultSettings.settingsList(String(vaultId));
+      return res.data;
+    },
+    enabled: !!vaultId,
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: (data: UpdateVaultSettingsRequest) =>
+      api.vaultSettings.settingsUpdate(String(vaultId), data),
+    onSuccess: () => {
+      message.success(t("common.saved"));
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateTabVisibilityMutation = useMutation({
+    mutationFn: (data: Record<string, boolean>) =>
+      api.vaultSettings.settingsVisibilityUpdate(String(vaultId), data),
+    onSuccess: () => {
+      message.success(t("common.saved"));
+      // Layout reads Viewer-accessible vault detail while this form reads settings;
+      // invalidate both caches so visibility changes apply immediately and stay controlled.
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
+      queryClient.invalidateQueries({
+        queryKey: ["vault", vaultId, "settings"],
+      });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const positionMutation = useMutation({
+    mutationFn: async ({
+      entityType,
+      id,
+      position,
+      categoryId,
+    }: {
+      entityType: string;
+      id: number;
+      position: number;
+      categoryId?: number;
+    }): Promise<void> => {
+      const vid = String(vaultId);
+      switch (entityType) {
+        case "activityCategories":
+          await api.vaultSettings.settingsActivityCategoriesPositionCreate(
+            vid,
+            id,
+            { position },
+          );
+          break;
+        case "activityTypes":
+          await api.vaultSettings.settingsActivityCategoriesActivityTypesPositionCreate(
+            vid,
+            categoryId!,
+            id,
+            { position },
+          );
+          break;
+        case "moodParams":
+          await api.vaultSettings.settingsMoodParamsPositionCreate(vid, id, {
+            position,
+          });
+          break;
+        case "quickFactTemplates":
+          await api.vaultSettings.settingsQuickFactTemplatesPositionCreate(
+            vid,
+            id,
+            { position },
+          );
+          break;
+      }
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["vault", vaultId] });
+      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] });
+      if (
+        vars.entityType === "activityCategories" ||
+        vars.entityType === "activityTypes"
+      ) {
+        queryClient.invalidateQueries({
+          queryKey: ["vault", vaultId, "activityCategories"],
+        });
+      } else {
+        queryClient.invalidateQueries({
+          queryKey: ["vault", vaultId, vars.entityType],
+        });
+      }
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
   const tabItems: TabsProps["items"] = [
     {
       key: "general",
       label: t("vault_settings.general"),
-      children: <GeneralTab />,
+      children: (
+        <GeneralTab
+          vaultSettings={vaultSettings}
+          updateSettingsMutation={updateSettingsMutation}
+        />
+      ),
     },
-    { key: "tabs", label: t("vault_settings.tabs"), children: <TabsTab /> },
+    {
+      key: "tabs",
+      label: t("vault_settings.tabs"),
+      children: (
+        <TabsTab
+          vaultSettings={vaultSettings}
+          updateTabVisibilityMutation={updateTabVisibilityMutation}
+        />
+      ),
+    },
     { key: "users", label: t("vault_settings.users"), children: <UsersTab /> },
     {
       key: "labels",
@@ -2194,6 +2309,7 @@ export default function VaultSettings() {
           updateRequest={buildUpdateTagRequest}
           title={t("vault_settings.tags")}
           itemNameKey="name"
+          positionMutation={positionMutation}
         />
       ),
     },
@@ -2221,6 +2337,7 @@ export default function VaultSettings() {
           createRequest={buildCreateImportantDateTypeRequest}
           updateRequest={buildUpdateImportantDateTypeRequest}
           title={t("vault_settings.date_types")}
+          positionMutation={positionMutation}
         />
       ),
     },
@@ -2259,18 +2376,19 @@ export default function VaultSettings() {
             },
           ]}
           positionEntityType="moodParams"
+          positionMutation={positionMutation}
         />
       ),
     },
     {
       key: "activities",
       label: t("vault_settings.activities"),
-      children: <ActivitiesTab />,
+      children: <ActivitiesTab positionMutation={positionMutation} />,
     },
     {
       key: "quickFacts",
       label: t("vault_settings.quick_facts"),
-      children: <QuickFactTemplatesTab />,
+      children: <QuickFactTemplatesTab positionMutation={positionMutation} />,
     },
     {
       key: "csv_import",

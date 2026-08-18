@@ -1094,9 +1094,10 @@ describe("VaultSettings", () => {
       replacementVaultId,
       "calendar",
     ]);
-    expect(
-      within(container).queryByText("Import completed"),
-    ).not.toBeInTheDocument();
+    // The import tab survives the route rerender (module-level components no
+    // longer remount on every parent render), so the completed result stays
+    // visible, bound to the vault the file was submitted against.
+    expect(within(container).queryByText("Import completed")).toBeInTheDocument();
   });
 
   it("keeps a pending Monica import bound to its submission Vault after a route rerender", async () => {
@@ -1162,9 +1163,9 @@ describe("VaultSettings", () => {
       replacementVaultId,
       "reminders",
     ]);
-    expect(
-      within(container).queryByText("Import completed"),
-    ).not.toBeInTheDocument();
+    // Same survival guarantee as the CSV case: the completed import result
+    // remains visible after the route rerender.
+    expect(within(container).queryByText("Import completed")).toBeInTheDocument();
   });
 
   it.each([
