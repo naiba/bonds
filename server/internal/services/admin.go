@@ -213,6 +213,11 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 			return fmt.Errorf("delete call reasons: %w", err)
 		}
 
+		postTemplateSubquery := tx.Model(&models.PostTemplate{}).Select("id").Where("account_id = ?", user.AccountID)
+		if err := tx.Where("post_template_id IN (?)", postTemplateSubquery).Delete(&models.PostTemplateSection{}).Error; err != nil {
+			return fmt.Errorf("delete post template sections: %w", err)
+		}
+
 		accountTables := []interface{}{
 			&models.Invitation{},
 			&models.AccountCurrency{},
@@ -228,7 +233,6 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 			&models.Emotion{},
 			&models.GiftOccasion{},
 			&models.GiftState{},
-			&models.PostTemplateSection{},
 			&models.PostTemplate{},
 			&models.GroupType{},
 			&models.SyncToken{},

@@ -527,21 +527,26 @@ func cloneFloat64Ptr(value *float64) *float64 {
 }
 
 func cleanMovedContactsFromActivities(tx *gorm.DB, contactIDs []string, currentVaultID string) error {
-	affectedActivityIDs := tx.Model(&models.ActivityParticipant{}).
-		Select("activity_id").
-		Where("contact_id IN ?", contactIDs)
+	var affectedActivityIDs []uint
+	if err := tx.Model(&models.ActivityParticipant{}).
+		Where("contact_id IN ?", contactIDs).
+		Distinct().
+		Pluck("activity_id", &affectedActivityIDs).Error; err != nil {
+		return err
+	}
+	if len(affectedActivityIDs) == 0 {
+		return nil
+	}
 	if err := tx.Where("contact_id IN ?", contactIDs).Delete(&models.ActivityParticipant{}).Error; err != nil {
 		return err
 	}
-	doomed := tx.Model(&models.Activity{}).
-		Select("id").
-		Where("vault_id = ?", currentVaultID).
-		Where("id IN (?)", affectedActivityIDs).
-		Where("id NOT IN (?)", tx.Model(&models.ActivityParticipant{}).Select("activity_id"))
 	if err := tx.Model(&models.Activity{}).
-		Where("parent_id IN (?)", doomed).
+		Where("parent_id IN ?", affectedActivityIDs).
 		Update("parent_id", nil).Error; err != nil {
 		return err
 	}
-	return tx.Where("vault_id = ? AND id IN (?)", currentVaultID, doomed).Delete(&models.Activity{}).Error
+	return tx.
+		Where("vault_id = ? AND id IN ? AND id NOT IN (?)", currentVaultID, affectedActivityIDs,
+			tx.Model(&models.ActivityParticipant{}).Select("activity_id")).
+		Delete(&models.Activity{}).Error
 }
