@@ -13,6 +13,7 @@ import (
 var ErrPersonalizeEntityNotFound = errors.New("entity not found")
 var ErrUnknownEntityType = errors.New("unknown entity type")
 var ErrPersonalizeEntityNotSortable = errors.New("entity is not sortable")
+var ErrCurrenciesNotEditable = errors.New("currencies are curated via the dedicated toggle APIs")
 
 type PersonalizeService struct {
 	db *gorm.DB
@@ -103,6 +104,10 @@ func (s *PersonalizeService) Create(accountID, entity string, req dto.Personaliz
 		return s.createTaskStatus(accountID, req)
 	}
 
+	if entity == "currencies" {
+		return nil, ErrCurrenciesNotEditable
+	}
+
 	labelCol := s.getLabelCol(cfg)
 	nameCol := s.getNameCol(cfg)
 	val := req.Label
@@ -159,6 +164,10 @@ func (s *PersonalizeService) Update(accountID, entity string, id uint, req dto.P
 		val = req.Name
 	}
 
+	if entity == "currencies" {
+		return nil, ErrCurrenciesNotEditable
+	}
+
 	result := s.db.Exec(
 		fmt.Sprintf("UPDATE %s SET %s = ?, %s = ?, updated_at = ? WHERE id = ? AND account_id = ?", cfg.table, labelCol, nameCol),
 		val, val, time.Now(), id, accountID,
@@ -183,6 +192,10 @@ func (s *PersonalizeService) Delete(accountID, entity string, id uint) error {
 
 	if entity == "task-statuses" {
 		return s.deleteTaskStatus(accountID, id)
+	}
+
+	if entity == "currencies" {
+		return ErrCurrenciesNotEditable
 	}
 
 	result := s.db.Exec(

@@ -671,6 +671,9 @@ func (s *MonicaImportService) importReminders(
 		}
 		if err := tx.Create(&reminder).Error; err == nil {
 			resp.ImportedReminders++
+			if err := scheduleReminderForVaultUsers(tx, &reminder); err != nil {
+				resp.Errors = append(resp.Errors, fmt.Sprintf("reminder %s: could not schedule reminder", mr.UUID))
+			}
 			if mr.Properties.Description != "" {
 				sourceType := "monica_reminder_description"
 				sourceUUID := mr.UUID

@@ -74,6 +74,9 @@ func (h *PersonalizeHandler) Create(c echo.Context) error {
 		if errors.Is(err, services.ErrUnknownEntityType) {
 			return response.NotFound(c, "err.unknown_entity_type")
 		}
+		if errors.Is(err, services.ErrCurrenciesNotEditable) {
+			return response.BadRequest(c, "err.currencies_not_editable", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_entity")
 	}
 	return response.Created(c, item)
@@ -115,6 +118,9 @@ func (h *PersonalizeHandler) Update(c echo.Context) error {
 		if errors.Is(err, services.ErrPersonalizeEntityNotFound) {
 			return response.NotFound(c, "err.entity_not_found")
 		}
+		if errors.Is(err, services.ErrCurrenciesNotEditable) {
+			return response.BadRequest(c, "err.currencies_not_editable", nil)
+		}
 		return response.InternalError(c, "err.failed_to_update_entity")
 	}
 	return response.OK(c, item)
@@ -147,6 +153,9 @@ func (h *PersonalizeHandler) Delete(c echo.Context) error {
 		}
 		if errors.Is(err, services.ErrPersonalizeEntityNotFound) {
 			return response.NotFound(c, "err.entity_not_found")
+		}
+		if errors.Is(err, services.ErrCurrenciesNotEditable) {
+			return response.BadRequest(c, "err.currencies_not_editable", nil)
 		}
 		return response.InternalError(c, "err.failed_to_delete_entity")
 	}
