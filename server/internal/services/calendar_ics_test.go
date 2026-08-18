@@ -328,26 +328,33 @@ func TestExportVaultICSRecurrenceRules(t *testing.T) {
 	}
 	out := string(data)
 
-	if !strings.Contains(out, "SUMMARY:Jane - Anniversary\r\nDTSTART;VALUE=DATE:20250315\r\n") {
+	if !strings.Contains(out, "DTSTART;VALUE=DATE:20250315\r\nSUMMARY:Jane - Anniversary\r\n") {
 		t.Errorf("expected dated important date to be a single occurrence without RRULE\n---\n%s", out)
 	}
-	if strings.Contains(out, "SUMMARY:Jane - Anniversary\r\nDTSTART;VALUE=DATE:20250315\r\nRRULE") {
+	if strings.Contains(out, "DTSTART;VALUE=DATE:20250315\r\nSUMMARY:Jane - Anniversary\r\nRRULE") {
 		t.Errorf("expected dated important date to carry no RRULE\n---\n%s", out)
 	}
-	if !strings.Contains(out, "SUMMARY:Jane - Birthday\r\nDTSTART;VALUE=DATE:"+time.Now().Format("2006")+"0315\r\nRRULE:FREQ=YEARLY") {
+	if !strings.Contains(out, "DTSTART;VALUE=DATE:"+time.Now().Format("2006")+"0315\r\nRRULE:FREQ=YEARLY\r\nSUMMARY:Jane - Birthday") {
 		t.Errorf("expected year-unknown date projected onto the current year with RRULE:FREQ=YEARLY\n---\n%s", out)
 	}
-	if !strings.Contains(out, "SUMMARY:Monthly\r\nDTSTART;VALUE=DATE:20250315\r\nRRULE:FREQ=MONTHLY;INTERVAL=2") {
+	if !strings.Contains(out, "DTSTART;VALUE=DATE:"+time.Now().Format("2006")+"0315\r\nRRULE:FREQ=MONTHLY;INTERVAL=2\r\nSUMMARY:Monthly") {
 		t.Errorf("expected monthly reminder with INTERVAL=2\n---\n%s", out)
 	}
-	if !strings.Contains(out, "SUMMARY:Yearly\r\nDTSTART;VALUE=DATE:20250315\r\nRRULE:FREQ=YEARLY") {
+	if !strings.Contains(out, "DTSTART;VALUE=DATE:"+time.Now().Format("2006")+"0315\r\nRRULE:FREQ=YEARLY\r\nSUMMARY:Yearly") {
 		t.Errorf("expected yearly reminder with RRULE:FREQ=YEARLY\n---\n%s", out)
 	}
 	if !strings.Contains(out, "SUMMARY:One Off\r\n") {
 		t.Errorf("expected one_time reminder in output\n---\n%s", out)
 	}
-	if strings.Contains(out, "SUMMARY:One Off\r\nDTSTART;VALUE=DATE:20250315\r\nRRULE") {
-		t.Errorf("expected one_time reminder to carry no RRULE\n---\n%s", out)
+	idx := strings.Index(out, "SUMMARY:One Off\r\n")
+	if idx < 0 {
+		t.Errorf("expected one_time reminder in output\n---\n%s", out)
+	} else {
+		start := strings.LastIndex(out[:idx], "BEGIN:VEVENT")
+		end := strings.Index(out[idx:], "END:VEVENT")
+		if block := out[start : idx+end+len("END:VEVENT")]; strings.Contains(block, "RRULE") {
+			t.Errorf("expected one_time reminder to carry no RRULE\n---\n%s", out)
+		}
 	}
 }
 
