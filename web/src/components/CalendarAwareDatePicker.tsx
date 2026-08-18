@@ -31,12 +31,15 @@ export default function CalendarAwareDatePicker({
   allowClear,
   style,
 }: CalendarAwareDatePickerProps) {
-  const pickerValue = useMemo<CalendarDatePickerValue>(() => {
+  const pickerValue = useMemo<CalendarDatePickerValue | undefined>(() => {
     if (!value) {
-      const now = dayjs();
-      return { calendarType: "gregorian", day: now.date(), month: now.month() + 1, year: now.year(), datePrecision: "full" };
+      return undefined;
     }
-    if (value.calendarType !== "gregorian" && value.originalDay != null && value.originalMonth != null) {
+    if (
+      value.calendarType !== "gregorian" &&
+      value.originalDay != null &&
+      value.originalMonth != null
+    ) {
       return {
         calendarType: value.calendarType,
         day: value.originalDay,
@@ -87,8 +90,10 @@ export default function CalendarAwareDatePicker({
     <CalendarDatePicker
       enableAlternativeCalendar
       value={pickerValue}
+      allowClear={allowClear}
       onChange={(next) => {
-        if (next.day == null || next.month == null) {
+        if (!next || next.day == null || next.month == null) {
+          onChange?.(null);
           return;
         }
 

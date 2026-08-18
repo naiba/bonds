@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
-import { App as AntApp, ConfigProvider } from "antd";
+import { App as AntApp, Button, ConfigProvider, Form } from "antd";
 import userEvent from "@testing-library/user-event";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
+import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
+import dayjs from "dayjs";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class {
@@ -29,28 +31,49 @@ describe("CalendarDatePicker", () => {
     renderPicker({
       enableNoYear: true,
       enableDatePrecision: true,
-      value: { calendarType: "gregorian", day: 15, month: 8, year: 2025, datePrecision: "full" },
+      value: {
+        calendarType: "gregorian",
+        day: 15,
+        month: 8,
+        year: 2025,
+        datePrecision: "full",
+      },
       onChange,
     });
 
     await user.click(screen.getByText("Month & year"));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ day: null, month: 8, year: 2025, datePrecision: "month" }),
+        expect.objectContaining({
+          day: null,
+          month: 8,
+          year: 2025,
+          datePrecision: "month",
+        }),
       );
     });
 
     await user.click(screen.getByText("Year only"));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ day: null, month: null, year: 2025, datePrecision: "year" }),
+        expect.objectContaining({
+          day: null,
+          month: null,
+          year: 2025,
+          datePrecision: "year",
+        }),
       );
     });
 
     await user.click(screen.getByText("Month & day"));
     await waitFor(() => {
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ day: 15, month: 8, year: null, datePrecision: "month_day" }),
+        expect.objectContaining({
+          day: 15,
+          month: 8,
+          year: null,
+          datePrecision: "month_day",
+        }),
       );
     });
   });
@@ -59,7 +82,13 @@ describe("CalendarDatePicker", () => {
     renderPicker({
       enableDatePrecision: true,
       allowedDatePrecisions: ["full", "month", "year"],
-      value: { calendarType: "gregorian", day: 15, month: 8, year: 2025, datePrecision: "full" },
+      value: {
+        calendarType: "gregorian",
+        day: 15,
+        month: 8,
+        year: 2025,
+        datePrecision: "full",
+      },
     });
 
     expect(screen.queryByText("Month & day")).not.toBeInTheDocument();
@@ -77,9 +106,23 @@ describe("CalendarDatePicker", () => {
 
   it("shows an empty input instead of today's date when value is missing", () => {
     renderPicker();
-    const input = document.querySelector(".ant-picker-input input") as HTMLInputElement;
+    const input = document.querySelector(
+      ".ant-picker-input input",
+    ) as HTMLInputElement;
     expect(input).toBeInTheDocument();
     expect(input.value).toBe("");
+  });
+
+  it("shows placeholders instead of today's date in the precision layout", () => {
+    renderPicker({
+      enableDatePrecision: true,
+      allowedDatePrecisions: ["full", "month_day"],
+    });
+
+    const placeholders = Array.from(
+      document.querySelectorAll(".ant-select-placeholder"),
+    ).map((element) => element.textContent);
+    expect(placeholders).toEqual(["Year", "Month", "Day"]);
   });
 
   it("clears the value when the clear button is clicked", async () => {
@@ -95,14 +138,45 @@ describe("CalendarDatePicker", () => {
     await user.click(clearButton as Element);
 
     await waitFor(() => {
-      expect(onChange).toHaveBeenCalledWith({
-        calendarType: "gregorian",
-        day: null,
-        month: null,
-        year: null,
-        datePrecision: "full",
-      });
+      expect(onChange).toHaveBeenCalledWith(null);
     });
+  });
+
+  it("keeps a cleared picker empty for required Form validation", async () => {
+    const user = userEvent.setup();
+    const onFinish = vi.fn();
+    const onFinishFailed = vi.fn();
+    render(
+      <ConfigProvider>
+        <AntApp>
+          <Form
+            initialValues={{
+              calendarDate: {
+                calendarType: "gregorian",
+                day: 15,
+                month: 8,
+                year: 2025,
+              },
+            }}
+            onFinish={onFinish}
+            onFinishFailed={onFinishFailed}
+          >
+            <Form.Item name="calendarDate" rules={[{ required: true }]}>
+              <CalendarDatePicker />
+            </Form.Item>
+            <Button htmlType="submit">Submit</Button>
+          </Form>
+        </AntApp>
+      </ConfigProvider>,
+    );
+
+    const clearButton = document.querySelector(".ant-picker-clear");
+    expect(clearButton).not.toBeNull();
+    await user.click(clearButton as Element);
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => expect(onFinishFailed).toHaveBeenCalledOnce());
+    expect(onFinish).not.toHaveBeenCalled();
   });
 
   it("renders with segmented calendar switcher when enabled", () => {
@@ -129,7 +203,13 @@ describe("CalendarDatePicker", () => {
     renderPicker({
       enableAlternativeCalendar: true,
       enableDatePrecision: true,
-      value: { calendarType: "lunar", day: 15, month: 1, year: 2025, datePrecision: "full" },
+      value: {
+        calendarType: "lunar",
+        day: 15,
+        month: 1,
+        year: 2025,
+        datePrecision: "full",
+      },
       onChange,
     });
 
@@ -181,7 +261,13 @@ describe("CalendarDatePicker", () => {
     renderPicker({
       enableAlternativeCalendar: true,
       enableNoYear: true,
-      value: { calendarType: "lunar", day: 15, month: 1, year: null, datePrecision: "month_day" },
+      value: {
+        calendarType: "lunar",
+        day: 15,
+        month: 1,
+        year: null,
+        datePrecision: "month_day",
+      },
     });
     const yearSelect = document.querySelector(".ant-select");
     expect(yearSelect).toBeTruthy();
@@ -229,5 +315,52 @@ describe("CalendarDatePicker", () => {
         expect.objectContaining({ year: null, datePrecision: "month_day" }),
       );
     });
+  });
+});
+
+describe("CalendarAwareDatePicker", () => {
+  it("renders an empty alternative-calendar picker when the form value is empty", () => {
+    render(
+      <ConfigProvider>
+        <AntApp>
+          <CalendarAwareDatePicker enableAlternativeCalendar value={null} />
+        </AntApp>
+      </ConfigProvider>,
+    );
+
+    const input = document.querySelector(
+      ".ant-picker-input input",
+    ) as HTMLInputElement;
+    expect(input.value).toBe("");
+    expect(screen.queryByText(/Chinese Lunar:/)).not.toBeInTheDocument();
+  });
+
+  it("forwards clear as null in the alternative-calendar path", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ConfigProvider>
+        <AntApp>
+          <CalendarAwareDatePicker
+            enableAlternativeCalendar
+            allowClear
+            value={{
+              date: dayjs("2025-08-15"),
+              calendarType: "gregorian",
+              originalDay: null,
+              originalMonth: null,
+              originalYear: null,
+            }}
+            onChange={onChange}
+          />
+        </AntApp>
+      </ConfigProvider>,
+    );
+
+    const clearButton = document.querySelector(".ant-picker-clear");
+    expect(clearButton).not.toBeNull();
+    await user.click(clearButton as Element);
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(null));
   });
 });
