@@ -186,12 +186,7 @@ func (s *AdminService) DeleteUser(actorID, targetID string) error {
 
 // deleteEntireAccount removes the user, the account, and all associated data (vaults, contacts, files, etc.).
 func (s *AdminService) deleteEntireAccount(user models.User) error {
-	// Delete physical files BEFORE the transaction to avoid SQLite lock contention.
-	if err := s.deleteUserFiles(user.AccountID); err != nil {
-		return fmt.Errorf("delete user files: %w", err)
-	}
-
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var vaults []models.Vault
 		if err := tx.Where("account_id = ?", user.AccountID).Find(&vaults).Error; err != nil {
 			return err
@@ -233,6 +228,7 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 			&models.Emotion{},
 			&models.GiftOccasion{},
 			&models.GiftState{},
+			&models.PostTemplateSection{},
 			&models.PostTemplate{},
 			&models.GroupType{},
 			&models.SyncToken{},
@@ -256,8 +252,18 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 			return err
 		}
 
-		return tx.Where("id = ?", user.AccountID).Delete(&models.Account{}).Error
+		if err := tx.Where("id = ?", user.AccountID).Delete(&models.Account{}).Error; err != nil {
+			return err
+		}
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Delete physical files only after the transaction commits: a rollback must
+	// not leave the account without the files it still references.
+	return s.deleteUserFiles(user.AccountID)
 }
 
 // deleteUserOnly removes only the user record and their personal data (notification channels,

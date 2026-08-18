@@ -78,7 +78,7 @@ func (s *ContactMoveService) MoveMany(contactIDs []string, currentVaultID, targe
 				return err
 			}
 			sourceDAVDeleteTargets = sourceTargets
-			if err := updateBatchFirstMetThrough(tx, uniqueContactIDs); err != nil {
+			if err := updateBatchFirstMetThrough(tx, uniqueContactIDs, currentVaultID); err != nil {
 				return err
 			}
 			if err := moveAllContactRows(tx, uniqueContactIDs, currentVaultID, targetVaultID); err != nil {
@@ -107,7 +107,7 @@ func (s *ContactMoveService) MoveMany(contactIDs []string, currentVaultID, targe
 			if err := cleanSourceScopedMovePivots(tx, uniqueContactIDs, currentVaultID); err != nil {
 				return err
 			}
-			if err := cleanMovedContactsFromActivities(tx, uniqueContactIDs); err != nil {
+			if err := cleanMovedContactsFromActivities(tx, uniqueContactIDs, currentVaultID); err != nil {
 				return err
 			}
 		}
@@ -200,9 +200,9 @@ func validateMoveVaultsAndTargetAccess(tx *gorm.DB, currentVaultID, targetVaultI
 	return NewVaultService(tx).CheckUserVaultAccess(userID, targetVaultID, models.PermissionEditor)
 }
 
-func updateBatchFirstMetThrough(tx *gorm.DB, contactIDs []string) error {
+func updateBatchFirstMetThrough(tx *gorm.DB, contactIDs []string, currentVaultID string) error {
 	return tx.Model(&models.Contact{}).
-		Where("id IN ? AND first_met_through_contact_id IS NOT NULL AND first_met_through_contact_id NOT IN ?", contactIDs, contactIDs).
+		Where("vault_id = ? AND id IN ? AND first_met_through_contact_id IS NOT NULL AND first_met_through_contact_id NOT IN ?", currentVaultID, contactIDs, contactIDs).
 		Update("first_met_through_contact_id", nil).Error
 }
 
@@ -526,13 +526,22 @@ func cloneFloat64Ptr(value *float64) *float64 {
 	return &copyValue
 }
 
-func cleanMovedContactsFromActivities(tx *gorm.DB, contactIDs []string) error {
+func cleanMovedContactsFromActivities(tx *gorm.DB, contactIDs []string, currentVaultID string) error {
+	affectedActivityIDs := tx.Model(&models.ActivityParticipant{}).
+		Select("activity_id").
+		Where("contact_id IN ?", contactIDs)
 	if err := tx.Where("contact_id IN ?", contactIDs).Delete(&models.ActivityParticipant{}).Error; err != nil {
 		return err
 	}
-	orphans := tx.Model(&models.ActivityParticipant{}).Select("activity_id")
-	if err := tx.Model(&models.Activity{}).Where("id NOT IN (?)", orphans).Update("parent_id", nil).Error; err != nil {
+	doomed := tx.Model(&models.Activity{}).
+		Select("id").
+		Where("vault_id = ?", currentVaultID).
+		Where("id IN (?)", affectedActivityIDs).
+		Where("id NOT IN (?)", tx.Model(&models.ActivityParticipant{}).Select("activity_id"))
+	if err := tx.Model(&models.Activity{}).
+		Where("parent_id IN (?)", doomed).
+		Update("parent_id", nil).Error; err != nil {
 		return err
 	}
-	return tx.Where("id NOT IN (?)", orphans).Delete(&models.Activity{}).Error
+	return tx.Where("vault_id = ? AND id IN (?)", currentVaultID, doomed).Delete(&models.Activity{}).Error
 }
