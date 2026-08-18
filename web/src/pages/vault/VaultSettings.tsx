@@ -1960,7 +1960,7 @@ interface QuickFactTemplateFormValues {
             )}
             <Space>
               <Button onClick={reset}>
-                �?{t("vault_settings.csv_import.step_upload")}
+                ←{t("vault_settings.csv_import.step_upload")}
               </Button>
               <Button type="primary" onClick={handleImport} loading={importing}>
                 {t("vault_settings.csv_import.import_button")}
@@ -1997,7 +1997,7 @@ interface QuickFactTemplateFormValues {
               showIcon
             />
             <Button onClick={reset}>
-              �?{t("vault_settings.csv_import.step_upload")}
+              ←{t("vault_settings.csv_import.step_upload")}
             </Button>
           </Space>
         )}
@@ -2260,6 +2260,7 @@ export default function VaultSettings() {
       label: t("vault_settings.general"),
       children: (
         <GeneralTab
+          key={vaultId}
           vaultSettings={vaultSettings}
           updateSettingsMutation={updateSettingsMutation}
         />
@@ -2270,27 +2271,28 @@ export default function VaultSettings() {
       label: t("vault_settings.tabs"),
       children: (
         <TabsTab
+          key={vaultId}
           vaultSettings={vaultSettings}
           updateTabVisibilityMutation={updateTabVisibilityMutation}
         />
       ),
     },
-    { key: "users", label: t("vault_settings.users"), children: <UsersTab /> },
+    { key: "users", label: t("vault_settings.users"), children: <UsersTab key={vaultId} /> },
     {
       key: "labels",
       label: t("vault_settings.labels"),
-      children: <LabelsTab />,
+      children: <LabelsTab key={vaultId} />,
     },
     {
       key: "companies",
       label: t("vault.companies.title"),
-      children: <VaultCompanies vaultId={vaultId} />,
+      children: <VaultCompanies key={vaultId} vaultId={vaultId} />,
     },
     {
       key: "tags",
       label: t("vault_settings.tags"),
       children: (
-        <SimpleCrudTab
+        <SimpleCrudTab key={vaultId}
           queryKeySuffix="tags"
           apiList={(vid) => api.vaultSettings.settingsTagsList(String(vid))}
           apiCreate={(
@@ -2317,7 +2319,7 @@ export default function VaultSettings() {
       key: "dateTypes",
       label: t("vault_settings.date_types"),
       children: (
-        <SimpleCrudTab
+        <SimpleCrudTab key={vaultId}
           queryKeySuffix="contactImportantDateTypes"
           apiList={(vid) =>
             api.vaultSettings.settingsDateTypesList(String(vid))
@@ -2345,7 +2347,7 @@ export default function VaultSettings() {
       key: "moodParams",
       label: t("vault_settings.mood_params"),
       children: (
-        <SimpleCrudTab
+        <SimpleCrudTab key={vaultId}
           queryKeySuffix="moodTrackingParameters"
           apiList={(vid) =>
             api.vaultSettings.settingsMoodParamsList(String(vid))
@@ -2383,22 +2385,22 @@ export default function VaultSettings() {
     {
       key: "activities",
       label: t("vault_settings.activities"),
-      children: <ActivitiesTab positionMutation={positionMutation} />,
+      children: <ActivitiesTab key={vaultId} positionMutation={positionMutation} />,
     },
     {
       key: "quickFacts",
       label: t("vault_settings.quick_facts"),
-      children: <QuickFactTemplatesTab positionMutation={positionMutation} />,
+      children: <QuickFactTemplatesTab key={vaultId} positionMutation={positionMutation} />,
     },
     {
       key: "csv_import",
       label: t("vault_settings.csv_import.tab_label"),
-      children: <CSVImportTab />,
+      children: <CSVImportTab key={vaultId} />,
     },
     {
       key: "import",
       label: t("vault_settings.monica_import.tab_label"),
-      children: <MonicaImportTab />,
+      children: <MonicaImportTab key={vaultId} />,
     },
   ];
 
