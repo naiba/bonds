@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -297,6 +298,53 @@ func TestAdminDeleteUser_Success(t *testing.T) {
 	adminSvc.db.Model(&models.ContactTask{}).Where("vault_id = ?", vault.ID).Count(&taskCount)
 	if taskCount != 0 {
 		t.Error("expected standalone vault tasks to be deleted")
+	}
+}
+
+func TestAdminDeleteUser_RemovesPhysicalFilesAfterCommit(t *testing.T) {
+	tmpDir := t.TempDir()
+	uploadDir := filepath.Join(tmpDir, "uploads")
+	db, err := database.Connect(&config.DatabaseConfig{Driver: "sqlite", DSN: filepath.Join(tmpDir, "bonds.db")}, false)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	if err := database.AutoMigrate(db); err != nil {
+		t.Fatalf("AutoMigrate failed: %v", err)
+	}
+	adminSvc := NewAdminService(db, uploadDir)
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+	vaultSvc := NewVaultService(db)
+
+	admin := registerTestUser(t, authSvc, "del-files-admin@example.com")
+	target := registerTestUser(t, authSvc, "del-files-target@example.com")
+
+	vault, err := vaultSvc.CreateVault(target.User.AccountID, target.User.ID, dto.CreateVaultRequest{Name: "Files Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+
+	fileUUID := filepath.Join("2026", "08", "19", "vault-file.bin")
+	diskPath := filepath.Join(uploadDir, fileUUID)
+	if err := os.MkdirAll(filepath.Dir(diskPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+	if err := os.WriteFile(diskPath, []byte("content"), 0o644); err != nil {
+		t.Fatalf("WriteFile failed: %v", err)
+	}
+	fileType := "document"
+	if err := adminSvc.db.Create(&models.File{
+		VaultID: vault.ID, FileableType: &fileType, UUID: fileUUID,
+		Name: "vault-file.bin", Type: "document", MimeType: "application/octet-stream", Size: 7,
+	}).Error; err != nil {
+		t.Fatalf("Create File failed: %v", err)
+	}
+
+	if err := adminSvc.DeleteUser(admin.User.ID, target.User.ID); err != nil {
+		t.Fatalf("DeleteUser failed: %v", err)
+	}
+
+	if _, err := os.Stat(diskPath); !os.IsNotExist(err) {
+		t.Errorf("expected physical file %s to be removed after account deletion, stat err: %v", diskPath, err)
 	}
 }
 

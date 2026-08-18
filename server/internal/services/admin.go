@@ -186,7 +186,17 @@ func (s *AdminService) DeleteUser(actorID, targetID string) error {
 
 // deleteEntireAccount removes the user, the account, and all associated data (vaults, contacts, files, etc.).
 func (s *AdminService) deleteEntireAccount(user models.User) error {
+	var fileUUIDs []string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Collect physical file paths while the rows still exist; the files
+		// themselves are removed only after the transaction commits.
+		if err := tx.Model(&models.File{}).
+			Joins("INNER JOIN vaults ON files.vault_id = vaults.id").
+			Where("vaults.account_id = ?", user.AccountID).
+			Pluck("uuid", &fileUUIDs).Error; err != nil {
+			return fmt.Errorf("collect user files: %w", err)
+		}
+
 		var vaults []models.Vault
 		if err := tx.Where("account_id = ?", user.AccountID).Find(&vaults).Error; err != nil {
 			return err
@@ -267,7 +277,7 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 
 	// Delete physical files only after the transaction commits: a rollback must
 	// not leave the account without the files it still references.
-	return s.deleteUserFiles(user.AccountID)
+	return s.removeFiles(fileUUIDs)
 }
 
 // deleteUserOnly removes only the user record and their personal data (notification channels,
@@ -458,14 +468,9 @@ func (s *AdminService) deleteContactData(tx *gorm.DB, contactID string) error {
 	return nil
 }
 
-func (s *AdminService) deleteUserFiles(accountID string) error {
-	var files []models.File
-	s.db.Joins("INNER JOIN vaults ON files.vault_id = vaults.id").
-		Where("vaults.account_id = ?", accountID).
-		Find(&files)
-
-	for _, f := range files {
-		filePath := filepath.Join(s.uploadDir, f.UUID)
+func (s *AdminService) removeFiles(fileUUIDs []string) error {
+	for _, uuid := range fileUUIDs {
+		filePath := filepath.Join(s.uploadDir, uuid)
 		os.Remove(filePath)
 	}
 	return nil
