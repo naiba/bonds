@@ -178,13 +178,13 @@ export default function GroupsModule({ vaultId, contactId }: GroupsModuleProps) 
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Button
-            onClick={() => {
-              setIsModalOpen(false);
-              form.resetFields();
-            }}
-          >
-            {t("common.cancel")}
-          </Button>
+              onClick={() => {
+                setIsModalOpen(false);
+                form.resetFields();
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
             <Button
               type="primary"
               htmlType="submit"
