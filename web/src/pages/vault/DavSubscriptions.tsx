@@ -438,7 +438,7 @@ export default function DavSubscriptions() {
         onOk={handleModalOk}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         destroyOnClose
-        width={560}
+        width={screens.md ? 560 : "calc(100vw - 32px)"}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item

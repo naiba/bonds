@@ -120,13 +120,11 @@ export default function NetworkGraph({
     svg.selectAll("*").remove();
     svg.attr("viewBox", `0 0 ${width} ${height}`);
 
-    const isDark =
-      document.documentElement.getAttribute("data-theme") === "dark";
-    const textColor = isDark ? "#e5e7eb" : "#374151";
-    const edgeColor = isDark ? "#4b5563" : "#d1d5db";
+    const textColor = token.colorText;
+    const edgeColor = token.colorBorder;
     const centerColor = token.colorPrimary;
-    const nodeColor = isDark ? "#6b7280" : "#9ca3af";
-    const hoverEdgeColor = isDark ? "#93c5fd" : "#3b82f6";
+    const nodeColor = token.colorTextTertiary;
+    const hoverEdgeColor = token.colorInfo;
 
     const nodeRadius = isMobile ? 6 : 8;
     const centerNodeRadius = isMobile ? 9 : 12;
@@ -341,7 +339,11 @@ export default function NetworkGraph({
     };
   }, [
     graphData,
+    token.colorText,
+    token.colorBorder,
     token.colorPrimary,
+    token.colorTextTertiary,
+    token.colorInfo,
     navigate,
     vaultId,
     getNodeId,
@@ -352,11 +354,9 @@ export default function NetworkGraph({
     if (!svgRef.current || !graphData) return;
     const svg = d3.select(svgRef.current);
 
-    const isDark =
-      document.documentElement.getAttribute("data-theme") === "dark";
-    const edgeColor = isDark ? "#4b5563" : "#d1d5db";
+    const edgeColor = token.colorBorder;
     const centerColor = token.colorPrimary;
-    const nodeColor = isDark ? "#6b7280" : "#9ca3af";
+    const nodeColor = token.colorTextTertiary;
     const selectedColor = "#f59e0b";
     const highlightEdgeColor = "#ef4444";
 
@@ -404,7 +404,15 @@ export default function NetworkGraph({
         .attr("stroke-opacity", 0.3)
         .attr("stroke-width", 1.5);
     }
-  }, [selectedNodes, kinship, graphData, token.colorPrimary, getNodeId]);
+  }, [
+    selectedNodes,
+    kinship,
+    graphData,
+    token.colorBorder,
+    token.colorPrimary,
+    token.colorTextTertiary,
+    getNodeId,
+  ]);
 
   if (loading) {
     return (
