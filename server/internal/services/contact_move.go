@@ -540,13 +540,22 @@ func cleanMovedContactsFromActivities(tx *gorm.DB, contactIDs []string, currentV
 	if err := tx.Where("contact_id IN ?", contactIDs).Delete(&models.ActivityParticipant{}).Error; err != nil {
 		return err
 	}
+	var orphanActivityIDs []uint
 	if err := tx.Model(&models.Activity{}).
-		Where("parent_id IN ?", affectedActivityIDs).
+		Where("vault_id = ? AND id IN ? AND subject_user_id IS NULL", currentVaultID, affectedActivityIDs).
+		Where("NOT EXISTS (?)", tx.Model(&models.ActivityParticipant{}).
+			Select("1").
+			Where("activity_participants.activity_id = activities.id")).
+		Pluck("id", &orphanActivityIDs).Error; err != nil {
+		return err
+	}
+	if len(orphanActivityIDs) == 0 {
+		return nil
+	}
+	if err := tx.Model(&models.Activity{}).
+		Where("parent_id IN ?", orphanActivityIDs).
 		Update("parent_id", nil).Error; err != nil {
 		return err
 	}
-	return tx.
-		Where("vault_id = ? AND id IN ? AND id NOT IN (?)", currentVaultID, affectedActivityIDs,
-			tx.Model(&models.ActivityParticipant{}).Select("activity_id")).
-		Delete(&models.Activity{}).Error
+	return tx.Where("id IN ?", orphanActivityIDs).Delete(&models.Activity{}).Error
 }

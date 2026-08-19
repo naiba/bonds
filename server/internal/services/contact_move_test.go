@@ -418,6 +418,76 @@ func TestMoveManyCleansActivityPivotsAndOrphanEvent(t *testing.T) {
 	assertMoveCount(t, svc, &models.Activity{}, "id = ?", 0, created.ID)
 }
 
+func TestMoveManyPreservesUserSubjectActivityAfterLastContactParticipantMoves(t *testing.T) {
+	svc, contactID, vault1ID, vault2ID, userID := setupContactMoveTest(t)
+	activitySvc := NewActivityService(svc.db)
+	typeID := getActivityTypeIDForMoveVault(t, svc, vault1ID)
+	started := time.Now()
+	participantIDs := []string{contactID}
+	created, err := activitySvc.CreateForUser(vault1ID, userID, dto.ActivityUpsertRequest{
+		ActivityTypeID: typeID,
+		ParticipantIDs: &participantIDs,
+		StartDate:      &started,
+		Title:          "User subject with contact participant",
+	})
+	if err != nil {
+		t.Fatalf("Create user-subject activity failed: %v", err)
+	}
+
+	if _, err := svc.MoveMany([]string{contactID}, vault1ID, vault2ID, userID); err != nil {
+		t.Fatalf("MoveMany failed: %v", err)
+	}
+
+	assertMoveCount(t, svc, &models.ActivityParticipant{}, "activity_id = ?", 0, created.ID)
+	assertMoveCount(t, svc, &models.Activity{}, "id = ? AND vault_id = ? AND subject_user_id = ?", 1, created.ID, vault1ID, userID)
+}
+
+func TestMoveManyKeepsMilestoneAttachedWhenAffectedParentSurvives(t *testing.T) {
+	svc, contactID, vault1ID, vault2ID, userID := setupContactMoveTest(t)
+	contactSvc := NewContactService(svc.db)
+	remaining, err := contactSvc.CreateContact(vault1ID, userID, dto.CreateContactRequest{FirstName: "Remaining"})
+	if err != nil {
+		t.Fatalf("Create remaining participant failed: %v", err)
+	}
+	activitySvc := NewActivityService(svc.db)
+	typeID := getActivityTypeIDForMoveVault(t, svc, vault1ID)
+	started := time.Now()
+	participantIDs := []string{remaining.ID}
+	parent, err := activitySvc.Create(vault1ID, dto.ActivityUpsertRequest{
+		ActivityTypeID:   typeID,
+		PrimaryContactID: contactID,
+		ParticipantIDs:   &participantIDs,
+		StartDate:        &started,
+		Title:            "Parent with remaining participant",
+	})
+	if err != nil {
+		t.Fatalf("Create parent activity failed: %v", err)
+	}
+	milestone, err := activitySvc.Create(vault1ID, dto.ActivityUpsertRequest{
+		ActivityTypeID:   typeID,
+		PrimaryContactID: remaining.ID,
+		ParentID:         &parent.ID,
+		StartDate:        &started,
+		Title:            "Milestone",
+	})
+	if err != nil {
+		t.Fatalf("Create milestone failed: %v", err)
+	}
+
+	if _, err := svc.MoveMany([]string{contactID}, vault1ID, vault2ID, userID); err != nil {
+		t.Fatalf("MoveMany failed: %v", err)
+	}
+
+	assertMoveCount(t, svc, &models.Activity{}, "id = ?", 1, parent.ID)
+	var reloadedMilestone models.Activity
+	if err := svc.db.First(&reloadedMilestone, milestone.ID).Error; err != nil {
+		t.Fatalf("Reload milestone failed: %v", err)
+	}
+	if reloadedMilestone.ParentID == nil || *reloadedMilestone.ParentID != parent.ID {
+		t.Fatalf("expected milestone parent_id %d to be preserved, got %v", parent.ID, reloadedMilestone.ParentID)
+	}
+}
+
 func TestMoveManyAllowsArchivedContacts(t *testing.T) {
 	svc, _, vault1ID, vault2ID, userID := setupContactMoveTest(t)
 	listed := false
