@@ -306,15 +306,19 @@ func projectLunarDtStart(converter calendarPkg.Converter, origDay, origMonth, or
 	if origDay == nil || origMonth == nil {
 		return fallback
 	}
-	year := fallback.Year()
-	if origYear != nil {
-		year = *origYear
+	original := calendarPkg.DateInfo{Day: *origDay, Month: *origMonth}
+	if origYear == nil {
+		// Reminder rows created through applyCalendarFields can retain the fixed
+		// 2000 storage projection even though OriginalYear is nil. Never derive
+		// DTSTART's recurrence year from that projection; resolve the occurrence
+		// that actually lands in the current Gregorian year instead.
+		if gd, err := calendarOccurrenceInYear(converter, original, time.Now().UTC().Year()); err == nil {
+			return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 0, 0, 0, 0, time.UTC)
+		}
+		return fallback
 	}
-	if gd, err := converter.ToGregorian(calendarPkg.DateInfo{
-		Day:   *origDay,
-		Month: *origMonth,
-		Year:  year,
-	}); err == nil {
+	original.Year = *origYear
+	if gd, err := converter.ToGregorian(original); err == nil {
 		return time.Date(gd.Year, time.Month(gd.Month), gd.Day, 0, 0, 0, 0, time.UTC)
 	}
 	return fallback
@@ -328,9 +332,16 @@ func emitLunarRecurrence(c *ical.Component, converter calendarPkg.Converter, ori
 	if origDay == nil || origMonth == nil {
 		return
 	}
-	const horizonYears = 10
-	startYear := dtStart.Year()
-	if origYear != nil {
+	const horizonYears = 50
+	startYear := calendarYearForGregorianDate(converter, dtStart)
+	if current, err := calendarOccurrenceInYear(converter, calendarPkg.DateInfo{
+		Day:   *origDay,
+		Month: *origMonth,
+	}, time.Now().UTC().Year()); err == nil {
+		currentDate := time.Date(current.Year, time.Month(current.Month), current.Day, 0, 0, 0, 0, time.UTC)
+		startYear = calendarYearForGregorianDate(converter, currentDate)
+	}
+	if origYear != nil && *origYear > startYear {
 		startYear = *origYear
 	}
 
@@ -354,6 +365,18 @@ func emitLunarRecurrence(c *ical.Component, converter calendarPkg.Converter, ori
 	prop.SetValueType(ical.ValueDate)
 	prop.Value = strings.Join(values, ",")
 	c.Props.Set(prop)
+}
+
+func calendarYearForGregorianDate(converter calendarPkg.Converter, date time.Time) int {
+	converted, err := converter.FromGregorian(calendarPkg.GregorianDate{
+		Day:   date.Day(),
+		Month: int(date.Month()),
+		Year:  date.Year(),
+	})
+	if err == nil && converted.Year != 0 {
+		return converted.Year
+	}
+	return date.Year()
 }
 
 func icsUID(uuid *string, kind string, id uint) string {

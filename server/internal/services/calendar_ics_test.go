@@ -1,10 +1,12 @@
 package services
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	calendarPkg "github.com/naiba/bonds/internal/calendar"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
@@ -386,13 +388,13 @@ func TestExportVaultICSLunarMonthDayProjection(t *testing.T) {
 	// degrading to a phantom Jan 1.
 	origDay, origMonth := 5, 8
 	if err := db.Create(&models.ContactImportantDate{
-		ContactID:      contact.ID,
-		Label:          "Lunar Fest",
-		CalendarType:   "lunar",
-		OriginalDay:    &origDay,
-		OriginalMonth:  &origMonth,
-		IsYearUnknown:  true,
-		DatePrecision:  "full",
+		ContactID:     contact.ID,
+		Label:         "Lunar Fest",
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+		IsYearUnknown: true,
+		DatePrecision: "full",
 	}).Error; err != nil {
 		t.Fatalf("create lunar important date failed: %v", err)
 	}
@@ -414,4 +416,95 @@ func TestExportVaultICSLunarMonthDayProjection(t *testing.T) {
 	if strings.Contains(out, "DTSTART;VALUE=DATE:"+time.Now().Format("2006")+"0101") {
 		t.Errorf("expected DTSTART to be a projected lunar date, not Jan 1 of the current year\n---\n%s", out)
 	}
+}
+
+func TestExportVaultICSLunarReminderIgnoresStored2000Projection(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+	vaultSvc := NewVaultService(db)
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Ical",
+		LastName:  "Reminder",
+		Email:     "ical-lunar-reminder@example.com",
+		Password:  "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Lunar Reminder Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	contact, err := NewContactService(db).CreateContact(vault.ID, resp.User.ID, dto.CreateContactRequest{FirstName: "Jane"})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	converter, ok := calendarPkg.Get(calendarPkg.Lunar)
+	if !ok {
+		t.Fatal("expected lunar converter")
+	}
+	origDay, origMonth := 1, 1
+	stored, err := calendarOccurrenceInYear(converter, calendarPkg.DateInfo{Day: origDay, Month: origMonth}, calendarProjectionReferenceYear)
+	if err != nil {
+		t.Fatalf("project storage reference date: %v", err)
+	}
+	storedDay, storedMonth, storedYear := stored.Day, stored.Month, stored.Year
+	reminder := models.ContactReminder{
+		ContactID:     contact.ID,
+		Label:         "Lunar Reminder",
+		Day:           &storedDay,
+		Month:         &storedMonth,
+		Year:          &storedYear,
+		CalendarType:  "lunar",
+		OriginalDay:   &origDay,
+		OriginalMonth: &origMonth,
+		Type:          "recurring_year",
+	}
+	if err := db.Create(&reminder).Error; err != nil {
+		t.Fatalf("create lunar reminder failed: %v", err)
+	}
+
+	data, err := NewCalendarICSService(db).ExportVault(vault.ID, resp.User.ID)
+	if err != nil {
+		t.Fatalf("ExportVault failed: %v", err)
+	}
+	block := icsEventBlockForSummary(t, string(data), "Lunar Reminder")
+	currentYear := time.Now().UTC().Year()
+	expectedStart, err := calendarOccurrenceInYear(converter, calendarPkg.DateInfo{Day: origDay, Month: origMonth}, currentYear)
+	if err != nil {
+		t.Fatalf("project current occurrence: %v", err)
+	}
+	expectedStartValue := fmt.Sprintf("%04d%02d%02d", expectedStart.Year, expectedStart.Month, expectedStart.Day)
+	if !strings.Contains(block, "DTSTART;VALUE=DATE:"+expectedStartValue) {
+		t.Fatalf("expected current-year DTSTART %s, got\n---\n%s", expectedStartValue, block)
+	}
+	if strings.Contains(block, "DTSTART;VALUE=DATE:2000") {
+		t.Fatalf("expected DTSTART to ignore fixed 2000 storage projection\n---\n%s", block)
+	}
+
+	startCalendarYear := calendarYearForGregorianDate(converter, time.Date(expectedStart.Year, time.Month(expectedStart.Month), expectedStart.Day, 0, 0, 0, 0, time.UTC))
+	beyondOldHorizon, err := converter.ToGregorian(calendarPkg.DateInfo{Day: origDay, Month: origMonth, Year: startCalendarYear + 20})
+	if err != nil {
+		t.Fatalf("project occurrence beyond old horizon: %v", err)
+	}
+	beyondOldHorizonValue := fmt.Sprintf("%04d%02d%02d", beyondOldHorizon.Year, beyondOldHorizon.Month, beyondOldHorizon.Day)
+	if !strings.Contains(block, beyondOldHorizonValue) {
+		t.Fatalf("expected rolling recurrence to include %s beyond the old 10-year horizon\n---\n%s", beyondOldHorizonValue, block)
+	}
+}
+
+func icsEventBlockForSummary(t *testing.T, output, summary string) string {
+	t.Helper()
+	marker := "SUMMARY:" + summary + "\r\n"
+	markerIndex := strings.Index(output, marker)
+	if markerIndex < 0 {
+		t.Fatalf("missing event summary %q\n---\n%s", summary, output)
+	}
+	start := strings.LastIndex(output[:markerIndex], "BEGIN:VEVENT")
+	endOffset := strings.Index(output[markerIndex:], "END:VEVENT")
+	if start < 0 || endOffset < 0 {
+		t.Fatalf("invalid event block for summary %q\n---\n%s", summary, output)
+	}
+	return output[start : markerIndex+endOffset+len("END:VEVENT")]
 }
