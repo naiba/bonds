@@ -186,6 +186,7 @@
   "err.failed_to_list_templates": "Error al listar las plantillas",
   "err.failed_to_list_modules": "Error al listar los módulos",
   "err.unknown_entity_type": "Tipo de entidad desconocido",
+  "err.currencies_not_editable": "Las monedas no se pueden crear, editar ni eliminar",
   "err.failed_to_list_entities": "Error al listar las entidades",
   "err.failed_to_create_entity": "Error al crear la entidad",
   "err.invalid_entity_id": "ID de entidad inválido",

@@ -218,6 +218,7 @@
   "err.failed_to_list_templates": "获取模板列表失败",
   "err.failed_to_list_modules": "获取模块列表失败",
   "err.unknown_entity_type": "未知的实体类型",
+  "err.currencies_not_editable": "货币不能创建、编辑或删除",
   "err.failed_to_list_entities": "获取实体列表失败",
   "err.failed_to_create_entity": "创建实体失败",
   "err.invalid_entity_id": "无效的实体ID",

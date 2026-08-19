@@ -218,6 +218,7 @@
   "err.failed_to_list_templates": "Failed to list templates",
   "err.failed_to_list_modules": "Failed to list modules",
   "err.unknown_entity_type": "Unknown entity type",
+  "err.currencies_not_editable": "Currencies cannot be created, edited, or deleted",
   "err.failed_to_list_entities": "Failed to list entities",
   "err.failed_to_create_entity": "Failed to create entity",
   "err.invalid_entity_id": "Invalid entity ID",

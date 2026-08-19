@@ -7028,6 +7028,38 @@ func TestPersonalizeUpdatePositionUnsupportedEntityReturnsBadRequest(t *testing.
 	}
 }
 
+func TestPersonalizeCurrencyWritesReturnLocalizedBadRequest(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "personalize-currency-writes@example.com")
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "create", method: http.MethodPost, path: "/api/settings/personalize/currencies", body: `{"name":"USD"}`},
+		{name: "update", method: http.MethodPut, path: "/api/settings/personalize/currencies/1", body: `{"name":"USD"}`},
+		{name: "delete", method: http.MethodDelete, path: "/api/settings/personalize/currencies/1"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := ts.doRequest(tc.method, tc.path, tc.body, token)
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+			}
+			resp := parseResponse(t, rec)
+			if resp.Error == nil || resp.Error.Code != "BAD_REQUEST" {
+				t.Fatalf("expected BAD_REQUEST error, got %#v", resp.Error)
+			}
+			if resp.Error.Message != "Currencies cannot be created, edited, or deleted" {
+				t.Fatalf("unexpected localized message %q", resp.Error.Message)
+			}
+		})
+	}
+}
+
 func (ts *testServer) generateOAuthLinkToken(t *testing.T) string {
 	t.Helper()
 	oauthSvc := services.NewOAuthService(ts.db, &ts.cfg.JWT)

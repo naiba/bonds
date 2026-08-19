@@ -186,6 +186,7 @@
   "err.failed_to_list_templates": "Échec de la liste des modèles",
   "err.failed_to_list_modules": "Échec de la liste des modules",
   "err.unknown_entity_type": "Type d'entité inconnu",
+  "err.currencies_not_editable": "Les devises ne peuvent pas être créées, modifiées ou supprimées",
   "err.failed_to_list_entities": "Échec de la liste des entités",
   "err.failed_to_create_entity": "Échec de la création de l'entité",
   "err.invalid_entity_id": "ID d'entité invalide",

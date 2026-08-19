@@ -218,6 +218,7 @@
   "err.failed_to_list_templates": "Vorlagen konnten nicht aufgelistet werden",
   "err.failed_to_list_modules": "Module konnten nicht aufgelistet werden",
   "err.unknown_entity_type": "Unbekannter Entitätstyp",
+  "err.currencies_not_editable": "Währungen können nicht erstellt, bearbeitet oder gelöscht werden",
   "err.failed_to_list_entities": "Entitäten konnten nicht aufgelistet werden",
   "err.failed_to_create_entity": "Entität konnte nicht erstellt werden",
   "err.invalid_entity_id": "Ungültige Entitäts-ID",
