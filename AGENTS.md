@@ -338,7 +338,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 ### 敏感设置静态加密（SETTINGS_ENC_KEY）
 
 - `pkg/secret`：AES-256-GCM cipher，前缀 `enc:v1:` 标识密文，密文行格式 `enc:v1:hex(nonce|ciphertext)`
-- 受保护字段：`system_settings.value` 中 `smtp.password`、`geocoding.api_key`，以及 `oauth_providers.client_secret`
+- 受保护字段：`system_settings.value` 中的 `smtp.password`、`geocoding_provider_configs.config`，以及 `oauth_providers.client_secret`
 - 启用方式：设置环境变量 `SETTINGS_ENC_KEY`（任意长度，内部 SHA-256 拉伸到 32 字节）。未设置时全部走明文（向后兼容）
 - 启动时自动迁移：`MigratePlaintextSecrets` 在 `routes.go` 中调用一次，把已有明文行加密回写。幂等
 - Admin API（`GET/PUT /api/admin/settings`）改用 `GetAllRedacted`，敏感键以 `***` 返回；写入时 `***` 视为"保留原值"，UI 可直接 round-trip 编辑非敏感字段不会清空密钥
@@ -400,7 +400,7 @@ React 19、TypeScript 严格模式、Vite 7、Ant Design v6、TanStack Query v5�
 
 - `Geocoder` 接口 + `NominatimGeocoder`（免费 OSM）+ `LocationIQGeocoder`（API key）
 - 地址创建时异步编码，失败不影响主流程
-- 配置：`GEOCODING_PROVIDER`（nominatim/locationiq）、`GEOCODING_API_KEY`
+- 配置：`GEOCODING_PROVIDER` 与 `GEOCODING_PRECISION` 作为初始设置；各 Provider 的结构化配置在管理后台维护
 
 ### 审计日志（Feed）
 

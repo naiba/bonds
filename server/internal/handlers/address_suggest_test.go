@@ -36,16 +36,26 @@ func suggestProbe(t *testing.T, ts *testServer, vaultID, token string) suggestio
 	return data
 }
 
+func saveLocationIQConfig(t *testing.T, ts *testServer, token, apiKey string) {
+	t.Helper()
+	rec := ts.doRequest(http.MethodPut, "/api/admin/geocoding/providers/locationiq",
+		`{"config":{"api_key":"`+apiKey+`"}}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("save LocationIQ config: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // The admin's precision choice must reach the running service through the
 // production wiring in RegisterRoutes, not only through test setters: at
 // locality precision no street may leave the server, so lookup reports itself
 // unavailable however capable the provider is.
 func TestAddressSuggestHonoursThePersistedPrecisionSetting(t *testing.T) {
 	ts := setupTestServerWithConfig(t, func(cfg *config.Config) {
-		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", APIKey: "test-key", Precision: "locality"}
+		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", Precision: "locality"}
 	})
 	token, _ := ts.registerTestUser(t, "suggest-precision@example.com")
 	vault := ts.createTestVault(t, token, "Precision Vault")
+	saveLocationIQConfig(t, ts, token, "test-key")
 
 	data := suggestProbe(t, ts, vault.ID, token)
 	if data.Enabled {
@@ -58,10 +68,11 @@ func TestAddressSuggestHonoursThePersistedPrecisionSetting(t *testing.T) {
 
 func TestAddressSuggestEnabledAtExactPrecisionWithCapableProvider(t *testing.T) {
 	ts := setupTestServerWithConfig(t, func(cfg *config.Config) {
-		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", APIKey: "test-key", Precision: "exact"}
+		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", Precision: "exact"}
 	})
 	token, _ := ts.registerTestUser(t, "suggest-exact@example.com")
 	vault := ts.createTestVault(t, token, "Exact Vault")
+	saveLocationIQConfig(t, ts, token, "test-key")
 
 	data := suggestProbe(t, ts, vault.ID, token)
 	if !data.Enabled {
@@ -77,10 +88,11 @@ func TestAddressSuggestEnabledAtExactPrecisionWithCapableProvider(t *testing.T) 
 
 func TestAdminGeocodingSettingsHotReloadTheRunningAddressService(t *testing.T) {
 	ts := setupTestServerWithConfig(t, func(cfg *config.Config) {
-		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", APIKey: "old-key", Precision: "exact"}
+		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", Precision: "exact"}
 	})
 	adminToken, _ := ts.registerTestUser(t, "suggest-hot-reload@example.com")
 	vault := ts.createTestVault(t, adminToken, "Hot Reload Vault")
+	saveLocationIQConfig(t, ts, adminToken, "old-key")
 
 	if data := suggestProbe(t, ts, vault.ID, adminToken); !data.Enabled {
 		t.Fatal("precondition: exact LocationIQ lookup should be enabled")
@@ -126,10 +138,11 @@ func TestAdminGeocodingSettingsHotReloadTheRunningAddressService(t *testing.T) {
 
 func TestAdminGeocodingProviderConfigurationsAreStructured(t *testing.T) {
 	ts := setupTestServerWithConfig(t, func(cfg *config.Config) {
-		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", APIKey: "bootstrap-key", Precision: "exact"}
+		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", Precision: "exact"}
 	})
 	adminToken, _ := ts.registerTestUser(t, "geocoding-structured@example.com")
 	vault := ts.createTestVault(t, adminToken, "Structured Geocoding Vault")
+	saveLocationIQConfig(t, ts, adminToken, "test-key")
 
 	rec := ts.doRequest(http.MethodGet, "/api/admin/geocoding", "", adminToken)
 	if rec.Code != http.StatusOK {
@@ -279,10 +292,11 @@ func TestMapReportIncludesAttributionForDisplayedCoordinates(t *testing.T) {
 // route is held to the same permission as saving the address it would fill in.
 func TestAddressSuggestRequiresEditorPermission(t *testing.T) {
 	ts := setupTestServerWithConfig(t, func(cfg *config.Config) {
-		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", APIKey: "test-key", Precision: "exact"}
+		cfg.Geocoding = config.GeocodingConfig{Provider: "locationiq", Precision: "exact"}
 	})
 	token, auth := ts.registerTestUser(t, "suggest-owner@example.com")
 	vault := ts.createTestVault(t, token, "Permission Vault")
+	saveLocationIQConfig(t, ts, token, "test-key")
 
 	viewer := createSecondUser(t, ts, auth.User.AccountID, "suggest-viewer@example.com", false)
 	addUserToVault(t, ts, viewer.ID, vault.ID, models.PermissionViewer)

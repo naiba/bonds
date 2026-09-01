@@ -22,7 +22,6 @@ type GeocodingManager struct {
 	addressService *AddressService
 
 	defaultProvider  string
-	defaultAPIKey    string
 	defaultPrecision string
 }
 
@@ -31,11 +30,11 @@ func NewGeocodingManager(
 	configs *GeocodingProviderConfigService,
 	registry *GeocodingProviderRegistry,
 	addressService *AddressService,
-	defaultProvider, defaultAPIKey, defaultPrecision string,
+	defaultProvider, defaultPrecision string,
 ) *GeocodingManager {
 	return &GeocodingManager{
 		settings: settings, configs: configs, registry: registry, addressService: addressService,
-		defaultProvider: defaultProvider, defaultAPIKey: defaultAPIKey, defaultPrecision: defaultPrecision,
+		defaultProvider: defaultProvider, defaultPrecision: defaultPrecision,
 	}
 }
 
@@ -46,49 +45,7 @@ func (m *GeocodingManager) Initialize() (int, error) {
 	if err != nil {
 		return migrated, err
 	}
-	if err := m.migrateLegacyAPIKeyLocked(); err != nil {
-		return migrated, err
-	}
 	return migrated, m.reloadLocked()
-}
-
-func (m *GeocodingManager) migrateLegacyAPIKeyLocked() error {
-	legacyKey, err := m.settings.Get("geocoding.api_key")
-	switch {
-	case err == nil:
-		// Historically the single key belonged to LocationIQ. Preserve that
-		// meaning even if the operator temporarily switched the active provider.
-		if err := m.bootstrapAPIKeyLocked(GeocodingProviderLocationIQ, legacyKey); err != nil {
-			return err
-		}
-		if err := m.settings.Delete("geocoding.api_key"); err != nil && !errors.Is(err, ErrSystemSettingNotFound) {
-			return err
-		}
-	case errors.Is(err, ErrSystemSettingNotFound):
-		// Fresh deployments no longer seed the legacy key. Keep the existing
-		// GEOCODING_API_KEY environment variable as a bootstrap default for the
-		// selected keyed provider, then persist it in the structured row.
-		provider := m.settings.GetWithDefault("geocoding.provider", m.defaultProvider)
-		if err := m.bootstrapAPIKeyLocked(provider, m.defaultAPIKey); err != nil {
-			return err
-		}
-	default:
-		return err
-	}
-	return nil
-}
-
-func (m *GeocodingManager) bootstrapAPIKeyLocked(provider, apiKey string) error {
-	apiKey = strings.TrimSpace(apiKey)
-	if apiKey == "" || (provider != GeocodingProviderLocationIQ && provider != GeocodingProviderGeoapify) {
-		return nil
-	}
-	_, exists, err := m.configs.GetStored(provider)
-	if err != nil || exists {
-		return err
-	}
-	_, err = m.configs.Save(provider, map[string]string{"api_key": apiKey})
-	return err
 }
 
 func (m *GeocodingManager) Reload() error {

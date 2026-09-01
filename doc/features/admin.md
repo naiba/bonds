@@ -39,7 +39,8 @@ On first startup, these settings are seeded from environment variables if presen
 
 When `SETTINGS_ENC_KEY` is configured (see [Configuration, Encrypting Sensitive Settings](/guide/configuration#encrypting-sensitive-settings)), the following fields are AES-256-GCM encrypted in the database:
 
-- `smtp.password`, `geocoding.api_key`, and any `secret.*` key in **system_settings**
+- `smtp.password` and any `secret.*` key in **system_settings**
+- Each provider's structured `config` in **geocoding_provider_configs**
 - `client_secret` for every entry in **oauth_providers** (GitHub, Google, GitLab, Discord, OIDC)
 
 The admin **GET /admin/settings** endpoint always redacts secret values to `***` regardless of whether encryption is enabled. Admin browsers and audit logs never see plaintext credentials. Submitting `***` on update keeps the existing value untouched, so the UI can round-trip non-secret edits without wiping credentials.

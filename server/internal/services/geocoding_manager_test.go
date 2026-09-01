@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/naiba/bonds/internal/models"
@@ -15,62 +14,8 @@ func setupGeocodingManagerTest(t *testing.T, encKey string) (*GeocodingManager, 
 	registry := NewGeocodingProviderRegistry()
 	configs := NewGeocodingProviderConfigService(db, encKey, registry)
 	address := NewAddressService(db)
-	manager := NewGeocodingManager(settings, configs, registry, address, "", "", GeocodingPrecisionExact)
+	manager := NewGeocodingManager(settings, configs, registry, address, "", GeocodingPrecisionExact)
 	return manager, settings, configs, address
-}
-
-func TestGeocodingManagerMigratesLegacyKeyToLocationIQ(t *testing.T) {
-	manager, settings, configs, address := setupGeocodingManagerTest(t, "settings-key")
-	manager.defaultProvider = GeocodingProviderNominatim
-	if err := settings.Set("geocoding.provider", GeocodingProviderLocationIQ); err != nil {
-		t.Fatal(err)
-	}
-	if err := settings.Set("geocoding.precision", GeocodingPrecisionExact); err != nil {
-		t.Fatal(err)
-	}
-	if err := settings.Set("geocoding.api_key", "legacy-locationiq-key"); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := manager.Initialize(); err != nil {
-		t.Fatalf("initialize: %v", err)
-	}
-	if _, err := settings.Get("geocoding.api_key"); !errors.Is(err, ErrSystemSettingNotFound) {
-		t.Fatalf("legacy setting should be deleted, got %v", err)
-	}
-	config, exists, err := configs.GetStored(GeocodingProviderLocationIQ)
-	if err != nil || !exists || config["api_key"] != "legacy-locationiq-key" {
-		t.Fatalf("legacy key not migrated: config=%v exists=%v err=%v", config, exists, err)
-	}
-	runtime := address.geocodingSnapshot()
-	locationIQ, ok := runtime.geocoder.(*LocationIQGeocoder)
-	if !ok || locationIQ.apiKey != "legacy-locationiq-key" {
-		t.Fatalf("migrated runtime mismatch: %T %+v", runtime.geocoder, locationIQ)
-	}
-}
-
-func TestGeocodingManagerBootstrapsEnvironmentKeyForSelectedProvider(t *testing.T) {
-	manager, settings, configs, address := setupGeocodingManagerTest(t, "")
-	manager.defaultProvider = GeocodingProviderNominatim
-	manager.defaultAPIKey = "environment-key"
-	if err := settings.Set("geocoding.provider", GeocodingProviderGeoapify); err != nil {
-		t.Fatal(err)
-	}
-	if err := settings.Set("geocoding.precision", GeocodingPrecisionExact); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := manager.Initialize(); err != nil {
-		t.Fatalf("initialize: %v", err)
-	}
-	config, exists, err := configs.GetStored(GeocodingProviderGeoapify)
-	if err != nil || !exists || config["api_key"] != "environment-key" {
-		t.Fatalf("environment key not bootstrapped: config=%v exists=%v err=%v", config, exists, err)
-	}
-	geoapify, ok := address.geocodingSnapshot().geocoder.(*GeoapifyGeocoder)
-	if !ok || geoapify.apiKey != "environment-key" {
-		t.Fatalf("Geoapify runtime mismatch: %T", address.geocodingSnapshot().geocoder)
-	}
 }
 
 func TestGeocodingManagerAtomicallyReloadsAndDeletesActiveConfig(t *testing.T) {

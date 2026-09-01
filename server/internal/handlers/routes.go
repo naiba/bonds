@@ -126,7 +126,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		geocodingRegistry,
 		addressService,
 		cfg.Geocoding.Provider,
-		cfg.Geocoding.APIKey,
 		cfg.Geocoding.Precision,
 	)
 	if migrated, err := geocodingManager.Initialize(); err != nil {

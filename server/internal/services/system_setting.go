@@ -24,8 +24,7 @@ const RedactedSecretValue = "***"
 // credentials. Values for these keys are encrypted at rest when
 // SETTINGS_ENC_KEY is configured and redacted from admin reads.
 var SecretSettingKeys = map[string]bool{
-	"smtp.password":     true,
-	"geocoding.api_key": true,
+	"smtp.password": true,
 }
 
 func IsSecretKey(key string) bool {
