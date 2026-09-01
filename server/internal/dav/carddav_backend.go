@@ -251,11 +251,12 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 			contact.Nickname = strPtrOrNil(nickname)
 			contact.JobPosition = strPtrOrNil(title)
 			contact.LastUpdatedAt = &now
-			if err := b.db.Save(&contact).Error; err != nil {
-				return nil, err
-			}
-
-			if err := replaceContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+			if err := b.db.Transaction(func(tx *gorm.DB) error {
+				if err := tx.Save(&contact).Error; err != nil {
+					return err
+				}
+				return replaceContactVCardFields(tx, card, contact.ID, vaultID, accountID)
+			}); err != nil {
 				return nil, err
 			}
 
@@ -533,22 +534,101 @@ func saveContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, ac
 
 // replaceContactVCardFields deletes existing records and recreates from vCard.
 func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	db.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{})
+	if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{}).Error; err != nil {
+		return err
+	}
 
+	// vCards do not carry coordinates, so the delete-and-recreate below would
+	// erase every pin the server has geocoded — on every sync from a phone,
+	// even one that never touched the addresses. Remember the coordinates by
+	// what the address says, and put them back on recreated rows that still
+	// say the same thing.
+	coordinates := map[string][2]*float64{}
 	var pivots []models.ContactAddress
-	db.Where("contact_id = ?", contactID).Find(&pivots)
+	if err := db.Where("contact_id = ?", contactID).Find(&pivots).Error; err != nil {
+		return err
+	}
 	if len(pivots) > 0 {
 		addressIDs := make([]uint, len(pivots))
 		for i, p := range pivots {
 			addressIDs[i] = p.AddressID
 		}
-		db.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{})
-		db.Where("id IN ?", addressIDs).Delete(&models.Address{})
+		var previous []models.Address
+		if err := db.Where("id IN ?", addressIDs).Find(&previous).Error; err != nil {
+			return err
+		}
+		for i := range previous {
+			address := &previous[i]
+			if address.Latitude == nil || address.Longitude == nil {
+				continue
+			}
+			coordinates[addressCoordinateKey(address)] = [2]*float64{address.Latitude, address.Longitude}
+		}
+		if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{}).Error; err != nil {
+			return err
+		}
+		if err := db.Where("id IN ?", addressIDs).Delete(&models.Address{}).Error; err != nil {
+			return err
+		}
 	}
 
-	db.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{})
+	if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{}).Error; err != nil {
+		return err
+	}
 
-	return saveContactVCardFields(db, card, contactID, vaultID, accountID)
+	if err := saveContactVCardFields(db, card, contactID, vaultID, accountID); err != nil {
+		return err
+	}
+
+	if len(coordinates) > 0 {
+		var recreatedPivots []models.ContactAddress
+		if err := db.Where("contact_id = ?", contactID).Find(&recreatedPivots).Error; err != nil {
+			return err
+		}
+		if len(recreatedPivots) == 0 {
+			return nil
+		}
+		recreatedIDs := make([]uint, len(recreatedPivots))
+		for i, p := range recreatedPivots {
+			recreatedIDs[i] = p.AddressID
+		}
+		var recreated []models.Address
+		if err := db.Where("id IN ?", recreatedIDs).Find(&recreated).Error; err != nil {
+			return err
+		}
+		for i := range recreated {
+			address := &recreated[i]
+			if address.Latitude != nil && address.Longitude != nil {
+				continue
+			}
+			pair, known := coordinates[addressCoordinateKey(address)]
+			if !known {
+				continue
+			}
+			if err := db.Model(address).
+				Select("latitude", "longitude").
+				Updates(models.Address{Latitude: pair[0], Longitude: pair[1]}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// addressCoordinateKey identifies an address by what it says, so coordinates
+// can survive a delete-and-recreate when the recreated row still describes
+// the same place. Case and whitespace are ignored: they would not change what
+// a geocoder was asked, so they do not make it a different address.
+func addressCoordinateKey(address *models.Address) string {
+	parts := make([]string, 0, 5)
+	for _, part := range []*string{address.Line1, address.City, address.Province, address.PostalCode, address.Country} {
+		if part == nil {
+			parts = append(parts, "")
+			continue
+		}
+		parts = append(parts, strings.ToLower(strings.Join(strings.Fields(*part), "")))
+	}
+	return strings.Join(parts, "|")
 }
 
 // parseBirthdayString parses vCard BDAY formats: "19900115", "1990-01-15", "--0115" (no year)
