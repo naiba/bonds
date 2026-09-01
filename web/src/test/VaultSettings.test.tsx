@@ -50,7 +50,12 @@ const appMessageMock = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
+const appModalMock = vi.hoisted(() => ({
+  confirm: vi.fn(),
+}));
+
 const useBreakpointMock = vi.hoisted(() => vi.fn());
+const navigateMock = vi.hoisted(() => vi.fn());
 
 const queryClientMock = vi.hoisted(() => ({
   invalidateQueries: vi
@@ -73,7 +78,7 @@ vi.mock("antd", async () => {
   return {
     ...actual,
     App: Object.assign(actual.App, {
-      useApp: () => ({ message: appMessageMock }),
+      useApp: () => ({ message: appMessageMock, modal: appModalMock }),
     }),
     Grid: Object.assign(actual.Grid, {
       useBreakpoint: useBreakpointMock,
@@ -133,6 +138,10 @@ vi.mock("@/api", () => ({
   },
 }));
 
+vi.mock("@/stores/auth", () => ({
+  useAuth: () => ({ user: { id: "current-user" } }),
+}));
+
 vi.mock("@/components/contact-layout/ContactLayoutManager", () => ({
   default: () => <div>Contact view layouts</div>,
 }));
@@ -142,15 +151,25 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (...args: unknown[]) => mockUseQuery(...args),
   useMutation: <TData, TVariables>(
     options: MutationOptions<TData, TVariables>,
-  ) => ({
-    mutate: vi.fn((variables: TVariables) => {
-      void Promise.resolve(options.mutationFn(variables)).then(
-        async (data) => options.onSuccess?.(data, variables),
-        (error: unknown) => options.onError?.(error, variables),
-      );
-    }),
-    isPending: false,
-  }),
+  ) => {
+    const mutateAsync = vi.fn(async (variables: TVariables) => {
+      try {
+        const data = await options.mutationFn(variables);
+        await options.onSuccess?.(data, variables);
+        return data;
+      } catch (error) {
+        options.onError?.(error, variables);
+        throw error;
+      }
+    });
+    return {
+      mutate: vi.fn((variables: TVariables) => {
+        void mutateAsync(variables).catch(() => undefined);
+      }),
+      mutateAsync,
+      isPending: false,
+    };
+  },
   useQueryClient: () => queryClientMock,
 }));
 
@@ -159,7 +178,7 @@ vi.mock("react-router-dom", async () => {
   return {
     ...actual,
     useParams: () => ({ id: routeVaultId }),
-    useNavigate: () => vi.fn(),
+    useNavigate: () => navigateMock,
   };
 });
 
@@ -1056,7 +1075,8 @@ describe("VaultSettings", () => {
     }>();
     apiMocks.settingsImportCsvCreate.mockReturnValue(importResult.promise);
     mockLoadedVaultSettings();
-    const { container, rerenderForVault } = renderVaultSettings(submittedVaultId);
+    const { container, rerenderForVault } =
+      renderVaultSettings(submittedVaultId);
 
     // When: the original request completes after Vault B has rendered.
     const file = await startCsvImport(container);
@@ -1096,7 +1116,9 @@ describe("VaultSettings", () => {
     ]);
     // Tab state is keyed by vaultId, so the rerender resets the import tab:
     // the completed result for A must not leak onto Vault B's settings page.
-    expect(within(container).queryByText("Import completed")).not.toBeInTheDocument();
+    expect(
+      within(container).queryByText("Import completed"),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps a pending Monica import bound to its submission Vault after a route rerender", async () => {
@@ -1113,7 +1135,8 @@ describe("VaultSettings", () => {
     }>();
     apiMocks.settingsImportMonicaCreate.mockReturnValue(importResult.promise);
     mockLoadedVaultSettings();
-    const { container, rerenderForVault } = renderVaultSettings(submittedVaultId);
+    const { container, rerenderForVault } =
+      renderVaultSettings(submittedVaultId);
 
     // When: the original request completes after Vault B has rendered.
     const file = await startMonicaImport(container);
@@ -1164,7 +1187,9 @@ describe("VaultSettings", () => {
     ]);
     // Same keyed-by-vaultId reset as the CSV case: the completed import
     // result must not leak onto Vault B's settings page.
-    expect(within(container).queryByText("Import completed")).not.toBeInTheDocument();
+    expect(
+      within(container).queryByText("Import completed"),
+    ).not.toBeInTheDocument();
   });
 
   it.each([
@@ -1202,7 +1227,9 @@ describe("VaultSettings", () => {
 
       // Then: neither the original nor replacement Vault receives a success invalidation.
       expect(queryClientMock.invalidateQueries).not.toHaveBeenCalled();
-      expect(within(container).queryByText("Import completed")).not.toBeInTheDocument();
+      expect(
+        within(container).queryByText("Import completed"),
+      ).not.toBeInTheDocument();
     },
   );
 

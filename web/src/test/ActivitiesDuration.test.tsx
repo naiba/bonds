@@ -43,7 +43,7 @@ vi.mock("@/components/CalendarDatePicker", () => ({
   default: () => <div data-testid="calendar-date-picker" />,
 }));
 
-vi.mock("@/components/journal/ContactMentionEditor", () => ({
+vi.mock("@/components/markdown/MarkdownEditor", () => ({
   default: () => <div />,
 }));
 

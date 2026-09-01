@@ -138,7 +138,12 @@ func (s *ContactMoveService) MoveMany(contactIDs []string, currentVaultID, targe
 		return nil, err
 	}
 	for i := range quickFactFilesToDelete {
-		if err := s.fileService.deleteFileRecord(&quickFactFilesToDelete[i]); err != nil {
+		var currentFile models.File
+		err := s.fileService.db.Select("id", "vault_id").First(&currentFile, quickFactFilesToDelete[i].ID).Error
+		if err == nil {
+			err = s.fileService.ForceDeleteFile(currentFile.ID, currentFile.VaultID)
+		}
+		if err != nil {
 			// Post-commit maintenance cannot change the result of an already committed move.
 			log.Printf("[contact-move] failed to delete moved quick fact file %d: %v", quickFactFilesToDelete[i].ID, err)
 		}
@@ -207,6 +212,12 @@ func updateBatchFirstMetThrough(tx *gorm.DB, contactIDs []string, currentVaultID
 }
 
 func moveAllContactRows(tx *gorm.DB, contactIDs []string, currentVaultID, targetVaultID string) error {
+	var noteIDs []uint
+	if err := tx.Model(&models.Note{}).
+		Where("contact_id IN ? AND vault_id = ?", contactIDs, currentVaultID).
+		Pluck("id", &noteIDs).Error; err != nil {
+		return err
+	}
 	if err := tx.Model(&models.Contact{}).Where("id IN ?", contactIDs).Updates(map[string]interface{}{
 		"vault_id":     targetVaultID,
 		"distant_uuid": nil,
@@ -217,6 +228,13 @@ func moveAllContactRows(tx *gorm.DB, contactIDs []string, currentVaultID, target
 	}
 	if err := tx.Model(&models.Note{}).Where("contact_id IN ? AND vault_id = ?", contactIDs, currentVaultID).Update("vault_id", targetVaultID).Error; err != nil {
 		return err
+	}
+	if len(noteIDs) > 0 {
+		if err := tx.Model(&models.ContentFileReference{}).
+			Where("vault_id = ? AND owner_type = ? AND owner_id IN ?", currentVaultID, models.ContentOwnerNote, noteIDs).
+			Update("vault_id", targetVaultID).Error; err != nil {
+			return err
+		}
 	}
 	if err := tx.Model(&models.ContactVaultUser{}).Where("contact_id IN ? AND vault_id = ?", contactIDs, currentVaultID).Update("vault_id", targetVaultID).Error; err != nil {
 		return err

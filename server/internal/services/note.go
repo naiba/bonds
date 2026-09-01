@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/markdown"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
@@ -69,18 +70,27 @@ func (s *NoteService) List(contactID, vaultID string, page, perPage int) ([]dto.
 }
 
 func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.CreateNoteRequest) (*dto.NoteResponse, error) {
+	if !markdown.IsValidFormat(req.BodyFormat) {
+		return nil, ErrInvalidContentFormat
+	}
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	note := models.Note{
-		ContactID: contactID,
-		VaultID:   vaultID,
-		AuthorID:  strPtrOrNil(authorID),
-		Title:     strPtrOrNil(req.Title),
-		Body:      req.Body,
-		EmotionID: req.EmotionID,
+		ContactID:  contactID,
+		VaultID:    vaultID,
+		AuthorID:   strPtrOrNil(authorID),
+		Title:      strPtrOrNil(req.Title),
+		Body:       req.Body,
+		BodyFormat: markdown.NormalizeFormat(req.BodyFormat),
+		EmotionID:  req.EmotionID,
 	}
-	if err := s.db.Create(&note).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&note).Error; err != nil {
+			return err
+		}
+		return syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -98,20 +108,33 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 }
 
 func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateNoteRequest) (*dto.NoteResponse, error) {
+	if !markdown.IsValidFormat(req.BodyFormat) {
+		return nil, ErrInvalidContentFormat
+	}
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	var note models.Note
-	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&note).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNoteNotFound
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND contact_id = ? AND vault_id = ?", id, contactID, vaultID).First(&note).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNoteNotFound
+			}
+			return err
 		}
-		return nil, err
-	}
-	note.Title = strPtrOrNil(req.Title)
-	note.Body = req.Body
-	note.EmotionID = req.EmotionID
-	if err := s.db.Save(&note).Error; err != nil {
+		note.Title = strPtrOrNil(req.Title)
+		note.Body = req.Body
+		if req.BodyFormat != "" {
+			note.BodyFormat = markdown.NormalizeFormat(req.BodyFormat)
+		} else {
+			note.BodyFormat = markdown.NormalizeFormat(note.BodyFormat)
+		}
+		note.EmotionID = req.EmotionID
+		if err := tx.Save(&note).Error; err != nil {
+			return err
+		}
+		return syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat)
+	}); err != nil {
 		return nil, err
 	}
 
@@ -132,12 +155,21 @@ func (s *NoteService) Delete(id uint, contactID, vaultID string) error {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return err
 	}
-	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.Note{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrNoteNotFound
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		var note models.Note
+		if err := tx.Where("id = ? AND contact_id = ? AND vault_id = ?", id, contactID, vaultID).First(&note).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNoteNotFound
+			}
+			return err
+		}
+		if err := tx.Where("vault_id = ? AND owner_type = ? AND owner_id = ?", vaultID, models.ContentOwnerNote, id).
+			Delete(&models.ContentFileReference{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&note).Error
+	}); err != nil {
+		return err
 	}
 
 	if s.feedRecorder != nil {
@@ -154,14 +186,16 @@ func (s *NoteService) Delete(id uint, contactID, vaultID string) error {
 
 func toNoteResponse(n *models.Note) dto.NoteResponse {
 	return dto.NoteResponse{
-		ID:        n.ID,
-		ContactID: n.ContactID,
-		VaultID:   n.VaultID,
-		AuthorID:  ptrToStr(n.AuthorID),
-		Title:     ptrToStr(n.Title),
-		Body:      n.Body,
-		EmotionID: n.EmotionID,
-		CreatedAt: n.CreatedAt,
-		UpdatedAt: n.UpdatedAt,
+		ID:           n.ID,
+		ContactID:    n.ContactID,
+		VaultID:      n.VaultID,
+		AuthorID:     ptrToStr(n.AuthorID),
+		Title:        ptrToStr(n.Title),
+		Body:         n.Body,
+		BodyFormat:   markdown.NormalizeFormat(n.BodyFormat),
+		RenderedBody: markdown.Render(n.Body, n.BodyFormat),
+		EmotionID:    n.EmotionID,
+		CreatedAt:    n.CreatedAt,
+		UpdatedAt:    n.UpdatedAt,
 	}
 }

@@ -80,7 +80,7 @@ The server starts at **http://localhost:8080** with an embedded frontend and SQL
 
 ### Option 3: Build from Source
 
-**Prerequisites**: Go 1.25+, [Bun](https://bun.sh) 1.x
+**Prerequisites**: Go 1.26+, [Bun](https://bun.sh) 1.x
 
 ```bash
 git clone https://github.com/naiba/bonds.git

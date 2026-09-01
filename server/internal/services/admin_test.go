@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -548,6 +549,61 @@ func TestAdminDeleteUser_SharedAccount_OnlyDeletesTargetUser(t *testing.T) {
 	adminSvc.db.Model(&models.UserVault{}).Where("user_id = ?", invitedUser.ID).Count(&uvCount)
 	if uvCount != 0 {
 		t.Error("expected deleted user's UserVault to be removed")
+	}
+}
+
+func TestAdminDeleteUser_SharedAccountRejectsSoleVaultManager(t *testing.T) {
+	adminSvc, authSvc, vaultSvc := setupAdminTest(t)
+	owner := registerTestUser(t, authSvc, "guard-shared-owner@example.com")
+	vault, err := vaultSvc.CreateVault(owner.User.AccountID, owner.User.ID, dto.CreateVaultRequest{Name: "Guarded Shared Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	target := models.User{AccountID: owner.User.AccountID, Email: "guard-shared-target@example.com"}
+	if err := adminSvc.db.Create(&target).Error; err != nil {
+		t.Fatalf("create target: %v", err)
+	}
+	if err := adminSvc.db.Model(&models.UserVault{}).
+		Where("vault_id = ? AND user_id = ?", vault.ID, owner.User.ID).
+		Update("permission", models.PermissionEditor).Error; err != nil {
+		t.Fatalf("demote owner fixture: %v", err)
+	}
+	if err := adminSvc.db.Create(&models.UserVault{
+		VaultID: vault.ID, UserID: target.ID, Permission: models.PermissionManager,
+	}).Error; err != nil {
+		t.Fatalf("create target membership: %v", err)
+	}
+	actor := registerTestUser(t, authSvc, "guard-instance-admin@example.com")
+
+	err = adminSvc.DeleteUser(actor.User.ID, target.ID)
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("DeleteUser error = %v, want ErrLastVaultManager", err)
+	}
+	var count int64
+	adminSvc.db.Model(&models.User{}).Where("id = ?", target.ID).Count(&count)
+	if count != 1 {
+		t.Fatalf("target count after rejected delete = %d, want 1", count)
+	}
+}
+
+func TestAdminToggleUserRejectsSoleVaultManager(t *testing.T) {
+	adminSvc, authSvc, vaultSvc := setupAdminTest(t)
+	target := registerTestUser(t, authSvc, "guard-disable-target@example.com")
+	if _, err := vaultSvc.CreateVault(target.User.AccountID, target.User.ID, dto.CreateVaultRequest{Name: "Disable Guard Vault"}, "en"); err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	actor := registerTestUser(t, authSvc, "guard-disable-admin@example.com")
+
+	err := adminSvc.ToggleUser(actor.User.ID, target.User.ID, true)
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("ToggleUser error = %v, want ErrLastVaultManager", err)
+	}
+	var user models.User
+	if err := adminSvc.db.First(&user, "id = ?", target.User.ID).Error; err != nil {
+		t.Fatalf("load target: %v", err)
+	}
+	if user.Disabled {
+		t.Fatal("sole manager was disabled")
 	}
 }
 

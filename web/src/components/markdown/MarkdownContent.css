@@ -1,0 +1,38 @@
+.bonds-markdown-content {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.bonds-markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.bonds-markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+.bonds-markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.bonds-markdown-content pre {
+  overflow-x: auto;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.1);
+}
+
+.bonds-markdown-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.bonds-markdown-content th,
+.bonds-markdown-content td {
+  padding: 6px 10px;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+}

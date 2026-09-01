@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/markdown"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/utils"
 	"github.com/naiba/bonds/pkg/response"
@@ -19,6 +20,7 @@ import (
 var ErrActivityNotFound = errors.New("activity not found")
 var ErrInvalidActivityTime = errors.New("invalid activity time")
 var ErrInvalidActivityInput = errors.New("invalid activity input")
+var ErrInvalidContentFormat = errors.New("invalid content format")
 
 var contactMentionPattern = regexp.MustCompile(`@\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:([0-9a-fA-F-]{36})\)`)
 
@@ -111,6 +113,9 @@ func (s *ActivityService) CreateForUser(vaultID, userID string, req dto.Activity
 		if err := tx.Create(&event).Error; err != nil {
 			return err
 		}
+		if err := syncContentFileReferences(tx, vaultID, models.ContentOwnerActivity, event.ID, req.Description, event.DescriptionFormat); err != nil {
+			return err
+		}
 		if err := replaceActivityParticipants(tx, event.ID, contactIDs); err != nil {
 			return err
 		}
@@ -146,6 +151,9 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 		return nil, err
 	}
 	replacement.ID, replacement.CreatedAt = current.ID, current.CreatedAt
+	if req.DescriptionFormat == "" {
+		replacement.DescriptionFormat = markdown.NormalizeFormat(current.DescriptionFormat)
+	}
 	replacement.SubjectUserID = current.SubjectUserID
 	replacement.SubjectUserName = current.SubjectUserName
 	if replacement.ParentID != nil && *replacement.ParentID == id {
@@ -153,6 +161,9 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&replacement).Error; err != nil {
+			return err
+		}
+		if err := syncContentFileReferences(tx, vaultID, models.ContentOwnerActivity, id, req.Description, replacement.DescriptionFormat); err != nil {
 			return err
 		}
 		if err := replaceActivityParticipantsLocked(tx, id, contactIDs); err != nil {
@@ -180,6 +191,10 @@ func (s *ActivityService) Delete(vaultID string, id uint) error {
 		if err := tx.Where("activity_id = ?", id).Delete(&models.ActivityParticipant{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("vault_id = ? AND owner_type = ? AND owner_id = ?", vaultID, models.ContentOwnerActivity, id).
+			Delete(&models.ContentFileReference{}).Error; err != nil {
+			return err
+		}
 		return tx.Delete(&event).Error
 	})
 }
@@ -202,6 +217,9 @@ func (s *ActivityService) get(vaultID string, id uint, userID string) (*dto.Acti
 func (s *ActivityService) eventFromRequest(vaultID string, req dto.ActivityUpsertRequest, existingParticipantIDs []string, allowEmptyParticipants bool) (models.Activity, []string, error) {
 	if strings.TrimSpace(req.Title) == "" || req.ActivityTypeID == 0 {
 		return models.Activity{}, nil, ErrInvalidActivityInput
+	}
+	if !markdown.IsValidFormat(req.DescriptionFormat) {
+		return models.Activity{}, nil, ErrInvalidContentFormat
 	}
 	if !validPrecision(req.StartPrecision, true) || !validEndStatus(req.EndStatus) ||
 		(normalizedEndStatus(req.EndStatus) == "known" && !validPrecision(req.EndPrecision, true)) ||
@@ -246,7 +264,8 @@ func (s *ActivityService) eventFromRequest(vaultID string, req dto.ActivityUpser
 	event := models.Activity{
 		VaultID: vaultID, ParentID: req.ParentID, ActivityTypeID: &typeID, Title: strings.TrimSpace(req.Title),
 		Description: strPtrOrNil(req.Description), StartDate: req.StartDate, StartPrecision: normalizedPrecision(req.StartPrecision),
-		EndDate: req.EndDate, EndPrecision: normalizedPrecision(req.EndPrecision), EndStatus: normalizedEndStatus(req.EndStatus),
+		DescriptionFormat: markdown.NormalizeFormat(req.DescriptionFormat),
+		EndDate:           req.EndDate, EndPrecision: normalizedPrecision(req.EndPrecision), EndStatus: normalizedEndStatus(req.EndStatus),
 		CalendarType: req.CalendarType, OriginalDay: req.OriginalDay, OriginalMonth: req.OriginalMonth, OriginalYear: req.OriginalYear,
 		EmotionID: req.EmotionID, Costs: req.Costs, CurrencyID: req.CurrencyID, DurationInMinutes: req.DurationInMinutes,
 		Distance: req.Distance, DistanceUnit: strPtrOrNil(req.DistanceUnit), FromPlace: strPtrOrNil(req.FromPlace),
@@ -319,7 +338,8 @@ func (s *ActivityService) toActivityResponse(le *models.Activity, currentUserID 
 	resp := dto.ActivityResponse{ID: le.ID, VaultID: le.VaultID, SubjectUserID: ptrToStr(le.SubjectUserID),
 		SubjectUserName: ptrToStr(le.SubjectUserName), SubjectIsCurrentUser: le.SubjectUserID != nil && *le.SubjectUserID == currentUserID,
 		ParentID: le.ParentID, ActivityTypeID: le.ActivityTypeID,
-		Title: le.Title, Description: ptrToStr(le.Description), StartDate: le.StartDate, StartPrecision: le.StartPrecision,
+		Title: le.Title, Description: ptrToStr(le.Description), DescriptionFormat: markdown.NormalizeFormat(le.DescriptionFormat),
+		RenderedDescription: markdown.Render(ptrToStr(le.Description), le.DescriptionFormat), StartDate: le.StartDate, StartPrecision: le.StartPrecision,
 		EndDate: le.EndDate, EndPrecision: le.EndPrecision, EndStatus: le.EndStatus, CalendarType: le.CalendarType,
 		OriginalDay: le.OriginalDay, OriginalMonth: le.OriginalMonth, OriginalYear: le.OriginalYear, EmotionID: le.EmotionID,
 		Costs: le.Costs, CurrencyID: le.CurrencyID, DurationInMinutes: le.DurationInMinutes, Distance: le.Distance,

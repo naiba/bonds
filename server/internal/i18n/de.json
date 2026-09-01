@@ -38,6 +38,7 @@
   "err.failed_to_get_vault": "Tresor konnte nicht abgerufen werden",
   "err.failed_to_update_vault": "Tresor konnte nicht aktualisiert werden",
   "err.failed_to_delete_vault": "Tresor konnte nicht gelöscht werden",
+  "err.last_vault_manager": "Ein Tresor muss mindestens einen Manager behalten",
 
   "err.failed_to_list_contacts": "Kontakte konnten nicht aufgelistet werden",
   "err.failed_to_create_contact": "Kontakt konnte nicht erstellt werden",
@@ -188,6 +189,7 @@
   "err.failed_to_list_vault_files": "Tresordateien konnten nicht aufgelistet werden",
   "err.invalid_file_id": "Ungültige Datei-ID",
   "err.file_not_found": "Datei nicht gefunden",
+  "err.file_in_use": "Diese Datei wird verwendet und kann nicht gelöscht werden",
   "err.failed_to_delete_file": "Datei konnte nicht gelöscht werden",
 
   "err.failed_to_list_companies": "Unternehmen konnten nicht aufgelistet werden",

@@ -1,6 +1,9 @@
 package services
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,6 +91,74 @@ func TestCreatePost(t *testing.T) {
 	}
 	if post.ID == 0 {
 		t.Error("Expected post ID to be non-zero")
+	}
+}
+
+func TestPostMarkdownRendersAndTracksUploadedFiles(t *testing.T) {
+	ctx := setupPostTestFull(t)
+	file := models.File{VaultID: ctx.vaultID, UUID: "markdown-file", Name: "photo.png", MimeType: "image/png", Type: "photo"}
+	if err := ctx.db.Create(&file).Error; err != nil {
+		t.Fatalf("create file: %v", err)
+	}
+	post, err := ctx.svc.Create(ctx.journalID, ctx.vaultID, dto.CreatePostRequest{
+		Title: "Markdown", WrittenAt: time.Now(),
+		Sections: []dto.PostSectionInput{{
+			Position: 0, Label: "Body", Content: "**bold**\n\n![photo](bonds-file:" + fmt.Sprint(file.ID) + ")", ContentFormat: "markdown",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Create Markdown post: %v", err)
+	}
+	section := post.Sections[0]
+	if section.ContentFormat != "markdown" || !strings.Contains(section.RenderedContent, "<strong>bold</strong>") || !strings.Contains(section.RenderedContent, `data-bonds-file="`) {
+		t.Fatalf("Markdown section response = %+v", section)
+	}
+	var referenceCount int64
+	ctx.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 1 {
+		t.Fatalf("content file reference count = %d, want 1", referenceCount)
+	}
+	fileSvc := NewVaultFileService(ctx.db, t.TempDir())
+	if err := fileSvc.Delete(file.ID, ctx.vaultID); !errors.Is(err, ErrFileInUse) {
+		t.Fatalf("Delete referenced file error = %v, want ErrFileInUse", err)
+	}
+
+	legacyUpdated, err := ctx.svc.Update(post.ID, ctx.journalID, ctx.vaultID, dto.UpdatePostRequest{
+		Title: "Legacy client update", WrittenAt: post.WrittenAt,
+		Sections: []dto.PostSectionInput{{Position: 0, Label: "Body", Content: "![photo](bonds-file:" + fmt.Sprint(file.ID) + ")"}},
+	})
+	if err != nil {
+		t.Fatalf("Update Markdown post without format: %v", err)
+	}
+	if legacyUpdated.Sections[0].ContentFormat != "markdown" {
+		t.Fatalf("ContentFormat after legacy update = %q, want markdown", legacyUpdated.Sections[0].ContentFormat)
+	}
+	ctx.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 1 {
+		t.Fatalf("content file reference count after legacy update = %d, want 1", referenceCount)
+	}
+
+	_, err = ctx.svc.Update(post.ID, ctx.journalID, ctx.vaultID, dto.UpdatePostRequest{
+		Title: "Markdown", WrittenAt: post.WrittenAt,
+		Sections: []dto.PostSectionInput{{Position: 0, Label: "Body", Content: "reference removed", ContentFormat: "markdown"}},
+	})
+	if err != nil {
+		t.Fatalf("Update Markdown post: %v", err)
+	}
+	ctx.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 0 {
+		t.Fatalf("content file reference count after update = %d, want 0", referenceCount)
+	}
+}
+
+func TestPostRejectsUnknownMarkdownFile(t *testing.T) {
+	ctx := setupPostTestFull(t)
+	_, err := ctx.svc.Create(ctx.journalID, ctx.vaultID, dto.CreatePostRequest{
+		Title: "Missing file", WrittenAt: time.Now(),
+		Sections: []dto.PostSectionInput{{Content: "[missing](bonds-file:999999)", ContentFormat: "markdown"}},
+	})
+	if !errors.Is(err, ErrFileNotFound) {
+		t.Fatalf("Create error = %v, want ErrFileNotFound", err)
 	}
 }
 

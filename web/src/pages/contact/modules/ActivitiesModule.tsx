@@ -34,8 +34,12 @@ import type {
   PaginationMeta,
   UserPreferences,
 } from "@/api";
-import ContactMentionEditor from "@/components/journal/ContactMentionEditor";
-import ContactMentionText from "@/components/journal/ContactMentionText";
+import MarkdownEditor from "@/components/markdown/MarkdownEditor";
+import MarkdownContent from "@/components/markdown/MarkdownContent";
+import {
+  plainTextToMarkdown,
+  plainTextToSafeHTML,
+} from "@/components/markdown/markdownFormat";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import {
   dateInputToTimestamp,
@@ -199,6 +203,7 @@ export default function ActivitiesModule({
         activity_type_id: values.activity_type_id,
         title: values.title,
         description,
+        description_format: "markdown" as const,
         start_date: gregorianStart
           ? dateInputToTimestamp(
               `${gregorianStart.year}-${String(gregorianStart.month).padStart(2, "0")}-${String(gregorianStart.day).padStart(2, "0")}`,
@@ -274,7 +279,11 @@ export default function ActivitiesModule({
   const startEdit = (activity: Activity) => {
     const startDate = parseDateOnly(activity.start_date);
     setEditing(activity);
-    setDescription(activity.description ?? "");
+    setDescription(
+      activity.description_format === "markdown"
+        ? (activity.description ?? "")
+        : plainTextToMarkdown(activity.description ?? ""),
+    );
     form.setFieldsValue({
       activity_type_id: activity.activity_type_id,
       title: activity.title,
@@ -435,14 +444,15 @@ export default function ActivitiesModule({
                   </Space>
                 </Space>
                 {activity.description && (
-                  <div style={{ marginTop: 6, whiteSpace: "pre-wrap" }}>
-                    <ContactMentionText
+                  <div style={{ marginTop: 6 }}>
+                    <MarkdownContent
                       vaultId={String(vaultId)}
                       contacts={activity.mentioned_contacts ?? []}
-                      appendUnmentionedContacts={false}
-                    >
-                      {activity.description}
-                    </ContactMentionText>
+                      html={
+                        activity.rendered_description ??
+                        plainTextToSafeHTML(activity.description)
+                      }
+                    />
                   </div>
                 )}
               </div>
@@ -473,6 +483,7 @@ export default function ActivitiesModule({
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
         destroyOnHidden
+        width={820}
       >
         <Form
           form={form}
@@ -561,14 +572,13 @@ export default function ActivitiesModule({
             </Form.Item>
           )}
           <Form.Item label={t("modules.activities.description")}>
-            <ContactMentionEditor
+            <MarkdownEditor
               vaultId={String(vaultId)}
               value={description}
               onChange={setDescription}
               ariaLabel={t("modules.activities.description")}
               placeholder={t("modules.activities.description_placeholder")}
-              rows={4}
-              showHint
+              variant="compact"
             />
           </Form.Item>
           <Form.Item name="place" label={t("modules.activities.place")}>

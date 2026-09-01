@@ -62,6 +62,9 @@ func TestAutoMigrateSQLiteFreshSchemaKeepsCoreForeignKeys(t *testing.T) {
 	if !hasForeignKey(t, db, "notes", "contact_id", "contacts") {
 		t.Fatal("notes.contact_id should keep its SQLite foreign key")
 	}
+	if !hasForeignKey(t, db, "content_file_references", "file_id", "files") {
+		t.Fatal("content_file_references.file_id should keep its SQLite foreign key")
+	}
 	if hasContactSelfForeignKey(t, db) {
 		t.Fatal("contacts.first_met_through_contact_id should not have a self-referential foreign key in SQLite migrations")
 	}

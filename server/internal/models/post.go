@@ -62,13 +62,14 @@ type Post struct {
 }
 
 type PostSection struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	PostID    uint      `json:"post_id" gorm:"not null;index"`
-	Position  int       `json:"position" gorm:"not null"`
-	Label     string    `json:"label" gorm:"not null"`
-	Content   *string   `json:"content" gorm:"type:text"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	PostID        uint      `json:"post_id" gorm:"not null;index"`
+	Position      int       `json:"position" gorm:"not null"`
+	Label         string    `json:"label" gorm:"not null"`
+	Content       *string   `json:"content" gorm:"type:text"`
+	ContentFormat string    `json:"content_format" gorm:"size:16;not null;default:'plain'"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 
 	Post Post `json:"post,omitempty" gorm:"foreignKey:PostID"`
 }

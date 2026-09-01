@@ -62,6 +62,21 @@ vi.mock("@/api", () => ({
   },
 }));
 
+vi.mock("@/components/markdown/MarkdownEditor", async () => {
+  const { default: ContactMentionEditor } = await vi.importActual<
+    typeof import("@/components/journal/ContactMentionEditor")
+  >("@/components/journal/ContactMentionEditor");
+  return {
+    default: (props: {
+      vaultId: string;
+      value: string;
+      onChange: (value: string) => void;
+      ariaLabel: string;
+      placeholder: string;
+    }) => <ContactMentionEditor {...props} showHint />,
+  };
+});
+
 const mockUseQuery = vi.fn();
 
 type MutationOptions<TVariables> = {
@@ -226,6 +241,7 @@ describe("JournalDetail", () => {
           {
             label: "Body",
             content: `Met @[Alice Example](contact:${CONTACT_ID}) `,
+            content_format: "markdown",
             position: 0,
           },
         ],
@@ -271,7 +287,14 @@ describe("JournalDetail", () => {
       original_day: undefined,
       original_month: undefined,
       original_year: undefined,
-      sections: [{ label: "Body", content: "Draft A body", position: 0 }],
+      sections: [
+        {
+          label: "Body",
+          content: "Draft A body",
+          content_format: "markdown",
+          position: 0,
+        },
+      ],
       contact_ids: [],
       update_last_contacted: false,
     });

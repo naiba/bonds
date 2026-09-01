@@ -70,6 +70,11 @@ import {
 } from "@/utils/queryInvalidation";
 import { invalidateVaultTaskImpactQueries } from "@/utils/taskQueryInvalidation";
 import { refreshMostConsultedProjections } from "@/utils/mostConsultedProjection";
+import { useAuth } from "@/stores/auth";
+import {
+  decideVaultPermissionChange,
+  type VaultPermission,
+} from "./vaultManagerPermissions";
 import ContactLayoutManager from "@/components/contact-layout/ContactLayoutManager";
 import {
   buildCreateImportantDateTypeRequest,
@@ -131,755 +136,561 @@ interface QuickFactTemplateFormValues {
   select_options?: string;
 }
 
-  // --- Components for each tab ---
+// --- Components for each tab ---
 
-  type PositionMutation = UseMutationResult<
-    void,
+type PositionMutation = UseMutationResult<
+  void,
+  unknown,
+  { entityType: string; id: number; position: number; categoryId?: number }
+>;
+
+function GeneralTab({
+  vaultSettings,
+  updateSettingsMutation,
+}: {
+  vaultSettings?: GithubComNaibaBondsInternalDtoVaultSettingsResponse;
+  updateSettingsMutation: UseMutationResult<
     unknown,
-    { entityType: string; id: number; position: number; categoryId?: number }
+    unknown,
+    UpdateVaultSettingsRequest
   >;
+}) {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { token } = theme.useToken();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+  const [form] = Form.useForm();
+  const [deleteVaultOpen, setDeleteVaultOpen] = useState(false);
+  const [deleteVaultConfirmation, setDeleteVaultConfirmation] = useState("");
 
-  function GeneralTab({
-    vaultSettings,
-    updateSettingsMutation,
-  }: {
-    vaultSettings?: GithubComNaibaBondsInternalDtoVaultSettingsResponse;
-    updateSettingsMutation: UseMutationResult<
-      unknown,
-      unknown,
-      UpdateVaultSettingsRequest
-    >;
-  }) {
-    const { t } = useTranslation();
-    const { message } = App.useApp();
-    const queryClient = useQueryClient();
-    const navigate = useNavigate();
-    const { token } = theme.useToken();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
-    const [form] = Form.useForm();
-    const [deleteVaultOpen, setDeleteVaultOpen] = useState(false);
-    const [deleteVaultConfirmation, setDeleteVaultConfirmation] = useState("");
+  const deleteVaultMutation = useMutation({
+    mutationFn: () => api.vaults.vaultsDelete(String(vaultId)),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["vaults"] });
+      setDeleteVaultOpen(false);
+      setDeleteVaultConfirmation("");
+      message.success(t("vault.detail.deleted"));
+      navigate("/vaults");
+    },
+    onError: (e: APIError) => message.error(e.message || t("common.error")),
+  });
 
-    const deleteVaultMutation = useMutation({
-      mutationFn: () => api.vaults.vaultsDelete(String(vaultId)),
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: ["vaults"] });
-        setDeleteVaultOpen(false);
-        setDeleteVaultConfirmation("");
-        message.success(t("vault.detail.deleted"));
-        navigate("/vaults");
-      },
-      onError: (e: APIError) => message.error(e.message || t("common.error")),
-    });
+  if (!vaultSettings) return null;
 
-    if (!vaultSettings) return null;
-
-    return (
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Card title={t("vault_settings.general")}>
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={{
-              name: vaultSettings.name,
-              description: vaultSettings.description,
-            }}
-            onFinish={(values) => updateSettingsMutation.mutate(values)}
-          >
-            <Form.Item
-              name="name"
-              label={t("vault_settings.name")}
-              rules={[{ required: true, message: t("common.required") }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="description"
-              label={t("vault_settings.description_label")}
-            >
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<SaveOutlined />}
-                loading={updateSettingsMutation.isPending}
-              >
-                {t("common.save")}
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card title={t("contact.layout.title")}>
-          <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
-            {t("contact.layout.description")}
-          </Text>
-          <ContactLayoutManager vaultId={String(vaultId)} />
-        </Card>
-
-        <Card
-          style={{ borderColor: token.colorError }}
-          styles={{ header: { borderBottomColor: token.colorErrorBorder } }}
-          title={
-            <span style={{ color: token.colorError }}>
-              {t("vault_settings.danger_zone")}
-            </span>
-          }
-        >
-          <Text
-            type="secondary"
-            style={{ display: "block", marginBottom: 16 }}
-          >
-            {t("vault_settings.delete_description")}
-          </Text>
-          <Button
-            danger
-            type="primary"
-            icon={<DeleteOutlined />}
-            onClick={() => setDeleteVaultOpen(true)}
-          >
-            {t("vault.detail.delete")}
-          </Button>
-        </Card>
-        <Modal
-          title={t("vault.detail.delete")}
-          open={deleteVaultOpen}
-          onCancel={() => {
-            setDeleteVaultOpen(false);
-            setDeleteVaultConfirmation("");
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <Card title={t("vault_settings.general")}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            name: vaultSettings.name,
+            description: vaultSettings.description,
           }}
-          onOk={() => deleteVaultMutation.mutate()}
-          okText={t("common.delete")}
-          okButtonProps={{
-            danger: true,
-            disabled: deleteVaultConfirmation !== vaultSettings.name,
-          }}
-          confirmLoading={deleteVaultMutation.isPending}
+          onFinish={(values) => updateSettingsMutation.mutate(values)}
         >
-          <Text style={{ display: "block", marginBottom: 16 }}>
-            {t("vault_settings.delete_confirm_name", {
-              name: vaultSettings.name,
-            })}
-          </Text>
-          <Input
-            value={deleteVaultConfirmation}
-            onChange={(event) => setDeleteVaultConfirmation(event.target.value)}
-            placeholder={vaultSettings.name}
-            autoComplete="off"
-          />
-        </Modal>
-      </Space>
+          <Form.Item
+            name="name"
+            label={t("vault_settings.name")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label={t("vault_settings.description_label")}
+          >
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              icon={<SaveOutlined />}
+              loading={updateSettingsMutation.isPending}
+            >
+              {t("common.save")}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
+
+      <Card title={t("contact.layout.title")}>
+        <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+          {t("contact.layout.description")}
+        </Text>
+        <ContactLayoutManager vaultId={String(vaultId)} />
+      </Card>
+
+      <Card
+        style={{ borderColor: token.colorError }}
+        styles={{ header: { borderBottomColor: token.colorErrorBorder } }}
+        title={
+          <span style={{ color: token.colorError }}>
+            {t("vault_settings.danger_zone")}
+          </span>
+        }
+      >
+        <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+          {t("vault_settings.delete_description")}
+        </Text>
+        <Button
+          danger
+          type="primary"
+          icon={<DeleteOutlined />}
+          onClick={() => setDeleteVaultOpen(true)}
+        >
+          {t("vault.detail.delete")}
+        </Button>
+      </Card>
+      <Modal
+        title={t("vault.detail.delete")}
+        open={deleteVaultOpen}
+        onCancel={() => {
+          setDeleteVaultOpen(false);
+          setDeleteVaultConfirmation("");
+        }}
+        onOk={() => deleteVaultMutation.mutate()}
+        okText={t("common.delete")}
+        okButtonProps={{
+          danger: true,
+          disabled: deleteVaultConfirmation !== vaultSettings.name,
+        }}
+        confirmLoading={deleteVaultMutation.isPending}
+      >
+        <Text style={{ display: "block", marginBottom: 16 }}>
+          {t("vault_settings.delete_confirm_name", {
+            name: vaultSettings.name,
+          })}
+        </Text>
+        <Input
+          value={deleteVaultConfirmation}
+          onChange={(event) => setDeleteVaultConfirmation(event.target.value)}
+          placeholder={vaultSettings.name}
+          autoComplete="off"
+        />
+      </Modal>
+    </Space>
+  );
+}
+
+function TabsTab({
+  vaultSettings,
+  updateTabVisibilityMutation,
+}: {
+  vaultSettings?: GithubComNaibaBondsInternalDtoVaultSettingsResponse;
+  updateTabVisibilityMutation: UseMutationResult<
+    unknown,
+    unknown,
+    Record<string, boolean>
+  >;
+}) {
+  const { t } = useTranslation();
+
+  if (!vaultSettings) return null;
+
+  const tabs = [
+    { key: "show_group_tab", label: t("vault_settings.tab_group") },
+    { key: "show_tasks_tab", label: t("vault_settings.tab_tasks") },
+    { key: "show_files_tab", label: t("vault_settings.tab_files") },
+    { key: "show_journal_tab", label: t("vault_settings.tab_journal") },
+    { key: "show_reports_tab", label: t("vault_settings.tab_reports") },
+    { key: "show_calendar_tab", label: t("vault_settings.tab_calendar") },
+  ];
+
+  return (
+    <Card title={t("vault_settings.tabs")}>
+      <List
+        dataSource={tabs}
+        renderItem={(item) => (
+          <List.Item
+            actions={[
+              <Switch
+                key="toggle"
+                checked={
+                  vaultSettings[
+                    item.key as keyof typeof vaultSettings
+                  ] as boolean
+                }
+                onChange={(checked) =>
+                  updateTabVisibilityMutation.mutate({ [item.key]: checked })
+                }
+                loading={updateTabVisibilityMutation.isPending}
+              />,
+            ]}
+          >
+            <List.Item.Meta
+              title={t("vault_settings.show_tab", { tab: item.label })}
+            />
+          </List.Item>
+        )}
+      />
+    </Card>
+  );
+}
+
+function UsersTab() {
+  const { t } = useTranslation();
+  const { message, modal } = App.useApp();
+  const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
+  const nameOrder = useNameOrder();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["vault", vaultId, "users"],
+    queryFn: async () => {
+      const res = await api.vaultSettings.settingsUsersList(String(vaultId));
+      return res.data ?? [];
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: (values: { email: string; permission: 100 | 200 | 300 }) =>
+      api.vaultSettings.settingsUsersCreate(String(vaultId), values),
+    onSuccess: () => {
+      message.success(t("invitations.status.pending")); // Or specific success message
+      queryClient.invalidateQueries({
+        queryKey: ["vault", vaultId, "users"],
+      });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const removeUserMutation = useMutation({
+    mutationFn: (userId: number) =>
+      api.vaultSettings.settingsUsersDelete(String(vaultId), userId),
+    onSuccess: () => {
+      message.success(t("common.deleted"));
+      queryClient.invalidateQueries({
+        queryKey: ["vault", vaultId, "users"],
+      });
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateUserPermMutation = useMutation({
+    mutationFn: ({
+      userId,
+      permission,
+    }: {
+      userId: number;
+      permission: 100 | 200 | 300;
+      isSelf: boolean;
+    }) =>
+      api.vaultSettings.settingsUsersUpdate(String(vaultId), userId, {
+        permission,
+      }),
+    onSuccess: async (_, variables) => {
+      message.success(t("common.updated"));
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["vault", vaultId, "users"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["vaults"] }),
+        queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] }),
+      ]);
+      if (variables.isSelf && variables.permission !== 100) {
+        navigate(`/vaults/${vaultId}`);
+      }
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const [inviteForm] = Form.useForm();
+  const updatePermission = (
+    vaultUser: VaultUserResponse,
+    permission: VaultPermission,
+  ) => {
+    const decision = decideVaultPermissionChange(
+      users,
+      vaultUser,
+      permission,
+      currentUser?.id,
     );
+    if (decision.kind === "apply") {
+      updateUserPermMutation.mutate({
+        userId: vaultUser.id!,
+        permission,
+        isSelf: decision.isSelf,
+      });
+      return;
+    }
+    if (decision.kind === "block") {
+      message.error(t("vault_settings.last_manager_required"));
+      return;
+    }
+    modal.confirm({
+      title: t("vault_settings.demote_manager_title"),
+      content: decision.isSelf
+        ? t("vault_settings.demote_self_description")
+        : t("vault_settings.demote_manager_description", {
+            email: vaultUser.email,
+          }),
+      okText: t("common.confirm"),
+      cancelText: t("common.cancel"),
+      onOk: () =>
+        updateUserPermMutation.mutateAsync({
+          userId: vaultUser.id!,
+          permission,
+          isSelf: decision.isSelf,
+        }),
+    });
   };
 
-  function TabsTab({
-    vaultSettings,
-    updateTabVisibilityMutation,
-  }: {
-    vaultSettings?: GithubComNaibaBondsInternalDtoVaultSettingsResponse;
-    updateTabVisibilityMutation: UseMutationResult<
-      unknown,
-      unknown,
-      Record<string, boolean>
-    >;
-  }) {
-    const { t } = useTranslation();
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <Card title={t("vault_settings.add_user")}>
+        <Form
+          form={inviteForm}
+          layout="inline"
+          onFinish={(values) => {
+            inviteMutation.mutate(values);
+            inviteForm.resetFields();
+          }}
+        >
+          <Form.Item
+            name="email"
+            rules={[
+              {
+                required: true,
+                type: "email",
+                message: t("common.required"),
+              },
+            ]}
+          >
+            <Input placeholder={t("vault_settings.user_email")} />
+          </Form.Item>
+          <Form.Item
+            name="permission"
+            initialValue={200}
+            rules={[{ required: true }]}
+          >
+            <Select style={{ width: 120 }}>
+              <Option value={100}>{t("invitations.permission.manager")}</Option>
+              <Option value={200}>{t("invitations.permission.editor")}</Option>
+              <Option value={300}>{t("invitations.permission.viewer")}</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              icon={<UserAddOutlined />}
+              loading={inviteMutation.isPending}
+            >
+              {t("common.add")}
+            </Button>
+          </Form.Item>
+        </Form>
+      </Card>
 
-    if (!vaultSettings) return null;
-
-    const tabs = [
-      { key: "show_group_tab", label: t("vault_settings.tab_group") },
-      { key: "show_tasks_tab", label: t("vault_settings.tab_tasks") },
-      { key: "show_files_tab", label: t("vault_settings.tab_files") },
-      { key: "show_journal_tab", label: t("vault_settings.tab_journal") },
-      { key: "show_reports_tab", label: t("vault_settings.tab_reports") },
-      { key: "show_calendar_tab", label: t("vault_settings.tab_calendar") },
-    ];
-
-    return (
-      <Card title={t("vault_settings.tabs")}>
+      <Card title={t("vault_settings.users")}>
         <List
-          dataSource={tabs}
-          renderItem={(item) => (
+          loading={isLoading}
+          dataSource={users}
+          renderItem={(user: VaultUserResponse) => (
             <List.Item
               actions={[
-                <Switch
-                  key="toggle"
-                  checked={
-                    vaultSettings[
-                      item.key as keyof typeof vaultSettings
-                    ] as boolean
-                  }
-                  onChange={(checked) =>
-                    updateTabVisibilityMutation.mutate({ [item.key]: checked })
-                  }
-                  loading={updateTabVisibilityMutation.isPending}
-                />,
+                <Select<100 | 200 | 300>
+                  key="perm"
+                  value={(user.permission ?? 300) as 100 | 200 | 300}
+                  style={{ width: 120 }}
+                  onChange={(val) => updatePermission(user, val)}
+                  disabled={updateUserPermMutation.isPending}
+                >
+                  <Option value={100}>
+                    {t("invitations.permission.manager")}
+                  </Option>
+                  <Option value={200}>
+                    {t("invitations.permission.editor")}
+                  </Option>
+                  <Option value={300}>
+                    {t("invitations.permission.viewer")}
+                  </Option>
+                </Select>,
+                <Popconfirm
+                  key="del"
+                  title={t("common.delete_confirm")}
+                  onConfirm={() => removeUserMutation.mutate(user.id!)}
+                >
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    loading={removeUserMutation.isPending}
+                    disabled={user.user_id === currentUser?.id}
+                  />
+                </Popconfirm>,
               ]}
             >
               <List.Item.Meta
-                title={t("vault_settings.show_tab", { tab: item.label })}
+                title={formatContactName(nameOrder, user)}
+                description={user.email}
               />
             </List.Item>
           )}
         />
       </Card>
-    );
-  };
+    </Space>
+  );
+}
 
-  function UsersTab() {
-    const { t } = useTranslation();
-    const { message } = App.useApp();
-    const queryClient = useQueryClient();
-    const nameOrder = useNameOrder();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
+function LabelsTab() {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
 
-    const { data: users = [], isLoading } = useQuery({
-      queryKey: ["vault", vaultId, "users"],
-      queryFn: async () => {
-        const res = await api.vaultSettings.settingsUsersList(String(vaultId));
-        return res.data ?? [];
-      },
-    });
+  const queryKey = ["vault", vaultId, "labels"];
+  const { data: items = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: async () =>
+      (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ?? [],
+  });
 
-    const inviteMutation = useMutation({
-      mutationFn: (values: { email: string; permission: 100 | 200 | 300 }) =>
-        api.vaultSettings.settingsUsersCreate(String(vaultId), values),
-      onSuccess: () => {
-        message.success(t("invitations.status.pending")); // Or specific success message
-        queryClient.invalidateQueries({
-          queryKey: ["vault", vaultId, "users"],
-        });
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
+  const createMutation = useMutation({
+    mutationFn: (data: {
+      name: string;
+      description?: string;
+      bg_color: string;
+      text_color: string;
+    }) => api.vaultSettings.settingsLabelsCreate(String(vaultId), data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.created"));
+      form.resetFields();
+    },
+  });
 
-    const removeUserMutation = useMutation({
-      mutationFn: (userId: number) =>
-        api.vaultSettings.settingsUsersDelete(String(vaultId), userId),
-      onSuccess: () => {
-        message.success(t("common.deleted"));
-        queryClient.invalidateQueries({
-          queryKey: ["vault", vaultId, "users"],
-        });
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-
-    const updateUserPermMutation = useMutation({
-      mutationFn: ({
-        userId,
-        permission,
-      }: {
-        userId: number;
-        permission: 100 | 200 | 300;
-      }) =>
-        api.vaultSettings.settingsUsersUpdate(String(vaultId), userId, {
-          permission,
-        }),
-      onSuccess: () => {
-        message.success(t("common.updated"));
-        queryClient.invalidateQueries({
-          queryKey: ["vault", vaultId, "users"],
-        });
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-
-    const [inviteForm] = Form.useForm();
-
-    return (
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Card title={t("vault_settings.add_user")}>
-          <Form
-            form={inviteForm}
-            layout="inline"
-            onFinish={(values) => {
-              inviteMutation.mutate(values);
-              inviteForm.resetFields();
-            }}
-          >
-            <Form.Item
-              name="email"
-              rules={[
-                {
-                  required: true,
-                  type: "email",
-                  message: t("common.required"),
-                },
-              ]}
-            >
-              <Input placeholder={t("vault_settings.user_email")} />
-            </Form.Item>
-            <Form.Item
-              name="permission"
-              initialValue={200}
-              rules={[{ required: true }]}
-            >
-              <Select style={{ width: 120 }}>
-                <Option value={100}>
-                  {t("invitations.permission.manager")}
-                </Option>
-                <Option value={200}>
-                  {t("invitations.permission.editor")}
-                </Option>
-                <Option value={300}>
-                  {t("invitations.permission.viewer")}
-                </Option>
-              </Select>
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<UserAddOutlined />}
-                loading={inviteMutation.isPending}
-              >
-                {t("common.add")}
-              </Button>
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card title={t("vault_settings.users")}>
-          <List
-            loading={isLoading}
-            dataSource={users}
-            renderItem={(user: VaultUserResponse) => (
-              <List.Item
-                actions={[
-                  <Select<100 | 200 | 300>
-                    key="perm"
-                    defaultValue={(user.permission ?? 300) as 100 | 200 | 300}
-                    style={{ width: 120 }}
-                    onChange={(val) =>
-                      updateUserPermMutation.mutate({
-                        userId: user.id!,
-                        permission: val,
-                      })
-                    }
-                    disabled={updateUserPermMutation.isPending}
-                  >
-                    <Option value={100}>
-                      {t("invitations.permission.manager")}
-                    </Option>
-                    <Option value={200}>
-                      {t("invitations.permission.editor")}
-                    </Option>
-                    <Option value={300}>
-                      {t("invitations.permission.viewer")}
-                    </Option>
-                  </Select>,
-                  <Popconfirm
-                    key="del"
-                    title={t("common.delete_confirm")}
-                    onConfirm={() => removeUserMutation.mutate(user.id!)}
-                  >
-                    <Button
-                      danger
-                      icon={<DeleteOutlined />}
-                      loading={removeUserMutation.isPending}
-                    />
-                  </Popconfirm>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={formatContactName(nameOrder, user)}
-                  description={user.email}
-                />
-              </List.Item>
-            )}
-          />
-        </Card>
-      </Space>
-    );
-  };
-
-  function LabelsTab() {
-    const { t } = useTranslation();
-    const { message } = App.useApp();
-    const queryClient = useQueryClient();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
-
-    const queryKey = ["vault", vaultId, "labels"];
-    const { data: items = [], isLoading } = useQuery({
-      queryKey,
-      queryFn: async () =>
-        (await api.vaultSettings.settingsLabelsList(String(vaultId))).data ??
-        [],
-    });
-
-    const createMutation = useMutation({
-      mutationFn: (data: {
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: {
         name: string;
         description?: string;
         bg_color: string;
         text_color: string;
-      }) => api.vaultSettings.settingsLabelsCreate(String(vaultId), data),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.created"));
-        form.resetFields();
-      },
-    });
-
-    const updateMutation = useMutation({
-      mutationFn: ({
-        id,
-        data,
-      }: {
-        id: number;
-        data: {
-          name: string;
-          description?: string;
-          bg_color: string;
-          text_color: string;
-        };
-      }) => api.vaultSettings.settingsLabelsUpdate(String(vaultId), id, data),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.updated"));
-        setEditingId(null);
-        form.resetFields();
-      },
-    });
-
-    const deleteMutation = useMutation({
-      mutationFn: (id: number) =>
-        api.vaultSettings.settingsLabelsDelete(String(vaultId), id),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.deleted"));
-      },
-    });
-
-    const [form] = Form.useForm();
-    const [editingId, setEditingId] = useState<number | null>(null);
-
-    const onFinish = (values: {
-      name: string;
-      description?: string;
-      bg_color: string | { toHexString: () => string };
-      text_color: string | { toHexString: () => string };
-    }) => {
-      const data = {
-        name: values.name,
-        description: values.description,
-        bg_color:
-          typeof values.bg_color === "string"
-            ? values.bg_color
-            : values.bg_color.toHexString(),
-        text_color:
-          typeof values.text_color === "string"
-            ? values.text_color
-            : values.text_color.toHexString(),
       };
-
-      if (editingId) {
-        updateMutation.mutate({ id: editingId, data });
-      } else {
-        createMutation.mutate(data);
-      }
-    };
-
-    const startEdit = (item: LabelResponse) => {
-      setEditingId(item.id ?? null);
-      form.setFieldsValue({
-        name: item.name,
-        description: item.description,
-        bg_color: item.bg_color,
-        text_color: item.text_color,
-      });
-    };
-
-    const cancelEdit = () => {
+    }) => api.vaultSettings.settingsLabelsUpdate(String(vaultId), id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.updated"));
       setEditingId(null);
       form.resetFields();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      api.vaultSettings.settingsLabelsDelete(String(vaultId), id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.deleted"));
+    },
+  });
+
+  const [form] = Form.useForm();
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const onFinish = (values: {
+    name: string;
+    description?: string;
+    bg_color: string | { toHexString: () => string };
+    text_color: string | { toHexString: () => string };
+  }) => {
+    const data = {
+      name: values.name,
+      description: values.description,
+      bg_color:
+        typeof values.bg_color === "string"
+          ? values.bg_color
+          : values.bg_color.toHexString(),
+      text_color:
+        typeof values.text_color === "string"
+          ? values.text_color
+          : values.text_color.toHexString(),
     };
 
-    return (
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Card title={editingId ? t("common.edit") : t("common.add")}>
-          <Form form={form} layout="inline" onFinish={onFinish}>
-            <Form.Item name="name" rules={[{ required: true }]}>
-              <Input placeholder={t("common.name")} />
-            </Form.Item>
-            <Form.Item name="bg_color" initialValue="#1677ff">
-              <ColorPicker showText />
-            </Form.Item>
-            <Form.Item name="text_color" initialValue="#ffffff">
-              <ColorPicker showText />
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={createMutation.isPending || updateMutation.isPending}
-              >
-                {editingId ? t("common.update") : t("common.add")}
-              </Button>
-              {editingId && (
-                <Button onClick={cancelEdit} style={{ marginLeft: 8 }}>
-                  {t("common.cancel")}
-                </Button>
-              )}
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card title={t("vault_settings.labels")}>
-          <List<LabelResponse>
-            loading={isLoading}
-            dataSource={items as LabelResponse[]}
-            renderItem={(item) => {
-              const labelTagColors = getReadableLabelTagColors(
-                item.bg_color,
-                item.text_color,
-              );
-              return (
-                <List.Item
-                  actions={[
-                    <Button
-                      icon={<EditOutlined />}
-                      onClick={() => startEdit(item)}
-                    />,
-                    <Popconfirm
-                      title={t("common.delete_confirm")}
-                      onConfirm={() => deleteMutation.mutate(item.id!)}
-                    >
-                      <Button danger icon={<DeleteOutlined />} />
-                    </Popconfirm>,
-                  ]}
-                >
-                  <List.Item.Meta
-                    avatar={
-                      <Tag
-                        color={labelTagColors.color}
-                        style={labelTagColors.style}
-                      >
-                        {item.name}
-                      </Tag>
-                    }
-                    description={item.description}
-                  />
-                </List.Item>
-              );
-            }}
-          />
-        </Card>
-      </Space>
-    );
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
-  // Generalized CRUD Component for simple lists (Tags, DateTypes, MoodParams, QuickFactTemplates)
-  interface ExtraField {
-    name: string;
-    label?: string;
-    type?: "color" | "text";
-    initialValue?: string;
-    rules?: { required?: boolean }[];
-  }
-  function SimpleCrudTab<
-    T extends {
-      id: number;
-      label?: string;
-      name?: string;
-      hex_color?: string;
-      position?: number;
-    },
-    TCreateRequest,
-    TUpdateRequest,
-  >({
-    queryKeySuffix,
-    apiList,
-    apiCreate,
-    apiUpdate,
-    apiDelete,
-    createRequest,
-    updateRequest,
-    title,
-    itemNameKey = "label",
-    extraFields = [],
-    positionEntityType,
-    positionMutation,
-  }: {
-    queryKeySuffix: string;
-    apiList: (vid: string) => Promise<{ data?: T[] }>;
-    apiCreate: (vid: string, data: TCreateRequest) => Promise<unknown>;
-    apiUpdate: (
-      vid: string,
-      id: number,
-      data: TUpdateRequest,
-    ) => Promise<unknown>;
-    apiDelete: (vid: string, id: number) => Promise<unknown>;
-    createRequest: (values: Record<string, unknown>) => TCreateRequest;
-    updateRequest: (values: Record<string, unknown>) => TUpdateRequest;
-    title: string;
-    itemNameKey?: "label" | "name";
-    extraFields?: ExtraField[];
-    positionEntityType?: string;
-    positionMutation: PositionMutation;
-  }) {
-    const { t } = useTranslation();
-    const { message } = App.useApp();
-    const queryClient = useQueryClient();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
-
-    const queryKey = ["vault", vaultId, queryKeySuffix];
-    const { data: items = [], isLoading } = useQuery({
-      queryKey,
-      queryFn: async () => (await apiList(vaultId)).data ?? [],
+  const startEdit = (item: LabelResponse) => {
+    setEditingId(item.id ?? null);
+    form.setFieldsValue({
+      name: item.name,
+      description: item.description,
+      bg_color: item.bg_color,
+      text_color: item.text_color,
     });
+  };
 
-    const createMutation = useMutation({
-      mutationFn: (data: TCreateRequest) => apiCreate(vaultId, data),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.created"));
-        form.resetFields();
-      },
-    });
+  const cancelEdit = () => {
+    setEditingId(null);
+    form.resetFields();
+  };
 
-    const updateMutation = useMutation({
-      mutationFn: ({ id, data }: { id: number; data: TUpdateRequest }) =>
-        apiUpdate(vaultId, id, data),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.updated"));
-        setEditingId(null);
-        form.resetFields();
-      },
-    });
-
-    const deleteMutation = useMutation({
-      mutationFn: (id: number) => apiDelete(vaultId, id),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.deleted"));
-      },
-    });
-
-    const [form] = Form.useForm();
-    const [editingId, setEditingId] = useState<number | null>(null);
-
-    const onFinish = (values: Record<string, unknown>) => {
-      // Handle ColorPicker value
-      const processed = { ...values };
-      if (processed.hex_color && typeof processed.hex_color !== "string") {
-        processed.hex_color = (
-          processed.hex_color as { toHexString: () => string }
-        ).toHexString();
-      }
-
-      if (editingId) {
-        updateMutation.mutate({
-          id: editingId,
-          data: updateRequest(processed),
-        });
-      } else {
-        createMutation.mutate(createRequest(processed));
-      }
-    };
-
-    const startEdit = (item: T) => {
-      setEditingId(item.id);
-      form.setFieldsValue(item);
-    };
-
-    const cancelEdit = () => {
-      setEditingId(null);
-      form.resetFields();
-    };
-
-    return (
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Card title={editingId ? t("common.edit") : t("common.add")}>
-          <Form form={form} layout="inline" onFinish={onFinish}>
-            <Form.Item name={itemNameKey} rules={[{ required: true }]}>
-              <Input placeholder={t("common.name")} />
-            </Form.Item>
-            {extraFields.map((field) => (
-              <Form.Item
-                key={field.name}
-                name={field.name}
-                initialValue={field.initialValue}
-                rules={field.rules}
-                label={field.label}
-              >
-                {field.type === "color" ? <ColorPicker showText /> : <Input />}
-              </Form.Item>
-            ))}
-            <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={createMutation.isPending || updateMutation.isPending}
-              >
-                {editingId ? t("common.update") : t("common.add")}
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <Card title={editingId ? t("common.edit") : t("common.add")}>
+        <Form form={form} layout="inline" onFinish={onFinish}>
+          <Form.Item name="name" rules={[{ required: true }]}>
+            <Input placeholder={t("common.name")} />
+          </Form.Item>
+          <Form.Item name="bg_color" initialValue="#1677ff">
+            <ColorPicker showText />
+          </Form.Item>
+          <Form.Item name="text_color" initialValue="#ffffff">
+            <ColorPicker showText />
+          </Form.Item>
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={createMutation.isPending || updateMutation.isPending}
+            >
+              {editingId ? t("common.update") : t("common.add")}
+            </Button>
+            {editingId && (
+              <Button onClick={cancelEdit} style={{ marginLeft: 8 }}>
+                {t("common.cancel")}
               </Button>
-              {editingId && (
-                <Button onClick={cancelEdit} style={{ marginLeft: 8 }}>
-                  {t("common.cancel")}
-                </Button>
-              )}
-            </Form.Item>
-          </Form>
-        </Card>
+            )}
+          </Form.Item>
+        </Form>
+      </Card>
 
-        <Card title={title}>
-          <List
-            loading={isLoading}
-            dataSource={items}
-            renderItem={(item: T, index: number) => (
+      <Card title={t("vault_settings.labels")}>
+        <List<LabelResponse>
+          loading={isLoading}
+          dataSource={items as LabelResponse[]}
+          renderItem={(item) => {
+            const labelTagColors = getReadableLabelTagColors(
+              item.bg_color,
+              item.text_color,
+            );
+            return (
               <List.Item
                 actions={[
-                  ...(positionEntityType
-                    ? [
-                        <Button
-                          key="up"
-                          size="small"
-                          icon={<ArrowUpOutlined />}
-                          title={t("vault_settings.move_up")}
-                          disabled={index === 0}
-                          onClick={() =>
-                            positionMutation.mutate({
-                              entityType: positionEntityType,
-                              id: item.id,
-                              position: index - 1,
-                            })
-                          }
-                        />,
-                        <Button
-                          key="down"
-                          size="small"
-                          icon={<ArrowDownOutlined />}
-                          title={t("vault_settings.move_down")}
-                          disabled={index === items.length - 1}
-                          onClick={() =>
-                            positionMutation.mutate({
-                              entityType: positionEntityType,
-                              id: item.id,
-                              position: index + 1,
-                            })
-                          }
-                        />,
-                      ]
-                    : []),
                   <Button
-                    key="edit"
                     icon={<EditOutlined />}
                     onClick={() => startEdit(item)}
                   />,
                   <Popconfirm
-                    key="del"
                     title={t("common.delete_confirm")}
-                    onConfirm={() => deleteMutation.mutate(item.id)}
+                    onConfirm={() => deleteMutation.mutate(item.id!)}
                   >
                     <Button danger icon={<DeleteOutlined />} />
                   </Popconfirm>,
@@ -887,1264 +698,1456 @@ interface QuickFactTemplateFormValues {
               >
                 <List.Item.Meta
                   avatar={
-                    item.hex_color && (
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          backgroundColor: item.hex_color,
-                          borderRadius: 4,
-                        }}
-                      />
-                    )
+                    <Tag
+                      color={labelTagColors.color}
+                      style={labelTagColors.style}
+                    >
+                      {item.name}
+                    </Tag>
                   }
-                  title={item[itemNameKey]}
+                  description={item.description}
                 />
               </List.Item>
-            )}
-          />
-        </Card>
-      </Space>
-    );
-  };
+            );
+          }}
+        />
+      </Card>
+    </Space>
+  );
+}
 
-  function QuickFactTemplatesTab({
-    positionMutation,
-  }: {
-    positionMutation: PositionMutation;
-  }) {
-    const { t } = useTranslation();
-    const { message } = App.useApp();
-    const queryClient = useQueryClient();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
+// Generalized CRUD Component for simple lists (Tags, DateTypes, MoodParams, QuickFactTemplates)
+interface ExtraField {
+  name: string;
+  label?: string;
+  type?: "color" | "text";
+  initialValue?: string;
+  rules?: { required?: boolean }[];
+}
+function SimpleCrudTab<
+  T extends {
+    id: number;
+    label?: string;
+    name?: string;
+    hex_color?: string;
+    position?: number;
+  },
+  TCreateRequest,
+  TUpdateRequest,
+>({
+  queryKeySuffix,
+  apiList,
+  apiCreate,
+  apiUpdate,
+  apiDelete,
+  createRequest,
+  updateRequest,
+  title,
+  itemNameKey = "label",
+  extraFields = [],
+  positionEntityType,
+  positionMutation,
+}: {
+  queryKeySuffix: string;
+  apiList: (vid: string) => Promise<{ data?: T[] }>;
+  apiCreate: (vid: string, data: TCreateRequest) => Promise<unknown>;
+  apiUpdate: (
+    vid: string,
+    id: number,
+    data: TUpdateRequest,
+  ) => Promise<unknown>;
+  apiDelete: (vid: string, id: number) => Promise<unknown>;
+  createRequest: (values: Record<string, unknown>) => TCreateRequest;
+  updateRequest: (values: Record<string, unknown>) => TUpdateRequest;
+  title: string;
+  itemNameKey?: "label" | "name";
+  extraFields?: ExtraField[];
+  positionEntityType?: string;
+  positionMutation: PositionMutation;
+}) {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
 
-    const queryKey = ["vault", vaultId, "quickFactTemplates"];
-    const { data: items = [], isLoading } = useQuery({
-      queryKey,
-      queryFn: async () =>
-        (
-          await api.vaultSettings.settingsQuickFactTemplatesList(
-            String(vaultId),
-          )
-        ).data ?? [],
-    });
+  const queryKey = ["vault", vaultId, queryKeySuffix];
+  const { data: items = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: async () => (await apiList(vaultId)).data ?? [],
+  });
 
-    const [form] = Form.useForm<QuickFactTemplateFormValues>();
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const watchedFieldType = Form.useWatch("field_type", form);
-    const selectedFieldType = normalizeQuickFactFieldType(watchedFieldType);
+  const createMutation = useMutation({
+    mutationFn: (data: TCreateRequest) => apiCreate(vaultId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.created"));
+      form.resetFields();
+    },
+  });
 
-    const buildRequest = (
-      values: QuickFactTemplateFormValues,
-    ): CreateQuickFactTemplateRequest => {
-      const fieldType = normalizeQuickFactFieldType(values.field_type);
-      const helpText = values.help_text?.trim();
-      const defaultValue = values.default_value?.trim();
-      const request: CreateQuickFactTemplateRequest = {
-        label: values.label.trim(),
-        field_type: fieldType,
-        required: Boolean(values.required),
-        help_text: helpText || undefined,
-        select_options:
-          fieldType === "select"
-            ? parseSelectOptions(values.select_options)
-            : undefined,
-      };
-
-      if (isQuickFactScalarFieldType(fieldType) && defaultValue) {
-        request.default_value = defaultValue;
-      }
-
-      return request;
-    };
-
-    const createMutation = useMutation({
-      mutationFn: (data: CreateQuickFactTemplateRequest) =>
-        api.vaultSettings.settingsQuickFactTemplatesCreate(
-          String(vaultId),
-          data,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.created"));
-        form.resetFields();
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-
-    const updateMutation = useMutation({
-      mutationFn: ({
-        id,
-        data,
-      }: {
-        id: number;
-        data: UpdateQuickFactTemplateRequest;
-      }) =>
-        api.vaultSettings.settingsQuickFactTemplatesUpdate(
-          String(vaultId),
-          id,
-          data,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.updated"));
-        setEditingId(null);
-        form.resetFields();
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-
-    const deleteMutation = useMutation({
-      mutationFn: (id: number) =>
-        api.vaultSettings.settingsQuickFactTemplatesDelete(String(vaultId), id),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.deleted"));
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-
-    const onFinish = (values: QuickFactTemplateFormValues) => {
-      const request = buildRequest(values);
-      if (editingId) {
-        updateMutation.mutate({ id: editingId, data: request });
-      } else {
-        createMutation.mutate(request);
-      }
-    };
-
-    const startEdit = (item: QuickFactTemplateResponse) => {
-      if (!item.id) return;
-      const fieldType = normalizeQuickFactFieldType(item.field_type);
-      setEditingId(item.id);
-      form.setFieldsValue({
-        label: item.label ?? "",
-        field_type: fieldType,
-        required: item.required ?? false,
-        help_text: item.help_text ?? "",
-        default_value: isQuickFactScalarFieldType(fieldType)
-          ? (item.default_value ?? "")
-          : "",
-        select_options:
-          fieldType === "select" ? (item.select_options ?? []).join("\n") : "",
-      });
-    };
-
-    const cancelEdit = () => {
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: TUpdateRequest }) =>
+      apiUpdate(vaultId, id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.updated"));
       setEditingId(null);
       form.resetFields();
-    };
+    },
+  });
 
-    const fieldTypeOptions = QUICK_FACT_FIELD_TYPES.map((fieldType) => ({
-      value: fieldType,
-      label: t(`vault_settings.quick_fact_templates.type_${fieldType}`),
-    }));
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiDelete(vaultId, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.deleted"));
+    },
+  });
 
-    return (
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Card
-          title={
-            editingId
-              ? t("vault_settings.quick_fact_templates.edit_title")
-              : t("vault_settings.quick_fact_templates.add_title")
-          }
-        >
-          <Form<QuickFactTemplateFormValues>
-            form={form}
-            layout="vertical"
-            onFinish={onFinish}
-            initialValues={{ field_type: "text", required: false }}
-          >
-            <Form.Item
-              name="label"
-              label={t("vault_settings.quick_fact_templates.label")}
-              rules={[{ required: true, message: t("common.required") }]}
-            >
-              <Input
-                placeholder={t(
-                  "vault_settings.quick_fact_templates.label_placeholder",
-                )}
-              />
-            </Form.Item>
+  const [form] = Form.useForm();
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-            <Form.Item
-              name="field_type"
-              label={t("vault_settings.quick_fact_templates.field_type")}
-              rules={[{ required: true, message: t("common.required") }]}
-            >
-              <Select options={fieldTypeOptions} />
-            </Form.Item>
+  const onFinish = (values: Record<string, unknown>) => {
+    // Handle ColorPicker value
+    const processed = { ...values };
+    if (processed.hex_color && typeof processed.hex_color !== "string") {
+      processed.hex_color = (
+        processed.hex_color as { toHexString: () => string }
+      ).toHexString();
+    }
 
-            <Form.Item
-              name="required"
-              label={t("vault_settings.quick_fact_templates.required")}
-              valuePropName="checked"
-            >
-              <Switch />
-            </Form.Item>
-
-            <Form.Item
-              name="help_text"
-              label={t("vault_settings.quick_fact_templates.help_text")}
-            >
-              <Input.TextArea
-                rows={2}
-                placeholder={t(
-                  "vault_settings.quick_fact_templates.help_text_placeholder",
-                )}
-              />
-            </Form.Item>
-
-            {isQuickFactScalarFieldType(selectedFieldType) && (
-              <Form.Item
-                name="default_value"
-                label={t("vault_settings.quick_fact_templates.default_value")}
-              >
-                <Input
-                  placeholder={t(
-                    "vault_settings.quick_fact_templates.default_value_placeholder",
-                  )}
-                />
-              </Form.Item>
-            )}
-
-            {selectedFieldType === "select" && (
-              <Form.Item
-                name="select_options"
-                label={t("vault_settings.quick_fact_templates.select_options")}
-                extra={t("vault_settings.quick_fact_templates.option_per_line")}
-                rules={[
-                  {
-                    validator: async (_rule, value: unknown) => {
-                      const text = typeof value === "string" ? value : "";
-                      if (parseSelectOptions(text).length === 0) {
-                        throw new Error(
-                          t(
-                            "vault_settings.quick_fact_templates.select_options_required",
-                          ),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input.TextArea
-                  rows={4}
-                  placeholder={t(
-                    "vault_settings.quick_fact_templates.select_options_placeholder",
-                  )}
-                />
-              </Form.Item>
-            )}
-
-            <Form.Item>
-              <Space>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={createMutation.isPending || updateMutation.isPending}
-                >
-                  {editingId ? t("common.update") : t("common.add")}
-                </Button>
-                {editingId && (
-                  <Button onClick={cancelEdit}>{t("common.cancel")}</Button>
-                )}
-              </Space>
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card title={t("vault_settings.quick_fact_templates.list_title")}>
-          <List<QuickFactTemplateResponse>
-            loading={isLoading}
-            dataSource={items}
-            renderItem={(item, index) => {
-              const fieldType = normalizeQuickFactFieldType(item.field_type);
-              return (
-                <List.Item
-                  actions={[
-                    <Button
-                      key="up"
-                      size="small"
-                      icon={<ArrowUpOutlined />}
-                      title={t("vault_settings.move_up")}
-                      disabled={index === 0 || !item.id}
-                      onClick={() =>
-                        item.id &&
-                        positionMutation.mutate({
-                          entityType: "quickFactTemplates",
-                          id: item.id,
-                          position: index - 1,
-                        })
-                      }
-                    />,
-                    <Button
-                      key="down"
-                      size="small"
-                      icon={<ArrowDownOutlined />}
-                      title={t("vault_settings.move_down")}
-                      disabled={index === items.length - 1 || !item.id}
-                      onClick={() =>
-                        item.id &&
-                        positionMutation.mutate({
-                          entityType: "quickFactTemplates",
-                          id: item.id,
-                          position: index + 1,
-                        })
-                      }
-                    />,
-                    <Button
-                      key="edit"
-                      icon={<EditOutlined />}
-                      onClick={() => startEdit(item)}
-                      disabled={!item.id}
-                    />,
-                    <Popconfirm
-                      key="del"
-                      title={t("common.delete_confirm")}
-                      onConfirm={() =>
-                        item.id && deleteMutation.mutate(item.id)
-                      }
-                    >
-                      <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        disabled={!item.id}
-                      />
-                    </Popconfirm>,
-                  ]}
-                >
-                  <List.Item.Meta
-                    title={
-                      <Space wrap>
-                        <Text strong>{item.label}</Text>
-                        <Tag>
-                          {t(
-                            `vault_settings.quick_fact_templates.type_${fieldType}`,
-                          )}
-                        </Tag>
-                        {item.required && (
-                          <Tag color="red">
-                            {t("vault_settings.quick_fact_templates.required")}
-                          </Tag>
-                        )}
-                      </Space>
-                    }
-                    description={
-                      <Space direction="vertical" size={2}>
-                        {item.help_text && (
-                          <Text type="secondary">{item.help_text}</Text>
-                        )}
-                        {isQuickFactScalarFieldType(fieldType) &&
-                          item.default_value && (
-                            <Text type="secondary">
-                              {t(
-                                "vault_settings.quick_fact_templates.default_value",
-                              )}
-                              : {item.default_value}
-                            </Text>
-                          )}
-                        {fieldType === "select" &&
-                          (item.select_options?.length ?? 0) > 0 && (
-                            <Text type="secondary">
-                              {t(
-                                "vault_settings.quick_fact_templates.select_options",
-                              )}
-                              : {(item.select_options ?? []).join(", ")}
-                            </Text>
-                          )}
-                      </Space>
-                    }
-                  />
-                </List.Item>
-              );
-            }}
-          />
-        </Card>
-      </Space>
-    );
+    if (editingId) {
+      updateMutation.mutate({
+        id: editingId,
+        data: updateRequest(processed),
+      });
+    } else {
+      createMutation.mutate(createRequest(processed));
+    }
   };
 
-  // Activity Categories - Nested CRUD
-  function ActivitiesTab({ positionMutation }: { positionMutation: PositionMutation }) {
-    const { t } = useTranslation();
-    const { message } = App.useApp();
-    const queryClient = useQueryClient();
-    const { token } = theme.useToken();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
+  const startEdit = (item: T) => {
+    setEditingId(item.id);
+    form.setFieldsValue(item);
+  };
 
-    const queryKey = ["vault", vaultId, "activityCategories"];
-    const { data: categories = [] } = useQuery({
-      queryKey,
-      queryFn: async () =>
-        (
-          await api.vaultSettings.settingsActivityCategoriesList(
-            String(vaultId),
-          )
-        ).data ?? [],
-    });
+  const cancelEdit = () => {
+    setEditingId(null);
+    form.resetFields();
+  };
 
-    const createCategory = useMutation({
-      mutationFn: (data: { label: string }) =>
-        api.vaultSettings.settingsActivityCategoriesCreate(
-          String(vaultId),
-          data,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.created"));
-      },
-    });
-    const updateCategory = useMutation({
-      mutationFn: ({ id, data }: { id: number; data: { label: string } }) =>
-        api.vaultSettings.settingsActivityCategoriesUpdate(
-          String(vaultId),
-          id,
-          data,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("vault_settings.activity_category_updated"));
-        setEditingCatId(null);
-        setEditingCatLabel("");
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-    const deleteCategory = useMutation({
-      mutationFn: (id: number) =>
-        api.vaultSettings.settingsActivityCategoriesDelete(
-          String(vaultId),
-          id,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.deleted"));
-      },
-    });
-
-    const createType = useMutation({
-      mutationFn: ({
-        catId,
-        data,
-      }: {
-        catId: number;
-        data: { label: string };
-      }) =>
-        api.vaultSettings.settingsActivityCategoriesTypesCreate(
-          String(vaultId),
-          catId,
-          data,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.created"));
-      },
-    });
-
-    const updateType = useMutation({
-      mutationFn: ({
-        catId,
-        typeId,
-        data,
-      }: {
-        catId: number;
-        typeId: number;
-        data: { label: string };
-      }) =>
-        api.vaultSettings.settingsActivityCategoriesTypesUpdate(
-          String(vaultId),
-          catId,
-          typeId,
-          data,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("vault_settings.activity_type_updated"));
-        setEditingTypeId(null);
-        setEditingTypeLabel("");
-      },
-      onError: (e: APIError) => message.error(e.message),
-    });
-
-    const deleteType = useMutation({
-      mutationFn: ({ catId, typeId }: { catId: number; typeId: number }) =>
-        api.vaultSettings.settingsActivityCategoriesTypesDelete(
-          String(vaultId),
-          catId,
-          typeId,
-        ),
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey });
-        message.success(t("common.deleted"));
-      },
-    });
-
-    const [newCatLabel, setNewCatLabel] = useState("");
-    const [newTypeLabel, setNewTypeLabel] = useState<Record<number, string>>(
-      {},
-    );
-    const [editingCatId, setEditingCatId] = useState<number | null>(null);
-    const [editingCatLabel, setEditingCatLabel] = useState("");
-    const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
-    const [editingTypeLabel, setEditingTypeLabel] = useState("");
-
-    const handleAddType = (catId: number) => {
-      if (!newTypeLabel[catId]) return;
-      createType.mutate({ catId, data: { label: newTypeLabel[catId] } });
-      setNewTypeLabel((prev) => ({ ...prev, [catId]: "" }));
-    };
-
-    return (
-      <Space direction="vertical" style={{ width: "100%" }}>
-        <Card title={t("vault_settings.add_category")}>
-          <Space>
-            <Input
-              placeholder={t("common.name")}
-              value={newCatLabel}
-              onChange={(e) => setNewCatLabel(e.target.value)}
-              onPressEnter={() => {
-                if (newCatLabel) {
-                  createCategory.mutate({ label: newCatLabel });
-                  setNewCatLabel("");
-                }
-              }}
-            />
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <Card title={editingId ? t("common.edit") : t("common.add")}>
+        <Form form={form} layout="inline" onFinish={onFinish}>
+          <Form.Item name={itemNameKey} rules={[{ required: true }]}>
+            <Input placeholder={t("common.name")} />
+          </Form.Item>
+          {extraFields.map((field) => (
+            <Form.Item
+              key={field.name}
+              name={field.name}
+              initialValue={field.initialValue}
+              rules={field.rules}
+              label={field.label}
+            >
+              {field.type === "color" ? <ColorPicker showText /> : <Input />}
+            </Form.Item>
+          ))}
+          <Form.Item>
             <Button
               type="primary"
-              onClick={() => {
-                if (newCatLabel) {
-                  createCategory.mutate({ label: newCatLabel });
-                  setNewCatLabel("");
-                }
-              }}
+              htmlType="submit"
+              loading={createMutation.isPending || updateMutation.isPending}
             >
-              {t("common.add")}
+              {editingId ? t("common.update") : t("common.add")}
             </Button>
-          </Space>
-        </Card>
+            {editingId && (
+              <Button onClick={cancelEdit} style={{ marginLeft: 8 }}>
+                {t("common.cancel")}
+              </Button>
+            )}
+          </Form.Item>
+        </Form>
+      </Card>
 
-        <Card title={t("vault_settings.activities")}>
-          <Collapse accordion>
-            {categories.map(
-              (cat: ActivityCategoryResponse, catIndex: number) => (
-                <Collapse.Panel
-                  key={cat.id!}
-                  header={
-                    editingCatId === cat.id ? (
-                      <Space onClick={(e) => e.stopPropagation()}>
-                        <Input
-                          size="small"
-                          value={editingCatLabel}
-                          onChange={(e) => setEditingCatLabel(e.target.value)}
-                          onPressEnter={() => {
-                            if (editingCatLabel.trim())
-                              updateCategory.mutate({
-                                id: cat.id!,
-                                data: { label: editingCatLabel.trim() },
-                              });
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <Button
-                          size="small"
-                          type="primary"
-                          loading={updateCategory.isPending}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (editingCatLabel.trim())
-                              updateCategory.mutate({
-                                id: cat.id!,
-                                data: { label: editingCatLabel.trim() },
-                              });
-                          }}
-                        >
-                          {t("common.save")}
-                        </Button>
-                        <Button
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingCatId(null);
-                            setEditingCatLabel("");
-                          }}
-                        >
-                          {t("common.cancel")}
-                        </Button>
-                      </Space>
-                    ) : (
-                      cat.label
-                    )
-                  }
-                  extra={
-                    <Space onClick={(e) => e.stopPropagation()}>
+      <Card title={title}>
+        <List
+          loading={isLoading}
+          dataSource={items}
+          renderItem={(item: T, index: number) => (
+            <List.Item
+              actions={[
+                ...(positionEntityType
+                  ? [
                       <Button
+                        key="up"
                         size="small"
                         icon={<ArrowUpOutlined />}
                         title={t("vault_settings.move_up")}
-                        disabled={catIndex === 0}
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        disabled={index === 0}
+                        onClick={() =>
                           positionMutation.mutate({
-                            entityType: "activityCategories",
-                            id: cat.id!,
-                            position: catIndex - 1,
-                          });
-                        }}
-                      />
+                            entityType: positionEntityType,
+                            id: item.id,
+                            position: index - 1,
+                          })
+                        }
+                      />,
                       <Button
+                        key="down"
                         size="small"
                         icon={<ArrowDownOutlined />}
                         title={t("vault_settings.move_down")}
-                        disabled={catIndex === categories.length - 1}
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        disabled={index === items.length - 1}
+                        onClick={() =>
                           positionMutation.mutate({
-                            entityType: "activityCategories",
-                            id: cat.id!,
-                            position: catIndex + 1,
-                          });
-                        }}
-                      />
-                      <Button
-                        size="small"
-                        icon={<EditOutlined />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingCatId(cat.id!);
-                          setEditingCatLabel(cat.label ?? "");
-                        }}
-                      />
-                      <Popconfirm
-                        title={t("common.delete_confirm")}
-                        onConfirm={(e) => {
-                          e?.stopPropagation();
-                          deleteCategory.mutate(cat.id!);
-                        }}
-                      >
-                        <DeleteOutlined
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ color: token.colorError }}
-                        />
-                      </Popconfirm>
+                            entityType: positionEntityType,
+                            id: item.id,
+                            position: index + 1,
+                          })
+                        }
+                      />,
+                    ]
+                  : []),
+                <Button
+                  key="edit"
+                  icon={<EditOutlined />}
+                  onClick={() => startEdit(item)}
+                />,
+                <Popconfirm
+                  key="del"
+                  title={t("common.delete_confirm")}
+                  onConfirm={() => deleteMutation.mutate(item.id)}
+                >
+                  <Button danger icon={<DeleteOutlined />} />
+                </Popconfirm>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={
+                  item.hex_color && (
+                    <div
+                      style={{
+                        width: 20,
+                        height: 20,
+                        backgroundColor: item.hex_color,
+                        borderRadius: 4,
+                      }}
+                    />
+                  )
+                }
+                title={item[itemNameKey]}
+              />
+            </List.Item>
+          )}
+        />
+      </Card>
+    </Space>
+  );
+}
+
+function QuickFactTemplatesTab({
+  positionMutation,
+}: {
+  positionMutation: PositionMutation;
+}) {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+
+  const queryKey = ["vault", vaultId, "quickFactTemplates"];
+  const { data: items = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: async () =>
+      (await api.vaultSettings.settingsQuickFactTemplatesList(String(vaultId)))
+        .data ?? [],
+  });
+
+  const [form] = Form.useForm<QuickFactTemplateFormValues>();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const watchedFieldType = Form.useWatch("field_type", form);
+  const selectedFieldType = normalizeQuickFactFieldType(watchedFieldType);
+
+  const buildRequest = (
+    values: QuickFactTemplateFormValues,
+  ): CreateQuickFactTemplateRequest => {
+    const fieldType = normalizeQuickFactFieldType(values.field_type);
+    const helpText = values.help_text?.trim();
+    const defaultValue = values.default_value?.trim();
+    const request: CreateQuickFactTemplateRequest = {
+      label: values.label.trim(),
+      field_type: fieldType,
+      required: Boolean(values.required),
+      help_text: helpText || undefined,
+      select_options:
+        fieldType === "select"
+          ? parseSelectOptions(values.select_options)
+          : undefined,
+    };
+
+    if (isQuickFactScalarFieldType(fieldType) && defaultValue) {
+      request.default_value = defaultValue;
+    }
+
+    return request;
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (data: CreateQuickFactTemplateRequest) =>
+      api.vaultSettings.settingsQuickFactTemplatesCreate(String(vaultId), data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.created"));
+      form.resetFields();
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: number;
+      data: UpdateQuickFactTemplateRequest;
+    }) =>
+      api.vaultSettings.settingsQuickFactTemplatesUpdate(
+        String(vaultId),
+        id,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.updated"));
+      setEditingId(null);
+      form.resetFields();
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) =>
+      api.vaultSettings.settingsQuickFactTemplatesDelete(String(vaultId), id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.deleted"));
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const onFinish = (values: QuickFactTemplateFormValues) => {
+    const request = buildRequest(values);
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, data: request });
+    } else {
+      createMutation.mutate(request);
+    }
+  };
+
+  const startEdit = (item: QuickFactTemplateResponse) => {
+    if (!item.id) return;
+    const fieldType = normalizeQuickFactFieldType(item.field_type);
+    setEditingId(item.id);
+    form.setFieldsValue({
+      label: item.label ?? "",
+      field_type: fieldType,
+      required: item.required ?? false,
+      help_text: item.help_text ?? "",
+      default_value: isQuickFactScalarFieldType(fieldType)
+        ? (item.default_value ?? "")
+        : "",
+      select_options:
+        fieldType === "select" ? (item.select_options ?? []).join("\n") : "",
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    form.resetFields();
+  };
+
+  const fieldTypeOptions = QUICK_FACT_FIELD_TYPES.map((fieldType) => ({
+    value: fieldType,
+    label: t(`vault_settings.quick_fact_templates.type_${fieldType}`),
+  }));
+
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <Card
+        title={
+          editingId
+            ? t("vault_settings.quick_fact_templates.edit_title")
+            : t("vault_settings.quick_fact_templates.add_title")
+        }
+      >
+        <Form<QuickFactTemplateFormValues>
+          form={form}
+          layout="vertical"
+          onFinish={onFinish}
+          initialValues={{ field_type: "text", required: false }}
+        >
+          <Form.Item
+            name="label"
+            label={t("vault_settings.quick_fact_templates.label")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Input
+              placeholder={t(
+                "vault_settings.quick_fact_templates.label_placeholder",
+              )}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="field_type"
+            label={t("vault_settings.quick_fact_templates.field_type")}
+            rules={[{ required: true, message: t("common.required") }]}
+          >
+            <Select options={fieldTypeOptions} />
+          </Form.Item>
+
+          <Form.Item
+            name="required"
+            label={t("vault_settings.quick_fact_templates.required")}
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+
+          <Form.Item
+            name="help_text"
+            label={t("vault_settings.quick_fact_templates.help_text")}
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder={t(
+                "vault_settings.quick_fact_templates.help_text_placeholder",
+              )}
+            />
+          </Form.Item>
+
+          {isQuickFactScalarFieldType(selectedFieldType) && (
+            <Form.Item
+              name="default_value"
+              label={t("vault_settings.quick_fact_templates.default_value")}
+            >
+              <Input
+                placeholder={t(
+                  "vault_settings.quick_fact_templates.default_value_placeholder",
+                )}
+              />
+            </Form.Item>
+          )}
+
+          {selectedFieldType === "select" && (
+            <Form.Item
+              name="select_options"
+              label={t("vault_settings.quick_fact_templates.select_options")}
+              extra={t("vault_settings.quick_fact_templates.option_per_line")}
+              rules={[
+                {
+                  validator: async (_rule, value: unknown) => {
+                    const text = typeof value === "string" ? value : "";
+                    if (parseSelectOptions(text).length === 0) {
+                      throw new Error(
+                        t(
+                          "vault_settings.quick_fact_templates.select_options_required",
+                        ),
+                      );
+                    }
+                  },
+                },
+              ]}
+            >
+              <Input.TextArea
+                rows={4}
+                placeholder={t(
+                  "vault_settings.quick_fact_templates.select_options_placeholder",
+                )}
+              />
+            </Form.Item>
+          )}
+
+          <Form.Item>
+            <Space>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={createMutation.isPending || updateMutation.isPending}
+              >
+                {editingId ? t("common.update") : t("common.add")}
+              </Button>
+              {editingId && (
+                <Button onClick={cancelEdit}>{t("common.cancel")}</Button>
+              )}
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
+
+      <Card title={t("vault_settings.quick_fact_templates.list_title")}>
+        <List<QuickFactTemplateResponse>
+          loading={isLoading}
+          dataSource={items}
+          renderItem={(item, index) => {
+            const fieldType = normalizeQuickFactFieldType(item.field_type);
+            return (
+              <List.Item
+                actions={[
+                  <Button
+                    key="up"
+                    size="small"
+                    icon={<ArrowUpOutlined />}
+                    title={t("vault_settings.move_up")}
+                    disabled={index === 0 || !item.id}
+                    onClick={() =>
+                      item.id &&
+                      positionMutation.mutate({
+                        entityType: "quickFactTemplates",
+                        id: item.id,
+                        position: index - 1,
+                      })
+                    }
+                  />,
+                  <Button
+                    key="down"
+                    size="small"
+                    icon={<ArrowDownOutlined />}
+                    title={t("vault_settings.move_down")}
+                    disabled={index === items.length - 1 || !item.id}
+                    onClick={() =>
+                      item.id &&
+                      positionMutation.mutate({
+                        entityType: "quickFactTemplates",
+                        id: item.id,
+                        position: index + 1,
+                      })
+                    }
+                  />,
+                  <Button
+                    key="edit"
+                    icon={<EditOutlined />}
+                    onClick={() => startEdit(item)}
+                    disabled={!item.id}
+                  />,
+                  <Popconfirm
+                    key="del"
+                    title={t("common.delete_confirm")}
+                    onConfirm={() => item.id && deleteMutation.mutate(item.id)}
+                  >
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      disabled={!item.id}
+                    />
+                  </Popconfirm>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <Space wrap>
+                      <Text strong>{item.label}</Text>
+                      <Tag>
+                        {t(
+                          `vault_settings.quick_fact_templates.type_${fieldType}`,
+                        )}
+                      </Tag>
+                      {item.required && (
+                        <Tag color="red">
+                          {t("vault_settings.quick_fact_templates.required")}
+                        </Tag>
+                      )}
                     </Space>
                   }
-                >
-                  <List
-                    dataSource={cat.types}
-                    header={
-                      <Space style={{ width: "100%" }}>
-                        <Input
-                          placeholder={t("vault_settings.add_type")}
-                          value={newTypeLabel[cat.id!] || ""}
-                          onChange={(e) =>
-                            setNewTypeLabel((prev) => ({
-                              ...prev,
-                              [cat.id!]: e.target.value,
-                            }))
-                          }
-                          onPressEnter={() => handleAddType(cat.id!)}
-                        />
-                        <Button
-                          type="dashed"
-                          onClick={() => handleAddType(cat.id!)}
-                        >
-                          {t("common.add")}
-                        </Button>
-                      </Space>
-                    }
-                    renderItem={(
-                      type: ActivityCategoryTypeResponse,
-                      typeIndex: number,
-                    ) => (
-                      <List.Item
-                        actions={[
-                          <Button
-                            key="up"
-                            size="small"
-                            icon={<ArrowUpOutlined />}
-                            title={t("vault_settings.move_up")}
-                            type="text"
-                            disabled={typeIndex === 0}
-                            onClick={() =>
-                              positionMutation.mutate({
-                                entityType: "activityTypes",
-                                id: type.id!,
-                                position: typeIndex - 1,
-                                categoryId: cat.id!,
-                              })
-                            }
-                          />,
-                          <Button
-                            key="down"
-                            size="small"
-                            icon={<ArrowDownOutlined />}
-                            title={t("vault_settings.move_down")}
-                            type="text"
-                            disabled={
-                              typeIndex === (cat.types?.length ?? 1) - 1
-                            }
-                            onClick={() =>
-                              positionMutation.mutate({
-                                entityType: "activityTypes",
-                                id: type.id!,
-                                position: typeIndex + 1,
-                                categoryId: cat.id!,
-                              })
-                            }
-                          />,
-                          ...(editingTypeId === type.id
-                            ? [
-                                <Button
-                                  key="save"
-                                  size="small"
-                                  type="primary"
-                                  loading={updateType.isPending}
-                                  onClick={() => {
-                                    if (editingTypeLabel.trim())
-                                      updateType.mutate({
-                                        catId: cat.id!,
-                                        typeId: type.id!,
-                                        data: {
-                                          label: editingTypeLabel.trim(),
-                                        },
-                                      });
-                                  }}
-                                >
-                                  {t("common.save")}
-                                </Button>,
-                                <Button
-                                  key="cancel-edit"
-                                  size="small"
-                                  type="text"
-                                  onClick={() => {
-                                    setEditingTypeId(null);
-                                    setEditingTypeLabel("");
-                                  }}
-                                >
-                                  {t("common.cancel")}
-                                </Button>,
-                              ]
-                            : [
-                                <Button
-                                  key="edit"
-                                  size="small"
-                                  icon={<EditOutlined />}
-                                  type="text"
-                                  onClick={() => {
-                                    setEditingTypeId(type.id!);
-                                    setEditingTypeLabel(type.label ?? "");
-                                  }}
-                                />,
-                              ]),
-                          <Popconfirm
-                            key="del"
-                            title={t("common.delete_confirm")}
-                            onConfirm={() =>
-                              deleteType.mutate({
-                                catId: cat.id!,
-                                typeId: type.id!,
-                              })
-                            }
-                          >
-                            <Button
-                              danger
-                              size="small"
-                              icon={<DeleteOutlined />}
-                              type="text"
-                            />
-                          </Popconfirm>,
-                        ]}
-                      >
-                        {editingTypeId === type.id ? (
-                          <Input
-                            size="small"
-                            value={editingTypeLabel}
-                            onChange={(e) =>
-                              setEditingTypeLabel(e.target.value)
-                            }
-                            onPressEnter={() => {
-                              if (editingTypeLabel.trim())
-                                updateType.mutate({
-                                  catId: cat.id!,
-                                  typeId: type.id!,
-                                  data: { label: editingTypeLabel.trim() },
-                                });
-                            }}
-                          />
-                        ) : (
-                          type.label
+                  description={
+                    <Space direction="vertical" size={2}>
+                      {item.help_text && (
+                        <Text type="secondary">{item.help_text}</Text>
+                      )}
+                      {isQuickFactScalarFieldType(fieldType) &&
+                        item.default_value && (
+                          <Text type="secondary">
+                            {t(
+                              "vault_settings.quick_fact_templates.default_value",
+                            )}
+                            : {item.default_value}
+                          </Text>
                         )}
-                      </List.Item>
-                    )}
-                  />
-                </Collapse.Panel>
-              ),
-            )}
-          </Collapse>
-        </Card>
-      </Space>
-    );
+                      {fieldType === "select" &&
+                        (item.select_options?.length ?? 0) > 0 && (
+                          <Text type="secondary">
+                            {t(
+                              "vault_settings.quick_fact_templates.select_options",
+                            )}
+                            : {(item.select_options ?? []).join(", ")}
+                          </Text>
+                        )}
+                    </Space>
+                  }
+                />
+              </List.Item>
+            );
+          }}
+        />
+      </Card>
+    </Space>
+  );
+}
+
+// Activity Categories - Nested CRUD
+function ActivitiesTab({
+  positionMutation,
+}: {
+  positionMutation: PositionMutation;
+}) {
+  const { t } = useTranslation();
+  const { message } = App.useApp();
+  const queryClient = useQueryClient();
+  const { token } = theme.useToken();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+
+  const queryKey = ["vault", vaultId, "activityCategories"];
+  const { data: categories = [] } = useQuery({
+    queryKey,
+    queryFn: async () =>
+      (await api.vaultSettings.settingsActivityCategoriesList(String(vaultId)))
+        .data ?? [],
+  });
+
+  const createCategory = useMutation({
+    mutationFn: (data: { label: string }) =>
+      api.vaultSettings.settingsActivityCategoriesCreate(String(vaultId), data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.created"));
+    },
+  });
+  const updateCategory = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { label: string } }) =>
+      api.vaultSettings.settingsActivityCategoriesUpdate(
+        String(vaultId),
+        id,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("vault_settings.activity_category_updated"));
+      setEditingCatId(null);
+      setEditingCatLabel("");
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+  const deleteCategory = useMutation({
+    mutationFn: (id: number) =>
+      api.vaultSettings.settingsActivityCategoriesDelete(String(vaultId), id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.deleted"));
+    },
+  });
+
+  const createType = useMutation({
+    mutationFn: ({ catId, data }: { catId: number; data: { label: string } }) =>
+      api.vaultSettings.settingsActivityCategoriesTypesCreate(
+        String(vaultId),
+        catId,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.created"));
+    },
+  });
+
+  const updateType = useMutation({
+    mutationFn: ({
+      catId,
+      typeId,
+      data,
+    }: {
+      catId: number;
+      typeId: number;
+      data: { label: string };
+    }) =>
+      api.vaultSettings.settingsActivityCategoriesTypesUpdate(
+        String(vaultId),
+        catId,
+        typeId,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("vault_settings.activity_type_updated"));
+      setEditingTypeId(null);
+      setEditingTypeLabel("");
+    },
+    onError: (e: APIError) => message.error(e.message),
+  });
+
+  const deleteType = useMutation({
+    mutationFn: ({ catId, typeId }: { catId: number; typeId: number }) =>
+      api.vaultSettings.settingsActivityCategoriesTypesDelete(
+        String(vaultId),
+        catId,
+        typeId,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      message.success(t("common.deleted"));
+    },
+  });
+
+  const [newCatLabel, setNewCatLabel] = useState("");
+  const [newTypeLabel, setNewTypeLabel] = useState<Record<number, string>>({});
+  const [editingCatId, setEditingCatId] = useState<number | null>(null);
+  const [editingCatLabel, setEditingCatLabel] = useState("");
+  const [editingTypeId, setEditingTypeId] = useState<number | null>(null);
+  const [editingTypeLabel, setEditingTypeLabel] = useState("");
+
+  const handleAddType = (catId: number) => {
+    if (!newTypeLabel[catId]) return;
+    createType.mutate({ catId, data: { label: newTypeLabel[catId] } });
+    setNewTypeLabel((prev) => ({ ...prev, [catId]: "" }));
   };
 
-  // ── CSV Import ──────────────────────────────────────────────────────────
-
-  // Parse CSV header row in the browser (handles basic quoting).
-  function parseCSVHeaders(text: string): string[] {
-    const firstLine = text.split(/\r?\n/)[0] ?? "";
-    const headers: string[] = [];
-    let cur = "";
-    let inQuote = false;
-    for (let i = 0; i < firstLine.length; i++) {
-      const ch = firstLine[i];
-      if (ch === '"') {
-        inQuote = !inQuote;
-      } else if (ch === "," && !inQuote) {
-        headers.push(cur.trim());
-        cur = "";
-      } else {
-        cur += ch;
-      }
-    }
-    headers.push(cur.trim());
-    return headers;
-  }
-
-  // Auto-map columns: lowercase-normalise both sides and pick the first match.
-  function autoMap(headers: string[]): Record<string, string> {
-    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const aliases: Record<string, string[]> = {
-      first_name: ["firstname", "first", "givenname", "prenom"],
-      last_name: ["lastname", "last", "surname", "familyname", "nom"],
-      middle_name: ["middlename", "middle"],
-      nickname: ["nickname", "alias", "pseudo"],
-      prefix: ["prefix", "title", "salutation"],
-      suffix: ["suffix"],
-      gender: ["gender", "sexe", "genre"],
-      birthday: ["birthday", "birthdate", "dob", "dateofbirth", "naissance"],
-      email: ["email", "emailaddress", "mail", "courriel"],
-      phone: ["phone", "phonenumber", "mobile", "telephone", "tel"],
-      company: [
-        "company",
-        "organization",
-        "organisation",
-        "employer",
-        "societe",
-      ],
-      job_title: ["jobtitle", "job", "position", "title", "role", "fonction"],
-      tags: ["tags", "labels", "categories"],
-      groups: ["groups", "groupes"],
-      notes: ["notes", "note", "comment", "comments", "remarks"],
-      address_street: ["street", "address", "addressstreet", "line1", "rue"],
-      address_city: ["city", "ville"],
-      address_state: ["state", "province", "region"],
-      address_postal_code: [
-        "postalcode",
-        "zip",
-        "zipcode",
-        "postcode",
-        "codepostal",
-      ],
-      address_country: ["country", "pays"],
-    };
-    const mapping: Record<string, string> = {};
-    for (const [field, aliasList] of Object.entries(aliases)) {
-      const match = headers.find((h) => aliasList.includes(norm(h)));
-      mapping[field] = match ?? "";
-    }
-    return mapping;
-  }
-
-  function CSVImportTab() {
-    const { t } = useTranslation();
-    const queryClient = useQueryClient();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
-    const importInvalidationScopes = {
-      vaultIds: [String(vaultId)],
-      contacts: [],
-    } as const;
-
-    const CSV_FIELDS: { key: string; label: string }[] = [
-      {
-        key: "first_name",
-        label: t("vault_settings.csv_import.field_first_name"),
-      },
-      {
-        key: "last_name",
-        label: t("vault_settings.csv_import.field_last_name"),
-      },
-      {
-        key: "middle_name",
-        label: t("vault_settings.csv_import.field_middle_name"),
-      },
-      {
-        key: "nickname",
-        label: t("vault_settings.csv_import.field_nickname"),
-      },
-      { key: "prefix", label: t("vault_settings.csv_import.field_prefix") },
-      { key: "suffix", label: t("vault_settings.csv_import.field_suffix") },
-      { key: "gender", label: t("vault_settings.csv_import.field_gender") },
-      {
-        key: "birthday",
-        label: t("vault_settings.csv_import.field_birthday"),
-      },
-      { key: "email", label: t("vault_settings.csv_import.field_email") },
-      { key: "phone", label: t("vault_settings.csv_import.field_phone") },
-      { key: "company", label: t("vault_settings.csv_import.field_company") },
-      {
-        key: "job_title",
-        label: t("vault_settings.csv_import.field_job_title"),
-      },
-      { key: "tags", label: t("vault_settings.csv_import.field_tags") },
-      { key: "groups", label: t("vault_settings.csv_import.field_groups") },
-      { key: "notes", label: t("vault_settings.csv_import.field_notes") },
-      {
-        key: "address_street",
-        label: t("vault_settings.csv_import.field_address_street"),
-      },
-      {
-        key: "address_city",
-        label: t("vault_settings.csv_import.field_address_city"),
-      },
-      {
-        key: "address_state",
-        label: t("vault_settings.csv_import.field_address_state"),
-      },
-      {
-        key: "address_postal_code",
-        label: t("vault_settings.csv_import.field_address_postal_code"),
-      },
-      {
-        key: "address_country",
-        label: t("vault_settings.csv_import.field_address_country"),
-      },
-    ];
-
-    const [step, setStep] = useState<"upload" | "map" | "done">("upload");
-    const [csvFile, setCsvFile] = useState<File | null>(null);
-    const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-    const [mapping, setMapping] = useState<Record<string, string>>({});
-    const [importing, setImporting] = useState(false);
-    const [importResult, setImportResult] =
-      useState<GithubComNaibaBondsInternalDtoCSVImportResponse | null>(null);
-    const [importError, setImportError] = useState<string | null>(null);
-
-    const handleBeforeUpload = (file: File): boolean => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = (e.target?.result as string) ?? "";
-        const headers = parseCSVHeaders(text);
-        setCsvHeaders(headers);
-        setMapping(autoMap(headers));
-        setCsvFile(file);
-        setStep("map");
-      };
-      reader.readAsText(file);
-      return false;
-    };
-
-    const handleImport = async () => {
-      if (!csvFile) return;
-      setImporting(true);
-      setImportError(null);
-      try {
-        const res = await api.vaultSettings.settingsImportCsvCreate(
-          String(vaultId),
-          {
-            file: csvFile,
-            mapping: JSON.stringify(mapping),
-          },
-        );
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: ["vaults", String(vaultId), "contacts"],
-          }),
-          invalidateFeedQueries(queryClient, importInvalidationScopes),
-          invalidateCalendarQueries(queryClient, importInvalidationScopes),
-        ]);
-        setImportResult(res.data ?? null);
-        setStep("done");
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : t("vault_settings.csv_import.error");
-        setImportError(msg);
-      } finally {
-        setImporting(false);
-      }
-    };
-
-    const reset = () => {
-      setCsvFile(null);
-      setCsvHeaders([]);
-      setMapping({});
-      setImportResult(null);
-      setImportError(null);
-      setStep("upload");
-    };
-
-    return (
-      <Space direction="vertical" style={{ width: "100%" }} size="large">
-        <Title level={4} style={{ margin: 0 }}>
-          {t("vault_settings.csv_import.title")}
-        </Title>
-        <Text type="secondary">
-          {t("vault_settings.csv_import.description")}
-        </Text>
-
-        {step === "upload" && (
-          <Upload.Dragger
-            accept=".csv"
-            showUploadList={false}
-            beforeUpload={handleBeforeUpload}
-            multiple={false}
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      <Card title={t("vault_settings.add_category")}>
+        <Space>
+          <Input
+            placeholder={t("common.name")}
+            value={newCatLabel}
+            onChange={(e) => setNewCatLabel(e.target.value)}
+            onPressEnter={() => {
+              if (newCatLabel) {
+                createCategory.mutate({ label: newCatLabel });
+                setNewCatLabel("");
+              }
+            }}
+          />
+          <Button
+            type="primary"
+            onClick={() => {
+              if (newCatLabel) {
+                createCategory.mutate({ label: newCatLabel });
+                setNewCatLabel("");
+              }
+            }}
           >
-            <p className="ant-upload-drag-icon">
-              <InboxOutlined />
-            </p>
-            <p className="ant-upload-text">
-              {t("vault_settings.csv_import.upload_hint")}
-            </p>
-            <p className="ant-upload-hint">
-              {t("vault_settings.csv_import.upload_next_step")}
-            </p>
-            <p className="ant-upload-hint">
-              {t("vault_settings.csv_import.csv_only")}
-            </p>
-          </Upload.Dragger>
-        )}
+            {t("common.add")}
+          </Button>
+        </Space>
+      </Card>
 
-        {step === "map" && (
-          <Space direction="vertical" style={{ width: "100%" }} size="middle">
-            <Text strong>{csvFile?.name}</Text>
-            <Text type="secondary">
-              {t("vault_settings.csv_import.company_note")}
-            </Text>
-            <Text type="secondary">
-              {t("vault_settings.csv_import.groups_note")}
-            </Text>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-              }}
-            >
-              {CSV_FIELDS.map(({ key, label }) => (
-                <div key={key} style={{ display: "contents" }}>
-                  <Text style={{ alignSelf: "center" }}>{label}</Text>
-                  <Select
-                    style={{ width: "100%" }}
-                    value={mapping[key] ?? ""}
-                    onChange={(v) =>
-                      setMapping((prev) => ({ ...prev, [key]: v }))
-                    }
+      <Card title={t("vault_settings.activities")}>
+        <Collapse accordion>
+          {categories.map((cat: ActivityCategoryResponse, catIndex: number) => (
+            <Collapse.Panel
+              key={cat.id!}
+              header={
+                editingCatId === cat.id ? (
+                  <Space onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      size="small"
+                      value={editingCatLabel}
+                      onChange={(e) => setEditingCatLabel(e.target.value)}
+                      onPressEnter={() => {
+                        if (editingCatLabel.trim())
+                          updateCategory.mutate({
+                            id: cat.id!,
+                            data: { label: editingCatLabel.trim() },
+                          });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <Button
+                      size="small"
+                      type="primary"
+                      loading={updateCategory.isPending}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (editingCatLabel.trim())
+                          updateCategory.mutate({
+                            id: cat.id!,
+                            data: { label: editingCatLabel.trim() },
+                          });
+                      }}
+                    >
+                      {t("common.save")}
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCatId(null);
+                        setEditingCatLabel("");
+                      }}
+                    >
+                      {t("common.cancel")}
+                    </Button>
+                  </Space>
+                ) : (
+                  cat.label
+                )
+              }
+              extra={
+                <Space onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="small"
+                    icon={<ArrowUpOutlined />}
+                    title={t("vault_settings.move_up")}
+                    disabled={catIndex === 0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      positionMutation.mutate({
+                        entityType: "activityCategories",
+                        id: cat.id!,
+                        position: catIndex - 1,
+                      });
+                    }}
+                  />
+                  <Button
+                    size="small"
+                    icon={<ArrowDownOutlined />}
+                    title={t("vault_settings.move_down")}
+                    disabled={catIndex === categories.length - 1}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      positionMutation.mutate({
+                        entityType: "activityCategories",
+                        id: cat.id!,
+                        position: catIndex + 1,
+                      });
+                    }}
+                  />
+                  <Button
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingCatId(cat.id!);
+                      setEditingCatLabel(cat.label ?? "");
+                    }}
+                  />
+                  <Popconfirm
+                    title={t("common.delete_confirm")}
+                    onConfirm={(e) => {
+                      e?.stopPropagation();
+                      deleteCategory.mutate(cat.id!);
+                    }}
                   >
-                    <Option value="">
-                      {t("vault_settings.csv_import.not_mapped")}
-                    </Option>
-                    {csvHeaders.map((h) => (
-                      <Option key={h} value={h}>
-                        {h}
-                      </Option>
-                    ))}
-                  </Select>
-                </div>
-              ))}
-            </div>
-            {importError && (
-              <Alert type="error" message={importError} showIcon />
-            )}
-            <Space>
-              <Button onClick={reset}>
-                ←{t("vault_settings.csv_import.step_upload")}
-              </Button>
-              <Button type="primary" onClick={handleImport} loading={importing}>
-                {t("vault_settings.csv_import.import_button")}
-              </Button>
-            </Space>
-          </Space>
-        )}
-
-        {step === "done" && importResult && (
-          <Space direction="vertical" style={{ width: "100%" }} size="middle">
-            <Alert
-              type="success"
-              message={t("vault_settings.csv_import.success")}
-              description={
-                <Space direction="vertical" size="small">
-                  <Text>
-                    {t("vault_settings.csv_import.contacts_imported")}:{" "}
-                    {importResult.imported_contacts}
-                  </Text>
-                  {(importResult.skipped_count ?? 0) > 0 && (
-                    <Text type="warning">
-                      {t("vault_settings.csv_import.skipped")}:{" "}
-                      {importResult.skipped_count}
-                    </Text>
-                  )}
-                  {importResult.errors && importResult.errors.length > 0 && (
-                    <Text type="danger">
-                      {t("vault_settings.csv_import.errors")}:{" "}
-                      {importResult.errors.slice(0, 5).join("; ")}
-                    </Text>
-                  )}
+                    <DeleteOutlined
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ color: token.colorError }}
+                    />
+                  </Popconfirm>
                 </Space>
               }
-              showIcon
-            />
-            <Button onClick={reset}>
-              ←{t("vault_settings.csv_import.step_upload")}
-            </Button>
-          </Space>
-        )}
-      </Space>
-    );
+            >
+              <List
+                dataSource={cat.types}
+                header={
+                  <Space style={{ width: "100%" }}>
+                    <Input
+                      placeholder={t("vault_settings.add_type")}
+                      value={newTypeLabel[cat.id!] || ""}
+                      onChange={(e) =>
+                        setNewTypeLabel((prev) => ({
+                          ...prev,
+                          [cat.id!]: e.target.value,
+                        }))
+                      }
+                      onPressEnter={() => handleAddType(cat.id!)}
+                    />
+                    <Button
+                      type="dashed"
+                      onClick={() => handleAddType(cat.id!)}
+                    >
+                      {t("common.add")}
+                    </Button>
+                  </Space>
+                }
+                renderItem={(
+                  type: ActivityCategoryTypeResponse,
+                  typeIndex: number,
+                ) => (
+                  <List.Item
+                    actions={[
+                      <Button
+                        key="up"
+                        size="small"
+                        icon={<ArrowUpOutlined />}
+                        title={t("vault_settings.move_up")}
+                        type="text"
+                        disabled={typeIndex === 0}
+                        onClick={() =>
+                          positionMutation.mutate({
+                            entityType: "activityTypes",
+                            id: type.id!,
+                            position: typeIndex - 1,
+                            categoryId: cat.id!,
+                          })
+                        }
+                      />,
+                      <Button
+                        key="down"
+                        size="small"
+                        icon={<ArrowDownOutlined />}
+                        title={t("vault_settings.move_down")}
+                        type="text"
+                        disabled={typeIndex === (cat.types?.length ?? 1) - 1}
+                        onClick={() =>
+                          positionMutation.mutate({
+                            entityType: "activityTypes",
+                            id: type.id!,
+                            position: typeIndex + 1,
+                            categoryId: cat.id!,
+                          })
+                        }
+                      />,
+                      ...(editingTypeId === type.id
+                        ? [
+                            <Button
+                              key="save"
+                              size="small"
+                              type="primary"
+                              loading={updateType.isPending}
+                              onClick={() => {
+                                if (editingTypeLabel.trim())
+                                  updateType.mutate({
+                                    catId: cat.id!,
+                                    typeId: type.id!,
+                                    data: {
+                                      label: editingTypeLabel.trim(),
+                                    },
+                                  });
+                              }}
+                            >
+                              {t("common.save")}
+                            </Button>,
+                            <Button
+                              key="cancel-edit"
+                              size="small"
+                              type="text"
+                              onClick={() => {
+                                setEditingTypeId(null);
+                                setEditingTypeLabel("");
+                              }}
+                            >
+                              {t("common.cancel")}
+                            </Button>,
+                          ]
+                        : [
+                            <Button
+                              key="edit"
+                              size="small"
+                              icon={<EditOutlined />}
+                              type="text"
+                              onClick={() => {
+                                setEditingTypeId(type.id!);
+                                setEditingTypeLabel(type.label ?? "");
+                              }}
+                            />,
+                          ]),
+                      <Popconfirm
+                        key="del"
+                        title={t("common.delete_confirm")}
+                        onConfirm={() =>
+                          deleteType.mutate({
+                            catId: cat.id!,
+                            typeId: type.id!,
+                          })
+                        }
+                      >
+                        <Button
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          type="text"
+                        />
+                      </Popconfirm>,
+                    ]}
+                  >
+                    {editingTypeId === type.id ? (
+                      <Input
+                        size="small"
+                        value={editingTypeLabel}
+                        onChange={(e) => setEditingTypeLabel(e.target.value)}
+                        onPressEnter={() => {
+                          if (editingTypeLabel.trim())
+                            updateType.mutate({
+                              catId: cat.id!,
+                              typeId: type.id!,
+                              data: { label: editingTypeLabel.trim() },
+                            });
+                        }}
+                      />
+                    ) : (
+                      type.label
+                    )}
+                  </List.Item>
+                )}
+              />
+            </Collapse.Panel>
+          ))}
+        </Collapse>
+      </Card>
+    </Space>
+  );
+}
+
+// ── CSV Import ──────────────────────────────────────────────────────────
+
+// Parse CSV header row in the browser (handles basic quoting).
+function parseCSVHeaders(text: string): string[] {
+  const firstLine = text.split(/\r?\n/)[0] ?? "";
+  const headers: string[] = [];
+  let cur = "";
+  let inQuote = false;
+  for (let i = 0; i < firstLine.length; i++) {
+    const ch = firstLine[i];
+    if (ch === '"') {
+      inQuote = !inQuote;
+    } else if (ch === "," && !inQuote) {
+      headers.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  headers.push(cur.trim());
+  return headers;
+}
+
+// Auto-map columns: lowercase-normalise both sides and pick the first match.
+function autoMap(headers: string[]): Record<string, string> {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const aliases: Record<string, string[]> = {
+    first_name: ["firstname", "first", "givenname", "prenom"],
+    last_name: ["lastname", "last", "surname", "familyname", "nom"],
+    middle_name: ["middlename", "middle"],
+    nickname: ["nickname", "alias", "pseudo"],
+    prefix: ["prefix", "title", "salutation"],
+    suffix: ["suffix"],
+    gender: ["gender", "sexe", "genre"],
+    birthday: ["birthday", "birthdate", "dob", "dateofbirth", "naissance"],
+    email: ["email", "emailaddress", "mail", "courriel"],
+    phone: ["phone", "phonenumber", "mobile", "telephone", "tel"],
+    company: ["company", "organization", "organisation", "employer", "societe"],
+    job_title: ["jobtitle", "job", "position", "title", "role", "fonction"],
+    tags: ["tags", "labels", "categories"],
+    groups: ["groups", "groupes"],
+    notes: ["notes", "note", "comment", "comments", "remarks"],
+    address_street: ["street", "address", "addressstreet", "line1", "rue"],
+    address_city: ["city", "ville"],
+    address_state: ["state", "province", "region"],
+    address_postal_code: [
+      "postalcode",
+      "zip",
+      "zipcode",
+      "postcode",
+      "codepostal",
+    ],
+    address_country: ["country", "pays"],
+  };
+  const mapping: Record<string, string> = {};
+  for (const [field, aliasList] of Object.entries(aliases)) {
+    const match = headers.find((h) => aliasList.includes(norm(h)));
+    mapping[field] = match ?? "";
+  }
+  return mapping;
+}
+
+function CSVImportTab() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+  const importInvalidationScopes = {
+    vaultIds: [String(vaultId)],
+    contacts: [],
+  } as const;
+
+  const CSV_FIELDS: { key: string; label: string }[] = [
+    {
+      key: "first_name",
+      label: t("vault_settings.csv_import.field_first_name"),
+    },
+    {
+      key: "last_name",
+      label: t("vault_settings.csv_import.field_last_name"),
+    },
+    {
+      key: "middle_name",
+      label: t("vault_settings.csv_import.field_middle_name"),
+    },
+    {
+      key: "nickname",
+      label: t("vault_settings.csv_import.field_nickname"),
+    },
+    { key: "prefix", label: t("vault_settings.csv_import.field_prefix") },
+    { key: "suffix", label: t("vault_settings.csv_import.field_suffix") },
+    { key: "gender", label: t("vault_settings.csv_import.field_gender") },
+    {
+      key: "birthday",
+      label: t("vault_settings.csv_import.field_birthday"),
+    },
+    { key: "email", label: t("vault_settings.csv_import.field_email") },
+    { key: "phone", label: t("vault_settings.csv_import.field_phone") },
+    { key: "company", label: t("vault_settings.csv_import.field_company") },
+    {
+      key: "job_title",
+      label: t("vault_settings.csv_import.field_job_title"),
+    },
+    { key: "tags", label: t("vault_settings.csv_import.field_tags") },
+    { key: "groups", label: t("vault_settings.csv_import.field_groups") },
+    { key: "notes", label: t("vault_settings.csv_import.field_notes") },
+    {
+      key: "address_street",
+      label: t("vault_settings.csv_import.field_address_street"),
+    },
+    {
+      key: "address_city",
+      label: t("vault_settings.csv_import.field_address_city"),
+    },
+    {
+      key: "address_state",
+      label: t("vault_settings.csv_import.field_address_state"),
+    },
+    {
+      key: "address_postal_code",
+      label: t("vault_settings.csv_import.field_address_postal_code"),
+    },
+    {
+      key: "address_country",
+      label: t("vault_settings.csv_import.field_address_country"),
+    },
+  ];
+
+  const [step, setStep] = useState<"upload" | "map" | "done">("upload");
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] =
+    useState<GithubComNaibaBondsInternalDtoCSVImportResponse | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleBeforeUpload = (file: File): boolean => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = (e.target?.result as string) ?? "";
+      const headers = parseCSVHeaders(text);
+      setCsvHeaders(headers);
+      setMapping(autoMap(headers));
+      setCsvFile(file);
+      setStep("map");
+    };
+    reader.readAsText(file);
+    return false;
   };
 
-  function MonicaImportTab() {
-    const { t } = useTranslation();
-    const queryClient = useQueryClient();
-    const { id } = useParams<{ id: string }>();
-    const vaultId = id!;
-    const importInvalidationScopes = {
-      vaultIds: [String(vaultId)],
-      contacts: [],
-    } as const;
+  const handleImport = async () => {
+    if (!csvFile) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const res = await api.vaultSettings.settingsImportCsvCreate(
+        String(vaultId),
+        {
+          file: csvFile,
+          mapping: JSON.stringify(mapping),
+        },
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["vaults", String(vaultId), "contacts"],
+        }),
+        invalidateFeedQueries(queryClient, importInvalidationScopes),
+        invalidateCalendarQueries(queryClient, importInvalidationScopes),
+      ]);
+      setImportResult(res.data ?? null);
+      setStep("done");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t("vault_settings.csv_import.error");
+      setImportError(msg);
+    } finally {
+      setImporting(false);
+    }
+  };
 
-    const [importing, setImporting] = useState(false);
-    const [importResult, setImportResult] =
-      useState<GithubComNaibaBondsInternalDtoMonicaImportResponse | null>(null);
-    const [importError, setImportError] = useState<string | null>(null);
+  const reset = () => {
+    setCsvFile(null);
+    setCsvHeaders([]);
+    setMapping({});
+    setImportResult(null);
+    setImportError(null);
+    setStep("upload");
+  };
 
-    const handleBeforeUpload = async (file: File): Promise<boolean> => {
-      setImporting(true);
-      setImportResult(null);
-      setImportError(null);
-      try {
-        const res = await api.vaultSettings.settingsImportMonicaCreate(
-          String(vaultId),
-          { file },
-        );
-        const invalidations = [
-          queryClient.invalidateQueries({
-            queryKey: ["vaults", String(vaultId), "contacts"],
-          }),
-          invalidateFeedQueries(queryClient, importInvalidationScopes),
-          invalidateCalendarQueries(queryClient, importInvalidationScopes),
-          invalidateReminderQueries(queryClient, importInvalidationScopes),
-        ];
-        if ((res.data?.imported_contacts ?? 0) > 0) {
-          invalidations.push(
-            refreshMostConsultedProjections(queryClient, [
-              { vaultId: String(vaultId) },
-            ]),
-          );
-        }
-        if ((res.data?.imported_tasks ?? 0) > 0) {
-          // Monica reports task counts without assignee IDs, so invalidate task projections across this Vault only.
-          invalidations.push(
-            invalidateVaultTaskImpactQueries(queryClient, [String(vaultId)]),
-          );
-        }
-        await Promise.all(invalidations);
-        setImportResult(res.data ?? null);
-      } catch (err: unknown) {
-        const msg =
-          err instanceof Error
-            ? err.message
-            : t("vault_settings.monica_import.error");
-        setImportError(msg);
-      } finally {
-        setImporting(false);
-      }
-      return false;
-    };
+  return (
+    <Space direction="vertical" style={{ width: "100%" }} size="large">
+      <Title level={4} style={{ margin: 0 }}>
+        {t("vault_settings.csv_import.title")}
+      </Title>
+      <Text type="secondary">{t("vault_settings.csv_import.description")}</Text>
 
-    return (
-      <Space direction="vertical" style={{ width: "100%" }} size="large">
-        <Title level={4} style={{ margin: 0 }}>
-          {t("vault_settings.monica_import.title")}
-        </Title>
-        <Text type="secondary">
-          {t("vault_settings.monica_import.description")}
-        </Text>
-
+      {step === "upload" && (
         <Upload.Dragger
-          accept=".json"
+          accept=".csv"
           showUploadList={false}
           beforeUpload={handleBeforeUpload}
-          disabled={importing}
           multiple={false}
         >
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>
           <p className="ant-upload-text">
-            {t("vault_settings.monica_import.upload_hint")}
+            {t("vault_settings.csv_import.upload_hint")}
           </p>
-          <p className="ant-upload-hint">JSON only</p>
+          <p className="ant-upload-hint">
+            {t("vault_settings.csv_import.upload_next_step")}
+          </p>
+          <p className="ant-upload-hint">
+            {t("vault_settings.csv_import.csv_only")}
+          </p>
         </Upload.Dragger>
+      )}
 
-        {importing && (
-          <div style={{ textAlign: "center" }}>
-            <Spin size="large" />
-            <Text style={{ marginLeft: 8 }}>
-              {t("vault_settings.monica_import.importing")}
-            </Text>
+      {step === "map" && (
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
+          <Text strong>{csvFile?.name}</Text>
+          <Text type="secondary">
+            {t("vault_settings.csv_import.company_note")}
+          </Text>
+          <Text type="secondary">
+            {t("vault_settings.csv_import.groups_note")}
+          </Text>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+            }}
+          >
+            {CSV_FIELDS.map(({ key, label }) => (
+              <div key={key} style={{ display: "contents" }}>
+                <Text style={{ alignSelf: "center" }}>{label}</Text>
+                <Select
+                  style={{ width: "100%" }}
+                  value={mapping[key] ?? ""}
+                  onChange={(v) =>
+                    setMapping((prev) => ({ ...prev, [key]: v }))
+                  }
+                >
+                  <Option value="">
+                    {t("vault_settings.csv_import.not_mapped")}
+                  </Option>
+                  {csvHeaders.map((h) => (
+                    <Option key={h} value={h}>
+                      {h}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+            ))}
           </div>
-        )}
+          {importError && <Alert type="error" message={importError} showIcon />}
+          <Space>
+            <Button onClick={reset}>
+              ←{t("vault_settings.csv_import.step_upload")}
+            </Button>
+            <Button type="primary" onClick={handleImport} loading={importing}>
+              {t("vault_settings.csv_import.import_button")}
+            </Button>
+          </Space>
+        </Space>
+      )}
 
-        {importError && <Alert type="error" message={importError} showIcon />}
-
-        {importResult && (
+      {step === "done" && importResult && (
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
           <Alert
             type="success"
-            message={t("vault_settings.monica_import.success")}
+            message={t("vault_settings.csv_import.success")}
             description={
               <Space direction="vertical" size="small">
-                {(
-                  [
-                    ["contacts", importResult.imported_contacts],
-                    ["notes", importResult.imported_notes],
-                    ["calls", importResult.imported_calls],
-                    ["tasks", importResult.imported_tasks],
-                    ["reminders", importResult.imported_reminders],
-                    ["relationships", importResult.imported_relationships],
-                    ["addresses", importResult.imported_addresses],
-                    ["activities", importResult.imported_activities],
-                    ["documents", importResult.imported_documents],
-                    ["photos", importResult.imported_photos],
-                  ] as [string, number | undefined][]
-                ).map(([key, val]) => (
-                  <Text key={key}>
-                    {t(`vault_settings.monica_import.${key}`)}: {val ?? 0}
-                  </Text>
-                ))}
+                <Text>
+                  {t("vault_settings.csv_import.contacts_imported")}:{" "}
+                  {importResult.imported_contacts}
+                </Text>
                 {(importResult.skipped_count ?? 0) > 0 && (
                   <Text type="warning">
-                    {t("vault_settings.monica_import.skipped")}:{" "}
+                    {t("vault_settings.csv_import.skipped")}:{" "}
                     {importResult.skipped_count}
                   </Text>
                 )}
-                {Array.isArray(importResult.errors) &&
-                  importResult.errors.length > 0 && (
-                    <Text type="danger">
-                      {t("vault_settings.monica_import.errors")}:{" "}
-                      {importResult.errors.slice(0, 3).join("; ")}
-                    </Text>
-                  )}
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <Text type="danger">
+                    {t("vault_settings.csv_import.errors")}:{" "}
+                    {importResult.errors.slice(0, 5).join("; ")}
+                  </Text>
+                )}
               </Space>
             }
             showIcon
           />
-        )}
-      </Space>
-    );
+          <Button onClick={reset}>
+            ←{t("vault_settings.csv_import.step_upload")}
+          </Button>
+        </Space>
+      )}
+    </Space>
+  );
+}
+
+function MonicaImportTab() {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const { id } = useParams<{ id: string }>();
+  const vaultId = id!;
+  const importInvalidationScopes = {
+    vaultIds: [String(vaultId)],
+    contacts: [],
+  } as const;
+
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] =
+    useState<GithubComNaibaBondsInternalDtoMonicaImportResponse | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const handleBeforeUpload = async (file: File): Promise<boolean> => {
+    setImporting(true);
+    setImportResult(null);
+    setImportError(null);
+    try {
+      const res = await api.vaultSettings.settingsImportMonicaCreate(
+        String(vaultId),
+        { file },
+      );
+      const invalidations = [
+        queryClient.invalidateQueries({
+          queryKey: ["vaults", String(vaultId), "contacts"],
+        }),
+        invalidateFeedQueries(queryClient, importInvalidationScopes),
+        invalidateCalendarQueries(queryClient, importInvalidationScopes),
+        invalidateReminderQueries(queryClient, importInvalidationScopes),
+      ];
+      if ((res.data?.imported_contacts ?? 0) > 0) {
+        invalidations.push(
+          refreshMostConsultedProjections(queryClient, [
+            { vaultId: String(vaultId) },
+          ]),
+        );
+      }
+      if ((res.data?.imported_tasks ?? 0) > 0) {
+        // Monica reports task counts without assignee IDs, so invalidate task projections across this Vault only.
+        invalidations.push(
+          invalidateVaultTaskImpactQueries(queryClient, [String(vaultId)]),
+        );
+      }
+      await Promise.all(invalidations);
+      setImportResult(res.data ?? null);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : t("vault_settings.monica_import.error");
+      setImportError(msg);
+    } finally {
+      setImporting(false);
+    }
+    return false;
   };
+
+  return (
+    <Space direction="vertical" style={{ width: "100%" }} size="large">
+      <Title level={4} style={{ margin: 0 }}>
+        {t("vault_settings.monica_import.title")}
+      </Title>
+      <Text type="secondary">
+        {t("vault_settings.monica_import.description")}
+      </Text>
+
+      <Upload.Dragger
+        accept=".json"
+        showUploadList={false}
+        beforeUpload={handleBeforeUpload}
+        disabled={importing}
+        multiple={false}
+      >
+        <p className="ant-upload-drag-icon">
+          <InboxOutlined />
+        </p>
+        <p className="ant-upload-text">
+          {t("vault_settings.monica_import.upload_hint")}
+        </p>
+        <p className="ant-upload-hint">JSON only</p>
+      </Upload.Dragger>
+
+      {importing && (
+        <div style={{ textAlign: "center" }}>
+          <Spin size="large" />
+          <Text style={{ marginLeft: 8 }}>
+            {t("vault_settings.monica_import.importing")}
+          </Text>
+        </div>
+      )}
+
+      {importError && <Alert type="error" message={importError} showIcon />}
+
+      {importResult && (
+        <Alert
+          type="success"
+          message={t("vault_settings.monica_import.success")}
+          description={
+            <Space direction="vertical" size="small">
+              {(
+                [
+                  ["contacts", importResult.imported_contacts],
+                  ["notes", importResult.imported_notes],
+                  ["calls", importResult.imported_calls],
+                  ["tasks", importResult.imported_tasks],
+                  ["reminders", importResult.imported_reminders],
+                  ["relationships", importResult.imported_relationships],
+                  ["addresses", importResult.imported_addresses],
+                  ["activities", importResult.imported_activities],
+                  ["documents", importResult.imported_documents],
+                  ["photos", importResult.imported_photos],
+                ] as [string, number | undefined][]
+              ).map(([key, val]) => (
+                <Text key={key}>
+                  {t(`vault_settings.monica_import.${key}`)}: {val ?? 0}
+                </Text>
+              ))}
+              {(importResult.skipped_count ?? 0) > 0 && (
+                <Text type="warning">
+                  {t("vault_settings.monica_import.skipped")}:{" "}
+                  {importResult.skipped_count}
+                </Text>
+              )}
+              {Array.isArray(importResult.errors) &&
+                importResult.errors.length > 0 && (
+                  <Text type="danger">
+                    {t("vault_settings.monica_import.errors")}:{" "}
+                    {importResult.errors.slice(0, 3).join("; ")}
+                  </Text>
+                )}
+            </Space>
+          }
+          showIcon
+        />
+      )}
+    </Space>
+  );
+}
 
 export default function VaultSettings() {
   const { id } = useParams<{ id: string }>();
@@ -2277,7 +2280,11 @@ export default function VaultSettings() {
         />
       ),
     },
-    { key: "users", label: t("vault_settings.users"), children: <UsersTab key={vaultId} /> },
+    {
+      key: "users",
+      label: t("vault_settings.users"),
+      children: <UsersTab key={vaultId} />,
+    },
     {
       key: "labels",
       label: t("vault_settings.labels"),
@@ -2292,7 +2299,8 @@ export default function VaultSettings() {
       key: "tags",
       label: t("vault_settings.tags"),
       children: (
-        <SimpleCrudTab key={vaultId}
+        <SimpleCrudTab
+          key={vaultId}
           queryKeySuffix="tags"
           apiList={(vid) => api.vaultSettings.settingsTagsList(String(vid))}
           apiCreate={(
@@ -2319,7 +2327,8 @@ export default function VaultSettings() {
       key: "dateTypes",
       label: t("vault_settings.date_types"),
       children: (
-        <SimpleCrudTab key={vaultId}
+        <SimpleCrudTab
+          key={vaultId}
           queryKeySuffix="contactImportantDateTypes"
           apiList={(vid) =>
             api.vaultSettings.settingsDateTypesList(String(vid))
@@ -2347,7 +2356,8 @@ export default function VaultSettings() {
       key: "moodParams",
       label: t("vault_settings.mood_params"),
       children: (
-        <SimpleCrudTab key={vaultId}
+        <SimpleCrudTab
+          key={vaultId}
           queryKeySuffix="moodTrackingParameters"
           apiList={(vid) =>
             api.vaultSettings.settingsMoodParamsList(String(vid))
@@ -2385,12 +2395,19 @@ export default function VaultSettings() {
     {
       key: "activities",
       label: t("vault_settings.activities"),
-      children: <ActivitiesTab key={vaultId} positionMutation={positionMutation} />,
+      children: (
+        <ActivitiesTab key={vaultId} positionMutation={positionMutation} />
+      ),
     },
     {
       key: "quickFacts",
       label: t("vault_settings.quick_facts"),
-      children: <QuickFactTemplatesTab key={vaultId} positionMutation={positionMutation} />,
+      children: (
+        <QuickFactTemplatesTab
+          key={vaultId}
+          positionMutation={positionMutation}
+        />
+      ),
     },
     {
       key: "csv_import",

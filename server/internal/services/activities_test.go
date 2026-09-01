@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,6 +73,51 @@ func TestActivityCRUDMentionsPeriodsAndMilestones(t *testing.T) {
 	var reloaded models.Activity
 	if err := svc.db.First(&reloaded, milestone.ID).Error; err != nil || reloaded.ParentID != nil {
 		t.Fatalf("detached milestone=%+v err=%v", reloaded, err)
+	}
+}
+
+func TestActivityMarkdownRendersAndTracksUploadedFiles(t *testing.T) {
+	svc, vaultID, primary, _, typeID := setupUnifiedActivityTest(t)
+	file := models.File{VaultID: vaultID, UUID: "activity-markdown-file", Name: "map.pdf", MimeType: "application/pdf", Type: "document"}
+	if err := svc.db.Create(&file).Error; err != nil {
+		t.Fatalf("create file: %v", err)
+	}
+	description := "## Notes\n\n[map](bonds-file:" + fmt.Sprint(file.ID) + ")"
+	event, err := svc.Create(vaultID, dto.ActivityUpsertRequest{
+		PrimaryContactID: primary.ID, ActivityTypeID: typeID, Title: "Markdown activity",
+		Description: description, DescriptionFormat: "markdown",
+	})
+	if err != nil {
+		t.Fatalf("Create activity: %v", err)
+	}
+	if event.DescriptionFormat != "markdown" || !strings.Contains(event.RenderedDescription, "<h2>Notes</h2>") || !strings.Contains(event.RenderedDescription, `data-bonds-file="`) {
+		t.Fatalf("Markdown activity response = %+v", event)
+	}
+	var referenceCount int64
+	svc.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 1 {
+		t.Fatalf("content file reference count = %d, want 1", referenceCount)
+	}
+	updated, err := svc.Update(vaultID, event.ID, dto.ActivityUpsertRequest{
+		PrimaryContactID: primary.ID, ActivityTypeID: typeID, Title: "Legacy client update",
+		Description: description,
+	})
+	if err != nil {
+		t.Fatalf("Update Markdown activity without format: %v", err)
+	}
+	if updated.DescriptionFormat != "markdown" {
+		t.Fatalf("DescriptionFormat after legacy update = %q, want markdown", updated.DescriptionFormat)
+	}
+	svc.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 1 {
+		t.Fatalf("content file reference count after legacy update = %d, want 1", referenceCount)
+	}
+	if err := svc.Delete(vaultID, event.ID); err != nil {
+		t.Fatalf("Delete activity: %v", err)
+	}
+	svc.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 0 {
+		t.Fatalf("content file reference count after delete = %d, want 0", referenceCount)
 	}
 }
 

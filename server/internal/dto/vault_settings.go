@@ -54,6 +54,7 @@ type VaultUserResponse struct {
 	Email      string `json:"email" example:"user@example.com"`
 	FirstName  string `json:"first_name" example:"John"`
 	LastName   string `json:"last_name" example:"Doe"`
+	Disabled   bool   `json:"disabled" example:"false"`
 	Permission int    `json:"permission" example:"100"`
 }
 

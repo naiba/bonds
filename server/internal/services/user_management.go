@@ -87,6 +87,9 @@ func (s *UserManagementService) Delete(id, accountID, currentUserID string) erro
 		return err
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := ensureUserIsNotSoleVaultManager(tx, id); err != nil {
+			return err
+		}
 		if err := tx.Where("user_id = ?", id).Delete(&models.UserVault{}).Error; err != nil {
 			return err
 		}

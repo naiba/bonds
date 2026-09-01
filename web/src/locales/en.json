@@ -34,7 +34,12 @@
     "updated": "Updated",
     "load_more": "Load more",
     "copy": "Copy",
-    "view": "View"
+    "view": "View",
+    "download_failed": "Failed to download file"
+  },
+  "markdown_editor": {
+    "uploading": "Uploading file {{current}} of {{total}}…",
+    "uploaded": "Upload complete"
   },
   "pagination": {
     "total": "Total {{count}}"
@@ -1487,6 +1492,7 @@
     "year": "Year",
     "month": "Month",
     "day": "Day",
+    "today": "Today",
     "no_year": "Not set",
     "date_precision": {
       "full": "Full date",
@@ -1523,6 +1529,10 @@
     "add_user": "Add User",
     "hex_color": "Hex Color",
     "user_email": "Email",
+    "last_manager_required": "A vault must retain at least one manager.",
+    "demote_manager_title": "Change manager permission?",
+    "demote_manager_description": "{{email}} will lose access to vault management settings.",
+    "demote_self_description": "You will lose access to this vault's management settings after saving.",
     "tab_journal": "Journal",
     "tab_companies": "Companies",
     "tab_reports": "Reports",

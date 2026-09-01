@@ -17,7 +17,12 @@ import { api } from "@/api";
 import type { Note, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
-import LinkifiedText from "@/components/LinkifiedText";
+import MarkdownEditor from "@/components/markdown/MarkdownEditor";
+import MarkdownContent from "@/components/markdown/MarkdownContent";
+import {
+  plainTextToMarkdown,
+  plainTextToSafeHTML,
+} from "@/components/markdown/markdownFormat";
 import type { NormalizedFeedSource } from "@/utils/feedSourceLink";
 import { invalidateFeedQueries } from "@/utils/queryInvalidation";
 import {
@@ -26,8 +31,6 @@ import {
   useSourceRecordReveal,
   useTargetRecordPageSelection,
 } from "../contactSourceRecord";
-
-const { TextArea } = Input;
 
 type NotesQueryKey = readonly [
   "vaults",
@@ -40,6 +43,7 @@ type NotesQueryKey = readonly [
 type NoteFormValues = {
   readonly title: string;
   readonly body: string;
+  readonly body_format: "markdown";
 };
 
 type NoteMutationScope = {
@@ -232,7 +236,11 @@ export default function NotesModule({
   function startEdit(note: Note) {
     setEditingId(note.id ?? null);
     setTitle(note.title ?? "");
-    setBody(note.body ?? "");
+    setBody(
+      note.body_format === "markdown"
+        ? (note.body ?? "")
+        : plainTextToMarkdown(note.body ?? ""),
+    );
     setAdding(false);
   }
 
@@ -246,10 +254,13 @@ export default function NotesModule({
       updateMutation.mutate({
         ...mutationScope,
         noteId: editingId,
-        values: { title, body },
+        values: { title, body, body_format: "markdown" },
       });
     } else {
-      createMutation.mutate({ ...mutationScope, values: { title, body } });
+      createMutation.mutate({
+        ...mutationScope,
+        values: { title, body, body_format: "markdown" },
+      });
     }
   }
 
@@ -294,14 +305,16 @@ export default function NotesModule({
             onChange={(e) => setTitle(e.target.value)}
             style={{ marginBottom: 8 }}
           />
-          <TextArea
+          <MarkdownEditor
+            vaultId={String(vaultId)}
+            contactId={String(contactId)}
+            ariaLabel={t("modules.notes.body_placeholder")}
             placeholder={t("modules.notes.body_placeholder")}
-            rows={3}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
-            style={{ marginBottom: 12 }}
+            onChange={setBody}
+            variant="compact"
           />
-          <Space>
+          <Space style={{ marginTop: 12 }}>
             <Button
               type="primary"
               onClick={handleSave}
@@ -381,15 +394,12 @@ export default function NotesModule({
               title={<span style={{ fontWeight: 500 }}>{note.title}</span>}
               description={
                 <>
-                  <LinkifiedText
-                    as="div"
-                    style={{
-                      color: token.colorTextSecondary,
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {note.body}
-                  </LinkifiedText>
+                  <MarkdownContent
+                    vaultId={String(vaultId)}
+                    html={
+                      note.rendered_body ?? plainTextToSafeHTML(note.body ?? "")
+                    }
+                  />
                   <div
                     style={{
                       fontSize: 12,

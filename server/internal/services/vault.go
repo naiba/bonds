@@ -262,6 +262,9 @@ func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
 	}
 
 	// Step 3: Delete vault-level children (grandchildren of vault-scoped tables first).
+	if err := tx.Where("vault_id = ?", vaultID).Delete(&models.ContentFileReference{}).Error; err != nil {
+		return fmt.Errorf("delete ContentFileReference: %w", err)
+	}
 
 	// Journal cascade: PostMetric → PostSection → PostTag → ContactPost → Post → SliceOfLife → JournalMetric → Journal
 	var journalIDs []uint

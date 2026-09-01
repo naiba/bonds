@@ -19,6 +19,23 @@ vi.mock("@/api", () => ({
       contactsNotesDelete: vi.fn(),
     },
   },
+  httpClient: { instance: { get: vi.fn() } },
+}));
+
+vi.mock("@/components/markdown/MarkdownEditor", () => ({
+  default: (props: {
+    readonly value: string;
+    readonly onChange: (value: string) => void;
+    readonly ariaLabel: string;
+    readonly placeholder: string;
+  }) => (
+    <textarea
+      aria-label={props.ariaLabel}
+      placeholder={props.placeholder}
+      value={props.value}
+      onChange={(event) => props.onChange(event.target.value)}
+    />
+  ),
 }));
 
 beforeAll(() => {

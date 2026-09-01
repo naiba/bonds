@@ -75,6 +75,7 @@ func AllModels() []interface{} {
 		&VaultQuickFactsTemplate{},
 		&Religion{},
 		&File{},
+		&ContentFileReference{},
 		&LifeMetric{},
 		&ContactLifeMetric{},
 		&MoodTrackingParameter{},

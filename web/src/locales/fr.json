@@ -34,7 +34,12 @@
     "updated": "Mis à jour",
     "load_more": "Charger plus",
     "copy": "Copier",
-    "view": "Voir"
+    "view": "Voir",
+    "download_failed": "Échec du téléchargement du fichier"
+  },
+  "markdown_editor": {
+    "uploading": "Téléversement du fichier {{current}} sur {{total}}…",
+    "uploaded": "Téléversement terminé"
   },
   "pagination": {
     "total": "Total {{count}}"
@@ -1487,6 +1492,7 @@
     "year": "Année",
     "month": "Mois",
     "day": "Jour",
+    "today": "Aujourd’hui",
     "no_year": "Non défini",
     "date_precision": {
       "full": "Date complète",
@@ -1523,6 +1529,10 @@
     "add_user": "Ajouter un utilisateur",
     "hex_color": "Couleur hexagonale",
     "user_email": "E-mail",
+    "last_manager_required": "Un coffre doit conserver au moins un gestionnaire.",
+    "demote_manager_title": "Modifier l’autorisation du gestionnaire ?",
+    "demote_manager_description": "{{email}} perdra l’accès aux paramètres de gestion du coffre.",
+    "demote_self_description": "Après l’enregistrement, vous perdrez l’accès aux paramètres de gestion de ce coffre.",
     "tab_journal": "Journal",
     "tab_companies": "Entreprises",
     "tab_reports": "Rapports",

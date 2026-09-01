@@ -62,6 +62,7 @@ type Activity struct {
 	OriginalYear      *int      `json:"original_year"`
 	Title             string    `json:"title" gorm:"not null"`
 	Description       *string   `json:"description" gorm:"type:text"`
+	DescriptionFormat string    `json:"description_format" gorm:"size:16;not null;default:'plain'"`
 	Costs             *int      `json:"costs"`
 	CurrencyID        *uint     `json:"currency_id" gorm:"index"`
 	PaidByContactID   *string   `json:"paid_by_contact_id" gorm:"type:text;index"`

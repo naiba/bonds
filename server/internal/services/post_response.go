@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/markdown"
 	"github.com/naiba/bonds/internal/models"
 )
 
@@ -44,10 +45,12 @@ func toPostResponseWithSections(p *models.Post) dto.PostResponse {
 	sections := make([]dto.PostSectionResponse, len(p.PostSections))
 	for i, section := range p.PostSections {
 		sections[i] = dto.PostSectionResponse{
-			ID:       section.ID,
-			Position: section.Position,
-			Label:    section.Label,
-			Content:  ptrToStr(section.Content),
+			ID:              section.ID,
+			Position:        section.Position,
+			Label:           section.Label,
+			Content:         ptrToStr(section.Content),
+			ContentFormat:   markdown.NormalizeFormat(section.ContentFormat),
+			RenderedContent: markdown.Render(ptrToStr(section.Content), section.ContentFormat),
 		}
 	}
 	resp.Sections = sections

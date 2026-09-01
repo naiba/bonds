@@ -28,6 +28,8 @@ interface CalendarDatePickerProps {
   enableDatePrecision?: boolean;
   allowedDatePrecisions?: readonly ImportantDatePrecision[];
   allowClear?: boolean;
+  showToday?: boolean;
+  maxDate?: Dayjs;
 }
 
 function buildDayOptions(
@@ -53,6 +55,67 @@ function buildGregorianMonthOptions(): Array<{ value: number; label: string }> {
   return options;
 }
 
+function optionsThroughValue(
+  options: Array<{ value: number; label: string }>,
+  maximumValue: number,
+) {
+  const maximumIndex = options.findIndex(
+    (option) => option.value === maximumValue,
+  );
+  return maximumIndex < 0 ? options : options.slice(0, maximumIndex + 1);
+}
+
+function clampValueToMaximum(
+  value: CalendarDatePickerValue | null,
+  maximum: CalendarDatePickerValue | null,
+): CalendarDatePickerValue | null {
+  if (
+    value == null ||
+    maximum == null ||
+    value.year == null ||
+    value.datePrecision === "month_day"
+  ) {
+    return value;
+  }
+  const maximumYear = maximum.year!;
+  const maximumMonth = maximum.month!;
+  const maximumDay = maximum.day!;
+  let afterMaximum = value.year > maximumYear;
+  if (!afterMaximum && value.year === maximumYear && value.month != null) {
+    const months = getCalendarSystem(value.calendarType).getMonths(value.year);
+    const valueMonthIndex = months.findIndex(
+      (month) => month.value === value.month,
+    );
+    const maximumMonthIndex = months.findIndex(
+      (month) => month.value === maximumMonth,
+    );
+    afterMaximum = valueMonthIndex > maximumMonthIndex;
+    if (
+      !afterMaximum &&
+      valueMonthIndex === maximumMonthIndex &&
+      value.day != null
+    ) {
+      afterMaximum = value.day > maximumDay;
+    }
+  }
+  if (!afterMaximum) {
+    return value;
+  }
+  if (value.datePrecision === "year") {
+    return { ...value, year: maximumYear, month: null, day: null };
+  }
+  if (value.datePrecision === "month") {
+    return { ...value, year: maximumYear, month: maximumMonth, day: null };
+  }
+  return {
+    ...value,
+    year: maximumYear,
+    month: maximumMonth,
+    day: maximumDay,
+    datePrecision: "full",
+  };
+}
+
 export default function CalendarDatePicker({
   value,
   onChange,
@@ -61,9 +124,12 @@ export default function CalendarDatePicker({
   enableDatePrecision = false,
   allowedDatePrecisions = ["full", "month", "year", "month_day"],
   allowClear,
+  showToday = false,
+  maxDate,
 }: CalendarDatePickerProps) {
   const { t } = useTranslation();
   const now = dayjs();
+  const effectiveDefaultDate = maxDate?.isBefore(now, "day") ? maxDate : now;
 
   const calendarType = value?.calendarType ?? "gregorian";
   const inferredPrecision = inferPrecisionFromValue(value ?? undefined);
@@ -71,9 +137,9 @@ export default function CalendarDatePicker({
     ? inferredPrecision
     : (allowedDatePrecisions[0] ?? "full");
   const usesPrecisionLayout = enableDatePrecision;
-  const selectedYear = value?.year ?? now.year();
-  const selectedMonth = value?.month ?? now.month() + 1;
-  const selectedDay = value?.day ?? now.date();
+  const selectedYear = value?.year ?? effectiveDefaultDate.year();
+  const selectedMonth = value?.month ?? effectiveDefaultDate.month() + 1;
+  const selectedDay = value?.day ?? effectiveDefaultDate.date();
   const displayYear = datePrecision === "month_day" ? null : selectedYear;
   const controlYear =
     value == null
@@ -87,10 +153,26 @@ export default function CalendarDatePicker({
     value?.day != null && value.month != null && value.year != null;
 
   const calendarSystem = getCalendarSystem(calendarType);
-  const selectableMonths = calendarSystem.getMonths(selectedYear);
-  const selectableDays = buildDayOptions(
+  const maximumCalendarDate = maxDate
+    ? calendarSystem.fromGregorian({
+        year: maxDate.year(),
+        month: maxDate.month() + 1,
+        day: maxDate.date(),
+      })
+    : null;
+  const allSelectableMonths = calendarSystem.getMonths(selectedYear);
+  const selectableMonths =
+    maximumCalendarDate?.year === selectedYear
+      ? optionsThroughValue(allSelectableMonths, maximumCalendarDate.month)
+      : allSelectableMonths;
+  const allSelectableDays = buildDayOptions(
     calendarSystem.getDaysInMonth(selectedYear, selectedMonth),
   );
+  const selectableDays =
+    maximumCalendarDate?.year === selectedYear &&
+    maximumCalendarDate.month === selectedMonth
+      ? optionsThroughValue(allSelectableDays, maximumCalendarDate.day)
+      : allSelectableDays;
   const [minYear, maxYear] = calendarSystem.getYearRange();
 
   const yearOptions = (() => {
@@ -98,21 +180,40 @@ export default function CalendarDatePicker({
     if (enableNoYear) {
       options.push({ value: NO_YEAR_VALUE, label: t("calendar.no_year") });
     }
-    for (let year = minYear; year <= maxYear; year += 1) {
+    const lastYear = Math.min(maxYear, maximumCalendarDate?.year ?? maxYear);
+    for (let year = minYear; year <= lastYear; year += 1) {
       options.push({ value: year, label: String(year) });
     }
     return options;
   })();
 
-  const gregorianMonthOptions = buildGregorianMonthOptions();
+  const allGregorianMonthOptions = buildGregorianMonthOptions();
+  const gregorianMonthOptions =
+    maximumCalendarDate?.year === selectedYear
+      ? optionsThroughValue(allGregorianMonthOptions, maximumCalendarDate.month)
+      : allGregorianMonthOptions;
   const gregorianDayOptions = (() => {
     const referenceYear = datePrecision === "month_day" ? 2000 : selectedYear;
-    return buildDayOptions(
+    const options = buildDayOptions(
       dayjs(
         `${referenceYear}-${String(selectedMonth).padStart(2, "0")}-01`,
       ).daysInMonth(),
     );
+    return maximumCalendarDate?.year === selectedYear &&
+      maximumCalendarDate.month === selectedMonth
+      ? optionsThroughValue(options, maximumCalendarDate.day)
+      : options;
   })();
+
+  const constrainedOnChange = (nextValue: CalendarDatePickerValue | null) =>
+    onChange?.(
+      clampValueToMaximum(
+        nextValue,
+        maximumCalendarDate
+          ? { calendarType, ...maximumCalendarDate, datePrecision: "full" }
+          : null,
+      ),
+    );
 
   const handlers = createCalendarDatePickerHandlers({
     calendarType,
@@ -122,7 +223,7 @@ export default function CalendarDatePicker({
     selectedMonth,
     selectedDay,
     noYearValue: NO_YEAR_VALUE,
-    onChange,
+    onChange: constrainedOnChange,
   });
 
   const previewText = hasCompleteSelection
@@ -162,6 +263,8 @@ export default function CalendarDatePicker({
       yearPlaceholder={t("calendar.year")}
       monthPlaceholder={t("calendar.month")}
       dayPlaceholder={t("calendar.day")}
+      showToday={showToday}
+      todayLabel={t("calendar.today")}
       precisionLabels={{
         full: t("calendar.date_precision.full"),
         month: t("calendar.date_precision.month"),
@@ -172,6 +275,14 @@ export default function CalendarDatePicker({
       onYearChange={handlers.handleYearChange}
       onMonthChange={handlers.handleMonthChange}
       onDayChange={handlers.handleDayChange}
+      onToday={() => {
+        const today = calendarSystem.fromGregorian({
+          year: now.year(),
+          month: now.month() + 1,
+          day: now.date(),
+        });
+        handlers.handleToday(today.year, today.month, today.day);
+      }}
     />
   );
 
@@ -203,6 +314,8 @@ export default function CalendarDatePicker({
         value={pickerValue}
         onChange={handleDatePickerChange}
         allowClear={allowClear}
+        showNow={showToday}
+        maxDate={maxDate}
         style={{ width: "100%" }}
       />
     );
@@ -224,6 +337,8 @@ export default function CalendarDatePicker({
           value={pickerValue}
           onChange={handleDatePickerChange}
           allowClear={allowClear}
+          showNow={showToday}
+          maxDate={maxDate}
           style={{ width: "100%" }}
         />
       ) : (

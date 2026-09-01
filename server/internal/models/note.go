@@ -10,6 +10,7 @@ type Note struct {
 	EmotionID  *uint      `json:"emotion_id" gorm:"index"`
 	Title      *string    `json:"title"`
 	Body       string     `json:"body" gorm:"type:text;not null"`
+	BodyFormat string     `json:"body_format" gorm:"size:16;not null;default:'plain'"`
 	SourceType *string    `json:"source_type" gorm:"size:64"`
 	SourceUUID *string    `json:"source_uuid" gorm:"size:256"`
 	HappenedAt *time.Time `json:"happened_at"`

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -111,6 +112,113 @@ func TestVaultUsersUpdatePermission(t *testing.T) {
 	}
 	if updated.Permission != 200 {
 		t.Errorf("Expected permission 200, got %d", updated.Permission)
+	}
+}
+
+func TestVaultUsersUpdatePermissionRejectsSoleManagerDemotion(t *testing.T) {
+	svc, _, vaultID, userID, _ := setupVaultUsersTest(t)
+
+	users, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	manager := users[0]
+	if manager.UserID != userID || manager.Permission != models.PermissionManager {
+		t.Fatalf("initial membership = %+v, want creator manager", manager)
+	}
+
+	_, err = svc.UpdatePermission(manager.ID, vaultID, dto.UpdateVaultUserPermRequest{Permission: models.PermissionEditor})
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("UpdatePermission error = %v, want ErrLastVaultManager", err)
+	}
+
+	users, err = svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List after rejected update failed: %v", err)
+	}
+	if users[0].Permission != models.PermissionManager {
+		t.Fatalf("permission after rejected update = %d, want manager", users[0].Permission)
+	}
+}
+
+func TestVaultUsersUpdatePermissionAlwaysRetainsOneManager(t *testing.T) {
+	svc, authSvc, vaultID, ownerID, accountID := setupVaultUsersTest(t)
+	registerSameAccountUser(t, authSvc, accountID, "second-manager@example.com")
+	second, err := svc.Add(vaultID, dto.AddVaultUserRequest{
+		Email: "second-manager@example.com", Permission: models.PermissionManager,
+	})
+	if err != nil {
+		t.Fatalf("Add second manager failed: %v", err)
+	}
+	users, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	var ownerMembershipID uint
+	for _, user := range users {
+		if user.UserID == ownerID {
+			ownerMembershipID = user.ID
+		}
+	}
+
+	if _, err := svc.UpdatePermission(ownerMembershipID, vaultID, dto.UpdateVaultUserPermRequest{Permission: models.PermissionEditor}); err != nil {
+		t.Fatalf("demote one of two managers: %v", err)
+	}
+	_, err = svc.UpdatePermission(second.ID, vaultID, dto.UpdateVaultUserPermRequest{Permission: models.PermissionViewer})
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("demote final manager error = %v, want ErrLastVaultManager", err)
+	}
+}
+
+func TestVaultUsersDisabledManagerDoesNotSatisfyManagerGuard(t *testing.T) {
+	svc, authSvc, vaultID, ownerID, accountID := setupVaultUsersTest(t)
+	registerSameAccountUser(t, authSvc, accountID, "disabled-manager@example.com")
+	second, err := svc.Add(vaultID, dto.AddVaultUserRequest{
+		Email: "disabled-manager@example.com", Permission: models.PermissionManager,
+	})
+	if err != nil {
+		t.Fatalf("Add second manager failed: %v", err)
+	}
+	if err := svc.db.Model(&models.User{}).Where("id = ?", second.UserID).Update("disabled", true).Error; err != nil {
+		t.Fatalf("disable second manager: %v", err)
+	}
+	users, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	var ownerMembershipID uint
+	for _, user := range users {
+		if user.UserID == ownerID {
+			ownerMembershipID = user.ID
+		}
+		if user.UserID == second.UserID && !user.Disabled {
+			t.Fatal("disabled manager was not marked disabled in the response")
+		}
+	}
+
+	_, err = svc.UpdatePermission(ownerMembershipID, vaultID, dto.UpdateVaultUserPermRequest{Permission: models.PermissionEditor})
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("demote only active manager error = %v, want ErrLastVaultManager", err)
+	}
+}
+
+func TestVaultUsersRemoveRejectsSoleManager(t *testing.T) {
+	svc, _, vaultID, ownerID, _ := setupVaultUsersTest(t)
+	users, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+
+	err = svc.Remove(users[0].ID, vaultID, "different-current-user")
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("Remove sole manager error = %v, want ErrLastVaultManager", err)
+	}
+	remaining, err := svc.List(vaultID)
+	if err != nil {
+		t.Fatalf("List after rejected removal failed: %v", err)
+	}
+	if len(remaining) != 1 || remaining[0].UserID != ownerID {
+		t.Fatalf("remaining memberships = %+v, want owner", remaining)
 	}
 }
 

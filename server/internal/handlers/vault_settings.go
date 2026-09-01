@@ -168,6 +168,7 @@ func (h *VaultSettingsHandler) ListUsers(c *echo.Context) error {
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/settings/users [post]
@@ -229,6 +230,9 @@ func (h *VaultSettingsHandler) UpdateUserPermission(c *echo.Context) error {
 		if errors.Is(err, services.ErrVaultUserNotFound) {
 			return response.NotFound(c, "err.vault_user_not_found")
 		}
+		if errors.Is(err, services.ErrLastVaultManager) {
+			return response.Conflict(c, "err.last_vault_manager")
+		}
 		return response.InternalError(c, "err.failed_to_update_vault_user")
 	}
 	return response.OK(c, user)
@@ -246,6 +250,7 @@ func (h *VaultSettingsHandler) UpdateUserPermission(c *echo.Context) error {
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/settings/users/{id} [delete]
 func (h *VaultSettingsHandler) RemoveUser(c *echo.Context) error {
@@ -261,6 +266,9 @@ func (h *VaultSettingsHandler) RemoveUser(c *echo.Context) error {
 		}
 		if errors.Is(err, services.ErrCannotRemoveSelf) {
 			return response.BadRequest(c, "err.cannot_remove_self", nil)
+		}
+		if errors.Is(err, services.ErrLastVaultManager) {
+			return response.Conflict(c, "err.last_vault_manager")
 		}
 		return response.InternalError(c, "err.failed_to_remove_vault_user")
 	}

@@ -13,6 +13,7 @@ var (
 	ErrUserEmailNotFound    = errors.New("user with this email not found")
 	ErrUserAlreadyInVault   = errors.New("user already in vault")
 	ErrCannotRemoveSelf     = errors.New("cannot remove yourself from vault")
+	ErrLastVaultManager     = errors.New("vault must retain at least one manager")
 	ErrLabelNotFound        = errors.New("label not found")
 	ErrDateTypeNotFound     = errors.New("important date type not found")
 	ErrCannotDeleteDefault  = errors.New("cannot delete default item")

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -118,5 +119,29 @@ func TestUserManagementDelete(t *testing.T) {
 	users, _, _ := svc.List(accountID, 0, 0)
 	if len(users) != 1 {
 		t.Errorf("Expected 1 user after delete, got %d", len(users))
+	}
+}
+
+func TestUserManagementDeleteRejectsSoleVaultManager(t *testing.T) {
+	svc, db, accountID, currentUserID := setupUserManagementTest(t)
+	target := createTestUser(t, db, accountID, "sole-manager-delete@example.com")
+	vault := models.Vault{AccountID: accountID, Name: "Guarded Vault", Type: "personal"}
+	if err := db.Create(&vault).Error; err != nil {
+		t.Fatalf("create vault: %v", err)
+	}
+	membership := models.UserVault{VaultID: vault.ID, UserID: target.ID, Permission: models.PermissionManager}
+	if err := db.Create(&membership).Error; err != nil {
+		t.Fatalf("create manager membership: %v", err)
+	}
+
+	err := svc.Delete(target.ID, accountID, currentUserID)
+	if !errors.Is(err, ErrLastVaultManager) {
+		t.Fatalf("Delete error = %v, want ErrLastVaultManager", err)
+	}
+	var userCount, membershipCount int64
+	db.Model(&models.User{}).Where("id = ?", target.ID).Count(&userCount)
+	db.Model(&models.UserVault{}).Where("id = ?", membership.ID).Count(&membershipCount)
+	if userCount != 1 || membershipCount != 1 {
+		t.Fatalf("rejected delete left user=%d membership=%d, want both 1", userCount, membershipCount)
 	}
 }

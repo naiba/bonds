@@ -125,6 +125,50 @@ describe("CalendarDatePicker", () => {
     expect(placeholders).toEqual(["Year", "Month", "Day"]);
   });
 
+  it("offers an opt-in Today action in the precision layout", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const today = dayjs();
+    renderPicker({
+      enableDatePrecision: true,
+      allowedDatePrecisions: ["full", "month", "year"],
+      showToday: true,
+      maxDate: today,
+      onChange,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Today" }));
+
+    expect(onChange).toHaveBeenCalledWith({
+      calendarType: "gregorian",
+      day: today.date(),
+      month: today.month() + 1,
+      year: today.year(),
+      datePrecision: "full",
+    });
+  });
+
+  it("removes future year, month, and day options at a maximum date", async () => {
+    const user = userEvent.setup();
+    renderPicker({
+      enableDatePrecision: true,
+      allowedDatePrecisions: ["full", "month", "year"],
+      maxDate: dayjs("2025-05-10"),
+    });
+    const selects = document.querySelectorAll(".ant-select");
+
+    await user.click(selects[0]);
+    expect(screen.queryByText("2026")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(selects[1]);
+    expect(screen.queryByText("June")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.click(selects[2]);
+    expect(screen.queryByText("11")).not.toBeInTheDocument();
+  });
+
   it("clears the value when the clear button is clicked", async () => {
     const onChange = vi.fn();
     renderPicker({

@@ -38,6 +38,7 @@
   "err.failed_to_get_vault": "Failed to get vault",
   "err.failed_to_update_vault": "Failed to update vault",
   "err.failed_to_delete_vault": "Failed to delete vault",
+  "err.last_vault_manager": "A vault must retain at least one manager",
 
   "err.failed_to_list_contacts": "Failed to list contacts",
   "err.failed_to_create_contact": "Failed to create contact",
@@ -188,6 +189,7 @@
   "err.failed_to_list_vault_files": "Failed to list vault files",
   "err.invalid_file_id": "Invalid file ID",
   "err.file_not_found": "File not found",
+  "err.file_in_use": "This file is in use and cannot be deleted",
   "err.failed_to_delete_file": "Failed to delete file",
 
   "err.failed_to_list_companies": "Failed to list companies",

@@ -27,6 +27,7 @@ import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import CalendarDatePicker from "@/components/CalendarDatePicker";
 import type { CalendarDatePickerValue } from "@/components/CalendarDatePicker";
 import { buildContactFirstMetRequest } from "@/utils/contactFirstMet";
+import dayjs from "dayjs";
 import {
   invalidateContactQueries,
   invalidateFeedQueries,
@@ -343,6 +344,8 @@ export default function ContactCreate() {
                 <CalendarDatePicker
                   enableDatePrecision
                   allowedDatePrecisions={["full", "month", "year"]}
+                  showToday
+                  maxDate={dayjs()}
                 />
               </Form.Item>
               <Form.Item

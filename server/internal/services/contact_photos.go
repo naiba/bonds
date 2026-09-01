@@ -1,9 +1,7 @@
 package services
 
 import (
-	"errors"
 	"math"
-	"os"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -59,30 +57,27 @@ func (s *VaultFileService) GetContactPhoto(fileID uint, contactID, vaultID strin
 }
 
 func (s *VaultFileService) DeleteContactPhoto(fileID uint, contactID, vaultID string) error {
-	var file models.File
-	if err := s.db.Where("id = ? AND ufileable_id = ? AND type IN (?, ?, ?) AND vault_id = ?",
-		fileID, contactID, "photo", "avatar", "video", vaultID).First(&file).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrFileNotFound
-		}
-		return err
-	}
-
-	// If this file is the contact's avatar, unset the reference first.
-	if file.Type == "avatar" {
-		if err := s.db.Model(&models.Contact{}).Where("id = ? AND file_id = ?", contactID, file.ID).
-			Update("file_id", nil).Error; err != nil {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		file, err := lockFileForMutation(tx, fileID, vaultID)
+		if err != nil {
 			return err
 		}
-	}
-	if err := s.ensureFileNotUsedByQuickFact(file.ID); err != nil {
-		return err
-	}
-
-	destPath := s.localPath(&file)
-	os.Remove(destPath)
-
-	return s.db.Delete(&file).Error
+		if file.UfileableID == nil || *file.UfileableID != contactID || (file.Type != "photo" && file.Type != "avatar" && file.Type != "video") {
+			return ErrFileNotFound
+		}
+		if err := ensureFileNotUsed(tx, file.ID, true); err != nil {
+			return err
+		}
+		// If this file is the contact's avatar, unset the reference in the
+		// same transaction so a failed physical removal preserves both rows.
+		if file.Type == "avatar" {
+			if err := tx.Model(&models.Contact{}).Where("id = ? AND file_id = ?", contactID, file.ID).
+				Update("file_id", nil).Error; err != nil {
+				return err
+			}
+		}
+		return s.deleteFileRecord(tx, &file)
+	})
 }
 
 func (s *VaultFileService) ListContactDocuments(contactID, vaultID string, page, perPage int) ([]dto.VaultFileResponse, response.Meta, error) {
@@ -120,20 +115,17 @@ func (s *VaultFileService) ListContactDocuments(contactID, vaultID string, page,
 }
 
 func (s *VaultFileService) DeleteContactDocument(fileID uint, contactID, vaultID string) error {
-	var file models.File
-	if err := s.db.Where("id = ? AND ufileable_id = ? AND type = ? AND vault_id = ?",
-		fileID, contactID, "document", vaultID).First(&file).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		file, err := lockFileForMutation(tx, fileID, vaultID)
+		if err != nil {
+			return err
+		}
+		if file.UfileableID == nil || *file.UfileableID != contactID || file.Type != "document" {
 			return ErrFileNotFound
 		}
-		return err
-	}
-	if err := s.ensureFileNotUsedByQuickFact(file.ID); err != nil {
-		return err
-	}
-
-	destPath := s.localPath(&file)
-	os.Remove(destPath)
-
-	return s.db.Delete(&file).Error
+		if err := ensureFileNotUsed(tx, file.ID, true); err != nil {
+			return err
+		}
+		return s.deleteFileRecord(tx, &file)
+	})
 }

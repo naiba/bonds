@@ -16,7 +16,7 @@ import (
 
 var (
 	ErrFileNotFound = errors.New("file not found")
-	ErrFileInUse    = errors.New("file is referenced by a quick fact")
+	ErrFileInUse    = errors.New("file is in use")
 )
 
 type VaultFileService struct {
@@ -202,19 +202,16 @@ func (s *VaultFileService) Upload(vaultID string, contactID string, authorID str
 }
 
 func (s *VaultFileService) Delete(id uint, vaultID string) error {
-	var file models.File
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&file).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrFileNotFound
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		file, err := lockFileForMutation(tx, id, vaultID)
+		if err != nil {
+			return err
 		}
-		return err
-	}
-
-	if err := s.ensureFileNotUsedByQuickFact(file.ID); err != nil {
-		return err
-	}
-
-	return s.deleteFileRecord(&file)
+		if err := ensureFileNotUsed(tx, file.ID, true); err != nil {
+			return err
+		}
+		return s.deleteFileRecord(tx, &file)
+	})
 }
 
 func assignFileToQuickFact(db *gorm.DB, fileID uint, quickFactID uint, vaultID string) error {
@@ -225,34 +222,63 @@ func assignFileToQuickFact(db *gorm.DB, fileID uint, quickFactID uint, vaultID s
 	}).Error
 }
 
-func (s *VaultFileService) ensureFileNotUsedByQuickFact(fileID uint) error {
-	var quickFactCount int64
-	if err := s.db.Model(&models.QuickFact{}).Where("file_id = ?", fileID).Count(&quickFactCount).Error; err != nil {
+func ensureFileNotUsed(db *gorm.DB, fileID uint, includeQuickFacts bool) error {
+	if includeQuickFacts {
+		var quickFactCount int64
+		if err := db.Model(&models.QuickFact{}).Where("file_id = ?", fileID).Count(&quickFactCount).Error; err != nil {
+			return err
+		}
+		if quickFactCount > 0 {
+			return ErrFileInUse
+		}
+	}
+	var contentReferenceCount int64
+	if err := db.Model(&models.ContentFileReference{}).Where("file_id = ?", fileID).Count(&contentReferenceCount).Error; err != nil {
 		return err
 	}
-	if quickFactCount > 0 {
+	if contentReferenceCount > 0 {
 		return ErrFileInUse
 	}
 	return nil
 }
 
 func (s *VaultFileService) ForceDeleteFile(id uint, vaultID string) error {
-	var file models.File
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&file).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrFileNotFound
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		file, err := lockFileForMutation(tx, id, vaultID)
+		if err != nil {
+			return err
 		}
-		return err
-	}
-	return s.deleteFileRecord(&file)
+		if err := ensureFileNotUsed(tx, file.ID, false); err != nil {
+			return err
+		}
+		return s.deleteFileRecord(tx, &file)
+	})
 }
 
-func (s *VaultFileService) deleteFileRecord(file *models.File) error {
+func lockFileForMutation(tx *gorm.DB, id uint, vaultID string) (models.File, error) {
+	result := tx.Exec("UPDATE files SET updated_at = updated_at WHERE id = ? AND vault_id = ?", id, vaultID)
+	if result.Error != nil {
+		return models.File{}, result.Error
+	}
+	if result.RowsAffected != 1 {
+		return models.File{}, ErrFileNotFound
+	}
+	var file models.File
+	if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&file).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return models.File{}, ErrFileNotFound
+		}
+		return models.File{}, err
+	}
+	return file, nil
+}
+
+func (s *VaultFileService) deleteFileRecord(tx *gorm.DB, file *models.File) error {
 	destPath := s.localPath(file)
 	if err := os.Remove(destPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove file %s: %w", file.UUID, err)
 	}
-	return s.db.Delete(file).Error
+	return tx.Delete(file).Error
 }
 
 func toVaultFileResponse(f *models.File) dto.VaultFileResponse {

@@ -2017,6 +2017,8 @@ export default function ContactDetail() {
                 <CalendarDatePicker
                   enableDatePrecision
                   allowedDatePrecisions={["full", "month", "year"]}
+                  showToday
+                  maxDate={dayjs()}
                 />
               </Form.Item>
               <Form.Item

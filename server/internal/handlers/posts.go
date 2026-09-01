@@ -86,6 +86,12 @@ func (h *PostHandler) Create(c *echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
+		if errors.Is(err, services.ErrFileNotFound) {
+			return response.NotFound(c, "err.file_not_found")
+		}
+		if errors.Is(err, services.ErrInvalidContentFormat) {
+			return response.BadRequest(c, "err.invalid_request_body", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_post")
 	}
 	return response.Created(c, post)
@@ -173,6 +179,12 @@ func (h *PostHandler) Update(c *echo.Context) error {
 		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
+		}
+		if errors.Is(err, services.ErrFileNotFound) {
+			return response.NotFound(c, "err.file_not_found")
+		}
+		if errors.Is(err, services.ErrInvalidContentFormat) {
+			return response.BadRequest(c, "err.invalid_request_body", nil)
 		}
 		return response.InternalError(c, "err.failed_to_update_post")
 	}

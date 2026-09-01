@@ -2049,6 +2049,42 @@ func TestEditorCannotRemoveVaultUser(t *testing.T) {
 	}
 }
 
+func TestSoleVaultManagerCannotDemoteThemselves(t *testing.T) {
+	ts := setupTestServer(t)
+	managerToken, manager := ts.registerTestUser(t, "sole-manager-handler@example.com")
+	vault := ts.createTestVault(t, managerToken, "Sole Manager Vault")
+	membership := getHandlerUserVault(t, ts, manager.User.ID, vault.ID)
+
+	path := fmt.Sprintf("/api/vaults/%s/settings/users/%d", vault.ID, membership.ID)
+	rec := ts.doRequest(http.MethodPut, path, `{"permission":200}`, managerToken)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for sole manager demotion, got %d: %s", rec.Code, rec.Body.String())
+	}
+	remaining := getHandlerUserVault(t, ts, manager.User.ID, vault.ID)
+	if remaining.Permission != models.PermissionManager {
+		t.Fatalf("permission after rejected demotion = %d, want manager", remaining.Permission)
+	}
+}
+
+func TestAccountAdministratorCannotDeleteSoleVaultManager(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, admin := ts.registerTestUser(t, "delete-manager-account-admin@example.com")
+	vault := ts.createTestVault(t, adminToken, "Account Guard Vault")
+	target := createSecondUser(t, ts, admin.User.AccountID, "delete-manager-target@example.com", false)
+	if err := ts.db.Model(&models.UserVault{}).
+		Where("vault_id = ? AND user_id = ?", vault.ID, admin.User.ID).
+		Update("permission", models.PermissionEditor).Error; err != nil {
+		t.Fatalf("demote fixture owner: %v", err)
+	}
+	addUserToVault(t, ts, target.ID, vault.ID, models.PermissionManager)
+
+	path := fmt.Sprintf("/api/settings/users/%s", target.ID)
+	rec := ts.doRequest(http.MethodDelete, path, "", adminToken)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 deleting sole manager, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 // ==================== W. Cross-Vault IDOR — DAV Subscriptions ====================
 
 func TestCrossVaultDavSubscriptionListBlocked(t *testing.T) {

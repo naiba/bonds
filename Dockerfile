@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS swagger
+FROM golang:1.26-alpine AS swagger
 
 RUN apk add --no-cache gcc musl-dev sqlite-dev
 RUN go install github.com/swaggo/swag/cmd/swag@latest
@@ -20,7 +20,7 @@ COPY web/ .
 COPY --from=swagger /build/docs/swagger.json /build/server/docs/swagger.json
 RUN bun run gen:api && bun run build
 
-FROM golang:1.25-alpine AS backend
+FROM golang:1.26-alpine AS backend
 ARG VERSION=dev
 
 RUN apk add --no-cache gcc musl-dev sqlite-dev

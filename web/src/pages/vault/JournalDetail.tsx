@@ -47,7 +47,7 @@ import CalendarAwareDatePicker from "@/components/CalendarAwareDatePicker";
 import LinkifiedText from "@/components/LinkifiedText";
 import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
 import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
-import ContactMentionEditor from "@/components/journal/ContactMentionEditor";
+import MarkdownEditor from "@/components/markdown/MarkdownEditor";
 import PostContactTags from "@/components/journal/PostContactTags";
 import { contactIdsFromMentions } from "@/components/journal/contactMentionSerialization";
 
@@ -811,6 +811,8 @@ export default function JournalDetail() {
         }}
         onOk={() => form.submit()}
         confirmLoading={createPostMutation.isPending}
+        width={860}
+        destroyOnHidden
       >
         <Form
           form={form}
@@ -830,6 +832,7 @@ export default function JournalDetail() {
                   {
                     label: t("vault.journal_mentions.body_label"),
                     content: postBody,
+                    content_format: "markdown",
                     position: 0,
                   },
                 ],
@@ -863,17 +866,19 @@ export default function JournalDetail() {
             <CalendarAwareDatePicker enableAlternativeCalendar={altCalendar} />
           </Form.Item>
           <Form.Item label={t("vault.journal_mentions.body_label")}>
-            <ContactMentionEditor
-              vaultId={vaultId}
-              value={postBody}
-              onChange={(value) => {
-                advancePostDraftRevision();
-                setPostBody(value);
-              }}
-              ariaLabel={t("vault.journal_mentions.body_label")}
-              placeholder={t("vault.journal_mentions.body_placeholder")}
-              showHint
-            />
+            {open && (
+              <MarkdownEditor
+                vaultId={vaultId}
+                value={postBody}
+                onChange={(value) => {
+                  advancePostDraftRevision();
+                  setPostBody(value);
+                }}
+                ariaLabel={t("vault.journal_mentions.body_label")}
+                placeholder={t("vault.journal_mentions.body_placeholder")}
+                variant="full"
+              />
+            )}
           </Form.Item>
           <Form.Item>
             <Checkbox

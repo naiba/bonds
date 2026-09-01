@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/markdown"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
 )
@@ -47,6 +48,11 @@ func (s *PostService) Create(journalID uint, vaultID string, req dto.CreatePostR
 	if err := validateJournalBelongsToVault(s.db, journalID, vaultID); err != nil {
 		return nil, err
 	}
+	for _, section := range req.Sections {
+		if !markdown.IsValidFormat(section.ContentFormat) {
+			return nil, ErrInvalidContentFormat
+		}
+	}
 	contactIDs, err := validateAndDedupeContactIDs(postContactIDsFromSections(req.Sections, req.ContactIDs))
 	if err != nil {
 		return nil, err
@@ -64,12 +70,16 @@ func (s *PostService) Create(journalID uint, vaultID string, req dto.CreatePostR
 		}
 		for _, sec := range req.Sections {
 			section := models.PostSection{
-				PostID:   post.ID,
-				Position: sec.Position,
-				Label:    sec.Label,
-				Content:  strPtrOrNil(sec.Content),
+				PostID:        post.ID,
+				Position:      sec.Position,
+				Label:         sec.Label,
+				Content:       strPtrOrNil(sec.Content),
+				ContentFormat: markdown.NormalizeFormat(sec.ContentFormat),
 			}
 			if err := tx.Create(&section).Error; err != nil {
+				return err
+			}
+			if err := syncContentFileReferences(tx, vaultID, models.ContentOwnerPostSection, section.ID, sec.Content, section.ContentFormat); err != nil {
 				return err
 			}
 		}
@@ -121,6 +131,11 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 	}
 	if err := validatePostBelongsToJournal(s.db, id, journalID); err != nil {
 		return nil, err
+	}
+	for _, section := range req.Sections {
+		if !markdown.IsValidFormat(section.ContentFormat) {
+			return nil, ErrInvalidContentFormat
+		}
 	}
 	var contactIDs []string
 	associationsProvided := req.Sections != nil || req.ContactIDs != nil
@@ -184,17 +199,41 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				return err
 			}
 			if req.Sections != nil {
+				var existingSections []models.PostSection
+				if err := tx.Where("post_id = ?", id).Find(&existingSections).Error; err != nil {
+					return err
+				}
+				existingFormats := make(map[int]string, len(existingSections))
+				existingSectionIDs := make([]uint, len(existingSections))
+				for index, section := range existingSections {
+					existingFormats[section.Position] = markdown.NormalizeFormat(section.ContentFormat)
+					existingSectionIDs[index] = section.ID
+				}
+				if len(existingSectionIDs) > 0 {
+					if err := tx.Where("owner_type = ? AND owner_id IN ?", models.ContentOwnerPostSection, existingSectionIDs).
+						Delete(&models.ContentFileReference{}).Error; err != nil {
+						return err
+					}
+				}
 				if err := tx.Where("post_id = ?", id).Delete(&models.PostSection{}).Error; err != nil {
 					return err
 				}
 				for _, sec := range req.Sections {
+					contentFormat := sec.ContentFormat
+					if contentFormat == "" {
+						contentFormat = existingFormats[sec.Position]
+					}
 					section := models.PostSection{
-						PostID:   post.ID,
-						Position: sec.Position,
-						Label:    sec.Label,
-						Content:  strPtrOrNil(sec.Content),
+						PostID:        post.ID,
+						Position:      sec.Position,
+						Label:         sec.Label,
+						Content:       strPtrOrNil(sec.Content),
+						ContentFormat: markdown.NormalizeFormat(contentFormat),
 					}
 					if err := tx.Create(&section).Error; err != nil {
+						return err
+					}
+					if err := syncContentFileReferences(tx, vaultID, models.ContentOwnerPostSection, section.ID, sec.Content, section.ContentFormat); err != nil {
 						return err
 					}
 				}

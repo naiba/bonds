@@ -80,7 +80,7 @@ O servidor inicia em **http://localhost:8080** com um frontend incorporado e bas
 
 ### Opção 3: Compilar a Partir do Código Fonte
 
-**Pré-requisitos**: Go 1.25+, [Bun](https://bun.sh) 1.x
+**Pré-requisitos**: Go 1.26+, [Bun](https://bun.sh) 1.x
 
 ```bash
 git clone https://github.com/naiba/bonds.git

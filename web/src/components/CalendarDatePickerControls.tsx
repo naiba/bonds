@@ -1,4 +1,4 @@
-import { Segmented, Select, Space } from "antd";
+import { Button, Segmented, Select, Space } from "antd";
 import type { ImportantDatePrecision } from "./calendarDatePickerValue";
 
 type SelectOption = {
@@ -21,6 +21,8 @@ interface CalendarDatePickerControlsProps {
   readonly yearPlaceholder: string;
   readonly monthPlaceholder: string;
   readonly dayPlaceholder: string;
+  readonly showToday: boolean;
+  readonly todayLabel: string;
   readonly precisionLabels: {
     readonly full: string;
     readonly month: string;
@@ -31,6 +33,7 @@ interface CalendarDatePickerControlsProps {
   readonly onYearChange: (value: number) => void;
   readonly onMonthChange: (value: number) => void;
   readonly onDayChange: (value: number) => void;
+  readonly onToday: () => void;
 }
 
 export default function CalendarDatePickerControls({
@@ -48,11 +51,14 @@ export default function CalendarDatePickerControls({
   yearPlaceholder,
   monthPlaceholder,
   dayPlaceholder,
+  showToday,
+  todayLabel,
   precisionLabels,
   onPrecisionChange,
   onYearChange,
   onMonthChange,
   onDayChange,
+  onToday,
 }: CalendarDatePickerControlsProps) {
   return (
     <>
@@ -108,6 +114,16 @@ export default function CalendarDatePickerControls({
           />
         )}
       </Space.Compact>
+      {showToday && (
+        <Button
+          type="link"
+          size="small"
+          onClick={onToday}
+          style={{ paddingInline: 0 }}
+        >
+          {todayLabel}
+        </Button>
+      )}
     </>
   );
 }

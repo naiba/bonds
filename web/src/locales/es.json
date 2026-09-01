@@ -34,7 +34,12 @@
     "updated": "Actualizado",
     "load_more": "Cargar más",
     "copy": "Copiar",
-    "view": "Ver"
+    "view": "Ver",
+    "download_failed": "No se pudo descargar el archivo"
+  },
+  "markdown_editor": {
+    "uploading": "Subiendo archivo {{current}} de {{total}}…",
+    "uploaded": "Carga completada"
   },
   "pagination": {
     "total": "Total {{count}}"
@@ -1487,6 +1492,7 @@
     "year": "Año",
     "month": "Mes",
     "day": "Día",
+    "today": "Hoy",
     "no_year": "No definido",
     "date_precision": {
       "full": "Fecha completa",
@@ -1523,6 +1529,10 @@
     "add_user": "Añadir usuario",
     "hex_color": "Color hexadecimal",
     "user_email": "Correo electrónico",
+    "last_manager_required": "Una bóveda debe conservar al menos un administrador.",
+    "demote_manager_title": "¿Cambiar el permiso de administrador?",
+    "demote_manager_description": "{{email}} perderá el acceso a la configuración de administración de la bóveda.",
+    "demote_self_description": "Después de guardar, perderás el acceso a la configuración de administración de esta bóveda.",
     "tab_journal": "Diario",
     "tab_companies": "Empresas",
     "tab_reports": "Informes",

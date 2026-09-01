@@ -45,16 +45,20 @@ import type {
 } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
-import ContactMentionEditor from "@/components/journal/ContactMentionEditor";
-import ContactMentionText from "@/components/journal/ContactMentionText";
+import MarkdownEditor from "@/components/markdown/MarkdownEditor";
+import MarkdownContent from "@/components/markdown/MarkdownContent";
 import PostContactTags from "@/components/journal/PostContactTags";
 import {
   appendMissingContactMentions,
   contactIdsFromMentions,
 } from "@/components/journal/contactMentionSerialization";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
+import {
+  plainTextToMarkdown,
+  plainTextToSafeHTML,
+} from "@/components/markdown/markdownFormat";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Dragger } = Upload;
 
 type UpdatePostVariables = {
@@ -303,8 +307,15 @@ export default function PostDetail() {
         label: s.label,
         body:
           index === 0
-            ? appendMissingContactMentions(s.content ?? "", associatedContacts)
-            : (s.content ?? ""),
+            ? appendMissingContactMentions(
+                s.content_format === "markdown"
+                  ? (s.content ?? "")
+                  : plainTextToMarkdown(s.content ?? ""),
+                associatedContacts,
+              )
+            : s.content_format === "markdown"
+              ? (s.content ?? "")
+              : plainTextToMarkdown(s.content ?? ""),
       })),
     );
     setUpdateLastContacted(false);
@@ -347,6 +358,7 @@ export default function PostDetail() {
         sections: sections.map((section, position) => ({
           label: section.label,
           content: section.body,
+          content_format: "markdown",
           position,
         })),
         contact_ids: Array.from(
@@ -469,7 +481,7 @@ export default function PostDetail() {
                       />
                     }
                   >
-                    <ContactMentionEditor
+                    <MarkdownEditor
                       vaultId={vaultId}
                       value={section.body}
                       onChange={(value) => updateSection(index, "body", value)}
@@ -480,7 +492,7 @@ export default function PostDetail() {
                       placeholder={t(
                         "vault.post_detail.section_content_placeholder",
                       )}
-                      rows={4}
+                      variant="full"
                     />
                   </Card>
                 ))}
@@ -656,21 +668,14 @@ export default function PostDetail() {
                         >
                           {section.label}
                         </Title>
-                        <Paragraph
-                          style={{
-                            fontSize: 15,
-                            lineHeight: 1.8,
-                            color: token.colorText,
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          <ContactMentionText
-                            vaultId={vaultId}
-                            contacts={post.contacts ?? []}
-                          >
-                            {section.content ?? ""}
-                          </ContactMentionText>
-                        </Paragraph>
+                        <MarkdownContent
+                          vaultId={vaultId}
+                          contacts={post.contacts ?? []}
+                          html={
+                            section.rendered_content ??
+                            plainTextToSafeHTML(section.content ?? "")
+                          }
+                        />
                       </div>
                     ))
                 ) : (

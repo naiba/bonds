@@ -83,6 +83,12 @@ func (h *NoteHandler) Create(c *echo.Context) error {
 
 	note, err := h.noteService.Create(contactID, vaultID, userID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidContentFormat) {
+			return response.BadRequest(c, "err.invalid_request_body", nil)
+		}
+		if errors.Is(err, services.ErrFileNotFound) {
+			return response.NotFound(c, "err.file_not_found")
+		}
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
@@ -128,6 +134,12 @@ func (h *NoteHandler) Update(c *echo.Context) error {
 
 	note, err := h.noteService.Update(uint(id), contactID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidContentFormat) {
+			return response.BadRequest(c, "err.invalid_request_body", nil)
+		}
+		if errors.Is(err, services.ErrFileNotFound) {
+			return response.NotFound(c, "err.file_not_found")
+		}
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}

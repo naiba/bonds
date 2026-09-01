@@ -34,7 +34,12 @@
     "updated": "Aktualisiert",
     "load_more": "Mehr laden",
     "copy": "Kopieren",
-    "view": "Anzeigen"
+    "view": "Anzeigen",
+    "download_failed": "Datei konnte nicht heruntergeladen werden"
+  },
+  "markdown_editor": {
+    "uploading": "Datei {{current}} von {{total}} wird hochgeladen…",
+    "uploaded": "Upload abgeschlossen"
   },
   "pagination": {
     "total": "Gesamt {{count}}"
@@ -1487,6 +1492,7 @@
     "year": "Jahr",
     "month": "Monat",
     "day": "Tag",
+    "today": "Heute",
     "no_year": "Nicht angegeben",
     "date_precision": {
       "full": "Vollständiges Datum",
@@ -1523,6 +1529,10 @@
     "add_user": "Benutzer hinzufügen",
     "hex_color": "Hex-Farbe",
     "user_email": "E-Mail",
+    "last_manager_required": "Ein Tresor muss mindestens einen Manager behalten.",
+    "demote_manager_title": "Manager-Berechtigung ändern?",
+    "demote_manager_description": "{{email}} verliert den Zugriff auf die Tresor-Verwaltungseinstellungen.",
+    "demote_self_description": "Nach dem Speichern verlieren Sie den Zugriff auf die Verwaltungseinstellungen dieses Tresors.",
     "tab_journal": "Journal",
     "tab_companies": "Unternehmen",
     "tab_reports": "Berichte",

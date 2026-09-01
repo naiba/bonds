@@ -619,7 +619,9 @@ test.describe("Vault - Feed, Calendar, Journal and Settings", () => {
     await modal
       .getByRole("textbox", { name: "Title" })
       .fill("Graduated from university");
-    await modal.locator("textarea").fill("Got my degree");
+    await modal
+      .getByRole("textbox", { name: "Description" })
+      .pressSequentially("Got my degree");
 
     const dashboardActivityResp = page.waitForResponse(
       (resp) =>
@@ -1185,8 +1187,8 @@ test.describe("Vault Feed - Contact Names", () => {
 
     await notesCard.getByPlaceholder(/title/i).fill("Feed Test Note");
     await notesCard
-      .locator("textarea")
-      .fill("This note generates a feed entry");
+      .getByRole("textbox", { name: /write your note/i })
+      .pressSequentially("This note generates a feed entry");
 
     const noteResp = page.waitForResponse(
       (resp) =>

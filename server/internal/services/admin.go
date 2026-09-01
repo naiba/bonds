@@ -126,7 +126,15 @@ func (s *AdminService) ToggleUser(actorID, targetID string, disabled bool) error
 		return err
 	}
 
-	return s.db.Model(&user).Update("disabled", disabled).Error
+	if !disabled {
+		return s.db.Model(&user).Update("disabled", false).Error
+	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := ensureUserIsNotSoleVaultManager(tx, user.ID); err != nil {
+			return err
+		}
+		return tx.Model(&user).Update("disabled", true).Error
+	})
 }
 
 func (s *AdminService) SetAdmin(actorID, targetID string, isAdmin bool) error {
@@ -284,6 +292,9 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 // WebAuthn credentials, etc.) without touching the shared account, vaults, or contacts.
 func (s *AdminService) deleteUserOnly(user models.User) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := ensureUserIsNotSoleVaultManager(tx, user.ID); err != nil {
+			return err
+		}
 		if err := s.deleteUserDirectData(tx, user.ID); err != nil {
 			return err
 		}
@@ -342,6 +353,9 @@ func (s *AdminService) deleteVaultData(tx *gorm.DB, vaultID string) error {
 
 	journalSubquery := tx.Model(&models.Journal{}).Select("id").Where("vault_id = ?", vaultID)
 	postSubquery := tx.Model(&models.Post{}).Select("id").Where("journal_id IN (?)", journalSubquery)
+	if err := tx.Where("vault_id = ?", vaultID).Delete(&models.ContentFileReference{}).Error; err != nil {
+		return fmt.Errorf("delete content file references: %w", err)
+	}
 
 	for _, model := range []interface{}{&models.PostSection{}, &models.PostMetric{}, &models.PostTag{}} {
 		if err := tx.Where("post_id IN (?)", postSubquery).Delete(model).Error; err != nil {
@@ -410,6 +424,16 @@ func (s *AdminService) deleteVaultData(tx *gorm.DB, vaultID string) error {
 }
 
 func (s *AdminService) deleteContactData(tx *gorm.DB, contactID string) error {
+	var noteIDs []uint
+	if err := tx.Model(&models.Note{}).Where("contact_id = ?", contactID).Pluck("id", &noteIDs).Error; err != nil {
+		return fmt.Errorf("collect note IDs: %w", err)
+	}
+	if len(noteIDs) > 0 {
+		if err := tx.Where("owner_type = ? AND owner_id IN ?", models.ContentOwnerNote, noteIDs).
+			Delete(&models.ContentFileReference{}).Error; err != nil {
+			return fmt.Errorf("delete note file references: %w", err)
+		}
+	}
 	// Reminder schedules and selected recipients depend on ContactReminder.
 	if err := tx.Where("contact_reminder_id IN (?)",
 		tx.Model(&models.ContactReminder{}).Select("id").Where("contact_id = ?", contactID),

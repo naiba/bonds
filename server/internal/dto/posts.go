@@ -29,9 +29,10 @@ type UpdatePostRequest struct {
 }
 
 type PostSectionInput struct {
-	Position int    `json:"position" example:"1"`
-	Label    string `json:"label" example:"Main Body"`
-	Content  string `json:"content" example:"Today was a wonderful day spent with family."`
+	Position      int    `json:"position" example:"1"`
+	Label         string `json:"label" example:"Main Body"`
+	Content       string `json:"content" example:"Today was a **wonderful** day spent with family."`
+	ContentFormat string `json:"content_format" example:"markdown" enums:"plain,markdown"`
 }
 
 type PostResponse struct {
@@ -52,10 +53,12 @@ type PostResponse struct {
 }
 
 type PostSectionResponse struct {
-	ID       uint   `json:"id" example:"1"`
-	Position int    `json:"position" example:"1"`
-	Label    string `json:"label" example:"Main Body"`
-	Content  string `json:"content" example:"Today was a wonderful day spent with family."`
+	ID              uint   `json:"id" example:"1"`
+	Position        int    `json:"position" example:"1"`
+	Label           string `json:"label" example:"Main Body"`
+	Content         string `json:"content" example:"Today was a **wonderful** day spent with family."`
+	ContentFormat   string `json:"content_format" example:"markdown" enums:"plain,markdown"`
+	RenderedContent string `json:"rendered_content" example:"<p>Today was a <strong>wonderful</strong> day spent with family.</p>"`
 }
 
 type PostContactResponse struct {

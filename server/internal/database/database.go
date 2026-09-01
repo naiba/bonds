@@ -93,6 +93,9 @@ func runPostAutoMigrateBackfills(db *gorm.DB) error {
 	if err := backfillContactReminderAudience(db); err != nil {
 		return err
 	}
+	if err := repairManagerlessVaults(db); err != nil {
+		return err
+	}
 	if hasLegacyContactLayoutTables(db) {
 		if err := models.BackfillGiftContactModules(db); err != nil {
 			return err

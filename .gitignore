@@ -17,6 +17,7 @@ server/docs/
 web/src/api/generated/
 web/playwright-report/
 web/test-results/
+web/public/vendor/vditor/
 .opencode/
 .sisyphus/
 monica-php

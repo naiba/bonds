@@ -36,6 +36,23 @@ vi.mock("@/api", () => ({
       contactsNotesDelete: vi.fn(),
     },
   },
+  httpClient: { instance: { get: vi.fn() } },
+}));
+
+vi.mock("@/components/markdown/MarkdownEditor", () => ({
+  default: (props: {
+    readonly value: string;
+    readonly onChange: (value: string) => void;
+    readonly ariaLabel: string;
+    readonly placeholder: string;
+  }) => (
+    <textarea
+      aria-label={props.ariaLabel}
+      placeholder={props.placeholder}
+      value={props.value}
+      onChange={(event) => props.onChange(event.target.value)}
+    />
+  ),
 }));
 
 const existingNote = {
@@ -156,6 +173,16 @@ describe("NotesModule local query invalidation", () => {
     await waitFor(() =>
       expect(appMessageMock.success).toHaveBeenCalledWith("Note updated"),
     );
+    expect(api.notes.contactsNotesUpdate).toHaveBeenCalledWith(
+      "101",
+      "202",
+      7,
+      {
+        title: "Existing note",
+        body: "Existing body",
+        body_format: "markdown",
+      },
+    );
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: notesQueryKey,
     });
@@ -206,6 +233,7 @@ describe("NotesModule Feed invalidation", () => {
       expect(api.notes.contactsNotesCreate).toHaveBeenCalledWith("101", "202", {
         title: "Created note",
         body: "",
+        body_format: "markdown",
       }),
     );
     view.rerender(notesView(queryClient, 303, 404));

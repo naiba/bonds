@@ -87,6 +87,7 @@ func (h *UserManagementHandler) Update(c *echo.Context) error {
 //	@Failure		400	{object}	response.APIResponse
 //	@Failure		401	{object}	response.APIResponse
 //	@Failure		404	{object}	response.APIResponse
+//	@Failure		409	{object}	response.APIResponse
 //	@Failure		500	{object}	response.APIResponse
 //	@Router			/settings/users/{id} [delete]
 func (h *UserManagementHandler) Delete(c *echo.Context) error {
@@ -99,6 +100,9 @@ func (h *UserManagementHandler) Delete(c *echo.Context) error {
 		}
 		if errors.Is(err, services.ErrManagedUserNotFound) {
 			return response.NotFound(c, "err.user_not_found")
+		}
+		if errors.Is(err, services.ErrLastVaultManager) {
+			return response.Conflict(c, "err.last_vault_manager")
 		}
 		return response.InternalError(c, "err.failed_to_delete_user")
 	}

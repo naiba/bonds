@@ -146,6 +146,10 @@ func activityError(c *echo.Context, err error, fallback string) error {
 		return response.BadRequest(c, "err.invalid_activity_time", nil)
 	case errors.Is(err, services.ErrInvalidActivityInput):
 		return response.BadRequest(c, "err.invalid_request_body", nil)
+	case errors.Is(err, services.ErrInvalidContentFormat):
+		return response.BadRequest(c, "err.invalid_request_body", nil)
+	case errors.Is(err, services.ErrFileNotFound):
+		return response.NotFound(c, "err.file_not_found")
 	default:
 		return response.InternalError(c, fallback)
 	}

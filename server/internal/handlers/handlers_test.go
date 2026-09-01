@@ -1453,6 +1453,34 @@ func TestNoteCreate_Success(t *testing.T) {
 	}
 }
 
+func TestNoteCreate_Markdown(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "note-markdown@example.com")
+	vault := ts.createTestVault(t, token, "Markdown Note Vault")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+	path := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/notes"
+
+	rec := ts.doRequest(http.MethodPost, path,
+		`{"title":"Markdown","body":"**bold** <script>alert(1)</script>","body_format":"markdown"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := parseResponse(t, rec)
+	var note dto.NoteResponse
+	if err := json.Unmarshal(resp.Data, &note); err != nil {
+		t.Fatalf("parse Markdown note: %v", err)
+	}
+	if note.BodyFormat != "markdown" || !strings.Contains(note.RenderedBody, "<strong>bold</strong>") || strings.Contains(note.RenderedBody, "<script>") {
+		t.Fatalf("Markdown note response = %+v", note)
+	}
+
+	badFormat := ts.doRequest(http.MethodPost, path,
+		`{"title":"Bad","body":"content","body_format":"html"}`, token)
+	if badFormat.Code != http.StatusBadRequest {
+		t.Fatalf("invalid format: expected 400, got %d: %s", badFormat.Code, badFormat.Body.String())
+	}
+}
+
 func TestNoteList_Success(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "note-list@example.com")
@@ -3136,8 +3164,8 @@ func TestQuickFactFileUploadReplaceAndDelete(t *testing.T) {
 	if deleteReferencedRec.Code != http.StatusBadRequest {
 		t.Fatalf("expected referenced file 400, got %d: %s", deleteReferencedRec.Code, deleteReferencedRec.Body.String())
 	}
-	if resp := parseResponse(t, deleteReferencedRec); resp.Error == nil || resp.Error.Message != "err.file_referenced_by_quick_fact" {
-		t.Fatalf("expected quick fact file reference error, got %+v", resp.Error)
+	if resp := parseResponse(t, deleteReferencedRec); resp.Error == nil || resp.Error.Message != "This file is in use and cannot be deleted" {
+		t.Fatalf("expected file-in-use error, got %+v", resp.Error)
 	}
 	deleteAsContactPhotoRec := ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/contacts/%s/photos/%d", vault.ID, contact.ID, *replaced.FileID), "", token)
 	if deleteAsContactPhotoRec.Code != http.StatusBadRequest {
@@ -5510,6 +5538,24 @@ func TestAdminDeleteUser_CannotDeleteSelf(t *testing.T) {
 		"/api/admin/users/"+adminData.User.ID, "", adminToken)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestAdminDeleteUser_SoleVaultManagerConflict(t *testing.T) {
+	ts := setupTestServer(t)
+	adminToken, _ := ts.registerTestUser(t, "admin-delete-manager-actor@example.com")
+	_, owner := ts.registerTestUser(t, "admin-delete-manager-owner@example.com")
+	target := createSecondUser(t, ts, owner.User.AccountID, "admin-delete-manager-target@example.com", false)
+	vault := models.Vault{AccountID: owner.User.AccountID, Name: "Admin Guard Vault", Type: "personal"}
+	if err := ts.db.Create(&vault).Error; err != nil {
+		t.Fatalf("create vault: %v", err)
+	}
+	addUserToVault(t, ts, owner.User.ID, vault.ID, models.PermissionEditor)
+	addUserToVault(t, ts, target.ID, vault.ID, models.PermissionManager)
+
+	rec := ts.doRequest(http.MethodDelete, "/api/admin/users/"+target.ID, "", adminToken)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409 deleting sole manager, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

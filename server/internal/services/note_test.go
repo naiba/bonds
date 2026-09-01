@@ -1,9 +1,13 @@
 package services
 
 import (
+	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -59,6 +63,72 @@ func TestCreateNote(t *testing.T) {
 	}
 	if note.ID == 0 {
 		t.Error("Expected note ID to be non-zero")
+	}
+}
+
+func TestNoteMarkdownRendersAndTracksUploadedFiles(t *testing.T) {
+	svc, contactID, vaultID, userID := setupNoteTest(t)
+	file := models.File{VaultID: vaultID, UUID: "note-markdown-file", Name: "brief.pdf", MimeType: "application/pdf", Type: "document"}
+	if err := svc.db.Create(&file).Error; err != nil {
+		t.Fatalf("create file: %v", err)
+	}
+	body := "**important** <script>alert(1)</script> [brief](bonds-file:" + fmt.Sprint(file.ID) + ")"
+	note, err := svc.Create(contactID, vaultID, userID, dto.CreateNoteRequest{
+		Title: "Markdown", Body: body, BodyFormat: "markdown",
+	})
+	if err != nil {
+		t.Fatalf("Create Markdown note: %v", err)
+	}
+	if note.BodyFormat != "markdown" || !strings.Contains(note.RenderedBody, "<strong>important</strong>") ||
+		!strings.Contains(note.RenderedBody, `data-bonds-file="`) || strings.Contains(note.RenderedBody, "<script>") {
+		t.Fatalf("Markdown note response = %+v", note)
+	}
+	var referenceCount int64
+	svc.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 1 {
+		t.Fatalf("content file reference count = %d, want 1", referenceCount)
+	}
+	fileSvc := NewVaultFileService(svc.db, t.TempDir())
+	if err := fileSvc.Delete(file.ID, vaultID); !errors.Is(err, ErrFileInUse) {
+		t.Fatalf("Delete referenced file error = %v, want ErrFileInUse", err)
+	}
+
+	updated, err := svc.Update(note.ID, contactID, vaultID, dto.UpdateNoteRequest{
+		Title: "Legacy client update", Body: body,
+	})
+	if err != nil {
+		t.Fatalf("Update Markdown note without format: %v", err)
+	}
+	if updated.BodyFormat != "markdown" {
+		t.Fatalf("BodyFormat after legacy update = %q, want markdown", updated.BodyFormat)
+	}
+	svc.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 1 {
+		t.Fatalf("content file reference count after legacy update = %d, want 1", referenceCount)
+	}
+
+	if err := svc.Delete(note.ID, contactID, vaultID); err != nil {
+		t.Fatalf("Delete Markdown note: %v", err)
+	}
+	svc.db.Model(&models.ContentFileReference{}).Where("file_id = ?", file.ID).Count(&referenceCount)
+	if referenceCount != 0 {
+		t.Fatalf("content file reference count after note delete = %d, want 0", referenceCount)
+	}
+}
+
+func TestNoteRejectsInvalidFormatAndUnknownMarkdownFile(t *testing.T) {
+	svc, contactID, vaultID, userID := setupNoteTest(t)
+	_, err := svc.Create(contactID, vaultID, userID, dto.CreateNoteRequest{
+		Body: "content", BodyFormat: "html",
+	})
+	if !errors.Is(err, ErrInvalidContentFormat) {
+		t.Fatalf("invalid format error = %v, want ErrInvalidContentFormat", err)
+	}
+	_, err = svc.Create(contactID, vaultID, userID, dto.CreateNoteRequest{
+		Body: "[missing](bonds-file:999999)", BodyFormat: "markdown",
+	})
+	if !errors.Is(err, ErrFileNotFound) {
+		t.Fatalf("unknown file error = %v, want ErrFileNotFound", err)
 	}
 }
 

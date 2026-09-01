@@ -38,6 +38,7 @@
   "err.failed_to_get_vault": "获取保险库失败",
   "err.failed_to_update_vault": "更新保险库失败",
   "err.failed_to_delete_vault": "删除保险库失败",
+  "err.last_vault_manager": "保险库必须至少保留一名管理员",
 
   "err.failed_to_list_contacts": "获取联系人列表失败",
   "err.failed_to_create_contact": "创建联系人失败",
@@ -188,6 +189,7 @@
   "err.failed_to_list_vault_files": "获取保险库文件列表失败",
   "err.invalid_file_id": "无效的文件ID",
   "err.file_not_found": "文件未找到",
+  "err.file_in_use": "此文件正在使用中，无法删除",
   "err.failed_to_delete_file": "删除文件失败",
 
   "err.failed_to_list_companies": "获取公司列表失败",

@@ -62,7 +62,7 @@ test.describe('Contact Modules - Notes', () => {
     await notesCard.getByRole('button', { name: /add/i }).click();
 
     await notesCard.getByPlaceholder(/title/i).fill('Test Note Title');
-    await notesCard.locator('textarea').fill('This is a test note body');
+    await notesCard.getByRole('textbox', { name: /write your note/i }).pressSequentially('This is a test note body');
 
     const responsePromise = page.waitForResponse((resp) => resp.url().includes('/notes') && resp.request().method() === 'POST');
     await notesCard.getByRole('button', { name: /save/i }).click();
@@ -86,7 +86,7 @@ test.describe('Contact Modules - Notes', () => {
 
     await notesCard.getByRole('button', { name: /add/i }).click();
     await notesCard.getByPlaceholder(/title/i).fill('Delete Me');
-    await notesCard.locator('textarea').fill('Note to delete');
+    await notesCard.getByRole('textbox', { name: /write your note/i }).pressSequentially('Note to delete');
 
     const createResp = page.waitForResponse((resp) => resp.url().includes('/notes') && resp.request().method() === 'POST');
     await notesCard.getByRole('button', { name: /save/i }).click();

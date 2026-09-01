@@ -32,6 +32,10 @@ vi.mock("@/api", () => ({
   },
 }));
 
+vi.mock("@/components/markdown/MarkdownEditor", () => ({
+  default: () => <div data-testid="markdown-editor" />,
+}));
+
 function renderModule(
   initiallyOpen = false,
   queryClient = new QueryClient({

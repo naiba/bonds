@@ -87,6 +87,21 @@ vi.mock("@/api", () => ({
   },
 }));
 
+vi.mock("@/components/markdown/MarkdownEditor", async () => {
+  const { default: ContactMentionEditor } = await vi.importActual<
+    typeof import("@/components/journal/ContactMentionEditor")
+  >("@/components/journal/ContactMentionEditor");
+  return {
+    default: (props: {
+      vaultId: string;
+      value: string;
+      onChange: (value: string) => void;
+      ariaLabel: string;
+      placeholder: string;
+    }) => <ContactMentionEditor {...props} />,
+  };
+});
+
 const mockUseQuery = vi.fn();
 
 type MutationOptions<TVariables> = {
@@ -196,6 +211,10 @@ function mockLoadedPostQueries(
                 id: 2,
                 label: "Body",
                 content,
+                content_format: "plain",
+                rendered_content: content.includes(`contact:${CONTACT_ID}`)
+                  ? `<p><span data-bonds-contact="${CONTACT_ID}" data-bonds-name="Old Name">Old Name</span></p>`
+                  : `<p>${content}</p>`,
                 position: 0,
               },
             ],
@@ -279,6 +298,7 @@ describe("PostDetail", () => {
           {
             label: "Body",
             content: `A legacy post @[Renamed Person](contact:${CONTACT_ID})`,
+            content_format: "markdown",
             position: 0,
           },
         ],
@@ -317,6 +337,7 @@ describe("PostDetail", () => {
         {
           label: "Body",
           content: `Hello @[Old Name](contact:${CONTACT_ID})`,
+          content_format: "markdown",
           position: 0,
         },
       ],

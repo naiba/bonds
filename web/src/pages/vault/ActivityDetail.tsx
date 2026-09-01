@@ -12,7 +12,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
 import type { Activity } from "@/api";
-import ContactMentionText from "@/components/journal/ContactMentionText";
+import MarkdownContent from "@/components/markdown/MarkdownContent";
+import { plainTextToSafeHTML } from "@/components/markdown/markdownFormat";
 import ContactReferenceList from "@/components/ContactReferenceList";
 import { parseCanonicalPositiveSafeInteger } from "@/utils/feedSourceLink";
 import {
@@ -22,7 +23,7 @@ import {
 } from "@/utils/dateOnlyInput";
 import { useDateFormat } from "@/utils/dateFormat";
 
-const { Paragraph, Text, Title } = Typography;
+const { Text, Title } = Typography;
 
 function getReturnPath(state: unknown, vaultId: string): string {
   if (typeof state !== "object" || state === null) return `/vaults/${vaultId}`;
@@ -140,15 +141,14 @@ export default function ActivityDetail() {
             {t("modules.activities.description")}
           </Divider>
           {activity.description ? (
-            <Paragraph style={{ whiteSpace: "pre-wrap" }}>
-              <ContactMentionText
-                vaultId={vaultId}
-                contacts={activity.mentioned_contacts ?? []}
-                appendUnmentionedContacts={false}
-              >
-                {activity.description}
-              </ContactMentionText>
-            </Paragraph>
+            <MarkdownContent
+              vaultId={vaultId}
+              contacts={activity.mentioned_contacts ?? []}
+              html={
+                activity.rendered_description ??
+                plainTextToSafeHTML(activity.description)
+              }
+            />
           ) : (
             <Text type="secondary">
               {t("modules.activities.no_description")}

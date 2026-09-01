@@ -34,7 +34,12 @@
     "updated": "已更新",
     "load_more": "加载更多",
     "copy": "复制",
-    "view": "查看"
+    "view": "查看",
+    "download_failed": "文件下载失败"
+  },
+  "markdown_editor": {
+    "uploading": "正在上传第 {{current}}/{{total}} 个文件…",
+    "uploaded": "上传完成"
   },
   "pagination": {
     "total": "共 {{count}} 条"
@@ -1487,6 +1492,7 @@
     "year": "年",
     "month": "月",
     "day": "日",
+    "today": "今天",
     "no_year": "未设置",
     "date_precision": {
       "full": "完整日期",
@@ -1523,6 +1529,10 @@
     "add_user": "添加用户",
     "hex_color": "十六进制颜色",
     "user_email": "邮箱",
+    "last_manager_required": "保险库必须至少保留一名管理员。",
+    "demote_manager_title": "确认修改管理员权限？",
+    "demote_manager_description": "{{email}} 将失去访问保险库管理设置的权限。",
+    "demote_self_description": "保存后，你将失去访问此保险库管理设置的权限。",
     "tab_journal": "日记",
     "tab_companies": "公司",
     "tab_reports": "报表",

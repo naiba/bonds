@@ -34,7 +34,12 @@
     "updated": "Atualizado",
     "load_more": "Carregar mais",
     "copy": "Copiar",
-    "view": "Visualizar"
+    "view": "Visualizar",
+    "download_failed": "Falha ao baixar o arquivo"
+  },
+  "markdown_editor": {
+    "uploading": "Enviando arquivo {{current}} de {{total}}…",
+    "uploaded": "Envio concluído"
   },
   "pagination": {
     "total": "Total {{count}}"
@@ -1487,6 +1492,7 @@
     "year": "Ano",
     "month": "Mês",
     "day": "Dia",
+    "today": "Hoje",
     "no_year": "Não definido",
     "date_precision": {
       "full": "Data completa",
@@ -1523,6 +1529,10 @@
     "add_user": "Adicionar Usuário",
     "hex_color": "Cor Hexadecimal",
     "user_email": "E-mail",
+    "last_manager_required": "Um cofre deve manter pelo menos um gerente.",
+    "demote_manager_title": "Alterar a permissão de gerente?",
+    "demote_manager_description": "{{email}} perderá o acesso às configurações de gerenciamento do cofre.",
+    "demote_self_description": "Após salvar, você perderá o acesso às configurações de gerenciamento deste cofre.",
     "tab_journal": "Diário",
     "tab_companies": "Empresas",
     "tab_reports": "Relatórios",

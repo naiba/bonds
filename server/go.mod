@@ -1,9 +1,10 @@
 module github.com/naiba/bonds
 
-go 1.25.2
+go 1.26.0
 
 require (
 	github.com/6tail/lunar-go v1.4.6
+	github.com/88250/lute v1.7.7
 	github.com/blevesearch/bleve/v2 v2.6.1
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/emersion/go-vcard v0.1.0
@@ -16,6 +17,7 @@ require (
 	github.com/jordan-wright/email v4.0.1-0.20210109023952-943e75fe5223+incompatible
 	github.com/labstack/echo/v5 v5.3.1
 	github.com/markbates/goth v1.82.0
+	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/nicholas-fedor/shoutrrr v0.18.0
 	github.com/pquerna/otp v1.5.0
@@ -37,6 +39,8 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/RoaringBitmap/roaring/v2 v2.25.0 // indirect
+	github.com/alecthomas/chroma v0.10.0 // indirect
+	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bits-and-blooms/bitset v1.25.0 // indirect
 	github.com/blevesearch/bleve_index_api v1.4.1 // indirect
 	github.com/blevesearch/geo v0.2.6 // indirect
@@ -57,6 +61,7 @@ require (
 	github.com/blevesearch/zapx/v16 v16.3.4 // indirect
 	github.com/blevesearch/zapx/v17 v17.2.3 // indirect
 	github.com/boombuler/barcode v1.1.0 // indirect
+	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/eclipse/paho.golang v0.23.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
 	github.com/go-chi/chi/v5 v5.3.2 // indirect
@@ -75,6 +80,8 @@ require (
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
+	github.com/gopherjs/gopherjs v1.17.2 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect

@@ -81,7 +81,7 @@ export JWT_SECRET="$(openssl rand -hex 32)"
 
 ### 方式三：从源码构建
 
-**环境要求**：Go 1.25+、[Bun](https://bun.sh) 1.x
+**环境要求**：Go 1.26+、[Bun](https://bun.sh) 1.x
 
 ```bash
 git clone https://github.com/naiba/bonds.git

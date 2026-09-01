@@ -123,6 +123,10 @@ export function createCalendarDatePickerHandlers({
       emit(calendarType, displayYear, selectedMonth, nextDay);
     },
 
+    handleToday(nextYear: number, nextMonth: number, nextDay: number) {
+      emit(calendarType, nextYear, nextMonth, nextDay, "full");
+    },
+
     handleClear() {
       onChange?.(null);
     },

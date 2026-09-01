@@ -70,6 +70,16 @@ func deletePostDependents(tx *gorm.DB, vaultID string, postIDs []uint) ([]models
 	if err := tx.Where("post_id IN ?", postIDs).Delete(&models.PostMetric{}).Error; err != nil {
 		return nil, err
 	}
+	var sectionIDs []uint
+	if err := tx.Model(&models.PostSection{}).Where("post_id IN ?", postIDs).Pluck("id", &sectionIDs).Error; err != nil {
+		return nil, err
+	}
+	if len(sectionIDs) > 0 {
+		if err := tx.Where("owner_type = ? AND owner_id IN ?", models.ContentOwnerPostSection, sectionIDs).
+			Delete(&models.ContentFileReference{}).Error; err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.Where("post_id IN ?", postIDs).Delete(&models.PostSection{}).Error; err != nil {
 		return nil, err
 	}
