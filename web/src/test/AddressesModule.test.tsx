@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { App as AntApp, ConfigProvider } from "antd";
 import { MemoryRouter } from "react-router-dom";
 import AddressesModule from "@/pages/contact/modules/AddressesModule";
@@ -22,6 +23,8 @@ const mockAddresses: Address[] = [
     province: "",
     postal_code: "75001",
     country: "France",
+    latitude: 48.8566,
+    longitude: 2.3522,
     is_past_address: true,
     date_from: "2025-03-01T00:00:00Z",
     date_to: "2025-04-01T00:00:00Z",
@@ -33,7 +36,8 @@ const mockAddresses: Address[] = [
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: unknown[] }) => {
     const key = JSON.stringify(opts.queryKey);
-    if (key.includes("preferences")) return { data: { date_format: "YYYY-MM-DD" } };
+    if (key.includes("preferences"))
+      return { data: { date_format: "YYYY-MM-DD" } };
     return { data: mockAddresses, isLoading: false };
   },
   useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -56,6 +60,28 @@ describe("AddressesModule", () => {
   it("formats address timeline dates with the user date preference", () => {
     renderModule();
     expect(screen.getByText("2025-03 → 2025-04")).toBeInTheDocument();
+  });
+
+  it("loads the OpenStreetMap embed only after the map button is clicked", async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderModule();
+
+    expect(screen.queryByTitle("Map of address")).not.toBeInTheDocument();
+    expect(
+      baseElement.querySelector('img[src*="/addresses/"]'),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "View map" }));
+
+    const map = await screen.findByTitle("Map of address");
+    const src = decodeURIComponent(map.getAttribute("src") ?? "");
+    expect(src).toContain("openstreetmap.org/export/embed.html");
+    expect(src).toContain("marker=48.8566,2.3522");
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await waitFor(() =>
+      expect(screen.queryByTitle("Map of address")).not.toBeInTheDocument(),
+    );
   });
 
   it("registers the hidden coordinate fields the lookup fills", async () => {

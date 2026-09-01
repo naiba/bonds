@@ -73,6 +73,34 @@ type AddressDeleteMutationOperation = {
   readonly id: number;
 };
 
+type GeocodedAddress = Address & {
+  readonly latitude: number;
+  readonly longitude: number;
+};
+
+function hasCoordinates(address: Address): address is GeocodedAddress {
+  return (
+    typeof address.latitude === "number" &&
+    typeof address.longitude === "number"
+  );
+}
+
+function osmEmbedUrl(address: GeocodedAddress): string {
+  const { latitude, longitude } = address;
+  const bbox = [
+    longitude - 0.005,
+    latitude - 0.005,
+    longitude + 0.005,
+    latitude + 0.005,
+  ].join(",");
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${latitude},${longitude}`)}`;
+}
+
+function osmPageUrl(address: GeocodedAddress): string {
+  const { latitude, longitude } = address;
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
+}
+
 export default function AddressesModule({
   vaultId,
   contactId,
@@ -84,6 +112,7 @@ export default function AddressesModule({
 }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [mapAddress, setMapAddress] = useState<GeocodedAddress | null>(null);
   const [form] = Form.useForm<AddressFormValues>();
   const queryClient = useQueryClient();
   const { message } = App.useApp();
@@ -252,14 +281,6 @@ export default function AddressesModule({
     return `→ ${to}`;
   }
 
-  function mapsUrl(a: Address) {
-    return `https://maps.google.com/?q=${encodeURIComponent(formatAddress(a))}`;
-  }
-
-  function mapImageUrl(a: Address) {
-    return `/api/vaults/${vaultId}/contacts/${contactId}/addresses/${a.id}/image/200/150`;
-  }
-
   return (
     <Card
       title={
@@ -291,6 +312,47 @@ export default function AddressesModule({
         split={false}
         renderItem={(a: Address) => {
           const range = formatRange(a);
+          const actions = [];
+          if (hasCoordinates(a)) {
+            actions.push(
+              <Button
+                key="map"
+                type="text"
+                size="small"
+                icon={<EnvironmentOutlined />}
+                onClick={() => setMapAddress(a)}
+                aria-label={t("modules.addresses.view_map")}
+              />,
+            );
+          }
+          actions.push(
+            <Button
+              key="e"
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEdit(a)}
+            />,
+            <Popconfirm
+              key="d"
+              title={t("modules.addresses.delete_confirm")}
+              onConfirm={() => {
+                if (a.id === undefined) return;
+                deleteMutation.mutate({
+                  source: scope,
+                  listQueryKey: qk,
+                  id: a.id,
+                });
+              }}
+            >
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </Popconfirm>,
+          );
           return (
             <List.Item
               data-source-record={
@@ -309,63 +371,9 @@ export default function AddressesModule({
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
               }}
-              actions={[
-                <Button
-                  key="map"
-                  type="text"
-                  size="small"
-                  icon={<EnvironmentOutlined />}
-                  href={mapsUrl(a)}
-                  target="_blank"
-                  aria-label={t("modules.addresses.view_map")}
-                />,
-                <Button
-                  key="e"
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => openEdit(a)}
-                />,
-                <Popconfirm
-                  key="d"
-                  title={t("modules.addresses.delete_confirm")}
-                  onConfirm={() => {
-                    if (a.id === undefined) return;
-                    deleteMutation.mutate({
-                      source: scope,
-                      listQueryKey: qk,
-                      id: a.id,
-                    });
-                  }}
-                >
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                  />
-                </Popconfirm>,
-              ]}
+              actions={actions}
             >
               <List.Item.Meta
-                avatar={
-                  a.latitude && a.longitude ? (
-                    <img
-                      src={mapImageUrl(a)}
-                      alt="Map"
-                      style={{
-                        width: 100,
-                        height: 75,
-                        objectFit: "cover",
-                        borderRadius: token.borderRadiusSM,
-                        border: `1px solid ${token.colorBorderSecondary}`,
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : null
-                }
                 title={
                   <span
                     style={{
@@ -395,6 +403,39 @@ export default function AddressesModule({
           );
         }}
       />
+
+      {mapAddress && (
+        <Modal
+          title={t("modules.addresses.map_title")}
+          open
+          onCancel={() => setMapAddress(null)}
+          width={760}
+          footer={
+            <Button
+              type="primary"
+              href={osmPageUrl(mapAddress)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t("modules.addresses.open_in_openstreetmap")}
+            </Button>
+          }
+        >
+          <iframe
+            src={osmEmbedUrl(mapAddress)}
+            title={t("modules.addresses.map_frame_title")}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            sandbox="allow-scripts allow-same-origin"
+            style={{
+              width: "100%",
+              height: "min(60vh, 480px)",
+              border: `1px solid ${token.colorBorderSecondary}`,
+              borderRadius: token.borderRadiusSM,
+            }}
+          />
+        </Modal>
+      )}
 
       <Modal
         title={
@@ -426,7 +467,10 @@ export default function AddressesModule({
               "country",
             ] as const;
             if (addressFields.some((field) => field in changed)) {
-              form.setFieldsValue({ latitude: undefined, longitude: undefined });
+              form.setFieldsValue({
+                latitude: undefined,
+                longitude: undefined,
+              });
             }
           }}
           onFinish={(values) =>

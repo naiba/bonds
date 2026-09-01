@@ -472,7 +472,6 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	addresses.POST("", addressHandler.Create, requireEditor)
 	addresses.PUT("/:id", addressHandler.Update, requireEditor)
 	addresses.DELETE("/:id", addressHandler.Delete, requireEditor)
-	addresses.GET("/:id/image/:width/:height", addressHandler.GetMapImage)
 
 	vaultContactInfo := protected.Group("/vaults/:vault_id/contactInformation", VaultPermissionMiddleware(vaultService, models.PermissionViewer))
 	vaultContactInfo.GET("/by-identity", contactInformationHandler.FindByIdentity)
