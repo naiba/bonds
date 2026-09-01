@@ -22,7 +22,7 @@ func TestNominatimGeocoderSuccess(t *testing.T) {
 	defer server.Close()
 
 	geocoder := &NominatimGeocoder{client: server.Client()}
-	result, err := geocodeFromURL(geocoder.client, server.URL, "New York", "")
+	result, err := geocodeFromURL(geocoder.client, server.URL, "New York", "", nil)
 	if err != nil {
 		t.Fatalf("Geocode failed: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestGeocoderEmptyResults(t *testing.T) {
 	defer server.Close()
 
 	geocoder := &NominatimGeocoder{client: server.Client()}
-	result, err := geocodeFromURL(geocoder.client, server.URL, "nonexistent place xyz", "")
+	result, err := geocodeFromURL(geocoder.client, server.URL, "nonexistent place xyz", "", nil)
 	if err != nil {
 		t.Fatalf("Geocode failed: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestGeocoderMalformedJSON(t *testing.T) {
 	defer server.Close()
 
 	geocoder := &NominatimGeocoder{client: server.Client()}
-	_, err := geocodeFromURL(geocoder.client, server.URL, "test", "")
+	_, err := geocodeFromURL(geocoder.client, server.URL, "test", "", nil)
 	if err == nil {
 		t.Error("Expected error for malformed JSON")
 	}
@@ -77,7 +77,7 @@ func TestGeocoderServerError(t *testing.T) {
 	defer server.Close()
 
 	geocoder := &NominatimGeocoder{client: server.Client()}
-	_, err := geocodeFromURL(geocoder.client, server.URL, "test", "")
+	_, err := geocodeFromURL(geocoder.client, server.URL, "test", "", nil)
 	if err == nil {
 		t.Error("Expected error for server error response")
 	}
@@ -96,7 +96,7 @@ func TestLocationIQGeocoderPassesAPIKey(t *testing.T) {
 	defer server.Close()
 
 	geocoder := &LocationIQGeocoder{client: server.Client(), apiKey: "test-api-key"}
-	result, err := geocodeFromURL(geocoder.client, server.URL, "London", geocoder.apiKey)
+	result, err := geocodeFromURL(geocoder.client, server.URL, "London", geocoder.apiKey, nil)
 	if err != nil {
 		t.Fatalf("Geocode failed: %v", err)
 	}

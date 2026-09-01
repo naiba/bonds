@@ -118,12 +118,21 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	notificationService.SetSender(notificationSender)
 	notificationService.SetSystemSettings(systemSettingService)
 
-	geocodingProvider := systemSettingService.GetWithDefault("geocoding.provider", cfg.Geocoding.Provider)
-	if geocodingProvider != "" {
-		geocodingAPIKey := systemSettingService.GetWithDefault("geocoding.api_key", cfg.Geocoding.APIKey)
-		geocoder := services.NewGeocoder(geocodingProvider, geocodingAPIKey)
-		addressService.SetGeocoder(geocoder)
+	reloadGeocoding := func() {
+		provider := systemSettingService.GetWithDefault("geocoding.provider", cfg.Geocoding.Provider)
+		var geocoder services.Geocoder
+		if provider != "" {
+			apiKey := systemSettingService.GetWithDefault("geocoding.api_key", cfg.Geocoding.APIKey)
+			geocoder = services.NewGeocoder(provider, apiKey)
+		}
+		// Provider, key and precision are swapped as one runtime snapshot. An
+		// empty provider deliberately removes the active geocoder.
+		addressService.ConfigureGeocoding(
+			geocoder,
+			systemSettingService.GetWithDefault("geocoding.precision", cfg.Geocoding.Precision),
+		)
 	}
+	reloadGeocoding()
 
 	oauthProviderService := services.NewOAuthProviderServiceWithCipher(db, cfg.Security.SettingsEncKey)
 	oauthProviderService.SetSystemSettings(systemSettingService)
@@ -213,7 +222,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	avatarHandler := NewAvatarHandler(db, vaultFileService)
 	companyHandler := NewCompanyHandler(companyService, contactJobService)
 	calendarHandler := NewCalendarHandler(calendarService, calendarICSService)
-	reportHandler := NewReportHandler(reportService)
+	reportHandler := NewReportHandler(reportService, addressService)
 	feedHandler := NewFeedHandler(feedService)
 	preferenceHandler := NewPreferenceHandler(preferenceService)
 	notificationHandler := NewNotificationHandler(notificationService)
@@ -254,6 +263,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	currencyHandler := NewCurrencyHandler(currencyService)
 	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
 	adminHandler := NewAdminHandler(adminService, systemSettingService, searchService, db)
+	adminHandler.RegisterReloader(reloadGeocoding)
 	adminHandler.RegisterReloader(func() {
 		oauthProviderService.ReloadProviders()
 	})
@@ -625,6 +635,12 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		VaultPermissionMiddleware(vaultService, models.PermissionViewer),
 	)
 	icsCalendar.GET("", calendarHandler.GetICS)
+
+	// Address lookup is vault-scoped rather than per-contact: it reads nothing
+	// from a contact. It is gated on Editor even though it reads nothing,
+	// because every lookup spends a request against the instance's geocoding
+	// quota — a viewer who cannot save an address has no use for it.
+	vaultScoped.GET("/addresses/suggest", addressHandler.Suggest, requireEditor)
 
 	vaultScoped.GET("/reports", reportHandler.Index)
 	vaultScoped.GET("/reports/overview", reportHandler.Overview)

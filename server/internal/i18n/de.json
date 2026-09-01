@@ -199,6 +199,8 @@
   "err.failed_to_get_address_report": "Adressbericht konnte nicht abgerufen werden",
   "err.failed_to_get_important_dates_report": "Bericht über wichtige Termine konnte nicht abgerufen werden",
   "err.failed_to_get_mood_report": "Stimmungsbericht konnte nicht abgerufen werden",
+  "err.failed_to_suggest_addresses": "Adressen konnten nicht gesucht werden",
+  "err.address_lookup_busy": "Die Adresssuche ist ausgelastet, bitte in Kürze erneut versuchen",
   "err.failed_to_get_report_overview": "Berichtsübersicht konnte nicht geladen werden",
   "err.failed_to_get_demographics_report": "Demografiebericht konnte nicht geladen werden",
   "err.failed_to_get_map_report": "Kartenbericht konnte nicht geladen werden",

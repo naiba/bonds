@@ -944,7 +944,12 @@
       "is_past_address": "Past address",
       "is_past_address_tooltip": "Mark this address as a former residence.",
       "past_tag": "Past",
-      "present": "Present"
+      "present": "Present",
+      "lookup_label": "Find an address",
+      "lookup_placeholder": "Start typing an address…",
+      "lookup_hint": "Pick a result to fill in the fields below.",
+      "lookup_searching": "Searching…",
+      "lookup_no_results": "No matching address"
     },
     "contact_info": {
       "title": "Contact Information",
@@ -1782,7 +1787,11 @@
         "api_key": "API Key",
         "none": "None",
         "nominatim": "Nominatim",
-        "locationiq": "LocationIQ"
+        "locationiq": "LocationIQ",
+        "precision": "Address precision",
+        "precision_exact": "Exact address",
+        "precision_locality": "District only",
+        "provider_hint": "The public OpenStreetMap server allows one request per second for the whole application and forbids autocomplete. Bonds paces its requests within a single instance only, so multi-instance deployments should self-host Nominatim or use LocationIQ."
       },
       "storage": {
         "max_size_mb": "Max Upload Size (MB)",

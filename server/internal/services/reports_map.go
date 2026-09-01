@@ -33,6 +33,7 @@ func (s *ReportService) MapReport(vaultID, userID string) (*dto.MapReportRespons
 		TotalAddresses: len(addresses),
 		Points:         []dto.MapPoint{},
 		Countries:      []dto.MapCountryItem{},
+		Attribution:    []dto.AddressAttribution{},
 	}
 	if len(addresses) == 0 {
 		return response, nil

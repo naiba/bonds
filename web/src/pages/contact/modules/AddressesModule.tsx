@@ -13,6 +13,7 @@ import {
   Tag,
   Empty,
   theme,
+  InputNumber,
 } from "antd";
 import {
   PlusOutlined,
@@ -36,6 +37,7 @@ import {
   invalidateFeedQueries,
   type ContactQueryScope,
 } from "@/utils/queryInvalidation";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 import { sourceRecordKey, useSourceRecordReveal } from "../contactSourceRecord";
 import {
   createContactSaveMutationOperation,
@@ -52,6 +54,10 @@ interface AddressFormValues {
   readonly is_past_address?: boolean;
   readonly date_from?: Dayjs | null;
   readonly date_to?: Dayjs | null;
+  // Set only when the address came from a lookup, so the server can store the
+  // coordinates it already knows instead of geocoding the same string again.
+  readonly latitude?: number;
+  readonly longitude?: number;
 }
 
 type AddressSaveMutationOperation =
@@ -129,6 +135,8 @@ export default function AddressesModule({
           ? values.date_from.toISOString()
           : undefined,
         date_to: values.date_to ? values.date_to.toISOString() : undefined,
+        latitude: values.latitude,
+        longitude: values.longitude,
       };
 
       switch (operation.kind) {
@@ -402,6 +410,25 @@ export default function AddressesModule({
         <Form
           form={form}
           layout="vertical"
+          // Coordinates arrive hidden, from a picked lookup result, and describe
+          // that exact suggestion. The moment any address field is typed over,
+          // they describe somewhere else — so they are dropped and the server
+          // geocodes the address the reader actually entered. antd does not
+          // fire this for setFieldsValue, so choosing a suggestion does not
+          // immediately discard its own coordinates.
+          onValuesChange={(changed: Partial<AddressFormValues>) => {
+            const addressFields = [
+              "line_1",
+              "line_2",
+              "city",
+              "province",
+              "postal_code",
+              "country",
+            ] as const;
+            if (addressFields.some((field) => field in changed)) {
+              form.setFieldsValue({ latitude: undefined, longitude: undefined });
+            }
+          }}
           onFinish={(values) =>
             saveMutation.mutate({
               ...createContactSaveMutationOperation(editingId, values),
@@ -410,6 +437,23 @@ export default function AddressesModule({
             })
           }
         >
+          <AddressAutocomplete
+            // Keyed by vault: switching vaults remounts the control, so no
+            // state — least of all availability — survives from the old one.
+            key={scope.vaultId}
+            vaultId={scope.vaultId}
+            onPick={(suggestion) =>
+              form.setFieldsValue({
+                line_1: suggestion.line_1 || undefined,
+                city: suggestion.city || undefined,
+                province: suggestion.province || undefined,
+                postal_code: suggestion.postal_code || undefined,
+                country: suggestion.country || undefined,
+                latitude: suggestion.latitude ?? undefined,
+                longitude: suggestion.longitude ?? undefined,
+              })
+            }
+          />
           <Form.Item
             name="line_1"
             label={t("modules.addresses.address_line_1")}
@@ -445,6 +489,15 @@ export default function AddressesModule({
             rules={[{ required: true }]}
           >
             <Input />
+          </Form.Item>
+          {/* Registered but invisible: antd's onFinish only hands over values
+              of registered fields, so without these the coordinates a picked
+              suggestion carries would silently never reach the server. */}
+          <Form.Item name="latitude" hidden>
+            <InputNumber />
+          </Form.Item>
+          <Form.Item name="longitude" hidden>
+            <InputNumber />
           </Form.Item>
           <Form.Item
             name="date_from"

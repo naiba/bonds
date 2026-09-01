@@ -171,6 +171,8 @@
   "err.failed_to_get_address_report": "Échec de l'obtention du rapport d'adresse",
   "err.failed_to_get_important_dates_report": "Échec de l'obtention du rapport sur les dates importantes",
   "err.failed_to_get_mood_report": "Échec de l'obtention du rapport d'humeur",
+  "err.failed_to_suggest_addresses": "Impossible de rechercher des adresses",
+  "err.address_lookup_busy": "La recherche d'adresses est occupée, veuillez réessayer sous peu",
   "err.failed_to_get_report_overview": "Impossible de récupérer l'aperçu des rapports",
   "err.failed_to_get_demographics_report": "Impossible de récupérer le rapport démographique",
   "err.failed_to_get_map_report": "Impossible de récupérer le rapport cartographique",

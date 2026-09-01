@@ -11,11 +11,12 @@ import (
 var _ dto.AddressReportItem
 
 type ReportHandler struct {
-	reportService *services.ReportService
+	reportService  *services.ReportService
+	addressService *services.AddressService
 }
 
-func NewReportHandler(reportService *services.ReportService) *ReportHandler {
-	return &ReportHandler{reportService: reportService}
+func NewReportHandler(reportService *services.ReportService, addressService *services.AddressService) *ReportHandler {
+	return &ReportHandler{reportService: reportService, addressService: addressService}
 }
 
 // Overview godoc

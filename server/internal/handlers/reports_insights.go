@@ -52,6 +52,9 @@ func (h *ReportHandler) Map(c *echo.Context) error {
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_get_map_report")
 	}
+	if data.GeocodedCount > 0 {
+		data.Attribution = h.addressService.Attribution()
+	}
 	return response.OK(c, data)
 }
 

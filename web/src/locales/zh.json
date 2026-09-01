@@ -944,7 +944,12 @@
       "is_past_address": "过往地址",
       "is_past_address_tooltip": "将此地址标记为旧居。",
       "past_tag": "过往",
-      "present": "至今"
+      "present": "至今",
+      "lookup_label": "查找地址",
+      "lookup_placeholder": "开始输入地址…",
+      "lookup_hint": "选择一个结果以填充下方字段。",
+      "lookup_searching": "搜索中…",
+      "lookup_no_results": "没有匹配的地址"
     },
     "contact_info": {
       "title": "联系方式",
@@ -1782,7 +1787,11 @@
         "api_key": "API Key",
         "none": "无",
         "nominatim": "Nominatim",
-        "locationiq": "LocationIQ"
+        "locationiq": "LocationIQ",
+        "precision": "地址精度",
+        "precision_exact": "精确地址",
+        "precision_locality": "仅到区域",
+        "provider_hint": "公共 OpenStreetMap 服务器对整个应用只允许每秒一次请求，并禁止自动补全。Bonds 仅在单个实例内遵守该频率限制；多实例部署请自建 Nominatim 或使用 LocationIQ。"
       },
       "storage": {
         "max_size_mb": "最大上传大小（MB）",

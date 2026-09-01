@@ -272,6 +272,7 @@ export default function VaultReports() {
           <ContactMap
             points={mapReport?.points ?? []}
             countries={mapReport?.countries ?? []}
+            attribution={mapReport?.attribution ?? []}
             onSelectContact={openContact}
             loading={mapPending}
           />

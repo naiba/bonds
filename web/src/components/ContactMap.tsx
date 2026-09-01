@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { Empty, Skeleton, Typography, theme } from "antd";
 import { useTranslation } from "react-i18next";
-import type { MapCountryItem, MapPoint } from "@/api";
+import type { AddressAttribution, MapCountryItem, MapPoint } from "@/api";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { fitProjectionToPoints } from "@/components/mapProjection";
 import { matchCountryName } from "@/utils/countryNames";
@@ -39,6 +39,7 @@ type MapDot = {
 type Props = {
   points: MapPoint[];
   countries: MapCountryItem[];
+  attribution?: AddressAttribution[];
   height?: number;
   onSelectContact?: (contactId: string) => void;
   /** True while the report is being fetched, so absent data is not mistaken for an empty vault. */
@@ -57,7 +58,7 @@ function loadWorld(): Promise<WorldData> {
   return worldPromise;
 }
 
-export default function ContactMap({ points, countries, height = 420, onSelectContact , loading = false }: Props) {
+export default function ContactMap({ points, countries, attribution = [], height = 420, onSelectContact , loading = false }: Props) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -345,7 +346,14 @@ export default function ContactMap({ points, countries, height = 420, onSelectCo
         </div>
       )}
       <Text type="secondary" style={{ fontSize: 12, display: "block", marginTop: 8 }}>
-        {t("vault.reports.map.hint")}
+        {t("vault.reports.map.hint")} {attribution.map((credit, index) => (
+          <span key={credit.url}>
+            {index > 0 && " · "}
+            <a href={credit.url} target="_blank" rel="noopener noreferrer">
+              {credit.label}
+            </a>
+          </span>
+        ))}
       </Text>
     </div>
   );

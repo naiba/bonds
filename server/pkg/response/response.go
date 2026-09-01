@@ -109,6 +109,20 @@ func Conflict(c *echo.Context, message string) error {
 	})
 }
 
+// TooManyRequests reports that a rate limit was hit. Unlike the other error
+// helpers this one is not the caller's fault — it means the request was
+// well-formed but arrived faster than an upstream allows, and retrying later
+// will work.
+func TooManyRequests(c *echo.Context, message string) error {
+	return c.JSON(http.StatusTooManyRequests, APIResponse{
+		Success: false,
+		Error: &APIError{
+			Code:    "TOO_MANY_REQUESTS",
+			Message: localize(c, message),
+		},
+	})
+}
+
 func InternalError(c *echo.Context, message string) error {
 	return c.JSON(http.StatusInternalServerError, APIResponse{
 		Success: false,

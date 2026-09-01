@@ -153,4 +153,23 @@ describe("VaultReports", () => {
       await screen.findByText(/12 of 379 addresses have coordinates/),
     ).toBeInTheDocument();
   });
+
+  it("links the geocoding attribution beside plotted provider results", async () => {
+    mocks.map.mockResolvedValue({
+      data: {
+        total_addresses: 1,
+        geocoded_count: 1,
+        points: [{ address_id: 1, latitude: 51.5, longitude: -0.12, contacts: [] }],
+        countries: [{ country: "United Kingdom", address_count: 1, contact_count: 1, geocoded: 1 }],
+        attribution: [{ label: "© OpenStreetMap contributors", url: "https://www.openstreetmap.org/copyright" }],
+      },
+    });
+
+    renderPage(<VaultReports />);
+
+    expect(await screen.findByRole("link", { name: "© OpenStreetMap contributors" })).toHaveAttribute(
+      "href",
+      "https://www.openstreetmap.org/copyright",
+    );
+  });
 });

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { App as AntApp, ConfigProvider } from "antd";
 import { MemoryRouter } from "react-router-dom";
 import AddressesModule from "@/pages/contact/modules/AddressesModule";
@@ -56,5 +56,17 @@ describe("AddressesModule", () => {
   it("formats address timeline dates with the user date preference", () => {
     renderModule();
     expect(screen.getByText("2025-03 → 2025-04")).toBeInTheDocument();
+  });
+
+  it("registers the hidden coordinate fields the lookup fills", async () => {
+    // antd's onFinish only hands over REGISTERED fields. A picked suggestion
+    // writes latitude/longitude with setFieldsValue, so without these two
+    // hidden Form.Items the coordinates silently never reach the server —
+    // which is exactly what happened before they existed.
+    const { baseElement } = renderModule();
+    fireEvent.click(screen.getByRole("button", { name: /add/i }));
+    await screen.findByText(/address line 1/i);
+    expect(baseElement.querySelector("#latitude")).not.toBeNull();
+    expect(baseElement.querySelector("#longitude")).not.toBeNull();
   });
 });

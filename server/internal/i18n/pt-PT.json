@@ -171,6 +171,8 @@
   "err.failed_to_get_address_report": "Falha ao obter relatório de moradas",
   "err.failed_to_get_important_dates_report": "Falha ao obter relatório de datas importantes",
   "err.failed_to_get_mood_report": "Falha ao obter relatório de humor",
+  "err.failed_to_suggest_addresses": "Falha ao procurar endereços",
+  "err.address_lookup_busy": "A procura de endereços está ocupada, tente novamente dentro de momentos",
   "err.failed_to_get_report_overview": "Falha ao obter a vista geral dos relatórios",
   "err.failed_to_get_demographics_report": "Falha ao obter o relatório demográfico",
   "err.failed_to_get_map_report": "Falha ao obter o relatório de mapa",

@@ -33,6 +33,10 @@ vi.mock("@/api", () => ({
       contactsAddressesCreate: vi.fn(),
       contactsAddressesUpdate: vi.fn(),
       contactsAddressesDelete: vi.fn(),
+      // The lookup control probes availability as soon as the form opens; an
+      // instance with lookup withdrawn answers enabled=false and the control
+      // stays out of these tests' way.
+      addressesSuggestList: vi.fn().mockResolvedValue({ data: { enabled: false, suggestions: [], attribution: [] } }),
     },
     preferences: {
       preferencesList: vi.fn(),

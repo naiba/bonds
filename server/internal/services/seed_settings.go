@@ -32,6 +32,7 @@ func SeedSettingsFromEnv(svc *SystemSettingService, cfg *config.Config) error {
 
 		{"geocoding.provider", cfg.Geocoding.Provider},
 		{"geocoding.api_key", cfg.Geocoding.APIKey},
+		{"geocoding.precision", cfg.Geocoding.Precision},
 
 		{"backup.cron", cfg.Backup.Cron},
 		{"backup.retention", strconv.Itoa(cfg.Backup.Retention)},

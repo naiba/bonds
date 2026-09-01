@@ -171,6 +171,8 @@
   "err.failed_to_get_address_report": "Error al obtener informe de direcciones",
   "err.failed_to_get_important_dates_report": "Error al obtener informe de fechas importantes",
   "err.failed_to_get_mood_report": "Error al obtener informe de ánimo",
+  "err.failed_to_suggest_addresses": "No se pudieron buscar direcciones",
+  "err.address_lookup_busy": "La búsqueda de direcciones está ocupada, inténtalo de nuevo en breve",
   "err.failed_to_get_report_overview": "No se pudo obtener el resumen de informes",
   "err.failed_to_get_demographics_report": "No se pudo obtener el informe demográfico",
   "err.failed_to_get_map_report": "No se pudo obtener el informe de mapa",

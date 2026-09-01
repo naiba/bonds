@@ -944,7 +944,12 @@
       "is_past_address": "Dirección anterior",
       "is_past_address_tooltip": "Marcar esta dirección como una residencia anterior.",
       "past_tag": "Anterior",
-      "present": "Actual"
+      "present": "Actual",
+      "lookup_label": "Buscar una dirección",
+      "lookup_placeholder": "Empieza a escribir una dirección…",
+      "lookup_hint": "Elige un resultado para rellenar los campos de abajo.",
+      "lookup_searching": "Buscando…",
+      "lookup_no_results": "Ninguna dirección coincide"
     },
     "contact_info": {
       "title": "Información de contacto",
@@ -1782,7 +1787,11 @@
         "api_key": "Clave de API",
         "none": "Ninguno",
         "nominatim": "Nominatim",
-        "locationiq": "LocationIQ"
+        "locationiq": "LocationIQ",
+        "precision": "Precisión de dirección",
+        "precision_exact": "Dirección exacta",
+        "precision_locality": "Solo distrito",
+        "provider_hint": "El servidor público de OpenStreetMap permite una solicitud por segundo para toda la aplicación y prohíbe el autocompletado. Bonds respeta ese ritmo solo dentro de una única instancia; los despliegues con varias instancias deben alojar su propio Nominatim o usar LocationIQ."
       },
       "storage": {
         "max_size_mb": "Tamaño máximo de subida (MB)",

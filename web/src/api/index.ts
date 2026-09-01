@@ -514,6 +514,9 @@ export type { GithubComNaibaBondsInternalDtoAddressReportItem as AddressReportIt
 export type { GithubComNaibaBondsInternalDtoImportantDateReportItem as ImportantDateReportItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoMoodReportItem as MoodReportItem } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoAddressContactItem as AddressContactItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoAddressSuggestionsResponse as AddressSuggestionsResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoAddressSuggestionItem as AddressSuggestionItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoAddressAttribution as AddressAttribution } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoDemographicsReportResponse as DemographicsReportResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoDemographicDimension as DemographicDimension } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoDemographicBucket as DemographicBucket } from "./generated/data-contracts";

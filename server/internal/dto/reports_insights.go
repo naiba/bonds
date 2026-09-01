@@ -64,10 +64,11 @@ type MapCountryItem struct {
 }
 
 type MapReportResponse struct {
-	TotalAddresses int              `json:"total_addresses" example:"379"`
-	GeocodedCount  int              `json:"geocoded_count" example:"40"`
-	Points         []MapPoint       `json:"points"`
-	Countries      []MapCountryItem `json:"countries"`
+	TotalAddresses int                  `json:"total_addresses" example:"379"`
+	GeocodedCount  int                  `json:"geocoded_count" example:"40"`
+	Points         []MapPoint           `json:"points"`
+	Countries      []MapCountryItem     `json:"countries"`
+	Attribution    []AddressAttribution `json:"attribution"`
 }
 
 // --- Interactions -----------------------------------------------------------

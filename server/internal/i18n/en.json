@@ -199,6 +199,8 @@
   "err.failed_to_get_address_report": "Failed to get address report",
   "err.failed_to_get_important_dates_report": "Failed to get important dates report",
   "err.failed_to_get_mood_report": "Failed to get mood report",
+  "err.failed_to_suggest_addresses": "Failed to look up addresses",
+  "err.address_lookup_busy": "Address lookup is busy, please try again shortly",
   "err.failed_to_get_report_overview": "Failed to get reports overview",
   "err.failed_to_get_demographics_report": "Failed to get demographics report",
   "err.failed_to_get_map_report": "Failed to get map report",
