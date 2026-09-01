@@ -85,7 +85,6 @@ type WebAuthnConfig struct {
 
 type GeocodingConfig struct {
 	Provider string
-	APIKey   string
 	// Precision decides how much of an address is sent to the provider. See
 	// services.GeocodingPrecision* for the accepted values.
 	Precision string
@@ -146,7 +145,6 @@ func Load() *Config {
 		Geocoding: GeocodingConfig{
 			Provider:  getEnv("GEOCODING_PROVIDER", "nominatim"),
 			Precision: getEnv("GEOCODING_PRECISION", "exact"),
-			APIKey:    getEnv("GEOCODING_API_KEY", ""),
 		},
 		WebAuthn: WebAuthnConfig{
 			RPID:          getEnv("WEBAUTHN_RP_ID", ""),

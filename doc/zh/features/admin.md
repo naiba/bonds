@@ -39,7 +39,8 @@ Bonds 包含管理面板，用于系统级配置和用户管理。
 
 当配置了 `SETTINGS_ENC_KEY` 时（参见[配置, 加密敏感设置](/zh/guide/configuration#加密敏感设置)），以下字段会以 AES-256-GCM 加密存储在数据库中：
 
-- **system_settings** 中的 `smtp.password`、`geocoding.api_key` 以及任何 `secret.*` 键
+- **system_settings** 中的 `smtp.password` 以及任何 `secret.*` 键
+- **geocoding_provider_configs** 中各服务商的结构化 `config`
 - **oauth_providers** 中所有 `client_secret`（GitHub、Google、GitLab、Discord、OIDC）
 
 无论是否启用加密，Admin **GET /admin/settings** 始终把敏感值脱敏为 `***`，管理员浏览器和审计日志看不到明文凭证。提交 `***` 进行更新表示保留原值，UI 可以安全地往返编辑非敏感字段而不会清空密钥。

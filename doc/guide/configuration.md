@@ -57,13 +57,15 @@ Most application settings are configured through the **Admin Settings** panel, a
 - **OIDC**: OpenID Connect provider for SSO (Authentik, Keycloak, etc.).
 - **WebAuthn**: Relying Party configuration for passkey authentication.
 - **Telegram**: Bot token for Telegram notifications.
-- **Geocoding**: Provider and API key for address geocoding.
+- **Geocoding**: Active provider, privacy precision, per-provider credentials, and self-hosted Photon URL.
 - **Storage**: Max upload size for files and documents (configured inside UI, not via env vars).
 - **Backup**: Cron schedule, retention period for automatic backups.
 - **Swagger**: Enable or disable API documentation UI independently of debug mode.
 
 ::: tip Migration from Environment Variables
 On first startup, Bonds seeds these admin settings from environment variables if present. After that, all changes are made through the admin panel. Environment variables for these settings are only used as initial seed values.
+
+Geocoding provider credentials and self-hosted URLs are configured only through the admin panel; they are not imported from a generic environment API key.
 :::
 
 ## Encrypting Sensitive Settings
@@ -89,7 +91,8 @@ Currently encrypted at rest when the key is set:
 
 | Field | Storage |
 |-------|---------|
-| `system_settings.value` for `smtp.password`, `geocoding.api_key`, and any `secret.*` key | AES-256-GCM |
+| `system_settings.value` for `smtp.password` and any `secret.*` key | AES-256-GCM |
+| `geocoding_provider_configs.config` (one structured config per provider) | AES-256-GCM |
 | `oauth_providers.client_secret` (GitHub, Google, GitLab, Discord, OIDC) | AES-256-GCM |
 
 ::: warning Losing the key

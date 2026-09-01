@@ -1784,14 +1784,40 @@
       },
       "geocoding": {
         "provider": "Provider",
-        "api_key": "API Key",
         "none": "None",
-        "nominatim": "Nominatim",
-        "locationiq": "LocationIQ",
         "precision": "Address precision",
         "precision_exact": "Exact address",
         "precision_locality": "District only",
-        "provider_hint": "The public OpenStreetMap server allows one request per second for the whole application and forbids autocomplete. Bonds paces its requests within a single instance only, so multi-instance deployments should self-host Nominatim or use LocationIQ."
+        "settings_saved": "Active geocoding settings saved",
+        "provider_saved": "Provider configuration saved",
+        "provider_reset": "Provider configuration reset",
+        "privacy_title": "Address data sent to providers",
+        "privacy_exact": "Exact mode sends the full address, including the street, to the selected provider.",
+        "privacy_locality": "District-only mode sends only postal code, city, province, and country. Street lines stay on this server and autocomplete is disabled.",
+        "save_settings": "Save active settings",
+        "configured": "Ready",
+        "not_configured": "Configuration required",
+        "autocomplete_supported": "Address autocomplete",
+        "autocomplete_unavailable": "Forward geocoding only",
+        "providers": {
+          "nominatim": { "description": "The public OpenStreetMap Nominatim service. No API key is required." },
+          "locationiq": { "description": "A hosted OpenStreetMap geocoding service with API-key authentication." },
+          "geoapify": { "description": "A hosted geocoding and autocomplete service with API-key authentication." },
+          "photon": { "description": "An open-source OpenStreetMap geocoder. Use the public demo endpoint or enter the URL of your own Photon server." }
+        },
+        "nominatim_notice_title": "Public Nominatim usage policy",
+        "nominatim_notice": "The public service permits at most one request per second and strictly forbids autocomplete. The limit is enforced per Bonds process, so multi-replica deployments should use another provider.",
+        "photon_notice_title": "Public Photon is a fair-use demo",
+        "photon_notice": "The public endpoint has no availability guarantee. Extensive use may be throttled or banned; self-host Photon for production or higher-volume use.",
+        "secret_hint": "*** preserves the existing secret. Enter a new value to replace it.",
+        "fields": {
+          "api_key": "API key",
+          "base_url": "Photon base URL"
+        },
+        "save_provider": "Save provider",
+        "reset_confirm": "Reset this provider to its built-in defaults? Providers without defaults will become unavailable.",
+        "reset_provider": "Reset configuration",
+        "attribution": "Required attribution"
       },
       "storage": {
         "max_size_mb": "Max Upload Size (MB)",

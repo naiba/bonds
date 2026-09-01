@@ -57,13 +57,15 @@ A maioria das configurações da aplicação é definida através do painel de *
 - **OIDC**: Provedor OpenID Connect para SSO (Authentik, Keycloak, etc.).
 - **WebAuthn**: Configuração da Parte Confiável para autenticação por chave de acesso.
 - **Telegram**: Token do bot para notificações no Telegram.
-- **Geocodificação**: Provedor e chave de API para geocodificação de endereços.
+- **Geocodificação**: Provedor ativo, precisão de privacidade, credenciais por provedor e URL do Photon auto-hospedado.
 - **Armazenamento**: Tamanho máximo de upload para arquivos e documentos (configurado na interface, não via variáveis de ambiente).
 - **Backup**: Agendamento cron, período de retenção para backups automáticos.
 - **Swagger**: Ativar ou desativar a interface de documentação da API independentemente do modo de depuração.
 
 ::: dica Migração de Variáveis de Ambiente
 Na primeira inicialização, Bonds semeia estas configurações de administração a partir de variáveis de ambiente, se presentes. Depois disso, todas as alterações são feitas através do painel de administração. Variáveis de ambiente para estas configurações são usadas apenas como valores de semente iniciais.
+
+As credenciais dos provedores de geocodificação e URLs auto-hospedadas são configuradas apenas no painel de administração; elas não são importadas de uma chave de API genérica do ambiente.
 :::
 
 ## Criptografando Configurações Sensíveis {#criptografando-configuracoes-sensiveis}
@@ -89,7 +91,8 @@ Atualmente criptografado em repouso quando a chave está definida:
 
 | Campo | Armazenamento |
 |-------|--------------|
-| `system_settings.value` para `smtp.password`, `geocoding.api_key` e qualquer chave `secret.*` | AES-256-GCM |
+| `system_settings.value` para `smtp.password` e qualquer chave `secret.*` | AES-256-GCM |
+| `geocoding_provider_configs.config` (uma configuração estruturada por provedor) | AES-256-GCM |
 | `oauth_providers.client_secret` (GitHub, Google, GitLab, Discord, OIDC) | AES-256-GCM |
 
 ::: warning Perdendo a chave

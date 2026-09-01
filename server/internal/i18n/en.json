@@ -475,5 +475,10 @@
   "err.contact_layout_in_use": "This contact view is still used by contacts",
   "err.contact_layout_is_default": "The default contact view cannot be deleted",
   "err.contact_layout_name_exists": "A contact view with this name already exists",
-  "err.failed_to_update_contact_layout": "Failed to update the contact view"
+  "err.failed_to_update_contact_layout": "Failed to update the contact view",
+  "err.failed_to_get_geocoding_settings": "Failed to get geocoding settings",
+  "err.invalid_geocoding_settings": "Invalid geocoding provider or configuration",
+  "err.failed_to_update_geocoding_settings": "Failed to update geocoding settings",
+  "err.failed_to_update_geocoding_provider": "Failed to update the geocoding provider",
+  "err.failed_to_delete_geocoding_provider": "Failed to reset the geocoding provider"
 }

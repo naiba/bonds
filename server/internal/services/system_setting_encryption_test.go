@@ -88,7 +88,7 @@ func TestSystemSetting_GetAllRedactsSecrets(t *testing.T) {
 
 	_ = svc.Set("smtp.password", "p@ss")
 	_ = svc.Set("smtp.host", "mail.example.com")
-	_ = svc.Set("geocoding.api_key", "abc")
+	_ = svc.Set("secret.webhook", "abc")
 
 	items, err := svc.GetAllRedacted()
 	if err != nil {
@@ -102,8 +102,8 @@ func TestSystemSetting_GetAllRedactsSecrets(t *testing.T) {
 	if got["smtp.password"] != RedactedSecretValue {
 		t.Errorf("smtp.password should be redacted, got %q", got["smtp.password"])
 	}
-	if got["geocoding.api_key"] != RedactedSecretValue {
-		t.Errorf("geocoding.api_key should be redacted, got %q", got["geocoding.api_key"])
+	if got["secret.webhook"] != RedactedSecretValue {
+		t.Errorf("secret.webhook should be redacted, got %q", got["secret.webhook"])
 	}
 	if got["smtp.host"] != "mail.example.com" {
 		t.Errorf("non-secret values must be visible, got %q", got["smtp.host"])
@@ -264,7 +264,7 @@ func TestSystemSetting_DecryptFailsWithWrongKey(t *testing.T) {
 }
 
 func TestIsSecretKey(t *testing.T) {
-	for _, k := range []string{"smtp.password", "geocoding.api_key", "secret.foo"} {
+	for _, k := range []string{"smtp.password", "secret.foo"} {
 		if !IsSecretKey(k) {
 			t.Errorf("%q should be classified as secret", k)
 		}

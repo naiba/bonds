@@ -549,4 +549,6 @@ export interface OAuthProvider {
 // Admin
 export type { GithubComNaibaBondsInternalDtoAdminUserResponse as AdminUser } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoSystemSettingItem as SystemSettingItem } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoGeocodingAdminResponse as GeocodingAdminSettings } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoGeocodingProviderResponse as GeocodingProvider } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoInstanceInfoResponse as InstanceInfo } from "./generated/data-contracts";

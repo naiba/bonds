@@ -421,5 +421,10 @@
   "err.contact_layout_in_use": "Esta vista todavía está en uso",
   "err.contact_layout_is_default": "La vista predeterminada no se puede eliminar",
   "err.contact_layout_name_exists": "Ya existe una vista con este nombre",
-  "err.failed_to_update_contact_layout": "No se pudo actualizar la vista de contacto"
+  "err.failed_to_update_contact_layout": "No se pudo actualizar la vista de contacto",
+  "err.failed_to_get_geocoding_settings": "No se pudo obtener la configuración de geocodificación",
+  "err.invalid_geocoding_settings": "Proveedor o configuración de geocodificación no válidos",
+  "err.failed_to_update_geocoding_settings": "No se pudo actualizar la configuración de geocodificación",
+  "err.failed_to_update_geocoding_provider": "No se pudo actualizar el proveedor de geocodificación",
+  "err.failed_to_delete_geocoding_provider": "No se pudo restablecer el proveedor de geocodificación"
 }

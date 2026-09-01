@@ -39,7 +39,8 @@ No primeiro arranque, estas definições são semeadas a partir de variáveis de
 
 Quando `SETTINGS_ENC_KEY` está configurada (veja [Configuração, A encriptar Definições Sensíveis](/pt-PT/guide/configuration#criptografando-configuracoes-sensiveis)), os seguintes campos são encriptados com AES-256-GCM na base de dados:
 
-- `smtp.password`, `geocoding.api_key` e qualquer chave `secret.*` em **system_settings**
+- `smtp.password` e qualquer chave `secret.*` em **system_settings**
+- O `config` estruturado de cada fornecedor em **geocoding_provider_configs**
 - `client_secret` para cada entrada em **oauth_providers** (GitHub, Google, GitLab, Discord, OIDC)
 
 O endpoint **GET /admin/settings** do administrador sempre oculta valores secretos como `***` independentemente de a encriptação estar ativada. Navegadores de administração e logs de auditoria nunca veem credenciais em texto simples. Enviar `***` na atualização mantém o valor existente intacto, para que a interface possa fazer edições não secretas sem apagar credenciais.

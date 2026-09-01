@@ -57,13 +57,15 @@ DB_DSN="host=localhost port=5432 user=bonds password=secret dbname=bonds sslmode
 - **OIDC**：OpenID Connect 提供商，用于企业 SSO（Authentik、Keycloak 等）。
 - **WebAuthn**：通行密钥认证的 Relying Party 配置。
 - **Telegram**：Bot Token，用于 Telegram 通知。
-- **地理编码**：服务提供商和 API Key。
+- **地理编码**：启用的服务商、地址隐私精度、各服务商独立凭据和自托管 Photon 地址。
 - **存储**：最大上传文件大小限制（在 Web UI 中配置，不再使用环境变量限制）。
 - **备份**：Cron 调度、保留天数。
 - **Swagger**：独立于调试模式启用或禁用 API 文档界面。
 
 ::: tip 从环境变量迁移
 首次启动时，Bonds 会从环境变量中读取这些设置作为初始值写入数据库。之后所有修改都通过管理面板进行。环境变量仅作为初始种子值使用。
+
+地理编码服务商凭据和自托管地址仅通过管理面板配置，不会从通用的环境变量 API Key 导入。
 :::
 
 ## 加密敏感设置
@@ -89,7 +91,8 @@ SETTINGS_ENC_KEY="$(openssl rand -hex 32)"
 
 | 字段 | 存储 |
 |------|------|
-| `system_settings.value`：`smtp.password`、`geocoding.api_key`，以及任何 `secret.*` 键 | AES-256-GCM |
+| `system_settings.value`：`smtp.password` 以及任何 `secret.*` 键 | AES-256-GCM |
+| `geocoding_provider_configs.config`（每个服务商一份结构化配置） | AES-256-GCM |
 | `oauth_providers.client_secret`（GitHub、Google、GitLab、Discord、OIDC） | AES-256-GCM |
 
 ::: warning 丢失密钥的后果

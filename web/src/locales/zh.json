@@ -1784,14 +1784,40 @@
       },
       "geocoding": {
         "provider": "服务商",
-        "api_key": "API Key",
         "none": "无",
-        "nominatim": "Nominatim",
-        "locationiq": "LocationIQ",
         "precision": "地址精度",
         "precision_exact": "精确地址",
         "precision_locality": "仅到区域",
-        "provider_hint": "公共 OpenStreetMap 服务器对整个应用只允许每秒一次请求，并禁止自动补全。Bonds 仅在单个实例内遵守该频率限制；多实例部署请自建 Nominatim 或使用 LocationIQ。"
+        "settings_saved": "地理编码启用设置已保存",
+        "provider_saved": "服务商配置已保存",
+        "provider_reset": "服务商配置已重置",
+        "privacy_title": "会发送给服务商的地址数据",
+        "privacy_exact": "精确模式会把包含街道在内的完整地址发送给所选服务商。",
+        "privacy_locality": "仅到区域模式只发送邮编、城市、省份和国家；街道信息保留在本服务器，同时禁用地址自动补全。",
+        "save_settings": "保存启用设置",
+        "configured": "可用",
+        "not_configured": "需要配置",
+        "autocomplete_supported": "支持地址自动补全",
+        "autocomplete_unavailable": "仅正向地理编码",
+        "providers": {
+          "nominatim": { "description": "OpenStreetMap 的公共 Nominatim 服务，无需 API Key。" },
+          "locationiq": { "description": "基于 OpenStreetMap、使用 API Key 鉴权的托管地理编码服务。" },
+          "geoapify": { "description": "使用 API Key 鉴权的托管地理编码和地址自动补全服务。" },
+          "photon": { "description": "开源 OpenStreetMap 地理编码器，可使用公共演示端点，也可填写自托管 Photon 地址。" }
+        },
+        "nominatim_notice_title": "公共 Nominatim 使用政策",
+        "nominatim_notice": "公共服务最多允许每秒一次请求，并严格禁止自动补全。限速仅在单个 Bonds 进程内生效，因此多副本部署应选用其他服务商。",
+        "photon_notice_title": "公共 Photon 是合理使用的演示服务",
+        "photon_notice": "公共端点不保证可用性；大量使用可能被限速或封禁。生产环境或较大用量请自行托管 Photon。",
+        "secret_hint": "*** 表示保留现有密钥；输入新值可替换它。",
+        "fields": {
+          "api_key": "API Key",
+          "base_url": "Photon 基础地址"
+        },
+        "save_provider": "保存服务商",
+        "reset_confirm": "确定恢复此服务商的内置默认配置吗？没有默认配置的服务商将变为不可用。",
+        "reset_provider": "重置配置",
+        "attribution": "必须展示的署名"
       },
       "storage": {
         "max_size_mb": "最大上传大小（MB）",

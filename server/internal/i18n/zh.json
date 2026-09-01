@@ -475,5 +475,10 @@
   "err.contact_layout_in_use": "仍有联系人在使用此视图",
   "err.contact_layout_is_default": "不能删除默认联系人视图",
   "err.contact_layout_name_exists": "已存在同名联系人视图",
-  "err.failed_to_update_contact_layout": "更新联系人视图失败"
+  "err.failed_to_update_contact_layout": "更新联系人视图失败",
+  "err.failed_to_get_geocoding_settings": "获取地理编码设置失败",
+  "err.invalid_geocoding_settings": "地理编码服务商或配置无效",
+  "err.failed_to_update_geocoding_settings": "更新地理编码设置失败",
+  "err.failed_to_update_geocoding_provider": "更新地理编码服务商失败",
+  "err.failed_to_delete_geocoding_provider": "重置地理编码服务商失败"
 }

@@ -120,7 +120,7 @@ func TestNewGeocoderFactory(t *testing.T) {
 	}
 
 	g = NewGeocoder("unknown", "")
-	if _, ok := g.(*NominatimGeocoder); !ok {
-		t.Error("Expected NominatimGeocoder for unknown provider")
+	if g != nil {
+		t.Errorf("unknown providers must not silently fall back, got %T", g)
 	}
 }
