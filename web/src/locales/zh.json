@@ -730,6 +730,7 @@
     },
     "detail": {
       "back": "返回联系人列表",
+      "back_to_top": "返回顶部",
       "favorite": "收藏",
       "unfavorite": "取消收藏",
       "archive": "归档",

@@ -9,7 +9,10 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrLoanNotFound = errors.New("loan not found")
+var (
+	ErrLoanNotFound           = errors.New("loan not found")
+	ErrLoanCurrencyNotEnabled = errors.New("loan currency is not enabled")
+)
 
 type LoanService struct {
 	db           *gorm.DB
@@ -53,6 +56,9 @@ func (s *LoanService) List(contactID, vaultID string) ([]dto.LoanResponse, error
 
 func (s *LoanService) Create(contactID, vaultID string, req dto.CreateLoanRequest) (*dto.LoanResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
+	if err := s.validateCurrencyEnabled(vaultID, req.CurrencyID); err != nil {
 		return nil, err
 	}
 	loan := models.Loan{
@@ -100,6 +106,11 @@ func (s *LoanService) Update(id uint, vaultID string, req dto.UpdateLoanRequest)
 			return nil, ErrLoanNotFound
 		}
 		return nil, err
+	}
+	if !sameOptionalUint(loan.CurrencyID, req.CurrencyID) {
+		if err := s.validateCurrencyEnabled(vaultID, req.CurrencyID); err != nil {
+			return nil, err
+		}
 	}
 	loan.Name = req.Name
 	loan.Type = req.Type
@@ -163,6 +174,33 @@ func loanCategoryOrDefault(category string) string {
 		return "money"
 	}
 	return category
+}
+
+func (s *LoanService) validateCurrencyEnabled(vaultID string, currencyID *uint) error {
+	if currencyID == nil {
+		return nil
+	}
+	var vault models.Vault
+	if err := s.db.Select("account_id").First(&vault, "id = ?", vaultID).Error; err != nil {
+		return err
+	}
+	var count int64
+	if err := s.db.Model(&models.AccountCurrency{}).
+		Where("account_id = ? AND currency_id = ?", vault.AccountID, *currencyID).
+		Count(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		return ErrLoanCurrencyNotEnabled
+	}
+	return nil
+}
+
+func sameOptionalUint(a, b *uint) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 func toLoanResponse(l *models.Loan) dto.LoanResponse {

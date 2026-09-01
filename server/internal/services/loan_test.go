@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -105,6 +106,69 @@ func TestCreateItemLoanIncludesLendingFields(t *testing.T) {
 	}
 	if loan.AmountLent != nil || loan.CurrencyID != nil {
 		t.Fatalf("expected item loan to preserve nil money fields, got amount=%v currency=%v", loan.AmountLent, loan.CurrencyID)
+	}
+}
+
+func TestLoanCurrencyMustBeEnabledForAccount(t *testing.T) {
+	svc, contactID, vaultID := setupLoanTest(t)
+	var vault models.Vault
+	if err := svc.db.First(&vault, "id = ?", vaultID).Error; err != nil {
+		t.Fatalf("load vault: %v", err)
+	}
+	activeCurrency := models.Currency{Code: "CNY"}
+	disabledCurrency := models.Currency{Code: "USD"}
+	if err := svc.db.Create(&activeCurrency).Error; err != nil {
+		t.Fatalf("create active currency: %v", err)
+	}
+	if err := svc.db.Create(&disabledCurrency).Error; err != nil {
+		t.Fatalf("create disabled currency: %v", err)
+	}
+	if err := svc.db.Create(&models.AccountCurrency{
+		AccountID:  vault.AccountID,
+		CurrencyID: activeCurrency.ID,
+	}).Error; err != nil {
+		t.Fatalf("enable currency: %v", err)
+	}
+
+	amount := 25
+	if _, err := svc.Create(contactID, vaultID, dto.CreateLoanRequest{
+		Name:       "Disabled currency",
+		Type:       "lender",
+		AmountLent: &amount,
+		CurrencyID: &disabledCurrency.ID,
+	}); !errors.Is(err, ErrLoanCurrencyNotEnabled) {
+		t.Fatalf("expected disabled currency error, got %v", err)
+	}
+
+	created, err := svc.Create(contactID, vaultID, dto.CreateLoanRequest{
+		Name:       "Enabled currency",
+		Type:       "lender",
+		AmountLent: &amount,
+		CurrencyID: &activeCurrency.ID,
+	})
+	if err != nil {
+		t.Fatalf("create with enabled currency: %v", err)
+	}
+	if _, err := svc.Update(created.ID, vaultID, dto.UpdateLoanRequest{
+		Name:       created.Name,
+		Type:       created.Type,
+		AmountLent: &amount,
+		CurrencyID: &disabledCurrency.ID,
+	}); !errors.Is(err, ErrLoanCurrencyNotEnabled) {
+		t.Fatalf("expected disabled currency error when switching, got %v", err)
+	}
+
+	if err := svc.db.Where("account_id = ? AND currency_id = ?", vault.AccountID, activeCurrency.ID).
+		Delete(&models.AccountCurrency{}).Error; err != nil {
+		t.Fatalf("disable historical currency: %v", err)
+	}
+	if _, err := svc.Update(created.ID, vaultID, dto.UpdateLoanRequest{
+		Name:       created.Name,
+		Type:       created.Type,
+		AmountLent: &amount,
+		CurrencyID: &activeCurrency.ID,
+	}); err != nil {
+		t.Fatalf("saving an unchanged historical currency should remain possible: %v", err)
 	}
 }
 

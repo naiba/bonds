@@ -28,7 +28,7 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Loan, APIError, Currency } from "@/api";
+import type { Loan, APIError, Currency, PersonalizeItem } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import dayjs from "dayjs";
@@ -114,6 +114,8 @@ export default function LoansModule({
   ] as const satisfies QueryKey;
   const activeCategory =
     (Form.useWatch("category", form) as LoanCategory | undefined) ?? "money";
+  const selectedCurrencyId = Form.useWatch("currency_id", form) as
+    number | undefined;
 
   const { data: loans = [], isLoading } = useQuery({
     queryKey: qk,
@@ -138,18 +140,48 @@ export default function LoansModule({
     },
   });
 
-  const currencyOptions = currencies.flatMap((currency) => {
+  const { data: enabledCurrencies = [] } = useQuery({
+    queryKey: ["settings", "personalize", "currencies"],
+    queryFn: async () => {
+      const res = await api.personalize.personalizeDetail("currencies");
+      return (res.data ?? []) as PersonalizeItem[];
+    },
+  });
+
+  const currencyOptions = enabledCurrencies.flatMap((currency) => {
     if (currency.id == null) return [];
     return [
-      { value: currency.id, label: currency.code ?? String(currency.id) },
+      {
+        value: currency.id,
+        label: currency.label ?? currency.name ?? String(currency.id),
+      },
     ];
   });
   const defaultCurrencyId =
     currencyOptions.find((currency) => currency.label === "USD")?.value ??
     currencyOptions[0]?.value;
   const currencyCodeById = new Map(
-    currencyOptions.map((currency) => [currency.value, currency.label]),
+    currencies.flatMap((currency) =>
+      currency.id == null
+        ? []
+        : [[currency.id, currency.code ?? String(currency.id)] as const],
+    ),
   );
+  const selectedDisabledCurrency =
+    selectedCurrencyId != null &&
+    !currencyOptions.some((currency) => currency.value === selectedCurrencyId)
+      ? currencyCodeById.get(selectedCurrencyId)
+      : undefined;
+  const currencySelectOptions = selectedDisabledCurrency
+    ? [
+        ...currencyOptions,
+        {
+          value: selectedCurrencyId,
+          label: selectedDisabledCurrency,
+          disabled: true,
+        },
+      ]
+    : currencyOptions;
 
   function buildLoanRequest(values: LoanFormValues): LoanRequest {
     const category = values.category ?? "money";
@@ -552,7 +584,7 @@ export default function LoansModule({
                   showSearch
                   allowClear
                   optionFilterProp="label"
-                  options={currencyOptions}
+                  options={currencySelectOptions}
                   placeholder={t("modules.loans.currency_placeholder")}
                 />
               </Form.Item>

@@ -45,6 +45,7 @@ import {
   Checkbox,
   Grid,
   Drawer,
+  FloatButton,
 } from "antd";
 import {
   EditOutlined,
@@ -2186,6 +2187,11 @@ export default function ContactDetail() {
           initialTemplateId={tabsData?.template_id}
         />
       </Drawer>
+
+      <FloatButton.BackTop
+        aria-label={t("contact.detail.back_to_top")}
+        tooltip={t("contact.detail.back_to_top")}
+      />
     </div>
   );
 }

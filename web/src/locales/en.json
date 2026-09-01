@@ -730,6 +730,7 @@
     },
     "detail": {
       "back": "Back to contacts",
+      "back_to_top": "Back to top",
       "favorite": "Favorite",
       "unfavorite": "Unfavorite",
       "archive": "Archive",

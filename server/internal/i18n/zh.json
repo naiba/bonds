@@ -108,6 +108,7 @@
   "err.failed_to_create_loan": "创建借贷失败",
   "err.invalid_loan_id": "无效的借贷ID",
   "err.loan_not_found": "借贷未找到",
+  "err.loan_currency_not_enabled": "所选货币未在此账户中启用",
   "err.failed_to_update_loan": "更新借贷失败",
   "err.failed_to_toggle_loan_settled": "切换借贷结算状态失败",
   "err.failed_to_delete_loan": "删除借贷失败",

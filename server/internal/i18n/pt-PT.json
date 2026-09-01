@@ -94,6 +94,7 @@
   "err.failed_to_create_loan": "Falha ao criar empréstimo",
   "err.invalid_loan_id": "ID de empréstimo inválido",
   "err.loan_not_found": "Empréstimo não encontrado",
+  "err.loan_currency_not_enabled": "A moeda selecionada não está ativada para esta conta",
   "err.failed_to_update_loan": "Falha ao atualizar empréstimo",
   "err.failed_to_toggle_loan_settled": "Falha ao alterar estado de liquidação do empréstimo",
   "err.failed_to_delete_loan": "Falha ao eliminar empréstimo",

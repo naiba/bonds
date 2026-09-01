@@ -108,6 +108,7 @@
   "err.failed_to_create_loan": "Kredit konnte nicht erstellt werden",
   "err.invalid_loan_id": "Ungültige Kredit-ID",
   "err.loan_not_found": "Kredit nicht gefunden",
+  "err.loan_currency_not_enabled": "Die ausgewählte Währung ist für dieses Konto nicht aktiviert",
   "err.failed_to_update_loan": "Kredit konnte nicht aktualisiert werden",
   "err.failed_to_toggle_loan_settled": "Kreditstatus konnte nicht geändert werden",
   "err.failed_to_delete_loan": "Kredit konnte nicht gelöscht werden",

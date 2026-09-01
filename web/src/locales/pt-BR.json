@@ -730,6 +730,7 @@
     },
     "detail": {
       "back": "Voltar aos contatos",
+      "back_to_top": "Voltar ao topo",
       "favorite": "Favoritar",
       "unfavorite": "Desfavoritar",
       "archive": "Arquivar",

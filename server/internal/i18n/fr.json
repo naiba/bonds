@@ -94,6 +94,7 @@
   "err.failed_to_create_loan": "Échec de la création du prêt",
   "err.invalid_loan_id": "ID de prêt invalide",
   "err.loan_not_found": "Prêt introuvable",
+  "err.loan_currency_not_enabled": "La devise sélectionnée n’est pas activée pour ce compte",
   "err.failed_to_update_loan": "Échec de la mise à jour du prêt",
   "err.failed_to_toggle_loan_settled": "Échec de l'activation du règlement du prêt",
   "err.failed_to_delete_loan": "Échec de la suppression du prêt",

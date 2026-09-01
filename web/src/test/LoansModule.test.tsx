@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { App as AntApp, ConfigProvider } from "antd";
 import LoansModule from "@/pages/contact/modules/LoansModule";
 import type { Loan, Currency } from "@/api";
@@ -24,6 +25,7 @@ vi.mock("@/api", () => ({
       contactsLoansDelete: vi.fn(),
     },
     currencies: { currenciesList: vi.fn() },
+    personalize: { personalizeDetail: vi.fn() },
   },
 }));
 
@@ -59,7 +61,11 @@ const loans: Loan[] = [
   },
 ];
 
-const currencies: Currency[] = [{ id: 1, code: "USD" }];
+const currencies: Currency[] = [
+  { id: 1, code: "USD" },
+  { id: 2, code: "CNY" },
+];
+const enabledCurrencies = [{ id: 2, label: "CNY" }];
 
 function renderLoansModule() {
   return render(
@@ -76,7 +82,10 @@ describe("LoansModule", () => {
     mockUseQuery.mockReset();
     mockUseQuery.mockImplementation((opts: { queryKey?: unknown[] }) => {
       const key = Array.isArray(opts.queryKey) ? opts.queryKey : [];
-      if (key[0] === "currencies") return { data: currencies, isLoading: false };
+      if (key[0] === "currencies")
+        return { data: currencies, isLoading: false };
+      if (key.includes("personalize"))
+        return { data: enabledCurrencies, isLoading: false };
       return { data: loans, isLoading: false };
     });
   });
@@ -108,5 +117,24 @@ describe("LoansModule", () => {
 
     expect(directionLabels).not.toContain("Eu emprestei dinheiro");
     expect(directionLabels).not.toContain("Eu peguei dinheiro emprestado");
+  });
+
+  it("offers only account-enabled currencies while retaining historical currency labels", async () => {
+    const user = userEvent.setup();
+    renderLoansModule();
+
+    expect(screen.getByText(/25 USD/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Add$/ }));
+    const dialog = await screen.findByRole("dialog");
+    const currencySelect = within(dialog).getByRole("combobox", {
+      name: "Currency",
+    });
+
+    await user.click(currencySelect);
+    expect(
+      await screen.findByRole("option", { name: "CNY" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "USD" })).toBeNull();
   });
 });

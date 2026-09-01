@@ -94,6 +94,7 @@
   "err.failed_to_create_loan": "Error al crear el préstamo",
   "err.invalid_loan_id": "ID de préstamo inválido",
   "err.loan_not_found": "Préstamo no encontrado",
+  "err.loan_currency_not_enabled": "La moneda seleccionada no está habilitada para esta cuenta",
   "err.failed_to_update_loan": "Error al actualizar el préstamo",
   "err.failed_to_toggle_loan_settled": "Error al cambiar el estado del préstamo",
   "err.failed_to_delete_loan": "Error al eliminar el préstamo",

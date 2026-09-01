@@ -108,6 +108,7 @@
   "err.failed_to_create_loan": "Failed to create loan",
   "err.invalid_loan_id": "Invalid loan ID",
   "err.loan_not_found": "Loan not found",
+  "err.loan_currency_not_enabled": "The selected currency is not enabled for this account",
   "err.failed_to_update_loan": "Failed to update loan",
   "err.failed_to_toggle_loan_settled": "Failed to toggle loan settled",
   "err.failed_to_delete_loan": "Failed to delete loan",

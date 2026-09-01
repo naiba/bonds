@@ -80,6 +80,9 @@ func (h *LoanHandler) Create(c *echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
+		if errors.Is(err, services.ErrLoanCurrencyNotEnabled) {
+			return response.BadRequest(c, "err.loan_currency_not_enabled", nil)
+		}
 		return response.InternalError(c, "err.failed_to_create_loan")
 	}
 	return response.Created(c, loan)
@@ -123,6 +126,9 @@ func (h *LoanHandler) Update(c *echo.Context) error {
 	if err != nil {
 		if errors.Is(err, services.ErrLoanNotFound) {
 			return response.NotFound(c, "err.loan_not_found")
+		}
+		if errors.Is(err, services.ErrLoanCurrencyNotEnabled) {
+			return response.BadRequest(c, "err.loan_currency_not_enabled", nil)
 		}
 		return response.InternalError(c, "err.failed_to_update_loan")
 	}

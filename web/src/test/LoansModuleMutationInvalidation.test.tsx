@@ -38,6 +38,9 @@ vi.mock("@/api", () => ({
     currencies: {
       currenciesList: vi.fn(),
     },
+    personalize: {
+      personalizeDetail: vi.fn(),
+    },
     preferences: {
       preferencesList: vi.fn(),
     },
@@ -158,6 +161,9 @@ describe("LoansModule mutation invalidation", () => {
     vi.mocked(api.loans.contactsLoansDelete).mockResolvedValue({ data: {} });
     vi.mocked(api.currencies.currenciesList).mockResolvedValue({
       data: [{ id: 1, code: "USD" }],
+    });
+    vi.mocked(api.personalize.personalizeDetail).mockResolvedValue({
+      data: [{ id: 1, label: "USD" }],
     });
     vi.mocked(api.preferences.preferencesList).mockResolvedValue({ data: {} });
   });
