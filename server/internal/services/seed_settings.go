@@ -31,7 +31,6 @@ func SeedSettingsFromEnv(svc *SystemSettingService, cfg *config.Config) error {
 		{"webauthn.rp_origins", joinStrings(cfg.WebAuthn.RPOrigins)},
 
 		{"geocoding.provider", cfg.Geocoding.Provider},
-		{"geocoding.api_key", cfg.Geocoding.APIKey},
 		{"geocoding.precision", cfg.Geocoding.Precision},
 
 		{"backup.cron", cfg.Backup.Cron},

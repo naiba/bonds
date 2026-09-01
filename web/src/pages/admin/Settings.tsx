@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/api";
 import type { SystemSettingItem, APIError } from "@/api";
+import GeocodingSettings from "@/pages/admin/GeocodingSettings";
 
 const { Title, Text } = Typography;
 
@@ -46,29 +47,6 @@ const KNOWN_SETTINGS: SettingDef[] = [
   { key: "webauthn.rp_id", section: "webauthn", placeholder: "e.g. bonds.example.com" },
   { key: "webauthn.rp_display_name", section: "webauthn", placeholder: "e.g. Bonds" },
   { key: "webauthn.rp_origins", section: "webauthn", placeholder: "e.g. https://bonds.example.com" },
-
-  // Geocoding
-  {
-    key: "geocoding.provider",
-    type: "select",
-    section: "geocoding",
-    hint: "admin.settings.geocoding.provider_hint",
-    options: [
-      { value: "", label: "admin.settings.geocoding.none" },
-      { value: "nominatim", label: "admin.settings.geocoding.nominatim" },
-      { value: "locationiq", label: "admin.settings.geocoding.locationiq" },
-    ],
-  },
-  { key: "geocoding.api_key", type: "password", section: "geocoding" },
-  {
-    key: "geocoding.precision",
-    type: "select",
-    section: "geocoding",
-    options: [
-      { value: "exact", label: "admin.settings.geocoding.precision_exact" },
-      { value: "locality", label: "admin.settings.geocoding.precision_locality" },
-    ],
-  },
 
   // Storage
   { key: "storage.max_size_mb", type: "number", section: "storage" },
@@ -215,16 +193,18 @@ export default function AdminSettings() {
 
   if (isLoading) {
     return (
-      <div style={{ textAlign: "center", padding: 80 }}>
-        <Spin size="large" />
-      </div>
+      <Form form={form}>
+        <div style={{ textAlign: "center", padding: 80 }}>
+          <Spin size="large" />
+        </div>
+      </Form>
     );
   }
 
   const collapseItems = SECTIONS.map((section) => ({
     key: section,
     label: t(`admin.settings.section_${section}`),
-    children: (
+    children: section === "geocoding" ? <GeocodingSettings /> : (
       <>
         {KNOWN_SETTINGS.filter((s) => s.section === section).map(renderField)}
       </>

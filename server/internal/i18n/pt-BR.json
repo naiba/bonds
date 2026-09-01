@@ -419,5 +419,10 @@
   "err.contact_layout_in_use": "Esta visualização ainda está em uso",
   "err.contact_layout_is_default": "A visualização padrão não pode ser excluída",
   "err.contact_layout_name_exists": "Já existe uma visualização com este nome",
-  "err.failed_to_update_contact_layout": "Falha ao atualizar a visualização de contato"
+  "err.failed_to_update_contact_layout": "Falha ao atualizar a visualização de contato",
+  "err.failed_to_get_geocoding_settings": "Falha ao obter as configurações de geocodificação",
+  "err.invalid_geocoding_settings": "Provedor ou configuração de geocodificação inválidos",
+  "err.failed_to_update_geocoding_settings": "Falha ao atualizar as configurações de geocodificação",
+  "err.failed_to_update_geocoding_provider": "Falha ao atualizar o provedor de geocodificação",
+  "err.failed_to_delete_geocoding_provider": "Falha ao redefinir o provedor de geocodificação"
 }

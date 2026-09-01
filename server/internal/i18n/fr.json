@@ -419,5 +419,10 @@
   "err.contact_layout_in_use": "Cette vue est encore utilisée",
   "err.contact_layout_is_default": "La vue par défaut ne peut pas être supprimée",
   "err.contact_layout_name_exists": "Une vue portant ce nom existe déjà",
-  "err.failed_to_update_contact_layout": "Échec de la mise à jour de la vue de contact"
+  "err.failed_to_update_contact_layout": "Échec de la mise à jour de la vue de contact",
+  "err.failed_to_get_geocoding_settings": "Échec du chargement des paramètres de géocodage",
+  "err.invalid_geocoding_settings": "Fournisseur ou configuration de géocodage invalide",
+  "err.failed_to_update_geocoding_settings": "Échec de la mise à jour des paramètres de géocodage",
+  "err.failed_to_update_geocoding_provider": "Échec de la mise à jour du fournisseur de géocodage",
+  "err.failed_to_delete_geocoding_provider": "Échec de la réinitialisation du fournisseur de géocodage"
 }

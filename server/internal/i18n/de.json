@@ -476,5 +476,10 @@
   "err.contact_layout_in_use": "Diese Ansicht wird noch verwendet",
   "err.contact_layout_is_default": "Die Standardansicht kann nicht gelöscht werden",
   "err.contact_layout_name_exists": "Eine Ansicht mit diesem Namen ist bereits vorhanden",
-  "err.failed_to_update_contact_layout": "Kontaktansicht konnte nicht aktualisiert werden"
+  "err.failed_to_update_contact_layout": "Kontaktansicht konnte nicht aktualisiert werden",
+  "err.failed_to_get_geocoding_settings": "Geocoding-Einstellungen konnten nicht geladen werden",
+  "err.invalid_geocoding_settings": "Ungültiger Geocoding-Anbieter oder ungültige Konfiguration",
+  "err.failed_to_update_geocoding_settings": "Geocoding-Einstellungen konnten nicht aktualisiert werden",
+  "err.failed_to_update_geocoding_provider": "Geocoding-Anbieter konnte nicht aktualisiert werden",
+  "err.failed_to_delete_geocoding_provider": "Geocoding-Anbieter konnte nicht zurückgesetzt werden"
 }

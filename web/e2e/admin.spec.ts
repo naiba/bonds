@@ -160,6 +160,34 @@ test.describe('Admin Features', () => {
     await expect(page.getByRole('button', { name: 'Save Settings' })).toBeVisible({ timeout: 5000 });
   });
 
+  test('admin can configure and activate a structured geocoding provider', async ({ page }) => {
+    await loginUser(page, adminEmail);
+    await page.goto('/admin/settings');
+    await page.waitForLoadState('networkidle');
+
+    await page.getByText('Geocoding', { exact: true }).click();
+    await expect(page.getByText('Public Photon is a fair-use demo')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#providers_photon_base_url')).toHaveValue('https://photon.komoot.io');
+
+    const geoapifyCard = page.locator('.ant-card-small').filter({ has: page.getByText('Geoapify', { exact: true }) });
+    await geoapifyCard.locator('#providers_geoapify_api_key').fill('e2e-geoapify-key');
+    await geoapifyCard.getByRole('button', { name: /Save provider/ }).click();
+    await expect(page.getByText('Provider configuration saved')).toBeVisible({ timeout: 10000 });
+    await expect(geoapifyCard.getByText('Ready', { exact: true })).toBeVisible({ timeout: 10000 });
+
+    await page.locator('#active_provider').click();
+    await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: 'Geoapify' }).click();
+    await page.getByRole('button', { name: /Save active settings/ }).click();
+    await expect(page.getByText('Active geocoding settings saved')).toBeVisible({ timeout: 10000 });
+
+    await page.reload();
+    await page.getByText('Geocoding', { exact: true }).click();
+    const providerField = page
+      .locator('#active_provider')
+      .locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " ant-form-item ")][1]');
+    await expect(providerField).toContainText('Geoapify');
+  });
+
   let secondUserEmail: string;
 
   test('admin can disable a user', async ({ page }) => {

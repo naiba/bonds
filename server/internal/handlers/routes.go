@@ -118,21 +118,22 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	notificationService.SetSender(notificationSender)
 	notificationService.SetSystemSettings(systemSettingService)
 
-	reloadGeocoding := func() {
-		provider := systemSettingService.GetWithDefault("geocoding.provider", cfg.Geocoding.Provider)
-		var geocoder services.Geocoder
-		if provider != "" {
-			apiKey := systemSettingService.GetWithDefault("geocoding.api_key", cfg.Geocoding.APIKey)
-			geocoder = services.NewGeocoder(provider, apiKey)
-		}
-		// Provider, key and precision are swapped as one runtime snapshot. An
-		// empty provider deliberately removes the active geocoder.
-		addressService.ConfigureGeocoding(
-			geocoder,
-			systemSettingService.GetWithDefault("geocoding.precision", cfg.Geocoding.Precision),
-		)
+	geocodingRegistry := services.NewGeocodingProviderRegistry()
+	geocodingConfigService := services.NewGeocodingProviderConfigService(db, cfg.Security.SettingsEncKey, geocodingRegistry)
+	geocodingManager := services.NewGeocodingManager(
+		systemSettingService,
+		geocodingConfigService,
+		geocodingRegistry,
+		addressService,
+		cfg.Geocoding.Provider,
+		cfg.Geocoding.APIKey,
+		cfg.Geocoding.Precision,
+	)
+	if migrated, err := geocodingManager.Initialize(); err != nil {
+		log.Printf("WARNING: failed to initialize geocoding providers: %v", err)
+	} else if migrated > 0 {
+		log.Printf("Encrypted %d previously-plaintext geocoding provider configurations", migrated)
 	}
-	reloadGeocoding()
 
 	oauthProviderService := services.NewOAuthProviderServiceWithCipher(db, cfg.Security.SettingsEncKey)
 	oauthProviderService.SetSystemSettings(systemSettingService)
@@ -263,7 +264,11 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	currencyHandler := NewCurrencyHandler(currencyService)
 	davClientHandler := NewDavClientHandler(davClientService, davSyncService)
 	adminHandler := NewAdminHandler(adminService, systemSettingService, searchService, db)
-	adminHandler.RegisterReloader(reloadGeocoding)
+	adminHandler.RegisterReloader(func() {
+		if err := geocodingManager.Reload(); err != nil {
+			log.Printf("WARNING: geocoding reload failed: %v", err)
+		}
+	})
 	adminHandler.RegisterReloader(func() {
 		oauthProviderService.ReloadProviders()
 	})
@@ -276,6 +281,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 		adminHandler.RegisterReloader(backupReloader)
 	}
 	oauthProviderHandler := NewOAuthProviderHandler(oauthProviderService)
+	geocodingAdminHandler := NewGeocodingAdminHandler(geocodingManager)
 	instanceHandler := NewInstanceHandler(systemSettingService, oauthService, webauthnService, version)
 
 	patHandler := NewPersonalAccessTokenHandler(patService)
@@ -354,6 +360,10 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	adminGroup.PUT("/users/:id/storage-limit", adminHandler.SetStorageLimit)
 	adminGroup.GET("/settings", adminHandler.GetSettings)
 	adminGroup.PUT("/settings", adminHandler.UpdateSettings)
+	adminGroup.GET("/geocoding", geocodingAdminHandler.Get)
+	adminGroup.PUT("/geocoding", geocodingAdminHandler.UpdateSettings)
+	adminGroup.PUT("/geocoding/providers/:provider", geocodingAdminHandler.UpdateProvider)
+	adminGroup.DELETE("/geocoding/providers/:provider", geocodingAdminHandler.DeleteProvider)
 	adminGroup.GET("/oauth-providers", oauthProviderHandler.List)
 	adminGroup.POST("/oauth-providers", oauthProviderHandler.Create)
 	adminGroup.PUT("/oauth-providers/:id", oauthProviderHandler.Update)

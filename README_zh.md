@@ -44,7 +44,7 @@ Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由�
 - **OAuth 登录**：GitHub 和 Google 单点登录。
 - **用户邀请**：通过邮件邀请他人加入账户，支持权限级别。
 - **审计日志**：联系人所有变更的操作记录。
-- **地理编码**：通过 Nominatim（免费）或 LocationIQ 获取地址坐标。
+- **地理编码**：支持 Nominatim、LocationIQ、Geoapify，以及公共或自托管 Photon 的可扩展服务商配置。
 - **Shoutrrr 通知**：通过 Telegram 及其他兼容 Shoutrrr 的渠道发送提醒。
 - **国际化**：英文和中文，前后端全覆盖。
 
@@ -138,7 +138,7 @@ cp server/.env.example server/.env
 - **OAuth / OIDC**：GitHub、Google 和 OIDC/SSO 凭据。
 - **WebAuthn**：依赖方 ID、显示名称、允许来源。
 - **Telegram**：Bot Token（通知推送）。
-- **地理编码**：服务商（Nominatim/LocationIQ）、API Key。
+- **地理编码**：启用的服务商、地址隐私精度、各服务商独立凭据和自托管 Photon 地址。
 - **存储**：最大上传大小限制。
 - **备份**：Cron 定时计划、保留天数。
 - **Swagger**：启用或禁用 API 文档界面。

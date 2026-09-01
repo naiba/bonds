@@ -44,7 +44,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **OAuth Login**: GitHub and Google single sign-on.
 - **User Invitations**: Invite others to your account via email with permission levels.
 - **Audit Log**: Feed of all changes across contacts.
-- **Geocoding**: Address coordinates via Nominatim (free) or LocationIQ.
+- **Geocoding**: Extensible provider configuration for Nominatim, LocationIQ, Geoapify, and public or self-hosted Photon.
 - **Shoutrrr Notifications**: Reminder delivery via Telegram and other Shoutrrr-compatible channels.
 - **i18n**: English and Chinese, frontend and backend.
 
@@ -137,7 +137,7 @@ The following are managed from the **Admin > System Settings** page after login:
 - **OAuth / OIDC**: GitHub, Google, and OIDC/SSO credentials.
 - **WebAuthn**: Relying Party ID, Display Name, Origins.
 - **Telegram**: Bot token for notifications.
-- **Geocoding**: Provider (Nominatim/LocationIQ), API key.
+- **Geocoding**: Active provider, address privacy precision, per-provider credentials, and self-hosted Photon URL.
 - **Storage**: Max upload size limit.
 - **Backup**: Cron schedule, Retention days.
 - **Swagger**: Enable or disable API documentation UI.

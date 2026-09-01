@@ -224,12 +224,15 @@ func (g *LocationIQGeocoder) Attribution() []ProviderAttribution {
 }
 
 func NewGeocoder(provider, apiKey string) Geocoder {
-	switch provider {
-	case "locationiq":
-		return NewLocationIQGeocoder(apiKey)
-	default:
-		return NewNominatimGeocoder()
+	config := map[string]string{}
+	if provider == GeocodingProviderLocationIQ || provider == GeocodingProviderGeoapify {
+		config["api_key"] = apiKey
 	}
+	geocoder, err := NewGeocodingProviderRegistry().Build(provider, config)
+	if err != nil {
+		return nil
+	}
+	return geocoder
 }
 
 // nominatimAddress is the structured breakdown returned with addressdetails=1.
@@ -395,14 +398,19 @@ func truncateQuery(query string, maxBytes int) string {
 	return query[:cut]
 }
 
+func normalizeSuggestionLimit(limit int) int {
+	if limit <= 0 || limit > suggestionLimit {
+		return suggestionLimit
+	}
+	return limit
+}
+
 func suggestFromURL(client *http.Client, baseURL, query, apiKey string, limit int, limiter *rateLimiter) ([]GeocodingSuggestion, error) {
 	query = truncateQuery(strings.TrimSpace(query), suggestQueryMaxLength)
 	if query == "" {
 		return []GeocodingSuggestion{}, nil
 	}
-	if limit <= 0 || limit > suggestionLimit {
-		limit = suggestionLimit
-	}
+	limit = normalizeSuggestionLimit(limit)
 
 	results, err := fetchGeocoding(client, baseURL, suggestParams(query, apiKey, limit), limiter, suggestWait)
 	if err != nil {
