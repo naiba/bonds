@@ -165,17 +165,19 @@ test.describe("Contact Summary Card", () => {
       }),
     });
     await expect(infoCard).toBeVisible({ timeout: 10000 });
-    // ContactInfo module uses inline form: click Add to show the form
+    // ContactInfo module opens its editor in a modal.
     await infoCard.getByRole("button", { name: /add/i }).click();
+    const infoModal = page.locator(".ant-modal:visible");
+    await expect(infoModal).toBeVisible({ timeout: 5000 });
 
-    await infoCard.locator(".ant-select:visible").click();
+    await infoModal.locator(".ant-select:visible").click();
     await page
       .locator(".ant-select-dropdown:visible .ant-select-item-option")
       .filter({ hasText: /email/i })
       .first()
       .click();
 
-    const valueInput = infoCard.getByPlaceholder(/value/i);
+    const valueInput = infoModal.getByPlaceholder(/value/i);
     await expect(valueInput).toBeVisible({ timeout: 5000 });
     await valueInput.fill("summary@example.com");
 
@@ -184,16 +186,18 @@ test.describe("Contact Summary Card", () => {
         resp.url().includes("/contactInformation") &&
         resp.request().method() === "POST",
     );
-    await infoCard.getByRole("button", { name: /save/i }).click();
+    await infoModal.getByRole("button", { name: /save/i }).click();
     await createResp;
     await page.waitForLoadState("networkidle");
 
     // Now add a phone number
     await infoCard.getByRole("button", { name: /add/i }).click();
-    const valueInput2 = infoCard.getByPlaceholder(/value/i);
+    const phoneModal = page.locator(".ant-modal:visible");
+    await expect(phoneModal).toBeVisible({ timeout: 5000 });
+    const valueInput2 = phoneModal.getByPlaceholder(/value/i);
     await expect(valueInput2).toBeVisible({ timeout: 5000 });
     // Switch type to phone
-    await infoCard.locator(".ant-select").first().click();
+    await phoneModal.locator(".ant-select").first().click();
     await page
       .locator(".ant-select-dropdown:visible .ant-select-item-option")
       .filter({ hasText: "Phone" })
@@ -205,7 +209,7 @@ test.describe("Contact Summary Card", () => {
         resp.url().includes("/contactInformation") &&
         resp.request().method() === "POST",
     );
-    await infoCard.getByRole("button", { name: /save/i }).click();
+    await phoneModal.getByRole("button", { name: /save/i }).click();
     await createResp2;
     await page.waitForLoadState("networkidle");
 

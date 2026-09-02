@@ -1279,9 +1279,13 @@ test.describe("Vault Feed - Contact Names", () => {
     const notesCard = page.locator(".ant-card").filter({ hasText: /^Notes/ });
     await expect(notesCard).toBeVisible({ timeout: 10000 });
     await notesCard.getByRole("button", { name: /add/i }).click();
+    const noteModal = page
+      .locator(".ant-modal")
+      .filter({ hasText: /add note/i });
+    await expect(noteModal).toBeVisible({ timeout: 5000 });
 
-    await notesCard.getByPlaceholder(/title/i).fill("Feed Test Note");
-    await notesCard
+    await noteModal.getByPlaceholder(/title/i).fill("Feed Test Note");
+    await noteModal
       .getByRole("textbox", { name: /write your note/i })
       .pressSequentially("This note generates a feed entry");
 
@@ -1289,7 +1293,7 @@ test.describe("Vault Feed - Contact Names", () => {
       (resp) =>
         resp.url().includes("/notes") && resp.request().method() === "POST",
     );
-    await notesCard.getByRole("button", { name: /save/i }).click();
+    await noteModal.getByRole("button", { name: /save/i }).click();
     const resp = await noteResp;
     expect(resp.status()).toBeLessThan(400);
 
