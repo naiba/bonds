@@ -64,18 +64,34 @@ async function chooseSelectOption(selectTestId: string, optionText: string) {
 
 function setupGiftApi(gifts = defaultGifts) {
   vi.mocked(api.gifts.contactsGiftsList).mockResolvedValue({ data: gifts });
-  vi.mocked(api.gifts.contactsGiftsCreate).mockResolvedValue({ data: createdGift });
-  vi.mocked(api.gifts.contactsGiftsUpdate).mockResolvedValue({ data: updatedGift });
-  vi.mocked(api.gifts.contactsGiftsDelete).mockResolvedValue(undefined);
-  vi.mocked(api.personalize.personalizeDetail).mockImplementation(async (entity: string) => {
-    if (entity === "gift-occasions") {
-      return { data: [{ id: 1, label: "Birthday" }, { id: 2, label: "Anniversary" }] };
-    }
-    if (entity === "gift-states") {
-      return { data: [{ id: 10, label: "Idea" }, { id: 11, label: "Bought" }] };
-    }
-    return { data: [] };
+  vi.mocked(api.gifts.contactsGiftsCreate).mockResolvedValue({
+    data: createdGift,
   });
+  vi.mocked(api.gifts.contactsGiftsUpdate).mockResolvedValue({
+    data: updatedGift,
+  });
+  vi.mocked(api.gifts.contactsGiftsDelete).mockResolvedValue(undefined);
+  vi.mocked(api.personalize.personalizeDetail).mockImplementation(
+    async (entity: string) => {
+      if (entity === "gift-occasions") {
+        return {
+          data: [
+            { id: 1, label: "Birthday" },
+            { id: 2, label: "Anniversary" },
+          ],
+        };
+      }
+      if (entity === "gift-states") {
+        return {
+          data: [
+            { id: 10, label: "Idea" },
+            { id: 11, label: "Bought" },
+          ],
+        };
+      }
+      return { data: [] };
+    },
+  );
 }
 
 const defaultGifts = [
@@ -130,10 +146,15 @@ describe("GiftsModule", () => {
 
     await user.click(screen.getByRole("button", { name: /Add/ }));
 
+    expect(screen.getByRole("dialog")).toHaveTextContent("Add Gift");
+
     const saveButton = screen.getByRole("button", { name: "Save" });
     expect(saveButton).toBeDisabled();
 
-    await user.type(screen.getByRole("textbox", { name: "Name" }), "Concert tickets");
+    await user.type(
+      screen.getByRole("textbox", { name: "Name" }),
+      "Concert tickets",
+    );
     expect(saveButton).toBeDisabled();
 
     await chooseSelectOption("gift-occasion-select", "Birthday");
@@ -149,24 +170,26 @@ describe("GiftsModule", () => {
     renderGiftsModule();
 
     await user.click(screen.getByRole("button", { name: /Add/ }));
-    await user.type(screen.getByRole("textbox", { name: "Name" }), "Concert tickets");
+    await user.type(
+      screen.getByRole("textbox", { name: "Name" }),
+      "Concert tickets",
+    );
     await chooseSelectOption("gift-occasion-select", "Birthday");
     await chooseSelectOption("gift-state-select", "Idea");
-    await user.type(screen.getByRole("textbox", { name: "Description" }), "Front-row seats");
+    await user.type(
+      screen.getByRole("textbox", { name: "Description" }),
+      "Front-row seats",
+    );
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(api.gifts.contactsGiftsCreate).toHaveBeenCalledWith(
-        "v1",
-        "c1",
-        {
-          name: "Concert tickets",
-          type: "given",
-          gift_occasion_id: 1,
-          gift_state_id: 10,
-          description: "Front-row seats",
-        },
-      );
+      expect(api.gifts.contactsGiftsCreate).toHaveBeenCalledWith("v1", "c1", {
+        name: "Concert tickets",
+        type: "given",
+        gift_occasion_id: 1,
+        gift_state_id: 10,
+        description: "Front-row seats",
+      });
     });
   });
 
@@ -176,6 +199,8 @@ describe("GiftsModule", () => {
 
     await screen.findByText("Birthday book");
     await user.click(screen.getByRole("button", { name: "Edit gift" }));
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("Edit Gift");
 
     const nameInput = screen.getByRole("textbox", { name: "Name" });
     await user.clear(nameInput);
@@ -205,9 +230,12 @@ describe("GiftsModule", () => {
     await user.click(screen.getByRole("button", { name: "Delete gift" }));
     expect(await screen.findByText("Delete this gift?")).toBeInTheDocument();
 
-    const confirmButton = document.querySelector<HTMLButtonElement>(".ant-popconfirm-buttons .ant-btn-primary");
+    const confirmButton = document.querySelector<HTMLButtonElement>(
+      ".ant-popconfirm-buttons .ant-btn-primary",
+    );
     expect(confirmButton).toBeInTheDocument();
-    if (!confirmButton) throw new Error("Delete confirmation button was not rendered");
+    if (!confirmButton)
+      throw new Error("Delete confirmation button was not rendered");
     fireEvent.click(confirmButton);
 
     await waitFor(() => {

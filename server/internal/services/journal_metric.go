@@ -64,14 +64,19 @@ func (s *JournalMetricService) Delete(id uint, journalID uint, vaultID string) e
 		}
 		return err
 	}
-	result := s.db.Where("id = ? AND journal_id = ?", id, journalID).Delete(&models.JournalMetric{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrJournalMetricNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var metric models.JournalMetric
+		if err := tx.Where("id = ? AND journal_id = ?", id, journalID).First(&metric).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrJournalMetricNotFound
+			}
+			return err
+		}
+		if err := tx.Where("journal_metric_id = ?", metric.ID).Delete(&models.PostMetric{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&metric).Error
+	})
 }
 
 func toJournalMetricResponse(m *models.JournalMetric) dto.JournalMetricResponse {

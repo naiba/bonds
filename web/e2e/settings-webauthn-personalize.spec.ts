@@ -306,6 +306,46 @@ test.describe("Settings - WebAuthn and Modules", () => {
       ),
     ).toBeChecked();
   });
+
+  test("should add a layout section when randomUUID is unavailable", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(globalThis.crypto, "randomUUID", {
+        configurable: true,
+        value: undefined,
+      });
+    });
+    await createVaultAndOpenContactLayouts(page);
+
+    await page.getByRole("button", { name: "Add section" }).click();
+    const modal = page
+      .locator(".ant-modal")
+      .filter({ hasText: /add section/i });
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await modal.getByPlaceholder("Section name").fill("Memories");
+    await modal.getByRole("button", { name: "OK" }).click();
+
+    await expect(
+      page.locator('input[aria-label="Section name"][value="Memories"]'),
+    ).toBeVisible({
+      timeout: 5000,
+    });
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/layout") &&
+        response.request().method() === "PUT" &&
+        response.status() < 400,
+    );
+    await page.getByRole("button", { name: /save/i }).last().click();
+    await saveResponse;
+    await page.reload();
+    await expect(
+      page.locator('input[aria-label="Section name"][value="Memories"]'),
+    ).toBeVisible({
+      timeout: 10000,
+    });
+  });
 });
 
 test.describe("Settings - Personalize", () => {

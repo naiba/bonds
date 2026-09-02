@@ -295,6 +295,7 @@
       "important_dates_overview": "Important Dates Overview",
       "no_date_data": "No date data available",
       "mood_trends": "Mood Trends",
+      "mood_history": "Mood History",
       "no_mood_data": "No mood data available",
       "col_country": "Country",
       "col_province": "Province",
@@ -305,6 +306,9 @@
       "col_date": "Date",
       "col_calendar": "Calendar",
       "col_mood": "Mood",
+      "col_sleep": "Sleep",
+      "col_note": "Note",
+      "hours_value": "{{count}} h",
       "contacts_in": "Contacts in {{location}}",
       "map": {
         "title": "Where they are",
@@ -405,6 +409,7 @@
     "journal_detail": {
       "back": "Back to journals",
       "metrics": "Metrics",
+      "metric_help": "Metrics are custom values from 0 to 100 that you can record on each post, such as happiness or energy.",
       "add_metric": "Add Metric",
       "metric_placeholder": "Metric name (e.g. Happiness)",
       "no_metrics": "No metrics",
@@ -481,6 +486,7 @@
       "photo_uploaded": "Photo uploaded",
       "photo_deleted": "Photo deleted",
       "metrics": "Metrics",
+      "metric_help": "Enter a value from 0 to 100. Clear the field to remove the value from this post.",
       "no_metrics": "No metrics",
       "metric_added": "Metric added",
       "assign_slice": "Assign to Slice",
@@ -840,6 +846,8 @@
     "notes": {
       "title": "Notes",
       "add": "Add",
+      "modal_add": "Add Note",
+      "modal_edit": "Edit Note",
       "title_placeholder": "Title",
       "body_placeholder": "Write your note…",
       "no_notes": "No notes yet",
@@ -963,6 +971,8 @@
     "contact_info": {
       "title": "Contact Information",
       "add": "Add",
+      "modal_add": "Add Contact Information",
+      "modal_edit": "Edit Contact Information",
       "no_info": "No contact info",
       "delete_confirm": "Delete?",
       "label_placeholder": "Label (e.g. Personal)",
@@ -989,6 +999,8 @@
     "pets": {
       "title": "Pets",
       "add": "Add",
+      "modal_add": "Add Pet",
+      "modal_edit": "Edit Pet",
       "name_placeholder": "Name",
       "category_placeholder": "Category (e.g. Dog, Cat)",
       "no_pets": "No pets",
@@ -1033,6 +1045,8 @@
     "gifts": {
       "title": "Gifts",
       "add": "Add",
+      "modal_add": "Add Gift",
+      "modal_edit": "Edit Gift",
       "name": "Name",
       "name_placeholder": "Gift name",
       "occasion": "Occasion",
@@ -1814,10 +1828,18 @@
         "autocomplete_supported": "Address autocomplete",
         "autocomplete_unavailable": "Forward geocoding only",
         "providers": {
-          "nominatim": { "description": "The public OpenStreetMap Nominatim service. No API key is required." },
-          "locationiq": { "description": "A hosted OpenStreetMap geocoding service with API-key authentication." },
-          "geoapify": { "description": "A hosted geocoding and autocomplete service with API-key authentication." },
-          "photon": { "description": "An open-source OpenStreetMap geocoder. Use the public demo endpoint or enter the URL of your own Photon server." }
+          "nominatim": {
+            "description": "The public OpenStreetMap Nominatim service. No API key is required."
+          },
+          "locationiq": {
+            "description": "A hosted OpenStreetMap geocoding service with API-key authentication."
+          },
+          "geoapify": {
+            "description": "A hosted geocoding and autocomplete service with API-key authentication."
+          },
+          "photon": {
+            "description": "An open-source OpenStreetMap geocoder. Use the public demo endpoint or enter the URL of your own Photon server."
+          }
         },
         "nominatim_notice_title": "Public Nominatim usage policy",
         "nominatim_notice": "The public service permits at most one request per second and strictly forbids autocomplete. The limit is enforced per Bonds process, so multi-replica deployments should use another provider.",

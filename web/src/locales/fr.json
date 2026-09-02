@@ -295,6 +295,7 @@
       "important_dates_overview": "Aperçu des dates importantes",
       "no_date_data": "Aucune donnée de date disponible",
       "mood_trends": "Tendances d'humeur",
+      "mood_history": "Historique de l'humeur",
       "no_mood_data": "Aucune donnée sur l'humeur disponible",
       "col_country": "Pays",
       "col_province": "Province",
@@ -305,6 +306,9 @@
       "col_date": "Date",
       "col_calendar": "Calendrier",
       "col_mood": "Humeur",
+      "col_sleep": "Sommeil",
+      "col_note": "Note",
+      "hours_value": "{{count}} h",
       "contacts_in": "Contacts aux {{location}}",
       "map": {
         "title": "Où ils vivent",
@@ -405,6 +409,7 @@
     "journal_detail": {
       "back": "Retour aux journaux",
       "metrics": "Métrique",
+      "metric_help": "Les métriques sont des valeurs personnalisées de 0 à 100 que vous pouvez enregistrer pour chaque publication, comme le bonheur ou l'énergie.",
       "add_metric": "Ajouter une métrique",
       "metric_placeholder": "Nom de la métrique (par exemple, Bonheur)",
       "no_metrics": "Aucune métrique",
@@ -481,6 +486,7 @@
       "photo_uploaded": "Photo téléchargée",
       "photo_deleted": "Photo supprimée",
       "metrics": "Métrique",
+      "metric_help": "Saisissez une valeur de 0 à 100. Videz le champ pour retirer la valeur de cette publication.",
       "no_metrics": "Aucune métrique",
       "metric_added": "Métrique ajoutée",
       "assign_slice": "Attribuer à la tranche",
@@ -840,6 +846,8 @@
     "notes": {
       "title": "Notes",
       "add": "Ajouter",
+      "modal_add": "Ajouter une note",
+      "modal_edit": "Modifier la note",
       "title_placeholder": "Titre",
       "body_placeholder": "Écrivez votre note…",
       "no_notes": "Aucune note pour l'instant",
@@ -963,6 +971,8 @@
     "contact_info": {
       "title": "Coordonnées",
       "add": "Ajouter",
+      "modal_add": "Ajouter des coordonnées",
+      "modal_edit": "Modifier les coordonnées",
       "no_info": "Aucune information de contact",
       "delete_confirm": "Supprimer?",
       "label_placeholder": "Étiquette (par exemple personnelle)",
@@ -989,6 +999,8 @@
     "pets": {
       "title": "Animaux de compagnie",
       "add": "Ajouter",
+      "modal_add": "Ajouter un animal",
+      "modal_edit": "Modifier l'animal",
       "name_placeholder": "Nom",
       "category_placeholder": "Catégorie (par exemple, chien, chat)",
       "no_pets": "Pas d'animaux",
@@ -1033,6 +1045,8 @@
     "gifts": {
       "title": "Cadeaux",
       "add": "Ajouter",
+      "modal_add": "Ajouter un cadeau",
+      "modal_edit": "Modifier le cadeau",
       "name": "Nom",
       "name_placeholder": "Nom du cadeau",
       "occasion": "Occasion",
@@ -1814,10 +1828,18 @@
         "autocomplete_supported": "Autocomplétion d'adresse",
         "autocomplete_unavailable": "Géocodage direct uniquement",
         "providers": {
-          "nominatim": { "description": "Service Nominatim public d'OpenStreetMap. Aucune clé API requise." },
-          "locationiq": { "description": "Service de géocodage OpenStreetMap hébergé avec authentification par clé API." },
-          "geoapify": { "description": "Service hébergé de géocodage et d'autocomplétion avec clé API." },
-          "photon": { "description": "Géocodeur OpenStreetMap open source. Utilisez la démo publique ou votre propre serveur Photon." }
+          "nominatim": {
+            "description": "Service Nominatim public d'OpenStreetMap. Aucune clé API requise."
+          },
+          "locationiq": {
+            "description": "Service de géocodage OpenStreetMap hébergé avec authentification par clé API."
+          },
+          "geoapify": {
+            "description": "Service hébergé de géocodage et d'autocomplétion avec clé API."
+          },
+          "photon": {
+            "description": "Géocodeur OpenStreetMap open source. Utilisez la démo publique ou votre propre serveur Photon."
+          }
         },
         "nominatim_notice_title": "Politique du Nominatim public",
         "nominatim_notice": "Le service public autorise au maximum une requête par seconde et interdit strictement l'autocomplétion. La limite s'applique par processus Bonds ; les déploiements répliqués doivent choisir un autre fournisseur.",

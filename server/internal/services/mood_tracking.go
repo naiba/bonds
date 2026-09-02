@@ -1,6 +1,8 @@
 package services
 
 import (
+	"errors"
+
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
@@ -15,14 +17,12 @@ func NewMoodTrackingService(db *gorm.DB) *MoodTrackingService {
 }
 
 func (s *MoodTrackingService) Create(vaultID, userID string, req dto.CreateMoodTrackingEventRequest) (*dto.MoodTrackingEventResponse, error) {
-	var parameterCount int64
-	if err := s.db.Model(&models.MoodTrackingParameter{}).
-		Where("id = ? AND vault_id = ?", req.MoodTrackingParameterID, vaultID).
-		Count(&parameterCount).Error; err != nil {
+	var parameter models.MoodTrackingParameter
+	if err := s.db.Where("id = ? AND vault_id = ?", req.MoodTrackingParameterID, vaultID).First(&parameter).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrMoodParamNotFound
+		}
 		return nil, err
-	}
-	if parameterCount != 1 {
-		return nil, ErrMoodParamNotFound
 	}
 	event := models.MoodTrackingEvent{
 		VaultID:                 vaultID,
@@ -35,13 +35,16 @@ func (s *MoodTrackingService) Create(vaultID, userID string, req dto.CreateMoodT
 	if err := s.db.Create(&event).Error; err != nil {
 		return nil, err
 	}
+	event.MoodTrackingParameter = parameter
 	resp := toMoodTrackingEventResponse(&event)
 	return &resp, nil
 }
 
 func (s *MoodTrackingService) List(vaultID, userID string) ([]dto.MoodTrackingEventResponse, error) {
 	var events []models.MoodTrackingEvent
-	if err := s.db.Where("vault_id = ? AND user_id = ?", vaultID, userID).Order("rated_at DESC").Find(&events).Error; err != nil {
+	if err := s.db.Where("vault_id = ? AND user_id = ?", vaultID, userID).
+		Preload("MoodTrackingParameter").
+		Order("rated_at DESC").Find(&events).Error; err != nil {
 		return nil, err
 	}
 	result := make([]dto.MoodTrackingEventResponse, len(events))
@@ -57,6 +60,8 @@ func toMoodTrackingEventResponse(e *models.MoodTrackingEvent) dto.MoodTrackingEv
 		VaultID:                 e.VaultID,
 		UserID:                  ptrToStr(e.UserID),
 		MoodTrackingParameterID: e.MoodTrackingParameterID,
+		ParameterLabel:          ptrToStr(e.MoodTrackingParameter.Label),
+		HexColor:                e.MoodTrackingParameter.HexColor,
 		RatedAt:                 e.RatedAt,
 		Note:                    ptrToStr(e.Note),
 		NumberOfHoursSlept:      e.NumberOfHoursSlept,

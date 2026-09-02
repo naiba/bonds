@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   App,
   Alert,
@@ -93,7 +93,13 @@ type ContactLayoutManagerProps = {
 };
 
 function layoutQueryKey(vaultId: string, templateId: number) {
-  return ["vaults", vaultId, "contact-layout", "templates", templateId] as const;
+  return [
+    "vaults",
+    vaultId,
+    "contact-layout",
+    "templates",
+    templateId,
+  ] as const;
 }
 
 function templatesQueryKey(vaultId: string) {
@@ -126,7 +132,8 @@ export default function ContactLayoutManager({
 
   const activeTemplateId =
     selectedTemplateId ??
-    (initialTemplateId && templates.some((item) => item.id === initialTemplateId)
+    (initialTemplateId &&
+    templates.some((item) => item.id === initialTemplateId)
       ? initialTemplateId
       : templates.find((item) => item.is_default)?.id) ??
     templates[0]?.id;
@@ -155,7 +162,9 @@ export default function ContactLayoutManager({
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: templatesQueryKey(vaultId) }),
       queryClient.invalidateQueries({ queryKey: ["vaults", vaultId] }),
-      queryClient.invalidateQueries({ queryKey: ["vaults", vaultId, "contacts"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["vaults", vaultId, "contacts"],
+      }),
     ]);
   };
 
@@ -266,10 +275,7 @@ export default function ContactLayoutManager({
             onTemplateChange?.(templateId);
           }}
         />
-        <Button
-          icon={<CopyOutlined />}
-          onClick={() => setCreateOpen(true)}
-        >
+        <Button icon={<CopyOutlined />} onClick={() => setCreateOpen(true)}>
           {t("contact.layout.duplicate")}
         </Button>
         <Button
@@ -348,9 +354,7 @@ export default function ContactLayoutManager({
           value={newTemplateName}
           onChange={(event) => setNewTemplateName(event.target.value)}
           placeholder={t("contact.layout.template_name")}
-          onPressEnter={() =>
-            newTemplateName.trim() && createMutation.mutate()
-          }
+          onPressEnter={() => newTemplateName.trim() && createMutation.mutate()}
         />
       </Modal>
 
@@ -390,13 +394,17 @@ function LayoutDraftEditor({
   );
   const [newPageOpen, setNewPageOpen] = useState(false);
   const [newPageName, setNewPageName] = useState("");
+  const nextNewPageKey = useRef(0);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const assignedKeys = useMemo(
-    () => new Set(pages.flatMap((page) => page.modules.map((item) => item.key))),
+    () =>
+      new Set(pages.flatMap((page) => page.modules.map((item) => item.key))),
     [pages],
   );
 
@@ -450,7 +458,9 @@ function LayoutDraftEditor({
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over || active.id === over.id) return;
     setPages((current) => {
-      const oldIndex = current.findIndex((page) => page.clientKey === active.id);
+      const oldIndex = current.findIndex(
+        (page) => page.clientKey === active.id,
+      );
       const newIndex = current.findIndex((page) => page.clientKey === over.id);
       return oldIndex < 0 || newIndex < 0
         ? current
@@ -475,7 +485,7 @@ function LayoutDraftEditor({
     setPages((current) => [
       ...current,
       {
-        clientKey: `new-${crypto.randomUUID()}`,
+        clientKey: `new-${nextNewPageKey.current++}`,
         name: newPageName.trim(),
         slug,
         type: "",
@@ -521,7 +531,10 @@ function LayoutDraftEditor({
                     ...item,
                     modules: [...item.modules],
                   }));
-                  const [module] = next[pageIndex]!.modules.splice(moduleIndex, 1);
+                  const [module] = next[pageIndex]!.modules.splice(
+                    moduleIndex,
+                    1,
+                  );
                   if (module) next[targetPageIndex]!.modules.push(module);
                   return next;
                 });
@@ -597,8 +610,14 @@ function SortablePage({
   onMoveModule: (moduleIndex: number, targetPageIndex: number) => void;
 }) {
   const { t } = useTranslation();
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: page.clientKey });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: page.clientKey });
   const [moduleToAdd, setModuleToAdd] = useState<string | null>(null);
 
   return (
@@ -760,7 +779,10 @@ function SortablePage({
               onChange({
                 modules: [
                   ...page.modules,
-                  { key: definition.key, name: definition.name ?? definition.key },
+                  {
+                    key: definition.key,
+                    name: definition.name ?? definition.key,
+                  },
                 ],
               });
               setModuleToAdd(null);

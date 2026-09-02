@@ -38,6 +38,7 @@ type PostSectionInput struct {
 type PostResponse struct {
 	ID            uint                  `json:"id" example:"1"`
 	JournalID     uint                  `json:"journal_id" example:"1"`
+	SliceOfLifeID *uint                 `json:"slice_of_life_id" example:"2"`
 	Title         string                `json:"title" example:"A Wonderful Day"`
 	Published     bool                  `json:"published" example:"true"`
 	WrittenAt     time.Time             `json:"written_at" example:"2026-01-15T10:30:00Z"`

@@ -10,6 +10,7 @@ import {
   App,
   Tag,
   Empty,
+  Modal,
   theme,
 } from "antd";
 import { PlusOutlined, DeleteOutlined, EditOutlined } from "@ant-design/icons";
@@ -46,7 +47,11 @@ export default function ContactInfoModule({
   });
 
   const typeOptions = useMemo(
-    () => infoTypes.map((it) => ({ value: it.id!, label: it.name || it.label || "" })),
+    () =>
+      infoTypes.map((it) => ({
+        value: it.id!,
+        label: it.name || it.label || "",
+      })),
     [infoTypes],
   );
 
@@ -61,7 +66,10 @@ export default function ContactInfoModule({
   const { data: items = [], isLoading } = useQuery({
     queryKey: qk,
     queryFn: async () => {
-      const res = await api.contactInformation.contactsContactInformationList(String(vaultId), String(contactId));
+      const res = await api.contactInformation.contactsContactInformationList(
+        String(vaultId),
+        String(contactId),
+      );
       return res.data ?? [];
     },
   });
@@ -70,20 +78,38 @@ export default function ContactInfoModule({
     mutationFn: () => {
       const payload = { data: value, kind: label, type_id: typeId! };
       if (editingId) {
-        return api.contactInformation.contactsContactInformationUpdate(String(vaultId), String(contactId), editingId, payload);
+        return api.contactInformation.contactsContactInformationUpdate(
+          String(vaultId),
+          String(contactId),
+          editingId,
+          payload,
+        );
       }
-      return api.contactInformation.contactsContactInformationCreate(String(vaultId), String(contactId), payload);
+      return api.contactInformation.contactsContactInformationCreate(
+        String(vaultId),
+        String(contactId),
+        payload,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       resetForm();
-      message.success(editingId ? t("modules.contact_info.updated") : t("modules.contact_info.added"));
+      message.success(
+        editingId
+          ? t("modules.contact_info.updated")
+          : t("modules.contact_info.added"),
+      );
     },
     onError: (e: APIError) => message.error(e.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.contactInformation.contactsContactInformationDelete(String(vaultId), String(contactId), id),
+    mutationFn: (id: number) =>
+      api.contactInformation.contactsContactInformationDelete(
+        String(vaultId),
+        String(contactId),
+        id,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.contact_info.deleted"));
@@ -111,84 +137,73 @@ export default function ContactInfoModule({
 
   return (
     <Card
-      title={<span style={{ fontWeight: 500 }}>{t("modules.contact_info.title")}</span>}
+      title={
+        <span style={{ fontWeight: 500 }}>
+          {t("modules.contact_info.title")}
+        </span>
+      }
       styles={{
         header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
-        body: { padding: '16px 24px' },
+        body: { padding: "16px 24px" },
       }}
       extra={
         !showForm && (
-          <Button type="text" icon={<PlusOutlined />} onClick={() => setAdding(true)} style={{ color: token.colorPrimary }}>
+          <Button
+            type="text"
+            icon={<PlusOutlined />}
+            onClick={() => setAdding(true)}
+            style={{ color: token.colorPrimary }}
+          >
             {t("modules.contact_info.add")}
           </Button>
         )
       }
     >
-      {showForm && (
-        <div style={{
-          marginBottom: 16,
-          padding: 16,
-          background: token.colorFillQuaternary,
-          borderRadius: token.borderRadius,
-        }}>
-          <Space orientation="vertical" style={{ width: "100%" }}>
-            <Select
-              value={typeId}
-              onChange={(v) => setTypeId(v)}
-              options={typeOptions}
-              placeholder={t("common.type")}
-              style={{ width: "100%" }}
-              showSearch
-              optionFilterProp="label"
-            />
-            <Input
-              placeholder={t("modules.contact_info.label_placeholder")}
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-            <Input
-              placeholder={t("modules.contact_info.value_placeholder")}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-            />
-            <Space>
-              <Button
-                type="primary"
-                onClick={() => saveMutation.mutate()}
-                loading={saveMutation.isPending}
-                disabled={!value.trim() || typeId == null}
-                size="small"
-              >
-                {editingId ? t("common.update") : t("common.save")}
-              </Button>
-              <Button onClick={resetForm} size="small">{t("common.cancel")}</Button>
-            </Space>
-          </Space>
-        </div>
-      )}
-
       <List
         loading={isLoading}
         dataSource={items}
-        locale={{ emptyText: <Empty description={t("modules.contact_info.no_info")} /> }}
+        locale={{
+          emptyText: <Empty description={t("modules.contact_info.no_info")} />,
+        }}
         split={false}
         renderItem={(item: ContactInfo) => {
-          const typeLabel = (item.type_id != null && typeMap.get(item.type_id)) || "";
-          const labelText = item.kind && item.kind.trim() ? item.kind : typeLabel;
+          const typeLabel =
+            (item.type_id != null && typeMap.get(item.type_id)) || "";
+          const labelText =
+            item.kind && item.kind.trim() ? item.kind : typeLabel;
           return (
             <List.Item
               style={{
                 borderRadius: token.borderRadius,
-                padding: '10px 12px',
+                padding: "10px 12px",
                 marginBottom: 4,
-                transition: 'background 0.2s',
+                transition: "background 0.2s",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = token.colorFillQuaternary; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = token.colorFillQuaternary;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
               actions={[
-                <Button key="e" type="text" size="small" icon={<EditOutlined />} onClick={() => startEdit(item)} />,
-                <Popconfirm key="d" title={t("modules.contact_info.delete_confirm")} onConfirm={() => deleteMutation.mutate(item.id!)}>
-                  <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                <Button
+                  key="e"
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => startEdit(item)}
+                />,
+                <Popconfirm
+                  key="d"
+                  title={t("modules.contact_info.delete_confirm")}
+                  onConfirm={() => deleteMutation.mutate(item.id!)}
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                  />
                 </Popconfirm>,
               ]}
             >
@@ -208,6 +223,43 @@ export default function ContactInfoModule({
           );
         }}
       />
+      <Modal
+        title={
+          editingId
+            ? t("modules.contact_info.modal_edit")
+            : t("modules.contact_info.modal_add")
+        }
+        open={showForm}
+        onCancel={resetForm}
+        onOk={() => saveMutation.mutate()}
+        okText={editingId ? t("common.update") : t("common.save")}
+        cancelText={t("common.cancel")}
+        confirmLoading={saveMutation.isPending}
+        okButtonProps={{ disabled: !value.trim() || typeId == null }}
+        destroyOnHidden
+      >
+        <Space orientation="vertical" style={{ width: "100%" }}>
+          <Select
+            value={typeId}
+            onChange={(v) => setTypeId(v)}
+            options={typeOptions}
+            placeholder={t("common.type")}
+            style={{ width: "100%" }}
+            showSearch
+            optionFilterProp="label"
+          />
+          <Input
+            placeholder={t("modules.contact_info.label_placeholder")}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <Input
+            placeholder={t("modules.contact_info.value_placeholder")}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </Space>
+      </Modal>
     </Card>
   );
 }

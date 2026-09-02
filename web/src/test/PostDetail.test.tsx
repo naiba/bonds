@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
 import PostDetail from "@/pages/vault/PostDetail";
+import { api } from "@/api";
 
 const CONTACT_ID = "550e8400-e29b-41d4-a716-446655440000";
 const mockUpdatePost = vi.fn().mockResolvedValue({ data: { id: 1 } });
@@ -236,6 +237,51 @@ function mockLoadedPostQueries(
   );
 }
 
+function mockLoadedPostMetadataQueries() {
+  mockUseQuery.mockImplementation(
+    (opts: { readonly queryKey?: readonly unknown[] }) => {
+      const key = Array.isArray(opts.queryKey) ? opts.queryKey : [];
+      if (
+        key.includes("posts") &&
+        !key.includes("tags") &&
+        !key.includes("photos") &&
+        !key.includes("metrics")
+      ) {
+        return {
+          data: {
+            id: 1,
+            title: "My Test Post",
+            written_at: "2025-06-15",
+            slice_of_life_id: 7,
+            contacts: [],
+            sections: [],
+          },
+          isLoading: false,
+        };
+      }
+      if (key.includes("slices")) {
+        return { data: [{ id: 7, name: "Summer trip" }], isLoading: false };
+      }
+      if (key.includes("metrics") && key.includes("posts")) {
+        return {
+          data: [{ id: 30, journal_metric_id: 20, value: 50 }],
+          isLoading: false,
+        };
+      }
+      if (key.includes("metrics")) {
+        return { data: [{ id: 20, label: "Happiness" }], isLoading: false };
+      }
+      if (key[0] === "settings") {
+        return {
+          data: { name_order: "%first_name% %last_name%" },
+          isLoading: false,
+        };
+      }
+      return { data: [], isLoading: false };
+    },
+  );
+}
+
 describe("PostDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -354,4 +400,29 @@ describe("PostDetail", () => {
     expect(newerDraftTitle).toBeVisible();
     expect(newerDraftTitle).toHaveValue("Title B");
   }, 10_000);
+
+  it("shows the slice of life already linked to the post", () => {
+    mockLoadedPostMetadataQueries();
+    renderPostDetail();
+
+    expect(screen.getByText("Summer trip")).toBeInTheDocument();
+  });
+
+  it("removes a post metric when its input is cleared", async () => {
+    mockLoadedPostMetadataQueries();
+    renderPostDetail();
+
+    fireEvent.change(screen.getByRole("spinbutton"), {
+      target: { value: "" },
+    });
+
+    await waitFor(() => {
+      expect(api.postMetrics.journalsPostsMetricsDelete).toHaveBeenCalledWith(
+        "v1",
+        1,
+        1,
+        30,
+      );
+    });
+  });
 });

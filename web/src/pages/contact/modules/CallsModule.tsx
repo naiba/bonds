@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Card,
   List,
@@ -28,7 +28,13 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { Call, PaginationMeta, APIError } from "@/api";
+import type {
+  APIError,
+  Call,
+  CallReason,
+  PaginationMeta,
+  PersonalizeItem,
+} from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDateTime } from "@/utils/dateFormat";
 import dayjs from "dayjs";
@@ -58,6 +64,7 @@ type CallFormValues = {
   readonly duration?: number;
   readonly type: string;
   readonly description?: string;
+  readonly call_reason_id?: number;
 };
 
 type CallSaveMutationOperation =
@@ -117,6 +124,44 @@ export default function CallsModule({
     { value: "outgoing", label: t("modules.calls.type_outgoing") },
     { value: "missed", label: t("modules.calls.type_missed") },
   ];
+
+  const { data: callReasonGroups = [], isLoading: callReasonsLoading } =
+    useQuery({
+      queryKey: ["personalize", "call-reasons", "call-options"],
+      queryFn: async () => {
+        const typesResponse =
+          await api.personalize.personalizeDetail("call-reasons");
+        const types = (typesResponse.data ?? []) as PersonalizeItem[];
+        return Promise.all(
+          types.flatMap((type) =>
+            type.id == null
+              ? []
+              : [
+                  api.callReasons
+                    .personalizeCallReasonsReasonsList(type.id)
+                    .then((response) => ({
+                      label: type.name || type.label || "",
+                      options: ((response.data ?? []) as CallReason[]).flatMap(
+                        (reason) =>
+                          reason.id == null
+                            ? []
+                            : [{ value: reason.id, label: reason.label || "" }],
+                      ),
+                    })),
+                ],
+          ),
+        );
+      },
+    });
+  const callReasonLabels = useMemo(
+    () =>
+      new Map(
+        callReasonGroups.flatMap((group) =>
+          group.options.map((option) => [option.value, option.label] as const),
+        ),
+      ),
+    [callReasonGroups],
+  );
 
   const {
     data: callsQueryResult,
@@ -200,6 +245,7 @@ export default function CallsModule({
         duration: values.duration,
         type: values.type,
         description: values.description,
+        call_reason_id: values.call_reason_id,
         who_initiated: values.type === "outgoing" ? "me" : "contact",
       };
 
@@ -385,6 +431,10 @@ export default function CallsModule({
               description={
                 <span style={{ color: token.colorTextTertiary }}>
                   {c.duration != null && <span>{c.duration} min · </span>}
+                  {c.call_reason_id != null &&
+                    callReasonLabels.has(c.call_reason_id) && (
+                      <Tag>{callReasonLabels.get(c.call_reason_id)}</Tag>
+                    )}
                   {c.description}
                 </span>
               }
@@ -445,6 +495,16 @@ export default function CallsModule({
           </Form.Item>
           <Form.Item name="duration" label={t("modules.calls.duration")}>
             <InputNumber min={0} style={{ width: "100%" }} />
+          </Form.Item>
+          <Form.Item
+            name="call_reason_id"
+            label={t("settings.personalize.call_reasons")}
+          >
+            <Select
+              allowClear
+              loading={callReasonsLoading}
+              options={callReasonGroups}
+            />
           </Form.Item>
           <Form.Item name="description" label={t("modules.calls.notes")}>
             <Input.TextArea rows={2} />

@@ -426,6 +426,12 @@ export default function JournalDetail() {
         }}
         bodyStyle={{ padding: 16 }}
       >
+        <Text
+          type="secondary"
+          style={{ display: "block", marginBottom: 12, fontSize: 12 }}
+        >
+          {t("vault.journal_detail.metric_help")}
+        </Text>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {metrics.map((metric: JournalMetricResponse) => (
             <Tag

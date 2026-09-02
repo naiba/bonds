@@ -295,6 +295,7 @@
       "important_dates_overview": "重要日期概览",
       "no_date_data": "暂无日期数据",
       "mood_trends": "心情趋势",
+      "mood_history": "心情历史",
       "no_mood_data": "暂无心情数据",
       "col_country": "国家",
       "col_province": "省份",
@@ -305,6 +306,9 @@
       "col_date": "日期",
       "col_calendar": "历法",
       "col_mood": "情绪",
+      "col_sleep": "睡眠",
+      "col_note": "备注",
+      "hours_value": "{{count}} 小时",
       "contacts_in": "{{location}} 的联系人",
       "map": {
         "title": "他们在哪里",
@@ -405,6 +409,7 @@
     "journal_detail": {
       "back": "返回日记本列表",
       "metrics": "指标",
+      "metric_help": "指标是可以在每篇文章中记录的 0–100 自定义数值，例如幸福感或精力。",
       "add_metric": "添加指标",
       "metric_placeholder": "指标名称（如：幸福感）",
       "no_metrics": "暂无指标",
@@ -481,6 +486,7 @@
       "photo_uploaded": "照片已上传",
       "photo_deleted": "照片已删除",
       "metrics": "指标",
+      "metric_help": "输入 0–100 的数值；清空输入框即可移除此文章中的指标值。",
       "no_metrics": "暂无指标",
       "metric_added": "指标已添加",
       "assign_slice": "关联人生片段",
@@ -840,6 +846,8 @@
     "notes": {
       "title": "笔记",
       "add": "添加",
+      "modal_add": "添加笔记",
+      "modal_edit": "编辑笔记",
       "title_placeholder": "标题",
       "body_placeholder": "写下你的笔记…",
       "no_notes": "暂无笔记",
@@ -963,6 +971,8 @@
     "contact_info": {
       "title": "联系方式",
       "add": "添加",
+      "modal_add": "添加联系方式",
+      "modal_edit": "编辑联系方式",
       "no_info": "暂无联系方式",
       "delete_confirm": "确定删除？",
       "label_placeholder": "标签（如：个人）",
@@ -989,6 +999,8 @@
     "pets": {
       "title": "宠物",
       "add": "添加",
+      "modal_add": "添加宠物",
+      "modal_edit": "编辑宠物",
       "name_placeholder": "名字",
       "category_placeholder": "类别（如：狗、猫）",
       "no_pets": "暂无宠物",
@@ -1033,6 +1045,8 @@
     "gifts": {
       "title": "礼物",
       "add": "添加",
+      "modal_add": "添加礼物",
+      "modal_edit": "编辑礼物",
       "name": "名称",
       "name_placeholder": "礼物名称",
       "occasion": "场合",
@@ -1814,10 +1828,18 @@
         "autocomplete_supported": "支持地址自动补全",
         "autocomplete_unavailable": "仅正向地理编码",
         "providers": {
-          "nominatim": { "description": "OpenStreetMap 的公共 Nominatim 服务，无需 API Key。" },
-          "locationiq": { "description": "基于 OpenStreetMap、使用 API Key 鉴权的托管地理编码服务。" },
-          "geoapify": { "description": "使用 API Key 鉴权的托管地理编码和地址自动补全服务。" },
-          "photon": { "description": "开源 OpenStreetMap 地理编码器，可使用公共演示端点，也可填写自托管 Photon 地址。" }
+          "nominatim": {
+            "description": "OpenStreetMap 的公共 Nominatim 服务，无需 API Key。"
+          },
+          "locationiq": {
+            "description": "基于 OpenStreetMap、使用 API Key 鉴权的托管地理编码服务。"
+          },
+          "geoapify": {
+            "description": "使用 API Key 鉴权的托管地理编码和地址自动补全服务。"
+          },
+          "photon": {
+            "description": "开源 OpenStreetMap 地理编码器，可使用公共演示端点，也可填写自托管 Photon 地址。"
+          }
         },
         "nominatim_notice_title": "公共 Nominatim 使用政策",
         "nominatim_notice": "公共服务最多允许每秒一次请求，并严格禁止自动补全。限速仅在单个 Bonds 进程内生效，因此多副本部署应选用其他服务商。",

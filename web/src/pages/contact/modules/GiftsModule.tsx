@@ -6,6 +6,7 @@ import {
   Empty,
   Input,
   List,
+  Modal,
   Popconfirm,
   Select,
   Space,
@@ -17,7 +18,13 @@ import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/api";
-import type { APIError, CreateGiftRequest, Gift, PersonalizeItem, UpdateGiftRequest } from "@/api";
+import type {
+  APIError,
+  CreateGiftRequest,
+  Gift,
+  PersonalizeItem,
+  UpdateGiftRequest,
+} from "@/api";
 
 type GiftFormState = {
   name: string;
@@ -41,7 +48,9 @@ function personalizeLabel(item: PersonalizeItem): string {
   return item.label || item.name || "";
 }
 
-function buildGiftRequest(form: GiftFormState): CreateGiftRequest | UpdateGiftRequest {
+function buildGiftRequest(
+  form: GiftFormState,
+): CreateGiftRequest | UpdateGiftRequest {
   const request: CreateGiftRequest | UpdateGiftRequest = {
     name: form.name.trim(),
     type: form.type,
@@ -72,12 +81,17 @@ export default function GiftsModule({
   const { data: gifts = [], isLoading } = useQuery<Gift[]>({
     queryKey: qk,
     queryFn: async () => {
-      const res = await api.gifts.contactsGiftsList(String(vaultId), String(contactId));
+      const res = await api.gifts.contactsGiftsList(
+        String(vaultId),
+        String(contactId),
+      );
       return res.data ?? [];
     },
   });
 
-  const { data: occasions = [], isLoading: isOccasionsLoading } = useQuery<PersonalizeItem[]>({
+  const { data: occasions = [], isLoading: isOccasionsLoading } = useQuery<
+    PersonalizeItem[]
+  >({
     queryKey: ["personalize", "gift-occasions"],
     queryFn: async () => {
       const res = await api.personalize.personalizeDetail("gift-occasions");
@@ -85,7 +99,9 @@ export default function GiftsModule({
     },
   });
 
-  const { data: states = [], isLoading: isStatesLoading } = useQuery<PersonalizeItem[]>({
+  const { data: states = [], isLoading: isStatesLoading } = useQuery<
+    PersonalizeItem[]
+  >({
     queryKey: ["personalize", "gift-states"],
     queryFn: async () => {
       const res = await api.personalize.personalizeDetail("gift-states");
@@ -94,11 +110,17 @@ export default function GiftsModule({
   });
 
   const occasionOptions = useMemo(
-    () => occasions.filter((item) => item.id != null).map((item) => ({ value: item.id!, label: personalizeLabel(item) })),
+    () =>
+      occasions
+        .filter((item) => item.id != null)
+        .map((item) => ({ value: item.id!, label: personalizeLabel(item) })),
     [occasions],
   );
   const stateOptions = useMemo(
-    () => states.filter((item) => item.id != null).map((item) => ({ value: item.id!, label: personalizeLabel(item) })),
+    () =>
+      states
+        .filter((item) => item.id != null)
+        .map((item) => ({ value: item.id!, label: personalizeLabel(item) })),
     [states],
   );
 
@@ -106,20 +128,32 @@ export default function GiftsModule({
     mutationFn: () => {
       const request = buildGiftRequest(form);
       if (editingId) {
-        return api.gifts.contactsGiftsUpdate(String(vaultId), String(contactId), editingId, request);
+        return api.gifts.contactsGiftsUpdate(
+          String(vaultId),
+          String(contactId),
+          editingId,
+          request,
+        );
       }
-      return api.gifts.contactsGiftsCreate(String(vaultId), String(contactId), request);
+      return api.gifts.contactsGiftsCreate(
+        String(vaultId),
+        String(contactId),
+        request,
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       resetForm();
-      message.success(editingId ? t("modules.gifts.updated") : t("modules.gifts.added"));
+      message.success(
+        editingId ? t("modules.gifts.updated") : t("modules.gifts.added"),
+      );
     },
     onError: (err: APIError) => message.error(err.message),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.gifts.contactsGiftsDelete(String(vaultId), String(contactId), id),
+    mutationFn: (id: number) =>
+      api.gifts.contactsGiftsDelete(String(vaultId), String(contactId), id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk });
       message.success(t("modules.gifts.deleted"));
@@ -152,102 +186,39 @@ export default function GiftsModule({
   }
 
   const showForm = adding || editingId !== null;
-  const canSave = !!form.name.trim() && form.giftOccasionId != null && form.giftStateId != null;
+  const canSave =
+    !!form.name.trim() &&
+    form.giftOccasionId != null &&
+    form.giftStateId != null;
 
   return (
     <Card
-      title={<span style={{ fontWeight: 500 }}>{t("modules.gifts.title")}</span>}
+      title={
+        <span style={{ fontWeight: 500 }}>{t("modules.gifts.title")}</span>
+      }
       styles={{
         header: { borderBottom: `1px solid ${token.colorBorderSecondary}` },
         body: { padding: "16px 24px" },
       }}
       extra={
         !showForm && (
-          <Button type="text" icon={<PlusOutlined />} onClick={startAdd} style={{ color: token.colorPrimary }}>
+          <Button
+            type="text"
+            icon={<PlusOutlined />}
+            onClick={startAdd}
+            style={{ color: token.colorPrimary }}
+          >
             {t("modules.gifts.add")}
           </Button>
         )
       }
     >
-      {showForm && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: 16,
-            background: token.colorFillQuaternary,
-            borderRadius: token.borderRadius,
-          }}
-        >
-          <Space direction="vertical" style={{ width: "100%" }}>
-            <Input
-              aria-label={t("modules.gifts.name")}
-              placeholder={t("modules.gifts.name_placeholder")}
-              value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-            />
-            <Select
-              data-testid="gift-occasion-select"
-              aria-label={t("modules.gifts.occasion")}
-              placeholder={t("modules.gifts.occasion_placeholder")}
-              value={form.giftOccasionId}
-              onChange={(value) => setForm((current) => ({ ...current, giftOccasionId: value }))}
-              options={occasionOptions}
-              loading={isOccasionsLoading}
-              showSearch
-              optionFilterProp="label"
-              style={{ width: "100%" }}
-            />
-            <Select
-              data-testid="gift-state-select"
-              aria-label={t("modules.gifts.state")}
-              placeholder={t("modules.gifts.state_placeholder")}
-              value={form.giftStateId}
-              onChange={(value) => setForm((current) => ({ ...current, giftStateId: value }))}
-              options={stateOptions}
-              loading={isStatesLoading}
-              showSearch
-              optionFilterProp="label"
-              style={{ width: "100%" }}
-            />
-            <Select
-              aria-label={t("modules.gifts.type")}
-              value={form.type}
-              onChange={(value) => setForm((current) => ({ ...current, type: value }))}
-              options={[
-                { value: "given", label: t("modules.gifts.type_given") },
-                { value: "received", label: t("modules.gifts.type_received") },
-              ]}
-              style={{ width: "100%" }}
-            />
-            <Input.TextArea
-              aria-label={t("common.description")}
-              placeholder={t("modules.gifts.description_placeholder")}
-              rows={2}
-              value={form.description}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-            />
-            <Space>
-              <Button
-                type="primary"
-                onClick={() => saveMutation.mutate()}
-                loading={saveMutation.isPending}
-                disabled={!canSave}
-                size="small"
-              >
-                {editingId ? t("common.update") : t("common.save")}
-              </Button>
-              <Button onClick={resetForm} size="small">
-                {t("common.cancel")}
-              </Button>
-            </Space>
-          </Space>
-        </div>
-      )}
-
       <List
         loading={isLoading}
         dataSource={gifts}
-        locale={{ emptyText: <Empty description={t("modules.gifts.no_gifts")} /> }}
+        locale={{
+          emptyText: <Empty description={t("modules.gifts.no_gifts")} />,
+        }}
         split={false}
         renderItem={(gift) => (
           <List.Item
@@ -290,14 +261,26 @@ export default function GiftsModule({
             <List.Item.Meta
               title={<span style={{ fontWeight: 500 }}>{gift.name}</span>}
               description={
-                <Space direction="vertical" size={4}>
+                <Space orientation="vertical" size={4}>
                   <Space size={4} wrap>
-                    {gift.gift_occasion_label && <Tag color="blue">{gift.gift_occasion_label}</Tag>}
-                    {gift.gift_state_label && <Tag color="green">{gift.gift_state_label}</Tag>}
-                    {gift.type && <Tag>{t(`modules.gifts.type_${gift.type}`, { defaultValue: gift.type })}</Tag>}
+                    {gift.gift_occasion_label && (
+                      <Tag color="blue">{gift.gift_occasion_label}</Tag>
+                    )}
+                    {gift.gift_state_label && (
+                      <Tag color="green">{gift.gift_state_label}</Tag>
+                    )}
+                    {gift.type && (
+                      <Tag>
+                        {t(`modules.gifts.type_${gift.type}`, {
+                          defaultValue: gift.type,
+                        })}
+                      </Tag>
+                    )}
                   </Space>
                   {gift.description && (
-                    <Typography.Text type="secondary">{gift.description}</Typography.Text>
+                    <Typography.Text type="secondary">
+                      {gift.description}
+                    </Typography.Text>
                   )}
                 </Space>
               }
@@ -305,6 +288,85 @@ export default function GiftsModule({
           </List.Item>
         )}
       />
+
+      <Modal
+        title={
+          editingId
+            ? t("modules.gifts.modal_edit")
+            : t("modules.gifts.modal_add")
+        }
+        open={showForm}
+        onCancel={resetForm}
+        onOk={() => saveMutation.mutate()}
+        okText={editingId ? t("common.update") : t("common.save")}
+        cancelText={t("common.cancel")}
+        confirmLoading={saveMutation.isPending}
+        okButtonProps={{ disabled: !canSave }}
+        destroyOnHidden
+      >
+        <Space orientation="vertical" style={{ width: "100%" }}>
+          <Input
+            aria-label={t("modules.gifts.name")}
+            placeholder={t("modules.gifts.name_placeholder")}
+            value={form.name}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, name: event.target.value }))
+            }
+          />
+          <Select
+            data-testid="gift-occasion-select"
+            aria-label={t("modules.gifts.occasion")}
+            placeholder={t("modules.gifts.occasion_placeholder")}
+            value={form.giftOccasionId}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, giftOccasionId: value }))
+            }
+            options={occasionOptions}
+            loading={isOccasionsLoading}
+            showSearch
+            optionFilterProp="label"
+            style={{ width: "100%" }}
+          />
+          <Select
+            data-testid="gift-state-select"
+            aria-label={t("modules.gifts.state")}
+            placeholder={t("modules.gifts.state_placeholder")}
+            value={form.giftStateId}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, giftStateId: value }))
+            }
+            options={stateOptions}
+            loading={isStatesLoading}
+            showSearch
+            optionFilterProp="label"
+            style={{ width: "100%" }}
+          />
+          <Select
+            aria-label={t("modules.gifts.type")}
+            value={form.type}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, type: value }))
+            }
+            options={[
+              { value: "given", label: t("modules.gifts.type_given") },
+              { value: "received", label: t("modules.gifts.type_received") },
+            ]}
+            style={{ width: "100%" }}
+          />
+          <Input.TextArea
+            aria-label={t("common.description")}
+            placeholder={t("modules.gifts.description_placeholder")}
+            rows={2}
+            value={form.description}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                description: event.target.value,
+              }))
+            }
+          />
+        </Space>
+      </Modal>
     </Card>
   );
 }

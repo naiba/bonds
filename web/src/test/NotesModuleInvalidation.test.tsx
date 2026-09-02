@@ -252,7 +252,7 @@ describe("NotesModule Feed invalidation", () => {
     await waitFor(() =>
       expect(appMessageMock.success).toHaveBeenCalledWith("Note added"),
     );
-    expect(screen.queryByDisplayValue("Created note")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add/i })).toBeInTheDocument();
   });
 
   it("invalidates only the notes and Feed scopes before resetting update UI", async () => {
@@ -286,7 +286,7 @@ describe("NotesModule Feed invalidation", () => {
     await waitFor(() =>
       expect(appMessageMock.success).toHaveBeenCalledWith("Note updated"),
     );
-    expect(screen.queryByDisplayValue("Existing note")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add/i })).toBeInTheDocument();
   });
 
   it("invalidates only the notes and Feed scopes before showing delete success", async () => {

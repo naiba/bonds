@@ -252,7 +252,9 @@ export default function VaultDetail() {
           marginBottom: 20,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
+        >
           <Title
             level={4}
             ellipsis={{ rows: 1, tooltip: vault.name }}
@@ -1183,6 +1185,7 @@ function MetricBarChart({
 
 // ─── Mood Recording Widget ───────────────────────────────────────
 function MoodRecordingWidget({ vaultId }: { vaultId: string }) {
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { token } = theme.useToken();
   const { message } = App.useApp();
@@ -1388,6 +1391,15 @@ function MoodRecordingWidget({ vaultId }: { vaultId: string }) {
           </Button>
         </div>
       )}
+      <Button
+        type="link"
+        size="small"
+        block
+        style={{ marginTop: 8 }}
+        onClick={() => navigate(`/vaults/${vaultId}/reports`)}
+      >
+        {t("vault.dashboard.mood_view_history")}
+      </Button>
     </div>
   );
 }

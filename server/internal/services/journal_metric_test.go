@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -76,6 +77,52 @@ func TestDeleteJournalMetric(t *testing.T) {
 	metrics, _ := svc.List(journalID, vaultID)
 	if len(metrics) != 0 {
 		t.Errorf("Expected 0 metrics after delete, got %d", len(metrics))
+	}
+}
+
+func TestDeleteJournalMetricRemovesPostValues(t *testing.T) {
+	db := testutil.SetupTestDBWithFKConstraints(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test", LastName: "User",
+		Email: "jm-delete-referenced@example.com", Password: "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	journal, err := NewJournalService(db).Create(vault.ID, dto.CreateJournalRequest{Name: "Test Journal"})
+	if err != nil {
+		t.Fatalf("CreateJournal failed: %v", err)
+	}
+	post, err := NewPostService(db).Create(journal.ID, vault.ID, dto.CreatePostRequest{Title: "Test Post", WrittenAt: time.Now()})
+	if err != nil {
+		t.Fatalf("Create post failed: %v", err)
+	}
+	metricSvc := NewJournalMetricService(db)
+	metric, err := metricSvc.Create(journal.ID, vault.ID, dto.CreateJournalMetricRequest{Label: "Mood"})
+	if err != nil {
+		t.Fatalf("Create metric failed: %v", err)
+	}
+	if _, err := NewPostMetricService(db).Create(post.ID, journal.ID, dto.CreatePostMetricRequest{JournalMetricID: metric.ID, Value: 8}); err != nil {
+		t.Fatalf("Create post metric failed: %v", err)
+	}
+
+	if err := metricSvc.Delete(metric.ID, journal.ID, vault.ID); err != nil {
+		t.Fatalf("Delete referenced metric failed: %v", err)
+	}
+	var remaining int64
+	if err := db.Model(&models.PostMetric{}).Where("journal_metric_id = ?", metric.ID).Count(&remaining).Error; err != nil {
+		t.Fatalf("Count post metrics failed: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("Post metric count = %d, want 0", remaining)
 	}
 }
 

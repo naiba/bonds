@@ -2,8 +2,10 @@ package services
 
 import (
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
+	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/testutil"
 )
 
@@ -91,6 +93,53 @@ func TestDeleteSliceOfLife(t *testing.T) {
 	slices, _ := svc.List(journalID, vaultID)
 	if len(slices) != 0 {
 		t.Errorf("Expected 0 slices, got %d", len(slices))
+	}
+}
+
+func TestDeleteSliceOfLifeUnlinksPosts(t *testing.T) {
+	db := testutil.SetupTestDBWithFKConstraints(t)
+	cfg := testutil.TestJWTConfig()
+	authSvc := NewAuthService(db, cfg)
+	vaultSvc := NewVaultService(db)
+
+	resp, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Test", LastName: "User",
+		Email: "slice-delete-referenced@example.com", Password: "password123",
+	}, "en")
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+	vault, err := vaultSvc.CreateVault(resp.User.AccountID, resp.User.ID, dto.CreateVaultRequest{Name: "Test Vault"}, "en")
+	if err != nil {
+		t.Fatalf("CreateVault failed: %v", err)
+	}
+	journal, err := NewJournalService(db).Create(vault.ID, dto.CreateJournalRequest{Name: "Test Journal"})
+	if err != nil {
+		t.Fatalf("CreateJournal failed: %v", err)
+	}
+	postSvc := NewPostService(db)
+	post, err := postSvc.Create(journal.ID, vault.ID, dto.CreatePostRequest{Title: "Test Post", WrittenAt: time.Now()})
+	if err != nil {
+		t.Fatalf("Create post failed: %v", err)
+	}
+	sliceSvc := NewSliceOfLifeService(db)
+	slice, err := sliceSvc.Create(journal.ID, vault.ID, dto.CreateSliceOfLifeRequest{Name: "Referenced"})
+	if err != nil {
+		t.Fatalf("Create slice failed: %v", err)
+	}
+	if err := postSvc.SetSliceOfLife(post.ID, journal.ID, vault.ID, slice.ID); err != nil {
+		t.Fatalf("Set slice failed: %v", err)
+	}
+
+	if err := sliceSvc.Delete(slice.ID, journal.ID, vault.ID); err != nil {
+		t.Fatalf("Delete referenced slice failed: %v", err)
+	}
+	var stored models.Post
+	if err := db.First(&stored, post.ID).Error; err != nil {
+		t.Fatalf("Reload post failed: %v", err)
+	}
+	if stored.SliceOfLifeID != nil {
+		t.Fatalf("Post slice_of_life_id = %v, want nil", *stored.SliceOfLifeID)
 	}
 }
 

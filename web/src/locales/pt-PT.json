@@ -295,6 +295,7 @@
       "important_dates_overview": "Resumo de Datas Importantes",
       "no_date_data": "Sem dados de data disponíveis",
       "mood_trends": "Tendências de Humor",
+      "mood_history": "Histórico de humor",
       "no_mood_data": "Sem dados de humor disponíveis",
       "col_country": "País",
       "col_province": "Província",
@@ -305,6 +306,9 @@
       "col_date": "Data",
       "col_calendar": "Calendário",
       "col_mood": "Humor",
+      "col_sleep": "Sono",
+      "col_note": "Nota",
+      "hours_value": "{{count}} h",
       "contacts_in": "Contactos em {{location}}",
       "map": {
         "title": "Onde estão",
@@ -405,6 +409,7 @@
     "journal_detail": {
       "back": "Voltar aos diários",
       "metrics": "Métricas",
+      "metric_help": "As métricas são valores personalizados de 0 a 100 que pode registar em cada publicação, como felicidade ou energia.",
       "add_metric": "Adicionar Métrica",
       "metric_placeholder": "Nome da métrica (ex.: Felicidade)",
       "no_metrics": "Sem métricas",
@@ -481,6 +486,7 @@
       "photo_uploaded": "Foto carregada",
       "photo_deleted": "Foto eliminada",
       "metrics": "Métricas",
+      "metric_help": "Introduza um valor de 0 a 100. Limpe o campo para remover o valor desta publicação.",
       "no_metrics": "Sem métricas",
       "metric_added": "Métrica adicionada",
       "assign_slice": "Atribuir a Momento",
@@ -840,6 +846,8 @@
     "notes": {
       "title": "Notas",
       "add": "Adicionar",
+      "modal_add": "Adicionar nota",
+      "modal_edit": "Editar nota",
       "title_placeholder": "Título",
       "body_placeholder": "Escreva a sua nota…",
       "no_notes": "Ainda sem notas",
@@ -963,6 +971,8 @@
     "contact_info": {
       "title": "Informação de Contacto",
       "add": "Adicionar",
+      "modal_add": "Adicionar informação de contacto",
+      "modal_edit": "Editar informação de contacto",
       "no_info": "Sem informação de contacto",
       "delete_confirm": "Eliminar?",
       "label_placeholder": "Etiqueta (ex.: Pessoal)",
@@ -989,6 +999,8 @@
     "pets": {
       "title": "Animais de Estimação",
       "add": "Adicionar",
+      "modal_add": "Adicionar animal",
+      "modal_edit": "Editar animal",
       "name_placeholder": "Nome",
       "category_placeholder": "Categoria (ex.: Cão, Gato)",
       "no_pets": "Sem animais de estimação",
@@ -1033,6 +1045,8 @@
     "gifts": {
       "title": "Presentes",
       "add": "Adicionar",
+      "modal_add": "Adicionar presente",
+      "modal_edit": "Editar presente",
       "name": "Nome",
       "name_placeholder": "Nome do presente",
       "occasion": "Ocasião",
@@ -1814,17 +1828,28 @@
         "autocomplete_supported": "Preenchimento automático de morada",
         "autocomplete_unavailable": "Apenas geocodificação direta",
         "providers": {
-          "nominatim": { "description": "Serviço Nominatim público do OpenStreetMap. Não requer chave de API." },
-          "locationiq": { "description": "Serviço alojado de geocodificação OpenStreetMap autenticado por chave de API." },
-          "geoapify": { "description": "Serviço alojado de geocodificação e preenchimento automático com chave de API." },
-          "photon": { "description": "Geocodificador OpenStreetMap de código aberto. Use a demonstração pública ou o seu próprio servidor Photon." }
+          "nominatim": {
+            "description": "Serviço Nominatim público do OpenStreetMap. Não requer chave de API."
+          },
+          "locationiq": {
+            "description": "Serviço alojado de geocodificação OpenStreetMap autenticado por chave de API."
+          },
+          "geoapify": {
+            "description": "Serviço alojado de geocodificação e preenchimento automático com chave de API."
+          },
+          "photon": {
+            "description": "Geocodificador OpenStreetMap de código aberto. Use a demonstração pública ou o seu próprio servidor Photon."
+          }
         },
         "nominatim_notice_title": "Política do Nominatim público",
         "nominatim_notice": "O serviço público permite no máximo um pedido por segundo e proíbe estritamente o preenchimento automático. O limite aplica-se por processo Bonds; réplicas devem usar outro fornecedor.",
         "photon_notice_title": "Photon público é uma demonstração de utilização razoável",
         "photon_notice": "O endpoint público não garante disponibilidade. Utilização intensa pode ser limitada ou bloqueada; aloje o Photon para produção.",
         "secret_hint": "*** preserva o segredo existente. Introduza um novo valor para o substituir.",
-        "fields": { "api_key": "Chave de API", "base_url": "URL base do Photon" },
+        "fields": {
+          "api_key": "Chave de API",
+          "base_url": "URL base do Photon"
+        },
         "save_provider": "Guardar fornecedor",
         "reset_confirm": "Repor este fornecedor para os padrões internos? Fornecedores sem padrões ficarão indisponíveis.",
         "reset_provider": "Repor configuração",

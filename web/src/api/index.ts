@@ -442,6 +442,7 @@ export type { GithubComNaibaBondsInternalDtoVaultTaskResponse as VaultTask } fro
 export type { GithubComNaibaBondsInternalDtoCreateVaultTaskRequest as CreateVaultTaskRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoUpdateVaultTaskRequest as UpdateVaultTaskRequest } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoCallResponse as Call } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoCallReasonResponse as CallReason } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoAddressResponse as Address } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoContactInformationResponse as ContactInfo } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoGiftResponse as Gift } from "./generated/data-contracts";
@@ -501,6 +502,7 @@ export type { GithubComNaibaBondsInternalDtoCurrencyResponse as Currency } from 
 export type { GithubComNaibaBondsInternalDtoLabelResponse as LabelResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoImportantDateTypeResponse as ImportantDateTypeResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoMoodTrackingParameterResponse as MoodTrackingParameterResponse } from "./generated/data-contracts";
+export type { GithubComNaibaBondsInternalDtoMoodTrackingEventResponse as MoodTrackingEvent } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoActivityCategoryResponse as ActivityCategoryResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoActivityTypeResponse as ActivityCategoryTypeResponse } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoQuickFactTemplateResponse as QuickFactTemplateResponse } from "./generated/data-contracts";

@@ -212,6 +212,49 @@ test.describe("Vault - Feed, Calendar, Journal and Settings", () => {
     await expect(sliceModal).not.toBeVisible({ timeout: 10000 });
 
     await expect(page.getByText("Summer 2025")).toBeVisible({ timeout: 10000 });
+
+    await createPostInJournal(page, "Summer post");
+    await navigateToPostDetail(page, "Summer post");
+    const sliceCard = page
+      .locator(".ant-card")
+      .filter({ hasText: /link to slice of life/i });
+    await sliceCard.locator(".ant-select").click();
+    const assignResponse = page.waitForResponse(
+      (resp) =>
+        resp.url().endsWith("/slices") &&
+        resp.request().method() === "PUT" &&
+        resp.status() < 400,
+    );
+    await page
+      .locator(".ant-select-dropdown:visible .ant-select-item-option")
+      .filter({ hasText: "Summer 2025" })
+      .click();
+    await assignResponse;
+    await expect(
+      sliceCard.locator('.ant-select-content[title="Summer 2025"]'),
+    ).toBeVisible({
+      timeout: 10000,
+    });
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/journals\/\d+$/, { timeout: 10000 });
+    const linkedSliceCard = page
+      .locator(".ant-card")
+      .filter({ hasText: "Summer 2025" });
+    await linkedSliceCard.locator(".anticon-delete").click();
+    const deleteResponse = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/slices/") && resp.request().method() === "DELETE",
+    );
+    await page
+      .locator(".ant-popconfirm")
+      .getByRole("button", { name: /ok|yes/i })
+      .click();
+    const deleted = await deleteResponse;
+    expect(deleted.status()).toBeLessThan(400);
+    await expect(page.getByText("Summer 2025")).not.toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test("Vault Settings Labels - create a label", async ({ page }) => {
@@ -693,6 +736,16 @@ test.describe("Vault - Feed, Calendar, Journal and Settings", () => {
       "mood has been recorded",
       { timeout: 10000 },
     );
+
+    await page.getByRole("button", { name: "View history" }).click();
+    await expect(page).toHaveURL(/\/reports$/, { timeout: 10000 });
+    await expect(page.getByText("Mood History", { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByText("Feeling great today")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByText("8 h")).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -985,11 +1038,53 @@ test.describe("Journal Metrics", () => {
       .filter({ hasText: "Productivity" });
     await expect(metricTag).toBeVisible({ timeout: 10000 });
 
+    await createPostInJournal(page, "Measured Post");
+    await navigateToPostDetail(page, "Measured Post");
+    const metricRow = page
+      .getByText("Productivity", { exact: true })
+      .locator("xpath=parent::div");
+    const metricValue = metricRow.locator(".ant-input-number-input");
+    await expect(metricValue).toBeVisible({ timeout: 10000 });
+
+    const addValueResponse = page.waitForResponse(
+      (resp) =>
+        resp.url().endsWith("/metrics") &&
+        resp.request().method() === "POST" &&
+        resp.status() < 400,
+    );
+    await metricValue.fill("42");
+    await addValueResponse;
+
+    const clearValueResponse = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/metrics/") &&
+        resp.request().method() === "DELETE" &&
+        resp.status() < 400,
+    );
+    await metricValue.fill("");
+    await clearValueResponse;
+
+    const restoreValueResponse = page.waitForResponse(
+      (resp) =>
+        resp.url().endsWith("/metrics") &&
+        resp.request().method() === "POST" &&
+        resp.status() < 400,
+    );
+    await metricValue.fill("42");
+    await restoreValueResponse;
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/journals\/\d+$/, { timeout: 10000 });
+    const referencedMetricTag = page
+      .locator(".ant-tag")
+      .filter({ hasText: "Productivity" });
+    await expect(referencedMetricTag).toBeVisible({ timeout: 10000 });
+
     const deleteResp = page.waitForResponse(
       (resp) =>
         resp.url().includes("/metrics") && resp.request().method() === "DELETE",
     );
-    await metricTag.locator(".anticon-close").click();
+    await referencedMetricTag.locator(".anticon-close").click();
     await deleteResp;
 
     await expect(

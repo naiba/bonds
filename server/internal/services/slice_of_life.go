@@ -108,14 +108,21 @@ func (s *SliceOfLifeService) Delete(id uint, journalID uint, vaultID string) err
 		}
 		return err
 	}
-	result := s.db.Where("id = ? AND journal_id = ?", id, journalID).Delete(&models.SliceOfLife{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrSliceOfLifeNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var slice models.SliceOfLife
+		if err := tx.Where("id = ? AND journal_id = ?", id, journalID).First(&slice).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrSliceOfLifeNotFound
+			}
+			return err
+		}
+		if err := tx.Model(&models.Post{}).
+			Where("slice_of_life_id = ?", slice.ID).
+			Update("slice_of_life_id", nil).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&slice).Error
+	})
 }
 
 func (s *SliceOfLifeService) UpdateCover(id uint, journalID uint, vaultID string, fileID uint) (*dto.SliceOfLifeResponse, error) {

@@ -388,10 +388,16 @@ export default function PostDetail() {
   };
 
   const handleMetricChange = (metricId: number, value: number | null) => {
-    if (value === null) return;
     const existingMetric = postMetrics?.find(
       (pm: PostMetric) => pm.journal_metric_id === metricId,
     );
+
+    if (value === null) {
+      if (existingMetric?.id != null) {
+        removeMetricMutation.mutate(existingMetric.id);
+      }
+      return;
+    }
 
     if (existingMetric) {
       removeMetricMutation.mutate(existingMetric.id!, {
@@ -789,11 +795,12 @@ export default function PostDetail() {
                 style={{ width: "100%" }}
                 placeholder={t("vault.post_detail.select_slice")}
                 allowClear
+                value={post.slice_of_life_id}
                 loading={
                   assignSliceMutation.isPending || removeSliceMutation.isPending
                 }
                 onChange={(value) => {
-                  if (value) {
+                  if (value != null) {
                     assignSliceMutation.mutate(value);
                   } else {
                     removeSliceMutation.mutate();
@@ -821,6 +828,12 @@ export default function PostDetail() {
                 borderRadius: token.borderRadiusLG,
               }}
             >
+              <Text
+                type="secondary"
+                style={{ display: "block", marginBottom: 12, fontSize: 12 }}
+              >
+                {t("vault.post_detail.metric_help")}
+              </Text>
               {journalMetrics && journalMetrics.length > 0 ? (
                 <Space direction="vertical" style={{ width: "100%" }}>
                   {journalMetrics.map((jm: JournalMetric) => {

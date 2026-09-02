@@ -295,6 +295,7 @@
       "important_dates_overview": "Resumen de fechas importantes",
       "no_date_data": "No hay datos de fechas disponibles",
       "mood_trends": "Tendencias de ánimo",
+      "mood_history": "Historial de ánimo",
       "no_mood_data": "No hay datos de ánimo disponibles",
       "col_country": "País",
       "col_province": "Provincia",
@@ -305,6 +306,9 @@
       "col_date": "Fecha",
       "col_calendar": "Calendario",
       "col_mood": "Ánimo",
+      "col_sleep": "Sueño",
+      "col_note": "Nota",
+      "hours_value": "{{count}} h",
       "contacts_in": "Contactos en {{location}}",
       "map": {
         "title": "Dónde están",
@@ -405,6 +409,7 @@
     "journal_detail": {
       "back": "Volver a los diarios",
       "metrics": "Métricas",
+      "metric_help": "Las métricas son valores personalizados de 0 a 100 que puedes registrar en cada publicación, como felicidad o energía.",
       "add_metric": "Añadir métrica",
       "metric_placeholder": "Nombre de la métrica (ej. Felicidad)",
       "no_metrics": "No hay métricas",
@@ -481,6 +486,7 @@
       "photo_uploaded": "Foto subida",
       "photo_deleted": "Foto eliminada",
       "metrics": "Métricas",
+      "metric_help": "Introduce un valor de 0 a 100. Vacía el campo para eliminar el valor de esta publicación.",
       "no_metrics": "No hay métricas",
       "metric_added": "Métrica añadida",
       "assign_slice": "Asignar a retazo",
@@ -840,6 +846,8 @@
     "notes": {
       "title": "Notas",
       "add": "Añadir",
+      "modal_add": "Añadir nota",
+      "modal_edit": "Editar nota",
       "title_placeholder": "Título",
       "body_placeholder": "Escribe tu nota…",
       "no_notes": "No hay notas aún",
@@ -963,6 +971,8 @@
     "contact_info": {
       "title": "Información de contacto",
       "add": "Añadir",
+      "modal_add": "Añadir información de contacto",
+      "modal_edit": "Editar información de contacto",
       "no_info": "No hay información de contacto",
       "delete_confirm": "¿Eliminar?",
       "label_placeholder": "Etiqueta (ej. Personal)",
@@ -989,6 +999,8 @@
     "pets": {
       "title": "Mascotas",
       "add": "Añadir",
+      "modal_add": "Añadir mascota",
+      "modal_edit": "Editar mascota",
       "name_placeholder": "Nombre",
       "category_placeholder": "Categoría (ej. Perro, Gato)",
       "no_pets": "No hay mascotas",
@@ -1033,6 +1045,8 @@
     "gifts": {
       "title": "Regalos",
       "add": "Añadir",
+      "modal_add": "Añadir regalo",
+      "modal_edit": "Editar regalo",
       "name": "Nombre",
       "name_placeholder": "Nombre del regalo",
       "occasion": "Ocasión",
@@ -1814,10 +1828,18 @@
         "autocomplete_supported": "Autocompletado de direcciones",
         "autocomplete_unavailable": "Solo geocodificación directa",
         "providers": {
-          "nominatim": { "description": "Servicio público Nominatim de OpenStreetMap. No requiere clave API." },
-          "locationiq": { "description": "Servicio alojado de geocodificación OpenStreetMap autenticado con clave API." },
-          "geoapify": { "description": "Servicio alojado de geocodificación y autocompletado con clave API." },
-          "photon": { "description": "Geocodificador OpenStreetMap de código abierto. Use la demo pública o su propio servidor Photon." }
+          "nominatim": {
+            "description": "Servicio público Nominatim de OpenStreetMap. No requiere clave API."
+          },
+          "locationiq": {
+            "description": "Servicio alojado de geocodificación OpenStreetMap autenticado con clave API."
+          },
+          "geoapify": {
+            "description": "Servicio alojado de geocodificación y autocompletado con clave API."
+          },
+          "photon": {
+            "description": "Geocodificador OpenStreetMap de código abierto. Use la demo pública o su propio servidor Photon."
+          }
         },
         "nominatim_notice_title": "Política de uso de Nominatim público",
         "nominatim_notice": "El servicio público permite como máximo una solicitud por segundo y prohíbe estrictamente el autocompletado. El límite se aplica por proceso de Bonds; las réplicas deben usar otro proveedor.",

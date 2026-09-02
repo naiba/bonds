@@ -14,6 +14,8 @@ type MoodTrackingEventResponse struct {
 	VaultID                 string    `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	UserID                  string    `json:"user_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	MoodTrackingParameterID uint      `json:"mood_tracking_parameter_id" example:"1"`
+	ParameterLabel          string    `json:"parameter_label" example:"Awesome"`
+	HexColor                string    `json:"hex_color" example:"#84CC16"`
 	RatedAt                 time.Time `json:"rated_at" example:"2026-01-15T10:30:00Z"`
 	Note                    string    `json:"note" example:"Feeling great after morning run"`
 	NumberOfHoursSlept      *int      `json:"number_of_hours_slept" example:"8"`

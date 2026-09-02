@@ -10,6 +10,7 @@ func toPostResponse(p *models.Post) dto.PostResponse {
 	response := dto.PostResponse{
 		ID:            p.ID,
 		JournalID:     p.JournalID,
+		SliceOfLifeID: p.SliceOfLifeID,
 		Title:         ptrToStr(p.Title),
 		Published:     p.Published,
 		WrittenAt:     p.WrittenAt,

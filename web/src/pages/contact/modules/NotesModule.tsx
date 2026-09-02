@@ -4,7 +4,7 @@ import {
   List,
   Button,
   Input,
-  Space,
+  Modal,
   Popconfirm,
   App,
   Empty,
@@ -290,47 +290,6 @@ export default function NotesModule({
         )
       }
     >
-      {showForm && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: 16,
-            background: token.colorFillQuaternary,
-            borderRadius: token.borderRadius,
-          }}
-        >
-          <Input
-            placeholder={t("modules.notes.title_placeholder")}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{ marginBottom: 8 }}
-          />
-          <MarkdownEditor
-            vaultId={String(vaultId)}
-            contactId={String(contactId)}
-            ariaLabel={t("modules.notes.body_placeholder")}
-            placeholder={t("modules.notes.body_placeholder")}
-            value={body}
-            onChange={setBody}
-            variant="compact"
-          />
-          <Space style={{ marginTop: 12 }}>
-            <Button
-              type="primary"
-              onClick={handleSave}
-              loading={createMutation.isPending || updateMutation.isPending}
-              disabled={!title.trim()}
-              size="small"
-            >
-              {editingId ? t("common.update") : t("common.save")}
-            </Button>
-            <Button onClick={resetForm} size="small">
-              {t("common.cancel")}
-            </Button>
-          </Space>
-        </div>
-      )}
-
       <List
         loading={isLoading}
         dataSource={notes as Note[]}
@@ -424,6 +383,38 @@ export default function NotesModule({
         style={{ marginTop: 12, textAlign: "center" }}
         hideOnSinglePage
       />
+      <Modal
+        title={
+          editingId
+            ? t("modules.notes.modal_edit")
+            : t("modules.notes.modal_add")
+        }
+        open={showForm}
+        onCancel={resetForm}
+        onOk={handleSave}
+        okText={editingId ? t("common.update") : t("common.save")}
+        cancelText={t("common.cancel")}
+        confirmLoading={createMutation.isPending || updateMutation.isPending}
+        okButtonProps={{ disabled: !title.trim() }}
+        width={760}
+        destroyOnHidden
+      >
+        <Input
+          placeholder={t("modules.notes.title_placeholder")}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          style={{ marginBottom: 12 }}
+        />
+        <MarkdownEditor
+          vaultId={String(vaultId)}
+          contactId={String(contactId)}
+          ariaLabel={t("modules.notes.body_placeholder")}
+          placeholder={t("modules.notes.body_placeholder")}
+          value={body}
+          onChange={setBody}
+          variant="compact"
+        />
+      </Modal>
     </Card>
   );
 }

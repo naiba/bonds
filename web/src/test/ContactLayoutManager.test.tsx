@@ -2,7 +2,15 @@ import { App as AntApp, ConfigProvider } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import ContactLayoutManager from "@/components/contact-layout/ContactLayoutManager";
 
 const apiMocks = vi.hoisted(() => ({
@@ -19,14 +27,22 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock("@/api", () => ({
   api: {
     contactLayouts: {
-      contactLayoutTemplatesList: (...args: unknown[]) => apiMocks.list(...args),
-      contactLayoutModulesList: (...args: unknown[]) => apiMocks.modules(...args),
-      contactLayoutTemplatesDetail: (...args: unknown[]) => apiMocks.detail(...args),
-      contactLayoutTemplatesCreate: (...args: unknown[]) => apiMocks.create(...args),
-      contactLayoutTemplatesUpdate: (...args: unknown[]) => apiMocks.update(...args),
-      contactLayoutTemplatesLayoutUpdate: (...args: unknown[]) => apiMocks.save(...args),
-      contactLayoutTemplatesDefaultUpdate: (...args: unknown[]) => apiMocks.setDefault(...args),
-      contactLayoutTemplatesDelete: (...args: unknown[]) => apiMocks.remove(...args),
+      contactLayoutTemplatesList: (...args: unknown[]) =>
+        apiMocks.list(...args),
+      contactLayoutModulesList: (...args: unknown[]) =>
+        apiMocks.modules(...args),
+      contactLayoutTemplatesDetail: (...args: unknown[]) =>
+        apiMocks.detail(...args),
+      contactLayoutTemplatesCreate: (...args: unknown[]) =>
+        apiMocks.create(...args),
+      contactLayoutTemplatesUpdate: (...args: unknown[]) =>
+        apiMocks.update(...args),
+      contactLayoutTemplatesLayoutUpdate: (...args: unknown[]) =>
+        apiMocks.save(...args),
+      contactLayoutTemplatesDefaultUpdate: (...args: unknown[]) =>
+        apiMocks.setDefault(...args),
+      contactLayoutTemplatesDelete: (...args: unknown[]) =>
+        apiMocks.remove(...args),
     },
   },
 }));
@@ -57,7 +73,12 @@ const layout = {
       position: 1,
       visible: true,
       modules: [
-        { id: 22, key: "relationship_network", name: "Relationship network", position: 0 },
+        {
+          id: 22,
+          key: "relationship_network",
+          name: "Relationship network",
+          position: 0,
+        },
       ],
     },
   ],
@@ -97,6 +118,10 @@ beforeEach(() => {
   apiMocks.save.mockResolvedValue({ data: { ...layout, revision: 5 } });
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 function renderManager() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -117,8 +142,12 @@ describe("ContactLayoutManager", () => {
     const user = userEvent.setup();
     renderManager();
 
-    expect(await screen.findByText(/Changes affect 2 contacts/)).toBeInTheDocument();
-    const networkTitle = await screen.findByDisplayValue("Relationship network");
+    expect(
+      await screen.findByText(/Changes affect 2 contacts/),
+    ).toBeInTheDocument();
+    const networkTitle = await screen.findByDisplayValue(
+      "Relationship network",
+    );
     const networkCard = networkTitle.closest(".ant-card");
     expect(networkCard).not.toBeNull();
     await user.click(within(networkCard as HTMLElement).getByRole("switch"));
@@ -129,16 +158,25 @@ describe("ContactLayoutManager", () => {
     expect(vaultId).toBe("vault-1");
     expect(templateId).toBe(1);
     expect(request.expected_revision).toBe(4);
-    expect(request.pages.find((page: { slug: string }) => page.slug === "relationship-network")).toMatchObject({
+    expect(
+      request.pages.find(
+        (page: { slug: string }) => page.slug === "relationship-network",
+      ),
+    ).toMatchObject({
       id: 12,
       visible: false,
       modules: [{ key: "relationship_network" }],
     });
-    const keys = request.pages.flatMap((page: { modules: Array<{ key: string }> }) =>
-      page.modules.map((module) => module.key),
+    const keys = request.pages.flatMap(
+      (page: { modules: Array<{ key: string }> }) =>
+        page.modules.map((module) => module.key),
     );
-    expect(keys.filter((key: string) => key === "relationships")).toHaveLength(1);
-    expect(keys.filter((key: string) => key === "relationship_network")).toHaveLength(1);
+    expect(keys.filter((key: string) => key === "relationships")).toHaveLength(
+      1,
+    );
+    expect(
+      keys.filter((key: string) => key === "relationship_network"),
+    ).toHaveLength(1);
   });
 
   it("resets unsaved shared layout edits locally", async () => {
@@ -148,11 +186,32 @@ describe("ContactLayoutManager", () => {
     const socialName = await screen.findByDisplayValue("Social");
     await user.clear(socialName);
     await user.type(socialName, "Changed for everyone");
-    expect(screen.getByDisplayValue("Changed for everyone")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("Changed for everyone"),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Reset changes/ }));
 
     expect(screen.getByDisplayValue("Social")).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("Changed for everyone")).not.toBeInTheDocument();
+    expect(
+      screen.queryByDisplayValue("Changed for everyone"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("adds a section when randomUUID is unavailable in an insecure context", async () => {
+    vi.stubGlobal("crypto", {});
+    const user = userEvent.setup();
+    renderManager();
+
+    await screen.findByDisplayValue("Social");
+    await user.click(screen.getByRole("button", { name: /Add section/ }));
+    await user.type(screen.getByPlaceholderText("Section name"), "Memories");
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(
+      screen
+        .getAllByRole("textbox", { name: "Section name" })
+        .some((input) => (input as HTMLInputElement).value === "Memories"),
+    ).toBe(true);
   });
 });

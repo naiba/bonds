@@ -53,6 +53,9 @@ func TestCreateMoodTrackingEvent(t *testing.T) {
 	if event.MoodTrackingParameterID != 1 {
 		t.Errorf("Expected mood_tracking_parameter_id 1, got %d", event.MoodTrackingParameterID)
 	}
+	if event.ParameterLabel == "" || event.HexColor == "" {
+		t.Errorf("Expected mood parameter details, got label=%q color=%q", event.ParameterLabel, event.HexColor)
+	}
 	if event.Note != "Feeling great" {
 		t.Errorf("Expected note 'Feeling great', got '%s'", event.Note)
 	}
@@ -91,5 +94,10 @@ func TestListMoodTrackingEvents(t *testing.T) {
 	}
 	if len(events) != 2 {
 		t.Errorf("Expected 2 events, got %d", len(events))
+	}
+	for _, event := range events {
+		if event.ParameterLabel == "" || event.HexColor == "" {
+			t.Errorf("Expected mood parameter details, got label=%q color=%q", event.ParameterLabel, event.HexColor)
+		}
 	}
 }
