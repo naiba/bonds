@@ -247,6 +247,8 @@
   "graph.relationships.step_parent": "beau-parent",
   "graph.relationships.step_child": "beau-fils/belle-fille",
   "graph.relationships.step_sibling": "frère/sœur par alliance",
+  "graph.relationships.parent_in_law": "beau-parent",
+  "graph.relationships.child_in_law": "gendre/belle-fille",
   "graph.relationships.ancestor_generations": "ancêtre ({{count}} générations)",
   "graph.relationships.descendant_generations": "descendant ({{count}} générations)",
   "seed.relationship_types.significant_other": "ma moitié",

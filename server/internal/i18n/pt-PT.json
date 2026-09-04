@@ -247,6 +247,8 @@
   "graph.relationships.step_parent": "padrasto/madrasta",
   "graph.relationships.step_child": "enteado(a)",
   "graph.relationships.step_sibling": "irmão/irmã por afinidade",
+  "graph.relationships.parent_in_law": "sogro(a)",
+  "graph.relationships.child_in_law": "genro/nora",
   "graph.relationships.ancestor_generations": "antepassado ({{count}} gerações)",
   "graph.relationships.descendant_generations": "descendente ({{count}} gerações)",
   "seed.relationship_types.significant_other": "companheiro(a)",

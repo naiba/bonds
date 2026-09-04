@@ -292,6 +292,8 @@
   "graph.relationships.step_parent": "继父母",
   "graph.relationships.step_child": "继子女",
   "graph.relationships.step_sibling": "继兄弟姐妹",
+  "graph.relationships.parent_in_law": "配偶父母",
+  "graph.relationships.child_in_law": "子女配偶",
   "graph.relationships.ancestor_generations": "{{count}} 代祖先",
   "graph.relationships.descendant_generations": "{{count}} 代后代",
   "seed.relationship_types.significant_other": "伴侣",

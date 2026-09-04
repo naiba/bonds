@@ -286,6 +286,8 @@
   "graph.relationships.step_parent": "step-parent",
   "graph.relationships.step_child": "step-child",
   "graph.relationships.step_sibling": "step-sibling",
+  "graph.relationships.parent_in_law": "parent-in-law",
+  "graph.relationships.child_in_law": "child-in-law",
   "graph.relationships.ancestor_generations": "ancestor ({{count}} generations)",
   "graph.relationships.descendant_generations": "descendant ({{count}} generations)",
   "seed.relationship_types.significant_other": "significant other",

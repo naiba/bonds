@@ -253,6 +253,8 @@
   "graph.relationships.step_parent": "padrastro/madrastra",
   "graph.relationships.step_child": "hijastro/a",
   "graph.relationships.step_sibling": "hermanastro/a",
+  "graph.relationships.parent_in_law": "suegro/a",
+  "graph.relationships.child_in_law": "yerno/nuera",
   "graph.relationships.ancestor_generations": "antepasado/a ({{count}} generaciones)",
   "graph.relationships.descendant_generations": "descendiente ({{count}} generaciones)",
   "seed.relationship_types.significant_other": "pareja",

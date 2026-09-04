@@ -286,6 +286,8 @@
   "graph.relationships.step_parent": "Stiefelternteil",
   "graph.relationships.step_child": "Stiefkind",
   "graph.relationships.step_sibling": "Stiefgeschwister",
+  "graph.relationships.parent_in_law": "Schwiegerelternteil",
+  "graph.relationships.child_in_law": "Schwiegerkind",
   "graph.relationships.ancestor_generations": "Vorfahre/Vorfahrin ({{count}} Generationen)",
   "graph.relationships.descendant_generations": "Nachkomme/Nachkommin ({{count}} Generationen)",
   "seed.relationship_types.significant_other": "Partner/in",

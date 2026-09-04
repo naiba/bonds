@@ -167,6 +167,50 @@ func TestContactGraphInfersStepFamilyWithoutMisclassifyingRecordedParents(t *tes
 	}
 }
 
+func TestContactGraphInfersInLawsWithoutMisclassifyingThemAsStepFamily(t *testing.T) {
+	ctx := setupRelationshipTestFull(t)
+	person := ctx.contactID
+	spouse := ctx.relatedContactID
+	spouseParent := createGraphContact(t, ctx, "SpouseParent")
+	parentTypeID := seededGraphRelationshipTypeID(t, ctx, relKeyParent)
+	spouseTypeID := seededGraphRelationshipTypeID(t, ctx, relKeySpouse)
+
+	createGraphRelationship(t, ctx, person, spouse, spouseTypeID)
+	createGraphRelationship(t, ctx, spouseParent, spouse, parentTypeID)
+
+	graph, err := ctx.svc.GetContactGraph(person, ctx.vaultID, ctx.userID, "en")
+	if err != nil {
+		t.Fatalf("GetContactGraph: %v", err)
+	}
+	if graphRelationCount(graph, spouseParent, person, relKindParentInLaw, relKindChildInLaw, true) != 1 {
+		t.Fatal("spouse's parent was not inferred as a parent-in-law")
+	}
+	if graphRelationCount(graph, spouseParent, person, relKindStepParent, relKindStepChild, true) != 0 {
+		t.Fatal("spouse's parent was misclassified as step-family")
+	}
+
+	for _, edge := range graph.Edges {
+		if !((edge.Source == spouseParent && edge.Target == person) || (edge.Source == person && edge.Target == spouseParent)) {
+			continue
+		}
+		for _, relation := range edge.Relations {
+			parentKind, childKind := relation.SourceKind, relation.TargetKind
+			parentLabel, childLabel := relation.SourceLabel, relation.TargetLabel
+			if edge.Source != spouseParent {
+				parentKind, childKind = childKind, parentKind
+				parentLabel, childLabel = childLabel, parentLabel
+			}
+			if parentKind == relKindParentInLaw && childKind == relKindChildInLaw {
+				if parentLabel != "parent-in-law" || childLabel != "child-in-law" {
+					t.Fatalf("in-law labels = %q/%q, want parent-in-law/child-in-law", parentLabel, childLabel)
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("in-law relation labels missing")
+}
+
 func TestContactGraphDoesNotInferStepParentFromNonSpouseRomance(t *testing.T) {
 	ctx := setupRelationshipTestFull(t)
 	child := ctx.contactID

@@ -23,6 +23,8 @@ const (
 	relKindStepParent  = "step_parent"
 	relKindStepChild   = "step_child"
 	relKindStepSibling = "step_sibling"
+	relKindParentInLaw = "parent_in_law"
+	relKindChildInLaw  = "child_in_law"
 	relKindUncleAunt   = "uncle_aunt"
 	relKindNephewNiece = "nephew_niece"
 	relKindCousin      = "cousin"
@@ -287,6 +289,26 @@ func (b *relationshipGraphBuilder) inferFamilyRelationships(reachable contactSet
 					relKindStepParent, relKindStepChild,
 					i18n.T(b.locale, "graph.relationships.step_parent"),
 					i18n.T(b.locale, "graph.relationships.step_child"),
+					1,
+				)
+			}
+		}
+	}
+
+	// A child's spouse is the parent's child-in-law, not their step-child. This
+	// is deliberately separate from the rule above: the spouse of a parent is a
+	// step-parent, while the spouse of a child is an in-law.
+	for parent, children := range b.childrenByParent {
+		for child := range children {
+			for spouse := range b.spouses[child] {
+				if spouse == parent {
+					continue
+				}
+				b.addInferredRelation(
+					parent, spouse,
+					relKindParentInLaw, relKindChildInLaw,
+					i18n.T(b.locale, "graph.relationships.parent_in_law"),
+					i18n.T(b.locale, "graph.relationships.child_in_law"),
 					1,
 				)
 			}
