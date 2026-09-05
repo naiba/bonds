@@ -63,7 +63,7 @@ func TestStripHTML(t *testing.T) {
 		{
 			name:     "simple tags",
 			input:    "<h2>Title</h2><p>Body text</p>",
-			expected: "TitleBody text",
+			expected: "Title\nBody text",
 		},
 		{
 			name:     "nested tags",
@@ -85,6 +85,16 @@ func TestStripHTML(t *testing.T) {
 			input:    `<a href="https://example.com">Link</a>`,
 			expected: "Link",
 		},
+		{
+			name:     "paragraphs and line breaks",
+			input:    `<p>First paragraph</p><p>Second<br>line</p>`,
+			expected: "First paragraph\nSecond\nline",
+		},
+		{
+			name:     "HTML entities",
+			input:    `<p>Alice &amp; Bob</p>`,
+			expected: "Alice & Bob",
+		},
 	}
 
 	for _, tt := range tests {
@@ -94,6 +104,17 @@ func TestStripHTML(t *testing.T) {
 				t.Errorf("stripHTML(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestFormatShoutrrrReminderMessage(t *testing.T) {
+	got := formatShoutrrrMessage(
+		"Reminder: Birthday — John Doe",
+		"<p>You have a <strong>Birthday</strong> reminder for <strong>John Doe</strong> on <strong>2026-09-05</strong>.</p>",
+	)
+	want := "Reminder: Birthday — John Doe\n\nYou have a Birthday reminder for John Doe on 2026-09-05."
+	if got != want {
+		t.Fatalf("formatted Shoutrrr reminder = %q, want %q", got, want)
 	}
 }
 

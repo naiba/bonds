@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"html"
 	"log"
 	"strings"
 
@@ -29,8 +30,7 @@ func (s *ShoutrrrSender) Send(shoutrrrURL, subject, message string) error {
 		return fmt.Errorf("empty shoutrrr URL")
 	}
 
-	plainMsg := stripHTML(message)
-	body := fmt.Sprintf("%s\n\n%s", subject, plainMsg)
+	body := formatShoutrrrMessage(subject, message)
 
 	err := shoutrrr.Send(shoutrrrURL, body)
 	if err != nil {
@@ -39,6 +39,18 @@ func (s *ShoutrrrSender) Send(shoutrrrURL, subject, message string) error {
 		return fmt.Errorf("notification send failed: %w", err)
 	}
 	return nil
+}
+
+func formatShoutrrrMessage(subject, message string) string {
+	subject = strings.TrimSpace(subject)
+	plainMessage := stripHTML(message)
+	if subject == "" {
+		return plainMessage
+	}
+	if plainMessage == "" {
+		return subject
+	}
+	return subject + "\n\n" + plainMessage
 }
 
 // NoopSender is a no-op implementation for testing.
@@ -64,22 +76,50 @@ func truncateURL(u string) string {
 	return u[:30] + "..."
 }
 
-// stripHTML removes HTML tags from a string (simple regex-free approach).
+// stripHTML removes HTML tags while retaining boundaries between block-level
+// elements so adjacent paragraphs and headings do not run together.
 func stripHTML(s string) string {
 	var result strings.Builder
-	inTag := false
-	for _, r := range s {
-		if r == '<' {
-			inTag = true
-			continue
+	for len(s) > 0 {
+		start := strings.IndexByte(s, '<')
+		if start < 0 {
+			result.WriteString(s)
+			break
 		}
-		if r == '>' {
-			inTag = false
-			continue
+		result.WriteString(s[:start])
+		end := strings.IndexByte(s[start:], '>')
+		if end < 0 {
+			result.WriteString(s[start:])
+			break
 		}
-		if !inTag {
-			result.WriteRune(r)
+		tag := s[start+1 : start+end]
+		if isHTMLBlockTag(tag) {
+			result.WriteByte('\n')
+		}
+		s = s[start+end+1:]
+	}
+
+	lines := strings.Split(html.UnescapeString(result.String()), "\n")
+	plainLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			plainLines = append(plainLines, line)
 		}
 	}
-	return result.String()
+	return strings.Join(plainLines, "\n")
+}
+
+func isHTMLBlockTag(tag string) bool {
+	tag = strings.TrimSpace(strings.TrimPrefix(tag, "/"))
+	if tag == "" {
+		return false
+	}
+	name := strings.ToLower(strings.TrimSuffix(strings.Fields(tag)[0], "/"))
+	switch name {
+	case "address", "article", "aside", "blockquote", "br", "div", "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li", "main", "nav", "ol", "p", "pre", "section", "table", "tr", "ul":
+		return true
+	default:
+		return false
+	}
 }

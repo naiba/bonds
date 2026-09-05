@@ -82,18 +82,41 @@ func cleanupLegacyActivityIndexes(tx *gorm.DB) error {
 		}
 		indexes, err := tx.Migrator().GetIndexes(tableName)
 		if err != nil {
-			continue
+			return fmt.Errorf("migrate activities: inspect indexes on %s: %w", tableName, err)
 		}
 		for _, index := range indexes {
 			if !strings.Contains(index.Name(), "life_event") {
 				continue
 			}
-			if err := tx.Migrator().DropIndex(tableName, index.Name()); err != nil {
+			if err := dropLegacyActivityIndex(tx, tableName, index.Name()); err != nil {
 				return fmt.Errorf("migrate activities: drop legacy index %s: %w", index.Name(), err)
 			}
 		}
 	}
 	return nil
+}
+
+// dropLegacyActivityIndex avoids postgres.Migrator.DropIndex when the table
+// does not have an explicitly qualified schema. postgres v1.6.2 renders the
+// fallback schema expression as an identifier prefix, producing invalid SQL:
+//
+//	DROP INDEX CURRENT_SCHEMA()."index_name"
+//
+// Resolve the schema first and quote both catalog-provided identifiers. Keep
+// the regular migrator path for SQLite and any future supported dialects.
+func dropLegacyActivityIndex(tx *gorm.DB, tableName, indexName string) error {
+	if tx.Dialector.Name() != "postgres" {
+		return tx.Migrator().DropIndex(tableName, indexName)
+	}
+
+	var schemaName string
+	if err := tx.Raw("SELECT current_schema()").Scan(&schemaName).Error; err != nil {
+		return fmt.Errorf("resolve current schema: %w", err)
+	}
+	if schemaName == "" {
+		return fmt.Errorf("resolve current schema: empty schema name")
+	}
+	return tx.Exec("DROP INDEX IF EXISTS " + quoteIdentifier(schemaName) + "." + quoteIdentifier(indexName)).Error
 }
 
 func migrateActivityMetadata(tx *gorm.DB) error {
@@ -240,19 +263,9 @@ func migrateLegacyTimelineActivities(tx *gorm.DB) error {
 	if err := tx.Migrator().RenameTable("life_events", oldEvents); err != nil {
 		return fmt.Errorf("rename activities: %w", err)
 	}
-	if indexes, err := tx.Migrator().GetIndexes(oldEvents); err == nil {
-		for _, index := range indexes {
-			_ = tx.Migrator().DropIndex(oldEvents, index.Name())
-		}
-	}
 	if tx.Migrator().HasTable("life_event_participants") {
 		if err := tx.Migrator().RenameTable("life_event_participants", oldParticipants); err != nil {
 			return fmt.Errorf("rename participants: %w", err)
-		}
-		if indexes, err := tx.Migrator().GetIndexes(oldParticipants); err == nil {
-			for _, index := range indexes {
-				_ = tx.Migrator().DropIndex(oldParticipants, index.Name())
-			}
 		}
 	}
 	if err := tx.Migrator().CreateTable(&models.Activity{}); err != nil {

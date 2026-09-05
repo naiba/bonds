@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -207,8 +208,14 @@ func TestProcessDueReminders_OneDueReminder(t *testing.T) {
 	if ctx.mailer.calls[0].To != "scheduler-test@example.com" {
 		t.Errorf("expected to='scheduler-test@example.com', got '%s'", ctx.mailer.calls[0].To)
 	}
-	if ctx.mailer.calls[0].Subject != "Reminder: Test Reminder" {
-		t.Errorf("expected subject='Reminder: Test Reminder', got '%s'", ctx.mailer.calls[0].Subject)
+	if ctx.mailer.calls[0].Subject != "Reminder: Test Reminder — John Doe" {
+		t.Errorf("expected subject to identify the reminder and contact, got %q", ctx.mailer.calls[0].Subject)
+	}
+	if strings.Contains(ctx.mailer.calls[0].Body, "<h2>") || strings.Count(ctx.mailer.calls[0].Body, "Test Reminder") != 1 {
+		t.Errorf("expected one reminder label and no repeated heading in body, got %q", ctx.mailer.calls[0].Body)
+	}
+	if !strings.Contains(ctx.mailer.calls[0].Body, "John Doe") {
+		t.Errorf("expected contact name in reminder body, got %q", ctx.mailer.calls[0].Body)
 	}
 
 	// Verify TriggeredAt is set
@@ -228,8 +235,8 @@ func TestProcessDueReminders_OneDueReminder(t *testing.T) {
 	if sent.Error != nil {
 		t.Errorf("expected no error on sent notification, got '%s'", *sent.Error)
 	}
-	if sent.SubjectLine != "Reminder: Test Reminder" {
-		t.Errorf("expected subject_line='Reminder: Test Reminder', got '%s'", sent.SubjectLine)
+	if sent.SubjectLine != "Reminder: Test Reminder — John Doe" {
+		t.Errorf("expected persisted subject line to identify the contact, got %q", sent.SubjectLine)
 	}
 
 	// Verify ContactReminder.NumberTimesTriggered incremented

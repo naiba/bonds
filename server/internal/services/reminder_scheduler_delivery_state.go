@@ -130,8 +130,9 @@ func (s *ReminderSchedulerService) reminderContactName(reminder *models.ContactR
 
 func reminderDeliveryContent(reminder *models.ContactReminder, scheduledAt time.Time, locale string, enableAltCalendar bool, contactName string) (string, string) {
 	date := formatReminderDate(reminder, scheduledAt, enableAltCalendar)
-	subject := i18n.Tt(locale, "reminder.subject", map[string]string{"label": reminder.Label})
-	body := i18n.Tt(locale, "reminder.body", map[string]string{"label": reminder.Label, "contact": contactName, "date": date})
+	params := map[string]string{"label": reminder.Label, "contact": contactName, "date": date}
+	subject := i18n.Tt(locale, "reminder.subject", params)
+	body := i18n.Tt(locale, "reminder.body", params)
 	return subject, body
 }
 
