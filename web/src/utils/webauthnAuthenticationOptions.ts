@@ -1,6 +1,6 @@
 import type {
   AuthenticationExtensionsClientInputs,
-  AuthenticatorTransportFuture,
+  AuthenticatorTransport,
   PublicKeyCredentialDescriptorJSON,
   PublicKeyCredentialHint,
   PublicKeyCredentialRequestOptionsJSON,
@@ -70,14 +70,12 @@ function isOptionalExtensions(
 
 function isAuthenticatorTransport(
   value: unknown,
-): value is AuthenticatorTransportFuture {
+): value is AuthenticatorTransport {
   switch (value) {
     case "ble":
-    case "cable":
     case "hybrid":
     case "internal":
     case "nfc":
-    case "smart-card":
     case "usb":
       return true;
     default:
