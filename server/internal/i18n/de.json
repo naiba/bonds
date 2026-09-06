@@ -68,6 +68,8 @@
   "err.failed_to_create_important_date": "Wichtiger Termin konnte nicht erstellt werden",
   "err.invalid_important_date_id": "Ungültige ID für wichtigen Termin",
   "err.important_date_not_found": "Wichtiger Termin nicht gefunden",
+  "err.invalid_important_date": "Ungültiges wichtiges Datum",
+  "err.important_date_singleton_conflict": "Für diesen Kontakt ist dieses Profildatum bereits vorhanden",
   "err.failed_to_update_important_date": "Wichtiger Termin konnte nicht aktualisiert werden",
   "err.failed_to_delete_important_date": "Wichtiger Termin konnte nicht gelöscht werden",
 

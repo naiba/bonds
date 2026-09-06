@@ -1419,7 +1419,7 @@ describe("ContactDetail", () => {
     expect(mockInvalidateQueries).not.toHaveBeenCalled();
   });
 
-  it("freezes update identity and awaits Contact, Contacts, Feed, and Most Consulted refresh", async () => {
+  it("freezes update identity and awaits all contact projections", async () => {
     const updateRequest =
       createDeferred<Awaited<ReturnType<typeof api.contacts.contactsUpdate>>>();
     const mostConsultedInvalidation = createDeferred<void>();
@@ -1462,7 +1462,7 @@ describe("ContactDetail", () => {
       ),
     );
     updateRequest.resolve({ data: mockContact });
-    await waitFor(() => expect(mockInvalidateQueries).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(mockInvalidateQueries).toHaveBeenCalledTimes(9));
 
     expect(invalidatedQueryFilters()).toEqual([
       { queryKey: ["vaults", SOURCE_VAULT_ID, "contacts", SOURCE_CONTACT_ID] },
@@ -1475,6 +1475,26 @@ describe("ContactDetail", () => {
           "contacts",
           SOURCE_CONTACT_ID,
           "feed",
+        ],
+      },
+      { queryKey: ["vaults", SOURCE_VAULT_ID, "calendar"] },
+      {
+        queryKey: [
+          "vaults",
+          SOURCE_VAULT_ID,
+          "contacts",
+          SOURCE_CONTACT_ID,
+          "important-dates",
+        ],
+      },
+      { queryKey: ["vaults", SOURCE_VAULT_ID, "reminders"] },
+      {
+        queryKey: [
+          "vaults",
+          SOURCE_VAULT_ID,
+          "contacts",
+          SOURCE_CONTACT_ID,
+          "reminders",
         ],
       },
       { queryKey: mostConsultedQueryKey(SOURCE_VAULT_ID), exact: true },

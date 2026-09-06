@@ -32,6 +32,12 @@ import {
   invalidateContactQueries,
   invalidateFeedQueries,
 } from "@/utils/queryInvalidation";
+import ContactImportantDatesEditor from "./ContactImportantDatesEditor";
+import {
+  areImportantDateDraftsValid,
+  buildImportantDateCreates,
+} from "./contactImportantDates";
+import type { ContactImportantDateDraft } from "./contactImportantDates";
 
 const { Title, Text } = Typography;
 
@@ -43,9 +49,11 @@ type ContactCreateFormValues = Omit<
   | "first_met_year"
   | "first_met_month"
   | "first_met_day"
+  | "important_dates"
 > & {
   last_talked_to?: string;
   first_met?: CalendarDatePickerValue;
+  important_dates?: ContactImportantDateDraft[];
 };
 
 type CreateContactMutationOperation = {
@@ -56,10 +64,12 @@ type CreateContactMutationOperation = {
 function buildCreateContactRequest(
   values: ContactCreateFormValues,
 ): CreateContactRequest {
+  const { important_dates: importantDateDrafts, ...contactValues } = values;
   const request: CreateContactRequest = {
-    ...values,
+    ...contactValues,
     last_talked_to: dateInputToTimestamp(values.last_talked_to),
     ...buildContactFirstMetRequest(values.first_met),
+    important_dates: buildImportantDateCreates(importantDateDrafts),
   };
   if (!request.last_talked_to) delete request.last_talked_to;
   if (!request.first_met_at) delete request.first_met_at;
@@ -72,6 +82,7 @@ function buildCreateContactRequest(
     delete request.first_met_through_contact_id;
   if (request.stay_in_touch_frequency_days == null)
     delete request.stay_in_touch_frequency_days;
+  if (request.important_dates?.length === 0) delete request.important_dates;
   return request;
 }
 
@@ -314,6 +325,25 @@ export default function ContactCreate() {
             style={{ marginBottom: 8 }}
           >
             <Checkbox>{t("contact.needs_verification.field_label")}</Checkbox>
+          </Form.Item>
+
+          <Form.Item<ContactCreateFormValues>
+            name="important_dates"
+            style={{ marginBottom: 0 }}
+            rules={[
+              {
+                validator: (_, drafts) =>
+                  areImportantDateDraftsValid(drafts)
+                    ? Promise.resolve()
+                    : Promise.reject(
+                        new Error(
+                          t("modules.important_dates.invalid_profile_dates"),
+                        ),
+                      ),
+              },
+            ]}
+          >
+            <ContactImportantDatesEditor vaultId={vaultId} />
           </Form.Item>
 
           <div

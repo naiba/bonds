@@ -309,6 +309,78 @@ func TestCreateImportantDate_ExplicitLabelOverridesType(t *testing.T) {
 	}
 }
 
+func TestImportantDateSingletonTypesRejectDuplicates(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+	var birthdateType models.ContactImportantDateType
+	if err := ctx.db.Where("vault_id = ? AND internal_type = ?", ctx.vaultID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("find birthdate type: %v", err)
+	}
+	year := 1990
+	first, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Birthdate",
+		DatePrecision:              "year",
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	})
+	if err != nil {
+		t.Fatalf("create first birthdate: %v", err)
+	}
+	_, err = ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Another birthdate",
+		DatePrecision:              "year",
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	})
+	if !errors.Is(err, ErrImportantDateSingletonConflict) {
+		t.Fatalf("expected singleton conflict, got %v", err)
+	}
+	if _, err := ctx.svc.Update(first.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
+		Label:                      "Birthdate",
+		DatePrecision:              "year",
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	}); err != nil {
+		t.Fatalf("updating the existing singleton should succeed: %v", err)
+	}
+
+	// Older installations could already contain duplicates because this rule was
+	// previously enforced only by the UI. Keep those rows editable so users can
+	// correct or delete them without weakening the rule for new assignments.
+	duplicate := models.ContactImportantDate{
+		ContactID:                  ctx.contactID,
+		Label:                      "Legacy duplicate birthdate",
+		DatePrecision:              "year",
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	}
+	if err := ctx.db.Create(&duplicate).Error; err != nil {
+		t.Fatalf("insert legacy duplicate: %v", err)
+	}
+	if _, err := ctx.svc.Update(duplicate.ID, ctx.contactID, ctx.vaultID, dto.UpdateImportantDateRequest{
+		Label:                      "Corrected legacy birthdate",
+		DatePrecision:              "year",
+		Year:                       &year,
+		ContactImportantDateTypeID: &birthdateType.ID,
+	}); err != nil {
+		t.Fatalf("legacy duplicate should remain editable: %v", err)
+	}
+}
+
+func TestImportantDateRejectsUnknownType(t *testing.T) {
+	ctx := setupImportantDateTest(t)
+	unknownTypeID := uint(999999)
+	year := 1990
+	_, err := ctx.svc.Create(ctx.contactID, ctx.vaultID, dto.CreateImportantDateRequest{
+		Label:                      "Unknown",
+		DatePrecision:              "year",
+		Year:                       &year,
+		ContactImportantDateTypeID: &unknownTypeID,
+	})
+	if !errors.Is(err, ErrImportantDateTypeNotFound) {
+		t.Fatalf("expected ErrImportantDateTypeNotFound, got %v", err)
+	}
+}
+
 func TestImportantDate_RemindMe(t *testing.T) {
 	ctx := setupImportantDateTest(t)
 

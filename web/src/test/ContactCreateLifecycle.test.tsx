@@ -46,6 +46,7 @@ vi.mock("@/api", () => ({
     },
     personalize: { personalizeDetail: vi.fn() },
     preferences: { preferencesList: vi.fn() },
+    vaultSettings: { settingsDateTypesList: vi.fn() },
     vaults: { vaultsDetail: vi.fn() },
   },
 }));
@@ -115,6 +116,9 @@ describe("ContactCreate cache lifecycle", () => {
     });
     vi.mocked(api.preferences.preferencesList).mockResolvedValue({
       data: { name_order: "%first_name% %last_name%" },
+    });
+    vi.mocked(api.vaultSettings.settingsDateTypesList).mockResolvedValue({
+      data: [{ id: 1, label: "Birthdate", internal_type: "birthdate" }],
     });
     vi.mocked(api.vaults.vaultsDetail).mockResolvedValue({ data: {} });
   });

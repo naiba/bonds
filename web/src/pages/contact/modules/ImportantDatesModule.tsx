@@ -82,7 +82,7 @@ export default function ImportantDatesModule({
   const canScheduleReminder =
     canScheduleImportantDateReminder(selectedCalendarDate);
 
-  const { data: dates = [], isLoading } = useQuery({
+  const { data: dates = [], isLoading } = useQuery<ImportantDate[]>({
     queryKey: qk,
     queryFn: async () => {
       const res = await api.importantDates.contactsDatesList(
@@ -91,6 +91,22 @@ export default function ImportantDatesModule({
       );
       return res.data ?? [];
     },
+  });
+
+  const selectableDateTypes = dateTypes.filter((dateType) => {
+    if (
+      dateType.internal_type !== "birthdate" &&
+      dateType.internal_type !== "deceased_date"
+    ) {
+      return true;
+    }
+    const editingDate = dates.find((date) => date.id === editingId);
+    if (editingDate?.contact_important_date_type_id === dateType.id) {
+      return true;
+    }
+    return !dates.some(
+      (date) => date.contact_important_date_type_id === dateType.id,
+    );
   });
 
   function openEdit(d: ImportantDate) {
@@ -177,7 +193,7 @@ export default function ImportantDatesModule({
       >
         <ImportantDatesModuleForm
           form={form}
-          dateTypes={dateTypes}
+          dateTypes={selectableDateTypes}
           isLabelRequired={isLabelRequired}
           altCalendar={altCalendar}
           canScheduleReminder={canScheduleReminder}

@@ -151,6 +151,7 @@ func (h *ContactHandler) ListByLabel(c *echo.Context) error {
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts [post]
@@ -179,6 +180,12 @@ func (h *ContactHandler) Create(c *echo.Context) error {
 		}
 		if errors.Is(err, services.ErrContactInvalidFirstMetPrecision) || errors.Is(err, services.ErrContactPromotionNotAllowed) {
 			return response.ValidationError(c, map[string]string{"validation": err.Error()})
+		}
+		if errors.Is(err, services.ErrImportantDateLabelRequired) || errors.Is(err, services.ErrImportantDateInvalidPrecision) || errors.Is(err, services.ErrImportantDateTypeNotFound) {
+			return response.BadRequest(c, "err.invalid_important_date", nil)
+		}
+		if errors.Is(err, services.ErrImportantDateSingletonConflict) {
+			return response.Conflict(c, "err.important_date_singleton_conflict")
 		}
 		return response.InternalError(c, "err.failed_to_create_contact")
 	}
@@ -229,6 +236,7 @@ func (h *ContactHandler) Get(c *echo.Context) error {
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{id} [put]
@@ -258,6 +266,15 @@ func (h *ContactHandler) Update(c *echo.Context) error {
 		}
 		if errors.Is(err, services.ErrContactInvalidFirstMetPrecision) || errors.Is(err, services.ErrContactPromotionNotAllowed) {
 			return response.ValidationError(c, map[string]string{"validation": err.Error()})
+		}
+		if errors.Is(err, services.ErrImportantDateNotFound) {
+			return response.NotFound(c, "err.important_date_not_found")
+		}
+		if errors.Is(err, services.ErrImportantDateLabelRequired) || errors.Is(err, services.ErrImportantDateInvalidPrecision) || errors.Is(err, services.ErrImportantDateTypeNotFound) {
+			return response.BadRequest(c, "err.invalid_important_date", nil)
+		}
+		if errors.Is(err, services.ErrImportantDateSingletonConflict) {
+			return response.Conflict(c, "err.important_date_singleton_conflict")
 		}
 		return response.InternalError(c, "err.failed_to_update_contact")
 	}

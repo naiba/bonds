@@ -99,6 +99,10 @@ vi.mock("@/api", () => ({
     },
     vaultSettings: {
       settingsLabelsList: vi.fn(),
+      settingsDateTypesList: vi.fn(),
+    },
+    preferences: {
+      preferencesList: vi.fn(),
     },
     personalize: {
       personalizeDetail: vi.fn(),
@@ -164,6 +168,12 @@ describe("ContactEdit Validation", () => {
         { id: 7, name: "Family" },
         { id: 8, name: "Friends" },
       ],
+    });
+    vi.mocked(api.vaultSettings.settingsDateTypesList).mockResolvedValue({
+      data: [{ id: 1, label: "Birthdate", internal_type: "birthdate" }],
+    });
+    vi.mocked(api.preferences.preferencesList).mockResolvedValue({
+      data: { enable_alternative_calendar: false },
     });
     vi.mocked(api.contactLabels.contactsLabelsCreate).mockResolvedValue({
       data: { id: 102, label_id: 8, name: "Friends" },

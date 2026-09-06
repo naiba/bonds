@@ -41,6 +41,7 @@ import type {
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import { formatContactFirstMetDisplay } from "@/utils/contactFirstMet";
+import { formatImportantDateDisplay } from "@/utils/importantDateDisplay";
 import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
@@ -480,10 +481,11 @@ export default function ContactList() {
       key: "birthday",
       responsive: ["md"] as Breakpoint[],
       render: (_, record) => {
-        const bday = (record as Contact & { birthday?: string }).birthday;
-        // 使用用户日期格式偏好格式化生日（fix #65）
-        return bday ? (
-          <Text type="secondary">{formatDate(bday, dateFormats)}</Text>
+        const birthdate = record.birthdate;
+        return birthdate ? (
+          <Text type="secondary">
+            {formatImportantDateDisplay(birthdate, dateFormats)}
+          </Text>
         ) : (
           <Text type="secondary">—</Text>
         );

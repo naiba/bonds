@@ -59,6 +59,8 @@
   "err.failed_to_create_important_date": "Error al crear fecha importante",
   "err.invalid_important_date_id": "ID de fecha importante inválido",
   "err.important_date_not_found": "Fecha importante no encontrada",
+  "err.invalid_important_date": "Fecha importante no válida",
+  "err.important_date_singleton_conflict": "Este contacto ya tiene esa fecha de perfil",
   "err.failed_to_update_important_date": "Error al actualizar fecha importante",
   "err.failed_to_delete_important_date": "Error al eliminar fecha importante",
   "err.failed_to_list_tasks": "Error al listar las tareas",

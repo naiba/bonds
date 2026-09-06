@@ -278,8 +278,12 @@ func TestMCPExecuteActionUsesExistingPermissions(t *testing.T) {
 	ts := setupTestServer(t)
 	managerToken, managerAuth := ts.registerTestUser(t, "mcp-manager@example.com")
 	vault := ts.createTestVault(t, managerToken, "MCP Vault")
+	var birthdateType models.ContactImportantDateType
+	if err := ts.db.Where("vault_id = ? AND internal_type = ?", vault.ID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("find birthdate type: %v", err)
+	}
 
-	body := mcpToolCall(1, "execute_action", fmt.Sprintf(`{"action_id":"post_vaults_by_vault_id_contacts","path_params":{"vault_id":%q},"body":{"first_name":"Alice","last_name":"Agent"}}`, vault.ID))
+	body := mcpToolCall(1, "execute_action", fmt.Sprintf(`{"action_id":"post_vaults_by_vault_id_contacts","path_params":{"vault_id":%q},"body":{"first_name":"Alice","last_name":"Agent","important_dates":[{"label":"Birthdate","date_precision":"full","year":1990,"month":6,"day":15,"contact_important_date_type_id":%d}]}}`, vault.ID, birthdateType.ID))
 	rec := ts.doRequest(http.MethodPost, "/mcp", body, managerToken)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
@@ -293,6 +297,19 @@ func TestMCPExecuteActionUsesExistingPermissions(t *testing.T) {
 	}
 	if toolResult.IsError {
 		t.Fatalf("manager execute_action unexpectedly failed: %s", rec.Body.String())
+	}
+	var createdContact models.Contact
+	if err := ts.db.Where("vault_id = ? AND first_name = ?", vault.ID, "Alice").First(&createdContact).Error; err != nil {
+		t.Fatalf("load contact created through MCP: %v", err)
+	}
+	var birthdateCount int64
+	if err := ts.db.Model(&models.ContactImportantDate{}).
+		Where("contact_id = ? AND contact_important_date_type_id = ?", createdContact.ID, birthdateType.ID).
+		Count(&birthdateCount).Error; err != nil {
+		t.Fatalf("count MCP-created birthdates: %v", err)
+	}
+	if birthdateCount != 1 {
+		t.Fatalf("expected MCP to create one birthdate, got %d", birthdateCount)
 	}
 
 	viewer := createSecondUser(t, ts, managerAuth.User.AccountID, "mcp-viewer@example.com", false)

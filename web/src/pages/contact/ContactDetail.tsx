@@ -120,6 +120,13 @@ import GroupsModule from "./modules/GroupsModule";
 import ContactSummaryModule from "./modules/ContactSummaryModule";
 import RelationshipNetworkModule from "./modules/RelationshipNetworkModule";
 import { buildContactLabelSyncPlan } from "./modules/contactLabelSync";
+import ContactImportantDatesEditor from "./ContactImportantDatesEditor";
+import {
+  areImportantDateDraftsValid,
+  buildImportantDateChanges,
+  importantDatesToDrafts,
+} from "./contactImportantDates";
+import type { ContactImportantDateDraft } from "./contactImportantDates";
 
 const { Title, Text } = Typography;
 
@@ -160,10 +167,12 @@ type ContactEditFormValues = Omit<
   | "first_met_year"
   | "first_met_month"
   | "first_met_day"
+  | "important_date_changes"
 > & {
   last_talked_to?: string;
   first_met?: CalendarDatePickerValue;
   label_ids?: number[];
+  important_dates?: ContactImportantDateDraft[];
 };
 
 type MoveContactMutationOperation = {
@@ -200,13 +209,20 @@ function createContactQueryScope(
 
 function buildUpdateContactRequest(
   values: ContactEditFormValues,
+  originalImportantDates: Contact["important_dates"],
 ): UpdateContactRequest {
   const contactValues = { ...values };
+  const importantDateDrafts = contactValues.important_dates;
   delete contactValues.label_ids;
+  delete contactValues.important_dates;
   const request: UpdateContactRequest = {
     ...contactValues,
     last_talked_to: dateInputToTimestamp(values.last_talked_to),
     ...buildContactFirstMetRequest(values.first_met),
+    important_date_changes: buildImportantDateChanges(
+      originalImportantDates,
+      importantDateDrafts,
+    ),
   };
   if (!request.last_talked_to) delete request.last_talked_to;
   if (!request.first_met_at) delete request.first_met_at;
@@ -869,6 +885,14 @@ export default function ContactDetail() {
           vaultIds: [operation.contact.vaultId],
           contacts: [operation.contact],
         }),
+        invalidateCalendarQueries(queryClient, {
+          vaultIds: [operation.contact.vaultId],
+          contacts: [operation.contact],
+        }),
+        invalidateReminderQueries(queryClient, {
+          vaultIds: [operation.contact.vaultId],
+          contacts: [operation.contact],
+        }),
         refreshMostConsultedProjections(queryClient, [
           { vaultId: operation.contact.vaultId },
         ]),
@@ -1225,6 +1249,7 @@ export default function ContactDetail() {
       last_talked_to: timestampToDateInput(contact.last_talked_to),
       stay_in_touch_frequency_days: contact.stay_in_touch_frequency_days,
       needs_verification: contact.needs_verification,
+      important_dates: importantDatesToDrafts(contact.important_dates),
       label_ids: assignedLabels.flatMap((label) =>
         label.label_id === undefined ? [] : [label.label_id],
       ),
@@ -1867,7 +1892,9 @@ export default function ContactDetail() {
             updateContactMutation.mutate(
               Object.freeze({
                 contact: createContactQueryScope(vaultId, cId),
-                request: Object.freeze(buildUpdateContactRequest(values)),
+                request: Object.freeze(
+                  buildUpdateContactRequest(values, contact.important_dates),
+                ),
                 labelIds: values.label_ids,
               } satisfies UpdateContactMutationOperation),
             )
@@ -1988,6 +2015,24 @@ export default function ContactDetail() {
             style={{ marginBottom: 16 }}
           >
             <Checkbox>{t("contact.needs_verification.field_label")}</Checkbox>
+          </Form.Item>
+          <Form.Item<ContactEditFormValues>
+            name="important_dates"
+            style={{ marginBottom: 0 }}
+            rules={[
+              {
+                validator: (_, drafts) =>
+                  areImportantDateDraftsValid(drafts)
+                    ? Promise.resolve()
+                    : Promise.reject(
+                        new Error(
+                          t("modules.important_dates.invalid_profile_dates"),
+                        ),
+                      ),
+              },
+            ]}
+          >
+            <ContactImportantDatesEditor vaultId={vaultId} />
           </Form.Item>
           <div
             style={{

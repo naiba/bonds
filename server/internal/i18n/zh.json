@@ -68,6 +68,8 @@
   "err.failed_to_create_important_date": "创建重要日期失败",
   "err.invalid_important_date_id": "无效的重要日期ID",
   "err.important_date_not_found": "重要日期未找到",
+  "err.invalid_important_date": "无效的重要日期",
+  "err.important_date_singleton_conflict": "该联系人已有此资料日期",
   "err.failed_to_update_important_date": "更新重要日期失败",
   "err.failed_to_delete_important_date": "删除重要日期失败",
 

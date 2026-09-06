@@ -51,6 +51,33 @@ async function createContact(
   });
 }
 
+async function setProfileBirthday(
+  page: import("@playwright/test").Page,
+  scope: import("@playwright/test").Locator,
+) {
+  const birthdayLabel = scope.locator("label").filter({
+    hasText: /^Birthdate$/,
+  });
+  await expect(birthdayLabel).toBeVisible({ timeout: 10000 });
+  const birthdayItem = birthdayLabel.locator(
+    "xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' ant-form-item ')][1]",
+  );
+  const dateSelects = birthdayItem.locator(".ant-select");
+
+  await dateSelects.nth(0).click();
+  await dateSelects.nth(0).locator("input").fill("1990");
+  await page
+    .locator(".ant-select-dropdown:visible .ant-select-item-option")
+    .filter({ hasText: /^1990$/ })
+    .click();
+
+  await dateSelects.nth(1).click();
+  await page
+    .locator(".ant-select-dropdown:visible .ant-select-item-option")
+    .filter({ hasText: /^June$/ })
+    .click();
+}
+
 test.describe("Contacts - CRUD", () => {
   test("should show empty contact list", async ({ page }) => {
     await setupVault(page, "empty");
@@ -111,6 +138,32 @@ test.describe("Contacts - CRUD", () => {
     await expect(page.getByText("UpdatedName User").first()).toBeVisible({
       timeout: 10000,
     });
+  });
+
+  test("should add a birthday from the contact editor", async ({ page }) => {
+    await setupVault(page, "birthday-edit");
+    await goToContacts(page);
+    await createContact(page, "Birthday", "Editor");
+
+    await page.getByRole("button", { name: "Edit" }).first().click();
+    const modal = page.locator(".ant-modal:visible");
+    await expect(modal).toBeVisible({ timeout: 5000 });
+    await setProfileBirthday(page, modal);
+
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/contacts/") &&
+        response.request().method() === "PUT",
+    );
+    await modal.getByRole("button", { name: "Save" }).click();
+    expect((await updateResponse).status()).toBeLessThan(400);
+    await expect(modal).not.toBeVisible({ timeout: 15000 });
+
+    const summary = page.locator('[data-testid="contact-summary-card"]');
+    await expect(summary.getByText("Birthdate", { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(summary.getByText(/1990/)).toBeVisible();
   });
 
   test("should show Move button on contact detail", async ({ page }) => {

@@ -1103,6 +1103,52 @@ func TestContactUpdate_Success(t *testing.T) {
 	}
 }
 
+func TestContactCreateAndUpdateImportantDates(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "contact-profile-dates@example.com")
+	vault := ts.createTestVault(t, token, "Contact Profile Dates")
+	var birthdateType models.ContactImportantDateType
+	if err := ts.db.Where("vault_id = ? AND internal_type = ?", vault.ID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("find birthdate type: %v", err)
+	}
+	var anniversaryType models.ContactImportantDateType
+	if err := ts.db.Where("vault_id = ? AND label = ?", vault.ID, "Anniversary").First(&anniversaryType).Error; err != nil {
+		t.Fatalf("find anniversary type: %v", err)
+	}
+
+	createBody := fmt.Sprintf(`{"first_name":"Profile","important_dates":[{"label":"Birthdate","date_precision":"full","year":1990,"month":6,"day":15,"contact_important_date_type_id":%d,"remind_me":true}]}`, birthdateType.ID)
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/contacts", createBody, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create contact with dates: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var created dto.ContactResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &created); err != nil {
+		t.Fatalf("parse created contact: %v", err)
+	}
+	if created.Birthdate == nil || created.Birthdate.Year == nil || *created.Birthdate.Year != 1990 {
+		t.Fatalf("expected structured birthdate, got %+v", created.Birthdate)
+	}
+	if len(created.ImportantDates) != 1 {
+		t.Fatalf("expected one important date, got %d", len(created.ImportantDates))
+	}
+
+	updateBody := fmt.Sprintf(`{"first_name":"Profile","important_date_changes":{"create":[{"label":"Wedding anniversary","date_precision":"month_day","month":9,"day":6,"contact_important_date_type_id":%d}],"update":[{"id":%d,"important_date":{"label":"Birthdate","date_precision":"full","year":1991,"month":6,"day":15,"contact_important_date_type_id":%d,"remind_me":true}}],"delete":[]}}`, anniversaryType.ID, created.ImportantDates[0].ID, birthdateType.ID)
+	rec = ts.doRequest(http.MethodPut, "/api/vaults/"+vault.ID+"/contacts/"+created.ID, updateBody, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update contact dates: expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var updated dto.ContactResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &updated); err != nil {
+		t.Fatalf("parse updated contact: %v", err)
+	}
+	if updated.Birthdate == nil || updated.Birthdate.Year == nil || *updated.Birthdate.Year != 1991 {
+		t.Fatalf("expected updated birthdate, got %+v", updated.Birthdate)
+	}
+	if len(updated.ImportantDates) != 2 {
+		t.Fatalf("expected two important dates, got %d", len(updated.ImportantDates))
+	}
+}
+
 func TestContactUpdate_NicknameOnlySuccess(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "cupdate-nickname-only@example.com")

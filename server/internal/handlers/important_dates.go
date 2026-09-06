@@ -60,6 +60,7 @@ func (h *ImportantDateHandler) List(c *echo.Context) error {
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/dates [post]
@@ -86,6 +87,12 @@ func (h *ImportantDateHandler) Create(c *echo.Context) error {
 		if errors.Is(err, services.ErrImportantDateInvalidPrecision) {
 			return response.BadRequest(c, "err.invalid_date_precision", nil)
 		}
+		if errors.Is(err, services.ErrImportantDateTypeNotFound) {
+			return response.BadRequest(c, "err.invalid_important_date", nil)
+		}
+		if errors.Is(err, services.ErrImportantDateSingletonConflict) {
+			return response.Conflict(c, "err.important_date_singleton_conflict")
+		}
 		return response.InternalError(c, "err.failed_to_create_important_date")
 	}
 	return response.Created(c, date)
@@ -107,6 +114,7 @@ func (h *ImportantDateHandler) Create(c *echo.Context) error {
 //	@Failure		400			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{contact_id}/dates/{id} [put]
@@ -139,6 +147,12 @@ func (h *ImportantDateHandler) Update(c *echo.Context) error {
 		}
 		if errors.Is(err, services.ErrImportantDateInvalidPrecision) {
 			return response.BadRequest(c, "err.invalid_date_precision", nil)
+		}
+		if errors.Is(err, services.ErrImportantDateTypeNotFound) {
+			return response.BadRequest(c, "err.invalid_important_date", nil)
+		}
+		if errors.Is(err, services.ErrImportantDateSingletonConflict) {
+			return response.Conflict(c, "err.important_date_singleton_conflict")
 		}
 		return response.InternalError(c, "err.failed_to_update_important_date")
 	}

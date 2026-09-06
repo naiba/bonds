@@ -68,6 +68,8 @@
   "err.failed_to_create_important_date": "Failed to create important date",
   "err.invalid_important_date_id": "Invalid important date ID",
   "err.important_date_not_found": "Important date not found",
+  "err.invalid_important_date": "Invalid important date",
+  "err.important_date_singleton_conflict": "This contact already has that profile date",
   "err.failed_to_update_important_date": "Failed to update important date",
   "err.failed_to_delete_important_date": "Failed to delete important date",
 

@@ -85,6 +85,154 @@ func TestCreateContact(t *testing.T) {
 	}
 }
 
+func TestCreateContactWithImportantDates(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	var birthdateType models.ContactImportantDateType
+	if err := svc.db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("find birthdate type: %v", err)
+	}
+	var anniversaryType models.ContactImportantDateType
+	if err := svc.db.Where("vault_id = ? AND label = ?", vaultID, "Anniversary").First(&anniversaryType).Error; err != nil {
+		t.Fatalf("find anniversary type: %v", err)
+	}
+	year, month, day := 1990, 6, 15
+	remind := true
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "Dates",
+		ImportantDates: []dto.CreateImportantDateRequest{
+			{
+				Label:                      "Birthdate",
+				DatePrecision:              "full",
+				Year:                       &year,
+				Month:                      &month,
+				Day:                        &day,
+				ContactImportantDateTypeID: &birthdateType.ID,
+				RemindMe:                   &remind,
+			},
+			{
+				Label:                      "Our anniversary",
+				DatePrecision:              "month_day",
+				Month:                      &month,
+				Day:                        &day,
+				ContactImportantDateTypeID: &anniversaryType.ID,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+	if len(contact.ImportantDates) != 2 {
+		t.Fatalf("expected 2 important dates, got %d", len(contact.ImportantDates))
+	}
+	if contact.Birthdate == nil || contact.Birthdate.Year == nil || *contact.Birthdate.Year != year {
+		t.Fatalf("expected structured birthdate in response, got %+v", contact.Birthdate)
+	}
+	var reminderCount int64
+	if err := svc.db.Model(&models.ContactReminder{}).Where("contact_id = ? AND important_date_id IS NOT NULL", contact.ID).Count(&reminderCount).Error; err != nil {
+		t.Fatalf("count birthday reminders: %v", err)
+	}
+	if reminderCount != 1 {
+		t.Fatalf("expected one birthday reminder, got %d", reminderCount)
+	}
+}
+
+func TestCreateContactRollsBackWhenImportantDateFails(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	invalidTypeID := uint(999999)
+	year := 1990
+	_, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "Rolled Back",
+		ImportantDates: []dto.CreateImportantDateRequest{{
+			Label:                      "Invalid",
+			DatePrecision:              "year",
+			Year:                       &year,
+			ContactImportantDateTypeID: &invalidTypeID,
+		}},
+	})
+	if !errors.Is(err, ErrImportantDateTypeNotFound) {
+		t.Fatalf("expected ErrImportantDateTypeNotFound, got %v", err)
+	}
+	var contactCount int64
+	if err := svc.db.Model(&models.Contact{}).Where("vault_id = ? AND first_name = ?", vaultID, "Rolled Back").Count(&contactCount).Error; err != nil {
+		t.Fatalf("count rolled-back contacts: %v", err)
+	}
+	if contactCount != 0 {
+		t.Fatalf("expected contact transaction to roll back, got %d rows", contactCount)
+	}
+}
+
+func TestUpdateContactAppliesImportantDateChangesAtomically(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	var birthdateType models.ContactImportantDateType
+	if err := svc.db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&birthdateType).Error; err != nil {
+		t.Fatalf("find birthdate type: %v", err)
+	}
+	var anniversaryType models.ContactImportantDateType
+	if err := svc.db.Where("vault_id = ? AND label = ?", vaultID, "Anniversary").First(&anniversaryType).Error; err != nil {
+		t.Fatalf("find anniversary type: %v", err)
+	}
+	year, month, day := 1990, 6, 15
+	contact, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{
+		FirstName: "Before",
+		ImportantDates: []dto.CreateImportantDateRequest{
+			{Label: "Birthdate", DatePrecision: "full", Year: &year, Month: &month, Day: &day, ContactImportantDateTypeID: &birthdateType.ID},
+			{Label: "Old anniversary", DatePrecision: "month_day", Month: &month, Day: &day, ContactImportantDateTypeID: &anniversaryType.ID},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create contact: %v", err)
+	}
+	var birthdateID, anniversaryID uint
+	for _, date := range contact.ImportantDates {
+		if date.ContactImportantDateTypeID != nil && *date.ContactImportantDateTypeID == birthdateType.ID {
+			birthdateID = date.ID
+		} else {
+			anniversaryID = date.ID
+		}
+	}
+	updatedYear := 1991
+	updated, err := svc.UpdateContact(contact.ID, vaultID, userID, dto.UpdateContactRequest{
+		FirstName: "After",
+		ImportantDateChanges: &dto.ImportantDateChangesRequest{
+			Create: []dto.CreateImportantDateRequest{{Label: "New anniversary", DatePrecision: "month_day", Month: &month, Day: &day, ContactImportantDateTypeID: &anniversaryType.ID}},
+			Update: []dto.UpdateImportantDateWithIDRequest{{
+				ID:            birthdateID,
+				ImportantDate: dto.UpdateImportantDateRequest{Label: "Birthdate", DatePrecision: "full", Year: &updatedYear, Month: &month, Day: &day, ContactImportantDateTypeID: &birthdateType.ID},
+			}},
+			Delete: []uint{anniversaryID},
+		},
+	})
+	if err != nil {
+		t.Fatalf("UpdateContact failed: %v", err)
+	}
+	if updated.FirstName != "After" {
+		t.Fatalf("expected updated name, got %q", updated.FirstName)
+	}
+	if updated.Birthdate == nil || updated.Birthdate.Year == nil || *updated.Birthdate.Year != updatedYear {
+		t.Fatalf("expected updated birthdate, got %+v", updated.Birthdate)
+	}
+	if len(updated.ImportantDates) != 2 {
+		t.Fatalf("expected two final important dates, got %d", len(updated.ImportantDates))
+	}
+
+	_, err = svc.UpdateContact(contact.ID, vaultID, userID, dto.UpdateContactRequest{
+		FirstName: "Must Roll Back",
+		ImportantDateChanges: &dto.ImportantDateChangesRequest{
+			Update: []dto.UpdateImportantDateWithIDRequest{{ID: 999999, ImportantDate: dto.UpdateImportantDateRequest{Label: "Missing"}}},
+		},
+	})
+	if !errors.Is(err, ErrImportantDateNotFound) {
+		t.Fatalf("expected ErrImportantDateNotFound, got %v", err)
+	}
+	var persisted models.Contact
+	if err := svc.db.First(&persisted, "id = ?", contact.ID).Error; err != nil {
+		t.Fatalf("reload contact: %v", err)
+	}
+	if persisted.FirstName == nil || *persisted.FirstName != "After" {
+		t.Fatalf("expected failed date change to roll back contact, got %v", persisted.FirstName)
+	}
+}
+
 func TestCreateContactWithNicknameOnly(t *testing.T) {
 	svc, vaultID, userID, _ := setupContactTest(t)
 
@@ -1511,10 +1659,10 @@ func TestListContacts_BirthdayAgeGroups(t *testing.T) {
 		t.Fatal("Expected to find both Alice and Bob in results")
 	}
 
-	if alice.Birthday == nil {
+	if alice.Birthdate == nil {
 		t.Error("Expected Alice to have a birthday")
-	} else if *alice.Birthday != "1990-06-15" {
-		t.Errorf("Expected birthday '1990-06-15', got '%s'", *alice.Birthday)
+	} else if alice.Birthdate.Year == nil || *alice.Birthdate.Year != 1990 || alice.Birthdate.Month == nil || *alice.Birthdate.Month != 6 || alice.Birthdate.Day == nil || *alice.Birthdate.Day != 15 {
+		t.Errorf("Expected structured birthday 1990-06-15, got %+v", alice.Birthdate)
 	}
 	if alice.Age == nil {
 		t.Error("Expected Alice to have an age")
@@ -1528,8 +1676,8 @@ func TestListContacts_BirthdayAgeGroups(t *testing.T) {
 		t.Errorf("Expected group name 'Family', got '%s'", alice.Groups[0].Name)
 	}
 
-	if bob.Birthday != nil {
-		t.Errorf("Expected Bob to have no birthday, got '%s'", *bob.Birthday)
+	if bob.Birthdate != nil {
+		t.Errorf("Expected Bob to have no birthday, got %+v", bob.Birthdate)
 	}
 	if bob.Age != nil {
 		t.Errorf("Expected Bob to have no age, got %d", *bob.Age)

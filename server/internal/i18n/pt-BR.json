@@ -59,6 +59,8 @@
   "err.failed_to_create_important_date": "Falha ao criar data importante",
   "err.invalid_important_date_id": "ID da data importante inválido",
   "err.important_date_not_found": "Data importante não encontrada",
+  "err.invalid_important_date": "Data importante inválida",
+  "err.important_date_singleton_conflict": "Este contato já possui essa data de perfil",
   "err.failed_to_update_important_date": "Falha ao atualizar data importante",
   "err.failed_to_delete_important_date": "Falha ao excluir data importante",
   "err.failed_to_list_tasks": "Falha ao listar tarefas",

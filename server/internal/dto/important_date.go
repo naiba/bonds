@@ -30,6 +30,23 @@ type UpdateImportantDateRequest struct {
 	RemindMe                   *bool  `json:"remind_me" example:"true"`
 }
 
+// UpdateImportantDateWithIDRequest identifies one existing important date and
+// carries its desired value. Contact profile updates use this shape so the
+// contact row and all date/reminder changes can commit atomically.
+type UpdateImportantDateWithIDRequest struct {
+	ID            uint                       `json:"id" validate:"required" example:"1"`
+	ImportantDate UpdateImportantDateRequest `json:"important_date"`
+}
+
+// ImportantDateChangesRequest is the mutation set submitted with a contact
+// profile update. Separate create/update/delete collections keep the generated
+// API contract explicit and avoid ambiguous optional IDs.
+type ImportantDateChangesRequest struct {
+	Create []CreateImportantDateRequest       `json:"create"`
+	Update []UpdateImportantDateWithIDRequest `json:"update"`
+	Delete []uint                             `json:"delete" example:"1,2"`
+}
+
 type ImportantDateResponse struct {
 	ID                         uint      `json:"id" example:"1"`
 	ContactID                  string    `json:"contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`

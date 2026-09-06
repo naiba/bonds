@@ -24,69 +24,72 @@ type CreateContactRequest struct {
 	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
 	// NeedsVerification flags a contact as needing later review (e.g. captured quickly
 	// or created by an automated agent). When nil, defaults to false.
-	NeedsVerification *bool `json:"needs_verification" example:"false"`
+	NeedsVerification *bool                        `json:"needs_verification" example:"false"`
+	ImportantDates    []CreateImportantDateRequest `json:"important_dates"`
 }
 
 type UpdateContactRequest struct {
-	FirstName                string     `json:"first_name" validate:"max=255" example:"John"`
-	LastName                 string     `json:"last_name" validate:"max=255" example:"Doe"`
-	MiddleName               string     `json:"middle_name" validate:"max=255" example:"Michael"`
-	Nickname                 string     `json:"nickname" validate:"max=255" example:"Johnny"`
-	MaidenName               string     `json:"maiden_name" validate:"max=255" example:"Smith"`
-	Prefix                   string     `json:"prefix" validate:"max=255" example:"Mr."`
-	Suffix                   string     `json:"suffix" validate:"max=255" example:"Jr."`
-	GenderID                 *uint      `json:"gender_id" example:"1"`
-	PronounID                *uint      `json:"pronoun_id" example:"1"`
-	TemplateID               *uint      `json:"template_id" example:"1"`
-	Listed                   *bool      `json:"listed" example:"true"`
-	LastTalkedTo             *time.Time `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
-	FirstMetAt               *time.Time `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
-	FirstMetDatePrecision    *string    `json:"first_met_date_precision" example:"year"`
-	FirstMetYear             *int       `json:"first_met_year" example:"2026"`
-	FirstMetMonth            *int       `json:"first_met_month" example:"5"`
-	FirstMetDay              *int       `json:"first_met_day" example:"15"`
-	FirstMetThroughContactID *string    `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	StayInTouchFrequencyDays *int       `json:"stay_in_touch_frequency_days" example:"30"`
-	NeedsVerification        *bool      `json:"needs_verification" example:"false"`
+	FirstName                string                       `json:"first_name" validate:"max=255" example:"John"`
+	LastName                 string                       `json:"last_name" validate:"max=255" example:"Doe"`
+	MiddleName               string                       `json:"middle_name" validate:"max=255" example:"Michael"`
+	Nickname                 string                       `json:"nickname" validate:"max=255" example:"Johnny"`
+	MaidenName               string                       `json:"maiden_name" validate:"max=255" example:"Smith"`
+	Prefix                   string                       `json:"prefix" validate:"max=255" example:"Mr."`
+	Suffix                   string                       `json:"suffix" validate:"max=255" example:"Jr."`
+	GenderID                 *uint                        `json:"gender_id" example:"1"`
+	PronounID                *uint                        `json:"pronoun_id" example:"1"`
+	TemplateID               *uint                        `json:"template_id" example:"1"`
+	Listed                   *bool                        `json:"listed" example:"true"`
+	LastTalkedTo             *time.Time                   `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	FirstMetAt               *time.Time                   `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetDatePrecision    *string                      `json:"first_met_date_precision" example:"year"`
+	FirstMetYear             *int                         `json:"first_met_year" example:"2026"`
+	FirstMetMonth            *int                         `json:"first_met_month" example:"5"`
+	FirstMetDay              *int                         `json:"first_met_day" example:"15"`
+	FirstMetThroughContactID *string                      `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	StayInTouchFrequencyDays *int                         `json:"stay_in_touch_frequency_days" example:"30"`
+	NeedsVerification        *bool                        `json:"needs_verification" example:"false"`
+	ImportantDateChanges     *ImportantDateChangesRequest `json:"important_date_changes,omitempty"`
 }
 
 type ContactResponse struct {
-	ID                       string              `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	VaultID                  string              `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	FirstName                string              `json:"first_name" example:"John"`
-	LastName                 string              `json:"last_name" example:"Doe"`
-	MiddleName               string              `json:"middle_name" example:"Michael"`
-	Nickname                 string              `json:"nickname" example:"Johnny"`
-	MaidenName               string              `json:"maiden_name" example:"Smith"`
-	Prefix                   string              `json:"prefix" example:"Mr."`
-	Suffix                   string              `json:"suffix" example:"Jr."`
-	GenderID                 *uint               `json:"gender_id" example:"1"`
-	PronounID                *uint               `json:"pronoun_id" example:"1"`
-	TemplateID               *uint               `json:"template_id" example:"1"`
-	CompanyID                *uint               `json:"company_id" example:"1"`
-	ReligionID               *uint               `json:"religion_id" example:"1"`
-	FileID                   *uint               `json:"file_id" example:"1"`
-	JobPosition              string              `json:"job_position" example:"Software Engineer"`
-	LastTalkedTo             *time.Time          `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
-	FirstMetAt               *time.Time          `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
-	FirstMetDatePrecision    string              `json:"first_met_date_precision,omitempty" example:"year"`
-	FirstMetYear             *int                `json:"first_met_year,omitempty" example:"2026"`
-	FirstMetMonth            *int                `json:"first_met_month,omitempty" example:"5"`
-	FirstMetDay              *int                `json:"first_met_day,omitempty" example:"15"`
-	FirstMetThroughContactID *string             `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	FirstMetThroughContact   *ContactSearchItem  `json:"first_met_through_contact,omitempty"`
-	StayInTouchFrequencyDays *int                `json:"stay_in_touch_frequency_days" example:"30"`
-	StayInTouchTriggerDate   *time.Time          `json:"stay_in_touch_trigger_date" example:"2026-02-14T10:30:00Z"`
-	Listed                   bool                `json:"listed" example:"true"`
-	ShowQuickFacts           bool                `json:"show_quick_facts" example:"false"`
-	IsArchived               bool                `json:"is_archived" example:"false"`
-	IsFavorite               bool                `json:"is_favorite" example:"true"`
-	NeedsVerification        bool                `json:"needs_verification" example:"false"`
-	CreatedAt                time.Time           `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt                time.Time           `json:"updated_at" example:"2026-01-15T10:30:00Z"`
-	Birthday                 *string             `json:"birthday,omitempty" example:"1990-06-15"`
-	Age                      *int                `json:"age,omitempty" example:"35"`
-	Groups                   []ContactGroupBrief `json:"groups,omitempty"`
+	ID                       string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	VaultID                  string                  `json:"vault_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstName                string                  `json:"first_name" example:"John"`
+	LastName                 string                  `json:"last_name" example:"Doe"`
+	MiddleName               string                  `json:"middle_name" example:"Michael"`
+	Nickname                 string                  `json:"nickname" example:"Johnny"`
+	MaidenName               string                  `json:"maiden_name" example:"Smith"`
+	Prefix                   string                  `json:"prefix" example:"Mr."`
+	Suffix                   string                  `json:"suffix" example:"Jr."`
+	GenderID                 *uint                   `json:"gender_id" example:"1"`
+	PronounID                *uint                   `json:"pronoun_id" example:"1"`
+	TemplateID               *uint                   `json:"template_id" example:"1"`
+	CompanyID                *uint                   `json:"company_id" example:"1"`
+	ReligionID               *uint                   `json:"religion_id" example:"1"`
+	FileID                   *uint                   `json:"file_id" example:"1"`
+	JobPosition              string                  `json:"job_position" example:"Software Engineer"`
+	LastTalkedTo             *time.Time              `json:"last_talked_to" example:"2026-01-15T10:30:00Z"`
+	FirstMetAt               *time.Time              `json:"first_met_at" example:"2026-01-15T10:30:00Z"`
+	FirstMetDatePrecision    string                  `json:"first_met_date_precision,omitempty" example:"year"`
+	FirstMetYear             *int                    `json:"first_met_year,omitempty" example:"2026"`
+	FirstMetMonth            *int                    `json:"first_met_month,omitempty" example:"5"`
+	FirstMetDay              *int                    `json:"first_met_day,omitempty" example:"15"`
+	FirstMetThroughContactID *string                 `json:"first_met_through_contact_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	FirstMetThroughContact   *ContactSearchItem      `json:"first_met_through_contact,omitempty"`
+	StayInTouchFrequencyDays *int                    `json:"stay_in_touch_frequency_days" example:"30"`
+	StayInTouchTriggerDate   *time.Time              `json:"stay_in_touch_trigger_date" example:"2026-02-14T10:30:00Z"`
+	Listed                   bool                    `json:"listed" example:"true"`
+	ShowQuickFacts           bool                    `json:"show_quick_facts" example:"false"`
+	IsArchived               bool                    `json:"is_archived" example:"false"`
+	IsFavorite               bool                    `json:"is_favorite" example:"true"`
+	NeedsVerification        bool                    `json:"needs_verification" example:"false"`
+	CreatedAt                time.Time               `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt                time.Time               `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	Birthdate                *ImportantDateResponse  `json:"birthdate,omitempty"`
+	Age                      *int                    `json:"age,omitempty" example:"35"`
+	ImportantDates           []ImportantDateResponse `json:"important_dates,omitempty"`
+	Groups                   []ContactGroupBrief     `json:"groups,omitempty"`
 }
 
 type ContactListResponse struct {

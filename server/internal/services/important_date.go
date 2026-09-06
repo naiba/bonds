@@ -10,6 +10,13 @@ import (
 
 var ErrImportantDateNotFound = errors.New("important date not found")
 var ErrImportantDateLabelRequired = errors.New("label is required when no type is selected")
+var ErrImportantDateTypeNotFound = errors.New("important date type not found")
+var ErrImportantDateSingletonConflict = errors.New("important date type already exists for contact")
+
+var singletonImportantDateInternalTypes = map[string]struct{}{
+	"birthdate":     {},
+	"deceased_date": {},
+}
 
 type ImportantDateService struct {
 	db *gorm.DB
@@ -35,15 +42,40 @@ func (s *ImportantDateService) List(contactID, vaultID string) ([]dto.ImportantD
 }
 
 func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateImportantDateRequest) (*dto.ImportantDateResponse, error) {
+	var result *dto.ImportantDateResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = NewImportantDateService(tx).create(contactID, vaultID, req)
+		return err
+	})
+	return result, err
+}
+
+func (s *ImportantDateService) create(contactID, vaultID string, req dto.CreateImportantDateRequest) (*dto.ImportantDateResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	label := req.Label
+	var dateType *models.ContactImportantDateType
 	if label == "" && req.ContactImportantDateTypeID != nil {
-		label = s.resolveTypeLabel(*req.ContactImportantDateTypeID)
+		resolved, err := s.resolveType(*req.ContactImportantDateTypeID, vaultID)
+		if err != nil {
+			return nil, err
+		}
+		dateType = resolved
+		label = resolved.Label
+	} else if req.ContactImportantDateTypeID != nil {
+		resolved, err := s.resolveType(*req.ContactImportantDateTypeID, vaultID)
+		if err != nil {
+			return nil, err
+		}
+		dateType = resolved
 	}
 	if label == "" {
 		return nil, ErrImportantDateLabelRequired
+	}
+	if err := s.ensureSingletonAvailable(contactID, dateType, 0); err != nil {
+		return nil, err
 	}
 	date := models.ContactImportantDate{
 		ContactID:                  contactID,
@@ -70,8 +102,12 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 
 	if req.RemindMe != nil && *req.RemindMe && importantDateCanScheduleReminder(&date) {
 		date.RemindMe = true
-		s.db.Model(&date).Update("remind_me", true)
-		s.ensureReminder(contactID, &date)
+		if err := s.db.Model(&date).Update("remind_me", true).Error; err != nil {
+			return nil, err
+		}
+		if err := s.ensureReminder(contactID, &date); err != nil {
+			return nil, err
+		}
 	}
 
 	resp := toImportantDateResponse(&date)
@@ -79,6 +115,16 @@ func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateI
 }
 
 func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dto.UpdateImportantDateRequest) (*dto.ImportantDateResponse, error) {
+	var result *dto.ImportantDateResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		result, err = NewImportantDateService(tx).update(id, contactID, vaultID, req)
+		return err
+	})
+	return result, err
+}
+
+func (s *ImportantDateService) update(id uint, contactID, vaultID string, req dto.UpdateImportantDateRequest) (*dto.ImportantDateResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -91,11 +137,28 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 	}
 	oldRemindMe := date.RemindMe
 	label := req.Label
+	var dateType *models.ContactImportantDateType
 	if label == "" && req.ContactImportantDateTypeID != nil {
-		label = s.resolveTypeLabel(*req.ContactImportantDateTypeID)
+		resolved, err := s.resolveType(*req.ContactImportantDateTypeID, vaultID)
+		if err != nil {
+			return nil, err
+		}
+		dateType = resolved
+		label = resolved.Label
+	} else if req.ContactImportantDateTypeID != nil {
+		resolved, err := s.resolveType(*req.ContactImportantDateTypeID, vaultID)
+		if err != nil {
+			return nil, err
+		}
+		dateType = resolved
 	}
 	if label == "" {
 		return nil, ErrImportantDateLabelRequired
+	}
+	if req.ContactImportantDateTypeID == nil || date.ContactImportantDateTypeID == nil || *req.ContactImportantDateTypeID != *date.ContactImportantDateTypeID {
+		if err := s.ensureSingletonAvailable(contactID, dateType, date.ID); err != nil {
+			return nil, err
+		}
 	}
 	date.Label = label
 	date.DatePrecision = req.DatePrecision
@@ -119,23 +182,35 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 
 	if !importantDateCanScheduleReminder(&date) {
 		if date.RemindMe {
-			s.db.Model(&date).Update("remind_me", false)
+			if err := s.db.Model(&date).Update("remind_me", false).Error; err != nil {
+				return nil, err
+			}
 			date.RemindMe = false
 		}
-		s.removeReminder(contactID, date.ID)
+		if err := s.removeReminder(contactID, date.ID); err != nil {
+			return nil, err
+		}
 	} else if req.RemindMe != nil {
 		newRemindMe := *req.RemindMe && importantDateCanScheduleReminder(&date)
 		if newRemindMe != oldRemindMe {
-			s.db.Model(&date).Update("remind_me", newRemindMe)
+			if err := s.db.Model(&date).Update("remind_me", newRemindMe).Error; err != nil {
+				return nil, err
+			}
 			date.RemindMe = newRemindMe
 		}
 		if newRemindMe {
-			s.ensureReminder(contactID, &date)
+			if err := s.ensureReminder(contactID, &date); err != nil {
+				return nil, err
+			}
 		} else {
-			s.removeReminder(contactID, date.ID)
+			if err := s.removeReminder(contactID, date.ID); err != nil {
+				return nil, err
+			}
 		}
 	} else if date.RemindMe {
-		s.ensureReminder(contactID, &date)
+		if err := s.ensureReminder(contactID, &date); err != nil {
+			return nil, err
+		}
 	}
 
 	resp := toImportantDateResponse(&date)
@@ -143,10 +218,18 @@ func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dt
 }
 
 func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		return NewImportantDateService(tx).delete(id, contactID, vaultID)
+	})
+}
+
+func (s *ImportantDateService) delete(id uint, contactID, vaultID string) error {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return err
 	}
-	s.removeReminder(contactID, id)
+	if err := s.removeReminder(contactID, id); err != nil {
+		return err
+	}
 	result := s.db.Where("id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactImportantDate{})
 	if result.Error != nil {
 		return result.Error
@@ -157,12 +240,38 @@ func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error 
 	return nil
 }
 
-func (s *ImportantDateService) resolveTypeLabel(typeID uint) string {
+func (s *ImportantDateService) resolveType(typeID uint, vaultID string) (*models.ContactImportantDateType, error) {
 	var dateType models.ContactImportantDateType
-	if err := s.db.First(&dateType, typeID).Error; err != nil {
-		return ""
+	if err := s.db.Where("id = ? AND vault_id = ?", typeID, vaultID).First(&dateType).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrImportantDateTypeNotFound
+		}
+		return nil, err
 	}
-	return dateType.Label
+	return &dateType, nil
+}
+
+func (s *ImportantDateService) ensureSingletonAvailable(contactID string, dateType *models.ContactImportantDateType, excludeID uint) error {
+	if dateType == nil || dateType.InternalType == nil {
+		return nil
+	}
+	if _, singleton := singletonImportantDateInternalTypes[*dateType.InternalType]; !singleton {
+		return nil
+	}
+	query := s.db.Model(&models.ContactImportantDate{}).
+		Joins("JOIN contact_important_date_types ON contact_important_date_types.id = contact_important_dates.contact_important_date_type_id").
+		Where("contact_important_dates.contact_id = ? AND contact_important_date_types.internal_type = ?", contactID, *dateType.InternalType)
+	if excludeID != 0 {
+		query = query.Where("contact_important_dates.id <> ?", excludeID)
+	}
+	var count int64
+	if err := query.Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return ErrImportantDateSingletonConflict
+	}
+	return nil
 }
 
 func (s *ImportantDateService) ensureReminder(contactID string, date *models.ContactImportantDate) error {
@@ -183,8 +292,10 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 		if err := s.db.Save(&existing).Error; err != nil {
 			return err
 		}
-		NewReminderService(s.db).reschedulePendingReminder(&existing)
-		return nil
+		return reschedulePendingReminder(s.db, &existing)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 	reminder := models.ContactReminder{
 		ContactID:       contactID,
@@ -207,8 +318,10 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 
 func (s *ImportantDateService) removeReminder(contactID string, dateID uint) error {
 	// Delete scheduled entries first
-	s.db.Where("contact_reminder_id IN (SELECT id FROM contact_reminders WHERE contact_id = ? AND important_date_id = ?)", contactID, dateID).
-		Delete(&models.ContactReminderScheduled{})
+	if err := s.db.Where("contact_reminder_id IN (SELECT id FROM contact_reminders WHERE contact_id = ? AND important_date_id = ?)", contactID, dateID).
+		Delete(&models.ContactReminderScheduled{}).Error; err != nil {
+		return err
+	}
 	if err := s.db.Where("contact_reminder_id IN (SELECT id FROM contact_reminders WHERE contact_id = ? AND important_date_id = ?)", contactID, dateID).
 		Delete(&models.ContactReminderSelectedUser{}).Error; err != nil {
 		return err

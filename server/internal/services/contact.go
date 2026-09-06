@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -185,18 +184,27 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 			UserID:    userID,
 			VaultID:   vaultID,
 		}
-		return tx.Create(&cvu).Error
+		if err := tx.Create(&cvu).Error; err != nil {
+			return err
+		}
+		if req.Listed != nil && !*req.Listed {
+			if err := tx.Model(&contact).Update("listed", false).Error; err != nil {
+				return err
+			}
+			contact.Listed = false
+		}
+		importantDateService := NewImportantDateService(tx)
+		for _, importantDate := range req.ImportantDates {
+			if _, err := importantDateService.create(contact.ID, vaultID, importantDate); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Handle GORM SQLite zero-value bool quirk: Listed defaults to true via gorm tag,
-	// so we must explicitly update to false after Create if requested.
-	if req.Listed != nil && !*req.Listed {
-		s.db.Model(&contact).Update("listed", false)
-		contact.Listed = false
-	}
 	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
@@ -220,6 +228,9 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 
 	resp, err := toContactResponse(&contact, false, formatter)
 	if err != nil {
+		return nil, err
+	}
+	if err := enrichContactWithImportantDates(s.db, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -247,6 +258,9 @@ func (s *ContactService) GetContact(contactID, userID, vaultID string) (*dto.Con
 	}
 	resp, err := toContactResponse(&contact, isFav, formatter)
 	if err != nil {
+		return nil, err
+	}
+	if err := enrichContactWithImportantDates(s.db, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -305,7 +319,12 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 		contact.NeedsVerification = *req.NeedsVerification
 	}
 
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&contact).Error; err != nil {
+			return err
+		}
+		return applyContactImportantDateChanges(tx, contactID, vaultID, req.ImportantDateChanges)
+	}); err != nil {
 		return nil, err
 	}
 	if err := s.db.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
@@ -331,6 +350,9 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 
 	resp, err := toContactResponse(&contact, false, formatter)
 	if err != nil {
+		return nil, err
+	}
+	if err := enrichContactWithImportantDates(s.db, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -774,6 +796,52 @@ func daysBetween(from, to time.Time) int {
 	return int(to.Sub(from).Hours() / 24)
 }
 
+func applyContactImportantDateChanges(db *gorm.DB, contactID, vaultID string, changes *dto.ImportantDateChangesRequest) error {
+	if changes == nil {
+		return nil
+	}
+	importantDateService := NewImportantDateService(db)
+	for _, id := range changes.Delete {
+		if err := importantDateService.delete(id, contactID, vaultID); err != nil {
+			return err
+		}
+	}
+	for _, update := range changes.Update {
+		if _, err := importantDateService.update(update.ID, contactID, vaultID, update.ImportantDate); err != nil {
+			return err
+		}
+	}
+	for _, create := range changes.Create {
+		if _, err := importantDateService.create(contactID, vaultID, create); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func enrichContactWithImportantDates(db *gorm.DB, contact *dto.ContactResponse) error {
+	var dates []models.ContactImportantDate
+	if err := db.Preload("ContactImportantDateType").
+		Where("contact_id = ?", contact.ID).
+		Order("created_at DESC, id DESC").
+		Find(&dates).Error; err != nil {
+		return err
+	}
+	contact.ImportantDates = make([]dto.ImportantDateResponse, len(dates))
+	for i := range dates {
+		dateResponse := toImportantDateResponse(&dates[i])
+		contact.ImportantDates[i] = dateResponse
+		if contact.Birthdate == nil && dates[i].ContactImportantDateType != nil &&
+			dates[i].ContactImportantDateType.InternalType != nil &&
+			*dates[i].ContactImportantDateType.InternalType == "birthdate" {
+			birthdate := dateResponse
+			contact.Birthdate = &birthdate
+			contact.Age = calculateAgeFromDate(&dates[i])
+		}
+	}
+	return nil
+}
+
 func (s *ContactService) fetchBirthdayAndGroupMaps(contactIDs []string) (map[string]*models.ContactImportantDate, map[string][]dto.ContactGroupBrief) {
 	birthdayMap := make(map[string]*models.ContactImportantDate)
 	if len(contactIDs) > 0 {
@@ -781,6 +849,7 @@ func (s *ContactService) fetchBirthdayAndGroupMaps(contactIDs []string) (map[str
 		s.db.Joins("JOIN contact_important_date_types ON contact_important_date_types.id = contact_important_dates.contact_important_date_type_id").
 			Where("contact_important_dates.contact_id IN ? AND contact_important_date_types.internal_type = ?", contactIDs, "birthdate").
 			Where("contact_important_dates.deleted_at IS NULL").
+			Order("contact_important_dates.created_at ASC, contact_important_dates.id ASC").
 			Find(&dates)
 		for i := range dates {
 			birthdayMap[dates[i].ContactID] = &dates[i]
@@ -812,26 +881,14 @@ func (s *ContactService) fetchBirthdayAndGroupMaps(contactIDs []string) (map[str
 func enrichContactsWithBirthdayAndGroups(result []dto.ContactResponse, contacts []models.Contact, birthdayMap map[string]*models.ContactImportantDate, groupMap map[string][]dto.ContactGroupBrief) {
 	for i, c := range contacts {
 		if bd, ok := birthdayMap[c.ID]; ok {
-			result[i].Birthday = formatBirthdayStr(bd)
+			birthdate := toImportantDateResponse(bd)
+			result[i].Birthdate = &birthdate
 			result[i].Age = calculateAgeFromDate(bd)
 		}
 		if groups, ok := groupMap[c.ID]; ok {
 			result[i].Groups = groups
 		}
 	}
-}
-
-func formatBirthdayStr(d *models.ContactImportantDate) *string {
-	if d.Month == nil || d.Day == nil {
-		return nil
-	}
-	var s string
-	if d.Year != nil {
-		s = fmt.Sprintf("%04d-%02d-%02d", *d.Year, *d.Month, *d.Day)
-	} else {
-		s = fmt.Sprintf("--%02d-%02d", *d.Month, *d.Day)
-	}
-	return &s
 }
 
 func calculateAgeFromDate(d *models.ContactImportantDate) *int {

@@ -10,13 +10,65 @@ import {
 } from "./importantDatesModuleTestHarness";
 
 describe("ImportantDatesModule payloads", () => {
+  it("does not offer singleton types that already exist when adding", async () => {
+    const user = userEvent.setup();
+    Object.assign(mockDateTypesReturn as object, {
+      data: [
+        {
+          id: 10,
+          label: "Birthdate",
+          internal_type: "birthdate",
+          can_be_deleted: false,
+        },
+        {
+          id: 11,
+          label: "Deceased date",
+          internal_type: "deceased_date",
+          can_be_deleted: false,
+        },
+        {
+          id: 12,
+          label: "Anniversary",
+          internal_type: null,
+          can_be_deleted: true,
+        },
+      ],
+    });
+    Object.assign(mockDatesReturn as object, {
+      data: [
+        {
+          id: 1,
+          contact_id: "c1",
+          label: "Birthdate",
+          day: 15,
+          month: 3,
+          year: 1990,
+          calendar_type: "gregorian",
+          contact_important_date_type_id: 10,
+        },
+      ],
+      isLoading: false,
+    });
+    renderImportantDatesModule();
+
+    await user.click(screen.getByText("Add"));
+    await user.click(screen.getByRole("combobox"));
+
+    expect(screen.queryByTitle("Birthdate")).not.toBeInTheDocument();
+    expect(await screen.findByTitle("Deceased date")).toBeInTheDocument();
+    expect(screen.getByTitle("Anniversary")).toBeInTheDocument();
+  });
+
   it("submits month-year payload without faking day", async () => {
     const user = userEvent.setup();
     renderImportantDatesModule();
 
     await user.click(screen.getByText("Add"));
     await user.click(screen.getByTestId("mock-calendar-change-month"));
-    await user.type(screen.getByRole("textbox", { name: /Label|label/i }), "Partial Test");
+    await user.type(
+      screen.getByRole("textbox", { name: /Label|label/i }),
+      "Partial Test",
+    );
     await user.click(screen.getByRole("button", { name: /Save|OK/i }));
 
     await waitFor(() => {
@@ -41,7 +93,10 @@ describe("ImportantDatesModule payloads", () => {
 
     await user.click(screen.getByText("Add"));
     await user.click(screen.getByTestId("mock-calendar-change-year"));
-    await user.type(screen.getByRole("textbox", { name: /Label|label/i }), "Founding Year");
+    await user.type(
+      screen.getByRole("textbox", { name: /Label|label/i }),
+      "Founding Year",
+    );
     await user.click(screen.getByRole("button", { name: /Save|OK/i }));
 
     await waitFor(() => {
@@ -66,7 +121,10 @@ describe("ImportantDatesModule payloads", () => {
 
     await user.click(screen.getByText("Add"));
     await user.click(screen.getByTestId("mock-calendar-change-month-day"));
-    await user.type(screen.getByRole("textbox", { name: /Label|label/i }), "Nameday");
+    await user.type(
+      screen.getByRole("textbox", { name: /Label|label/i }),
+      "Nameday",
+    );
     await user.click(screen.getByRole("button", { name: /Save|OK/i }));
 
     await waitFor(() => {
@@ -90,7 +148,10 @@ describe("ImportantDatesModule payloads", () => {
     renderImportantDatesModule();
 
     await user.click(screen.getByRole("button", { name: /add/i }));
-    await user.type(screen.getByRole("textbox", { name: /label/i }), "Graduation Day");
+    await user.type(
+      screen.getByRole("textbox", { name: /label/i }),
+      "Graduation Day",
+    );
     await user.click(screen.getByRole("button", { name: /ok/i }));
 
     await waitFor(() => {
@@ -117,7 +178,10 @@ describe("ImportantDatesModule payloads", () => {
 
     await user.click(screen.getByText("Add"));
     await user.click(screen.getByTestId("mock-calendar-change-lunar-full"));
-    await user.type(screen.getByRole("textbox", { name: /Label|label/i }), "Lunar Birthday");
+    await user.type(
+      screen.getByRole("textbox", { name: /Label|label/i }),
+      "Lunar Birthday",
+    );
     await user.click(screen.getByRole("button", { name: /Save|OK/i }));
 
     await waitFor(() => {
@@ -142,7 +206,12 @@ describe("ImportantDatesModule payloads", () => {
     const user = userEvent.setup();
     Object.assign(mockDateTypesReturn as object, {
       data: [
-        { id: 10, label: "Birthdate", internal_type: "birthdate", can_be_deleted: false },
+        {
+          id: 10,
+          label: "Birthdate",
+          internal_type: "birthdate",
+          can_be_deleted: false,
+        },
       ],
     });
     renderImportantDatesModule();
@@ -173,26 +242,30 @@ describe("ImportantDatesModule payloads", () => {
   it("restores existing year-only dates and keeps sparse update payload", async () => {
     const user = userEvent.setup();
     Object.assign(mockDatesReturn as object, {
-      data: [{
-        id: 77,
-        contact_id: "c1",
-        label: "Founding Year",
-        day: null,
-        month: null,
-        year: 2025,
-        date_precision: "year",
-        calendar_type: "gregorian",
-        original_day: null,
-        original_month: null,
-        original_year: null,
-        contact_important_date_type_id: null,
-      }],
+      data: [
+        {
+          id: 77,
+          contact_id: "c1",
+          label: "Founding Year",
+          day: null,
+          month: null,
+          year: 2025,
+          date_precision: "year",
+          calendar_type: "gregorian",
+          original_day: null,
+          original_month: null,
+          original_year: null,
+          contact_important_date_type_id: null,
+        },
+      ],
       isLoading: false,
     });
     renderImportantDatesModule();
 
     await user.click(screen.getByRole("button", { name: "edit" }));
-    expect(screen.getByTestId("calendar-picker-value")).toHaveTextContent('"datePrecision":"year"');
+    expect(screen.getByTestId("calendar-picker-value")).toHaveTextContent(
+      '"datePrecision":"year"',
+    );
 
     await user.click(screen.getByRole("button", { name: /Save|OK/i }));
     await waitFor(() => {
