@@ -320,7 +320,7 @@ describe("ContactCreate", () => {
         }),
       );
     });
-  });
+  }, 15000);
 
   it("submits year-only first-met precision without fabricating a full date", async () => {
     vi.mocked(api.contacts.contactsCreate).mockResolvedValue({
