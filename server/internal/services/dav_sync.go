@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -18,6 +19,7 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/pkg/response"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -412,11 +414,63 @@ func (s *DavSyncService) upsertFromObject(
 	var action string
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var state models.ContactSubscriptionState
+		stateErr := tx.Where("address_book_subscription_id = ? AND distant_uri = ?", subID, obj.Path).First(&state).Error
+		if stateErr != nil && !errors.Is(stateErr, gorm.ErrRecordNotFound) {
+			return stateErr
+		}
+		if stateErr == nil && state.DistantEtag != "" && state.DistantEtag == obj.ETag {
+			var mappedContact models.Contact
+			findErr := tx.Select("id").Where("id = ? AND vault_id = ?", state.ContactID, vaultID).First(&mappedContact).Error
+			if findErr == nil {
+				contactID = state.ContactID
+				action = "skipped"
+				return nil
+			}
+			if !errors.Is(findErr, gorm.ErrRecordNotFound) {
+				return findErr
+			}
+			if err := tx.Delete(&state).Error; err != nil {
+				return err
+			}
+			state = models.ContactSubscriptionState{}
+			stateErr = gorm.ErrRecordNotFound
+		}
+
+		existingContactID := ""
+		if stateErr == nil {
+			existingContactID = state.ContactID
+		}
+
 		var upsertErr error
 		contactID, action, upsertErr = s.vcardService.UpsertContactFromVCard(
-			tx, obj.Card, vaultID, userID, accountID, obj.Path, obj.ETag, lastSyncAt,
+			tx, obj.Card, vaultID, userID, accountID, existingContactID, obj.Path, obj.ETag, lastSyncAt,
 		)
-		return upsertErr
+		if upsertErr != nil {
+			return upsertErr
+		}
+		if stateErr == nil && state.ContactID != contactID {
+			if err := tx.Delete(&state).Error; err != nil {
+				return err
+			}
+			state = models.ContactSubscriptionState{}
+			stateErr = gorm.ErrRecordNotFound
+		}
+
+		stateEtag := obj.ETag
+		if action == "conflict_local_wins" {
+			if stateErr == nil {
+				stateEtag = state.DistantEtag
+			} else {
+				var contact models.Contact
+				if err := tx.Select("distant_etag").First(&contact, "id = ?", contactID).Error; err != nil {
+					return err
+				}
+				stateEtag = ptrToStr(contact.DistantEtag)
+			}
+		}
+
+		return upsertContactSubscriptionState(tx, contactID, subID, obj.Path, stateEtag)
 	})
 	if err != nil {
 		errMsg := fmt.Sprintf("upsert failed: %v", err)
@@ -439,6 +493,19 @@ func (s *DavSyncService) upsertFromObject(
 		result.Skipped++
 		s.logSyncAction(subID, nil, obj.Path, obj.ETag, "skipped", "")
 	}
+}
+
+func upsertContactSubscriptionState(db *gorm.DB, contactID, subID, distantURI, distantEtag string) error {
+	state := models.ContactSubscriptionState{
+		ContactID:                 contactID,
+		AddressBookSubscriptionID: subID,
+		DistantURI:                distantURI,
+		DistantEtag:               distantEtag,
+	}
+	return db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "contact_id"}, {Name: "address_book_subscription_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"distant_uri", "distant_etag", "updated_at"}),
+	}).Create(&state).Error
 }
 
 func (s *DavSyncService) processDeletedPaths(

@@ -276,17 +276,23 @@ func TestDavPushService_PushContactDelete_NoState(t *testing.T) {
 	pushSvc.PushContactDelete(contact.ID, vaultID)
 }
 
-func TestDavPushService_PushSkipsPullOrigin(t *testing.T) {
+func TestDavPushService_PushUpdatesPullOrigin(t *testing.T) {
 	pushSvc, clientSvc, _, _, vaultID, userID, _ := setupDavPushTest(t)
 
 	sub := createPushSubscription(t, clientSvc, vaultID, userID, SyncWayBoth)
+	addressBookPath := "/addressbooks/user/default/"
+	if err := pushSvc.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).Update("address_book_path", addressBookPath).Error; err != nil {
+		t.Fatalf("failed to set address book path: %v", err)
+	}
 
-	distantURI := "https://dav.example.com/contacts/pulled-contact.vcf"
+	distantURI := addressBookPath + "pulled-contact.vcf"
+	distantUUID := "remote-contact-uid"
 	contact := models.Contact{
-		VaultID:    vaultID,
-		FirstName:  strPtrOrNil("Pulled"),
-		LastName:   strPtrOrNil("Contact"),
-		DistantURI: &distantURI,
+		VaultID:     vaultID,
+		FirstName:   strPtrOrNil("Pulled"),
+		LastName:    strPtrOrNil("Contact"),
+		DistantUUID: &distantUUID,
+		DistantURI:  &distantURI,
 	}
 	pushSvc.db.Create(&contact)
 
@@ -296,20 +302,54 @@ func TestDavPushService_PushSkipsPullOrigin(t *testing.T) {
 		VaultID:   vaultID,
 	})
 
+	var putPath string
+	var pushedUID string
 	mc := &mockCardDAVClient{
 		putAddrObjFn: func(ctx context.Context, path string, card vcard.Card) (*carddav.AddressObject, error) {
-			t.Error("PutAddressObject should not be called for contact pulled from this subscription")
-			return nil, nil
+			putPath = path
+			pushedUID = card.Value(vcard.FieldUID)
+			return &carddav.AddressObject{Path: path, ETag: "updated-etag"}, nil
 		},
 	}
 	pushSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
 
 	pushSvc.PushContactChange(contact.ID, vaultID)
 
-	var logs []models.DavSyncLog
-	pushSvc.db.Where("address_book_subscription_id = ? AND action = ?", sub.ID, "skipped_push_origin").Find(&logs)
-	if len(logs) != 1 {
-		t.Errorf("expected 1 skipped_push_origin log, got %d", len(logs))
+	if putPath != distantURI {
+		t.Fatalf("expected PUT to original URI %q, got %q", distantURI, putPath)
+	}
+	if pushedUID != distantUUID {
+		t.Fatalf("expected original vCard UID %q, got %q", distantUUID, pushedUID)
+	}
+
+	var state models.ContactSubscriptionState
+	if err := pushSvc.db.Where("contact_id = ? AND address_book_subscription_id = ?", contact.ID, sub.ID).First(&state).Error; err != nil {
+		t.Fatalf("expected subscription state to be created: %v", err)
+	}
+	if state.DistantURI != distantURI || state.DistantEtag != "updated-etag" {
+		t.Fatalf("unexpected subscription state: %+v", state)
+	}
+}
+
+func TestDavURIHasBase(t *testing.T) {
+	tests := []struct {
+		name       string
+		distantURI string
+		base       string
+		want       bool
+	}{
+		{name: "relative address book path", distantURI: "/addressbooks/user/default/card.vcf", base: "/addressbooks/user/default/", want: true},
+		{name: "absolute same host", distantURI: "https://dav.example.com/addressbooks/user/default/card.vcf", base: "https://dav.example.com/", want: true},
+		{name: "different host", distantURI: "https://other.example.com/addressbooks/card.vcf", base: "https://dav.example.com/", want: false},
+		{name: "path boundary", distantURI: "/addressbooks/user/default-other/card.vcf", base: "/addressbooks/user/default/", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := davURIHasBase(tt.distantURI, tt.base); got != tt.want {
+				t.Fatalf("davURIHasBase(%q, %q) = %v, want %v", tt.distantURI, tt.base, got, tt.want)
+			}
+		})
 	}
 }
 

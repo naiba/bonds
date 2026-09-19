@@ -8,8 +8,8 @@ import "time"
 type ContactSubscriptionState struct {
 	ID                        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
 	ContactID                 string    `json:"contact_id" gorm:"type:text;not null;uniqueIndex:idx_contact_sub"`
-	AddressBookSubscriptionID string    `json:"address_book_subscription_id" gorm:"type:text;not null;uniqueIndex:idx_contact_sub"`
-	DistantURI                string    `json:"distant_uri" gorm:"size:2096;not null"`
+	AddressBookSubscriptionID string    `json:"address_book_subscription_id" gorm:"type:text;not null;uniqueIndex:idx_contact_sub;index:idx_subscription_uri,priority:1"`
+	DistantURI                string    `json:"distant_uri" gorm:"size:2096;not null;index:idx_subscription_uri,priority:2"`
 	DistantEtag               string    `json:"distant_etag" gorm:"size:256"`
 	CreatedAt                 time.Time `json:"created_at"`
 	UpdatedAt                 time.Time `json:"updated_at"`

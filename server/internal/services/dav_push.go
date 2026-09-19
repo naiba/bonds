@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -80,13 +82,12 @@ func (s *DavPushService) pushContactChange(contactID, vaultID string) {
 		log.Printf("[dav-push] failed to export contact %s to vCard: %v", contactID, err)
 		return
 	}
+	if contact.DistantUUID != nil && strings.TrimSpace(*contact.DistantUUID) != "" {
+		// A CardDAV UID is stable even when the object is updated in place.
+		card.SetValue("UID", *contact.DistantUUID)
+	}
 
 	for _, sub := range subs {
-		if contact.DistantURI != nil && strings.HasPrefix(*contact.DistantURI, strings.TrimRight(sub.URI, "/")) {
-			s.logPushAction(sub.ID, &contactID, ptrToStr(contact.DistantURI), "", "skipped_push_origin", "contact was pulled from this subscription")
-			continue
-		}
-
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -110,11 +111,20 @@ func (s *DavPushService) pushContactChange(contactID, vaultID string) {
 			defer cancel()
 
 			var state models.ContactSubscriptionState
-			hasState := s.db.Where("contact_id = ? AND address_book_subscription_id = ?", contactID, sub.ID).First(&state).Error == nil
+			stateErr := s.db.Where("contact_id = ? AND address_book_subscription_id = ?", contactID, sub.ID).First(&state).Error
+			hasState := stateErr == nil
+			if stateErr != nil && !errors.Is(stateErr, gorm.ErrRecordNotFound) {
+				s.logPushAction(sub.ID, &contactID, "", "", "error", fmt.Sprintf("load subscription state failed: %v", stateErr))
+				return
+			}
 
 			var putPath string
 			if hasState {
 				putPath = state.DistantURI
+			} else if contact.DistantURI != nil && distantURIIsWithinSubscription(*contact.DistantURI, &sub) {
+				// Compatibility for contacts pulled before pull-side subscription states
+				// were recorded. Update the original CardDAV object in place.
+				putPath = *contact.DistantURI
 			} else {
 				basePath := sub.AddressBookPath
 				if basePath == "" {
@@ -139,23 +149,60 @@ func (s *DavPushService) pushContactChange(contactID, vaultID string) {
 				resultPath = putPath
 			}
 
-			if hasState {
-				s.db.Model(&state).Updates(map[string]interface{}{
-					"distant_uri":  resultPath,
-					"distant_etag": resultEtag,
-				})
-			} else {
-				s.db.Create(&models.ContactSubscriptionState{
-					ContactID:                 contactID,
-					AddressBookSubscriptionID: sub.ID,
-					DistantURI:                resultPath,
-					DistantEtag:               resultEtag,
-				})
+			if err := upsertContactSubscriptionState(s.db, contactID, sub.ID, resultPath, resultEtag); err != nil {
+				s.logPushAction(sub.ID, &contactID, resultPath, resultEtag, "error", fmt.Sprintf("save subscription state failed: %v", err))
+				return
 			}
 
 			s.logPushAction(sub.ID, &contactID, resultPath, resultEtag, "pushed", "")
 		}()
 	}
+}
+
+func distantURIIsWithinSubscription(distantURI string, sub *models.AddressBookSubscription) bool {
+	for _, base := range []string{sub.AddressBookPath, sub.URI} {
+		if davURIHasBase(distantURI, base) {
+			return true
+		}
+	}
+	return false
+}
+
+func davURIHasBase(rawURI, rawBase string) bool {
+	if rawURI == "" || rawBase == "" {
+		return false
+	}
+
+	parsedURI, uriErr := url.Parse(rawURI)
+	parsedBase, baseErr := url.Parse(rawBase)
+	if uriErr != nil || baseErr != nil {
+		return false
+	}
+	if parsedURI.Host != "" && parsedBase.Host != "" && !strings.EqualFold(parsedURI.Host, parsedBase.Host) {
+		return false
+	}
+
+	uriPath := parsedURI.Path
+	basePath := parsedBase.Path
+	if uriPath == "" {
+		if parsedURI.Host != "" {
+			uriPath = "/"
+		} else {
+			uriPath = rawURI
+		}
+	}
+	if basePath == "" {
+		if parsedBase.Host != "" {
+			basePath = "/"
+		} else {
+			basePath = rawBase
+		}
+	}
+	basePath = strings.TrimRight(basePath, "/")
+	if basePath == "" {
+		return strings.HasPrefix(uriPath, "/")
+	}
+	return uriPath == basePath || strings.HasPrefix(uriPath, basePath+"/")
 }
 
 func (s *DavPushService) PushContactDelete(contactID, vaultID string) {

@@ -598,45 +598,58 @@ func extractFullNameFromCard(card vcard.Card) vcardNameComponents {
 }
 
 // UpsertContactFromVCard creates or updates a contact from a vCard.
-// If distantURI is non-empty, it looks up an existing contact by DistantURI in the vault.
+// If existingContactID is non-empty, it identifies the contact through its per-subscription
+// DAV state. Otherwise, distantURI is used for compatibility with legacy pull records.
 // lastSyncAt is used for conflict detection: if the contact was locally modified after lastSyncAt, the local version wins.
 // Returns the contact ID and an action string: "created", "updated", "skipped", or "conflict_local_wins".
-func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID string, distantURI, distantEtag string, lastSyncAt *time.Time) (contactID string, action string, err error) {
-	if distantURI != "" {
-		var existing models.Contact
-		if findErr := tx.Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error; findErr == nil {
-			if existing.DistantEtag != nil && *existing.DistantEtag == distantEtag {
-				return existing.ID, "skipped", nil
-			}
-
-			// Conflict detection: if contact was locally modified since last sync, local wins
-			if lastSyncAt != nil && existing.LastUpdatedAt != nil && existing.LastUpdatedAt.After(*lastSyncAt) {
-				return existing.ID, "conflict_local_wins", nil
-			}
-
-			nameComponents := extractFullNameFromCard(card)
-			nickname := card.Value(vcard.FieldNickname)
-			title := card.Value(vcard.FieldTitle)
-			now := time.Now()
-
-			existing.FirstName = strPtrOrNil(nameComponents.firstName)
-			existing.LastName = strPtrOrNil(nameComponents.lastName)
-			existing.MiddleName = strPtrOrNil(nameComponents.middleName)
-			existing.Prefix = strPtrOrNil(nameComponents.prefix)
-			existing.Suffix = strPtrOrNil(nameComponents.suffix)
-			existing.Nickname = strPtrOrNil(nickname)
-			existing.JobPosition = strPtrOrNil(title)
-			existing.DistantEtag = strPtrOrNil(distantEtag)
-			existing.LastUpdatedAt = &now
-			if err := tx.Save(&existing).Error; err != nil {
-				return "", "", err
-			}
-
-			if err := replaceVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
-				return "", "", err
-			}
-			return existing.ID, "updated", nil
+func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID, existingContactID, distantURI, distantEtag string, lastSyncAt *time.Time) (contactID string, action string, err error) {
+	var existing models.Contact
+	var findErr error
+	if existingContactID != "" {
+		findErr = tx.Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
+	}
+	if existingContactID == "" || errors.Is(findErr, gorm.ErrRecordNotFound) {
+		if distantURI != "" {
+			findErr = tx.Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
+		} else {
+			findErr = gorm.ErrRecordNotFound
 		}
+	}
+	if findErr != nil && !errors.Is(findErr, gorm.ErrRecordNotFound) {
+		return "", "", findErr
+	}
+	if findErr == nil {
+		if existing.DistantEtag != nil && *existing.DistantEtag == distantEtag {
+			return existing.ID, "skipped", nil
+		}
+
+		// Conflict detection: if contact was locally modified since last sync, local wins
+		if lastSyncAt != nil && existing.LastUpdatedAt != nil && existing.LastUpdatedAt.After(*lastSyncAt) {
+			return existing.ID, "conflict_local_wins", nil
+		}
+
+		nameComponents := extractFullNameFromCard(card)
+		nickname := card.Value(vcard.FieldNickname)
+		title := card.Value(vcard.FieldTitle)
+		now := time.Now()
+
+		existing.FirstName = strPtrOrNil(nameComponents.firstName)
+		existing.LastName = strPtrOrNil(nameComponents.lastName)
+		existing.MiddleName = strPtrOrNil(nameComponents.middleName)
+		existing.Prefix = strPtrOrNil(nameComponents.prefix)
+		existing.Suffix = strPtrOrNil(nameComponents.suffix)
+		existing.Nickname = strPtrOrNil(nickname)
+		existing.JobPosition = strPtrOrNil(title)
+		existing.DistantEtag = strPtrOrNil(distantEtag)
+		existing.LastUpdatedAt = &now
+		if err := tx.Save(&existing).Error; err != nil {
+			return "", "", err
+		}
+
+		if err := replaceVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
+			return "", "", err
+		}
+		return existing.ID, "updated", nil
 	}
 
 	nameComponents := extractFullNameFromCard(card)
