@@ -123,7 +123,9 @@ export default function VaultGraph() {
                 allowClear
                 size="small"
                 maxTagCount="responsive"
-                style={{ minWidth: 180 }}
+                // Responsive tags must measure against a stable width: an
+                // auto-sized Select can oscillate between a tag and "+1".
+                style={{ width: 220, maxWidth: "100%" }}
                 value={[...(filters[facet.key] ?? [])]}
                 onChange={(values: string[]) => selectFacet(facet.key, values)}
                 placeholder={t(`vault.graph.facet.${facet.key}`)}
