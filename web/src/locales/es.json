@@ -850,7 +850,7 @@
       "add": "Añadir",
       "modal_add": "Añadir nota",
       "modal_edit": "Editar nota",
-      "title_placeholder": "Título",
+      "title_placeholder": "Título (opcional)",
       "body_placeholder": "Escribe tu nota…",
       "no_notes": "No hay notas aún",
       "delete_confirm": "¿Eliminar esta nota?",

@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"math"
+	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/markdown"
@@ -80,7 +81,7 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 		ContactID:  contactID,
 		VaultID:    vaultID,
 		AuthorID:   strPtrOrNil(authorID),
-		Title:      strPtrOrNil(req.Title),
+		Title:      strPtrOrNil(strings.TrimSpace(req.Title)),
 		Body:       req.Body,
 		BodyFormat: markdown.NormalizeFormat(req.BodyFormat),
 		EmotionID:  req.EmotionID,
@@ -122,7 +123,7 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 			}
 			return err
 		}
-		note.Title = strPtrOrNil(req.Title)
+		note.Title = strPtrOrNil(strings.TrimSpace(req.Title))
 		note.Body = req.Body
 		if req.BodyFormat != "" {
 			note.BodyFormat = markdown.NormalizeFormat(req.BodyFormat)

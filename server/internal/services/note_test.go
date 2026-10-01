@@ -66,6 +66,26 @@ func TestCreateNote(t *testing.T) {
 	}
 }
 
+func TestNoteWhitespaceTitleIsAbsent(t *testing.T) {
+	svc, contactID, vaultID, userID := setupNoteTest(t)
+	note, err := svc.Create(contactID, vaultID, userID, dto.CreateNoteRequest{
+		Title: "   ", Body: "A quick fact",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if note.Title != "" {
+		t.Fatalf("title = %q, want empty", note.Title)
+	}
+	var stored models.Note
+	if err := svc.db.First(&stored, note.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Title != nil {
+		t.Fatalf("title in DB = %v, want NULL", stored.Title)
+	}
+}
+
 func TestNoteMarkdownRendersAndTracksUploadedFiles(t *testing.T) {
 	svc, contactID, vaultID, userID := setupNoteTest(t)
 	file := models.File{VaultID: vaultID, UUID: "note-markdown-file", Name: "brief.pdf", MimeType: "application/pdf", Type: "document"}

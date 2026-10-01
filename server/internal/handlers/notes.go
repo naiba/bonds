@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v5"
 	"github.com/naiba/bonds/internal/dto"
@@ -80,6 +81,9 @@ func (h *NoteHandler) Create(c *echo.Context) error {
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
 	}
+	if strings.TrimSpace(req.Body) == "" {
+		return response.ValidationError(c, map[string]string{"validation": "body is required"})
+	}
 
 	note, err := h.noteService.Create(contactID, vaultID, userID, req)
 	if err != nil {
@@ -130,6 +134,9 @@ func (h *NoteHandler) Update(c *echo.Context) error {
 	}
 	if err := validateRequest(req); err != nil {
 		return response.ValidationError(c, map[string]string{"validation": err.Error()})
+	}
+	if strings.TrimSpace(req.Body) == "" {
+		return response.ValidationError(c, map[string]string{"validation": "body is required"})
 	}
 
 	note, err := h.noteService.Update(uint(id), contactID, vaultID, req)

@@ -151,7 +151,14 @@ describe("NotesModule local query invalidation", () => {
 
     await screen.findByText("Existing note");
     await user.click(screen.getByRole("button", { name: /add/i }));
-    await user.type(screen.getByPlaceholderText("Title"), "Created note");
+    await user.type(
+      screen.getByPlaceholderText("Title (optional)"),
+      "Created note",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Write your note…" }),
+      "Created body",
+    );
     await user.click(screen.getByRole("button", { name: /save/i }));
 
     await waitFor(() =>
@@ -160,6 +167,56 @@ describe("NotesModule local query invalidation", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: notesQueryKey,
     });
+  });
+
+  it("saves a body-only note while rejecting an empty or whitespace-only body", async () => {
+    const user = userEvent.setup();
+    renderNotesModule();
+
+    await screen.findByText("Existing note");
+    await user.click(screen.getByRole("button", { name: /add/i }));
+    const save = screen.getByRole("button", { name: /save/i });
+    const body = screen.getByRole("textbox", { name: "Write your note…" });
+    expect(screen.getByPlaceholderText("Title (optional)")).toHaveValue("");
+    expect(save).toBeDisabled();
+    await user.type(body, "   ");
+    expect(save).toBeDisabled();
+    await user.type(body, "Remember their favorite tea");
+    await user.click(save);
+
+    await waitFor(() =>
+      expect(api.notes.contactsNotesCreate).toHaveBeenCalledWith("101", "202", {
+        title: "",
+        body: "   Remember their favorite tea",
+        body_format: "markdown",
+      }),
+    );
+  });
+
+  it("renders and edits an untitled note without an empty title row", async () => {
+    vi.mocked(api.notes.contactsNotesList).mockResolvedValue({
+      data: [{ ...existingNote, title: "", body: "Favorite tea is oolong" }],
+      meta: { page: 1, per_page: 15, total: 1, total_pages: 1 },
+    });
+    const user = userEvent.setup();
+    const { view } = renderNotesModule();
+
+    await screen.findByText("Favorite tea is oolong");
+    expect(
+      view.container.querySelector(".ant-list-item-meta-title"),
+    ).toBeNull();
+    await user.click(screen.getByRole("button", { name: "edit" }));
+    expect(screen.getByPlaceholderText("Title (optional)")).toHaveValue("");
+    await user.click(screen.getByRole("button", { name: /update/i }));
+
+    await waitFor(() =>
+      expect(api.notes.contactsNotesUpdate).toHaveBeenCalledWith(
+        "101",
+        "202",
+        7,
+        { title: "", body: "Favorite tea is oolong", body_format: "markdown" },
+      ),
+    );
   });
 
   it("keeps invalidating the notes list when update succeeds", async () => {
@@ -227,12 +284,19 @@ describe("NotesModule Feed invalidation", () => {
 
     await screen.findByText("Existing note");
     await user.click(screen.getByRole("button", { name: /add/i }));
-    await user.type(screen.getByPlaceholderText("Title"), "Created note");
+    await user.type(
+      screen.getByPlaceholderText("Title (optional)"),
+      "Created note",
+    );
+    await user.type(
+      screen.getByRole("textbox", { name: "Write your note…" }),
+      "Created body",
+    );
     await user.click(screen.getByRole("button", { name: /save/i }));
     await waitFor(() =>
       expect(api.notes.contactsNotesCreate).toHaveBeenCalledWith("101", "202", {
         title: "Created note",
-        body: "",
+        body: "Created body",
         body_format: "markdown",
       }),
     );

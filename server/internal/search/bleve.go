@@ -218,7 +218,17 @@ func nameFromHit(hit *bleveSearch.DocumentMatch) string {
 		return name
 	}
 	title, _ := hit.Fields["title"].(string)
-	return title
+	if strings.TrimSpace(title) != "" {
+		return title
+	}
+	// Untitled notes still need an identifiable label in search results. Keep
+	// the stored title empty and derive only a bounded display preview.
+	body, _ := hit.Fields["body"].(string)
+	preview := []rune(strings.Join(strings.Fields(body), " "))
+	if len(preview) > 100 {
+		return string(preview[:100]) + "…"
+	}
+	return string(preview)
 }
 
 func contactIDFromHit(hit *bleveSearch.DocumentMatch) string {

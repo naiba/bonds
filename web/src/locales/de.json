@@ -850,7 +850,7 @@
       "add": "Hinzufügen",
       "modal_add": "Notiz hinzufügen",
       "modal_edit": "Notiz bearbeiten",
-      "title_placeholder": "Titel",
+      "title_placeholder": "Titel (optional)",
       "body_placeholder": "Notiz schreiben…",
       "no_notes": "Noch keine Notizen",
       "delete_confirm": "Diese Notiz löschen?",

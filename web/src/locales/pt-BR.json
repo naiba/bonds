@@ -850,7 +850,7 @@
       "add": "Adicionar",
       "modal_add": "Adicionar anotação",
       "modal_edit": "Editar anotação",
-      "title_placeholder": "Título",
+      "title_placeholder": "Título (opcional)",
       "body_placeholder": "Escreva sua anotação…",
       "no_notes": "Nenhuma anotação ainda",
       "delete_confirm": "Excluir esta anotação?",

@@ -850,7 +850,7 @@
       "add": "添加",
       "modal_add": "添加笔记",
       "modal_edit": "编辑笔记",
-      "title_placeholder": "标题",
+      "title_placeholder": "标题（可选）",
       "body_placeholder": "写下你的笔记…",
       "no_notes": "暂无笔记",
       "delete_confirm": "确定删除此笔记？",

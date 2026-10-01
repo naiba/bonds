@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { forwardRef, lazy, Suspense } from "react";
 import { Skeleton } from "antd";
 
 const VditorMarkdownEditor = lazy(() => import("./VditorMarkdownEditor"));
@@ -13,12 +13,20 @@ export type MarkdownEditorProps = {
   readonly variant?: "full" | "compact";
 };
 
-export default function MarkdownEditor(props: MarkdownEditorProps) {
-  return (
-    <Suspense
-      fallback={<Skeleton.Input active block style={{ height: 180 }} />}
-    >
-      <VditorMarkdownEditor {...props} />
-    </Suspense>
-  );
-}
+export type MarkdownEditorHandle = {
+  getValue: () => string;
+};
+
+const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
+  function MarkdownEditor(props, ref) {
+    return (
+      <Suspense
+        fallback={<Skeleton.Input active block style={{ height: 180 }} />}
+      >
+        <VditorMarkdownEditor {...props} ref={ref} />
+      </Suspense>
+    );
+  },
+);
+
+export default MarkdownEditor;

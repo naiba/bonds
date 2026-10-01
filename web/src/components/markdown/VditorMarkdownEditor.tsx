@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import Vditor from "vditor";
 import "vditor/dist/index.css";
 import { api, httpClient } from "@/api";
@@ -6,7 +6,10 @@ import type { SearchResult } from "@/api";
 import i18n from "@/i18n";
 import { useTheme } from "@/stores/theme";
 import { serializeContactMention } from "@/components/journal/contactMentionSerialization";
-import type { MarkdownEditorProps } from "./MarkdownEditor";
+import type {
+  MarkdownEditorHandle,
+  MarkdownEditorProps,
+} from "./MarkdownEditor";
 
 const VDITOR_ASSET_ROOT = "/vendor/vditor";
 const MODE_STORAGE_KEY = "bonds-markdown-editor-mode";
@@ -59,21 +62,43 @@ function canonicalizeLocalPreviewURLs(
   return canonical;
 }
 
-export default function VditorMarkdownEditor({
-  vaultId,
-  contactId,
-  value,
-  onChange,
-  ariaLabel,
-  placeholder,
-  variant = "full",
-}: MarkdownEditorProps) {
+const VditorMarkdownEditor = forwardRef<
+  MarkdownEditorHandle,
+  MarkdownEditorProps
+>(function VditorMarkdownEditor(
+  {
+    vaultId,
+    contactId,
+    value,
+    onChange,
+    ariaLabel,
+    placeholder,
+    variant = "full",
+  }: MarkdownEditorProps,
+  ref,
+) {
   const hostRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Vditor | null>(null);
   const previewURLsRef = useRef(new Map<string, string>());
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   const { resolvedTheme } = useTheme();
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getValue: () => {
+        const editor = editorRef.current;
+        return editor
+          ? canonicalizeLocalPreviewURLs(
+              editor.getValue(),
+              previewURLsRef.current,
+            )
+          : valueRef.current;
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     valueRef.current = value;
@@ -339,4 +364,6 @@ export default function VditorMarkdownEditor({
   }, [value]);
 
   return <div ref={hostRef} className="bonds-markdown-editor" />;
-}
+});
+
+export default VditorMarkdownEditor;

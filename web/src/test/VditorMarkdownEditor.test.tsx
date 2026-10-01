@@ -1,7 +1,8 @@
-import { StrictMode } from "react";
+import { createRef, StrictMode } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import VditorMarkdownEditor from "@/components/markdown/VditorMarkdownEditor";
+import type { MarkdownEditorHandle } from "@/components/markdown/MarkdownEditor";
 import { api } from "@/api";
 
 type MockVditorOptions = {
@@ -175,5 +176,26 @@ describe("VditorMarkdownEditor uploads", () => {
 
     view.unmount();
     expect(vditorState.editors[0].destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the live editor value when input callbacks lag behind", async () => {
+    const ref = createRef<MarkdownEditorHandle>();
+    const onChange = vi.fn();
+    render(
+      <VditorMarkdownEditor
+        ref={ref}
+        vaultId="vault-1"
+        value="Favorite tea is"
+        onChange={onChange}
+        ariaLabel="Note body"
+        placeholder="Write a note"
+      />,
+    );
+    await waitFor(() => expect(vditorState.editor).not.toBeNull());
+    if (!vditorState.editor) throw new Error("editor was not created");
+    vditorState.editor.getValue = () => "Favorite tea is oolong";
+
+    expect(ref.current?.getValue()).toBe("Favorite tea is oolong");
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

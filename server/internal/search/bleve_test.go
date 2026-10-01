@@ -1,7 +1,10 @@
 package search
 
 import (
+	"strings"
 	"testing"
+
+	bleveSearch "github.com/blevesearch/bleve/v2/search"
 )
 
 func TestIndexAndSearch(t *testing.T) {
@@ -119,6 +122,50 @@ func TestSearch_returns_note_contact_id_when_note_matches(t *testing.T) {
 	}
 	if resp.Notes[0].ContactID != "c1" {
 		t.Fatalf("note contact_id = %q, want %q", resp.Notes[0].ContactID, "c1")
+	}
+}
+
+func TestSearchUntitledNoteUsesBoundedBodyPreview(t *testing.T) {
+	engine, err := NewBleveEngine(t.TempDir() + "/test.bleve")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer engine.Close()
+	if err := engine.IndexNote("n1", "v1", "c1", "", "Favorite   tea\nis oolong"); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.IndexNote("n2", "v1", "c2", "Named note", "Favorite tea is green"); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.IndexNote("n3", "v2", "c3", "", "Favorite tea is private"); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := engine.Search("v1", "Favorite", 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Notes) != 2 {
+		t.Fatalf("notes = %+v, want two notes from v1", resp.Notes)
+	}
+	for _, note := range resp.Notes {
+		switch note.ID {
+		case "n1":
+			if note.Name != "Favorite tea is oolong" {
+				t.Errorf("untitled note name = %q", note.Name)
+			}
+		case "n2":
+			if note.Name != "Named note" {
+				t.Errorf("named note name = %q", note.Name)
+			}
+		default:
+			t.Errorf("unexpected note from other vault: %+v", note)
+		}
+	}
+	preview := nameFromHit(&bleveSearch.DocumentMatch{Fields: map[string]any{
+		"entity_type": "note", "body": strings.Repeat("茶", 105),
+	}})
+	if preview != strings.Repeat("茶", 100)+"…" {
+		t.Errorf("long unicode preview = %q", preview)
 	}
 }
 

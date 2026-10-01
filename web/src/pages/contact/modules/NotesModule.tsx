@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Card,
   List,
@@ -18,6 +18,7 @@ import type { Note, PaginationMeta, APIError } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import MarkdownEditor from "@/components/markdown/MarkdownEditor";
+import type { MarkdownEditorHandle } from "@/components/markdown/MarkdownEditor";
 import MarkdownContent from "@/components/markdown/MarkdownContent";
 import {
   plainTextToMarkdown,
@@ -79,6 +80,7 @@ export default function NotesModule({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const editorRef = useRef<MarkdownEditorHandle>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(15);
   const queryClient = useQueryClient();
@@ -245,6 +247,8 @@ export default function NotesModule({
   }
 
   function handleSave() {
+    const currentBody = editorRef.current?.getValue() ?? body;
+    if (!currentBody.trim()) return;
     const mutationScope = {
       vaultId: String(vaultId),
       contactId: String(contactId),
@@ -254,12 +258,12 @@ export default function NotesModule({
       updateMutation.mutate({
         ...mutationScope,
         noteId: editingId,
-        values: { title, body, body_format: "markdown" },
+        values: { title, body: currentBody, body_format: "markdown" },
       });
     } else {
       createMutation.mutate({
         ...mutationScope,
-        values: { title, body, body_format: "markdown" },
+        values: { title, body: currentBody, body_format: "markdown" },
       });
     }
   }
@@ -350,7 +354,11 @@ export default function NotesModule({
             }
           >
             <List.Item.Meta
-              title={<span style={{ fontWeight: 500 }}>{note.title}</span>}
+              title={
+                note.title?.trim() ? (
+                  <span style={{ fontWeight: 500 }}>{note.title}</span>
+                ) : undefined
+              }
               description={
                 <>
                   <MarkdownContent
@@ -395,7 +403,7 @@ export default function NotesModule({
         okText={editingId ? t("common.update") : t("common.save")}
         cancelText={t("common.cancel")}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        okButtonProps={{ disabled: !title.trim() }}
+        okButtonProps={{ disabled: !body.trim() }}
         width={760}
         destroyOnHidden
       >
@@ -406,6 +414,7 @@ export default function NotesModule({
           style={{ marginBottom: 12 }}
         />
         <MarkdownEditor
+          ref={editorRef}
           vaultId={String(vaultId)}
           contactId={String(contactId)}
           ariaLabel={t("modules.notes.body_placeholder")}

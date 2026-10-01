@@ -1499,6 +1499,67 @@ func TestNoteCreate_Success(t *testing.T) {
 	}
 }
 
+func TestNoteUntitledCreateUpdateAndBodyRequired(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "note-untitled@example.com")
+	vault := ts.createTestVault(t, token, "Untitled Notes")
+	contact := ts.createTestContact(t, token, vault.ID, "John")
+	path := "/api/vaults/" + vault.ID + "/contacts/" + contact.ID + "/notes"
+
+	created := ts.doRequest(http.MethodPost, path, `{"body":"A quick fact"}`, token)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("untitled create: %d %s", created.Code, created.Body.String())
+	}
+	var note dto.NoteResponse
+	if err := json.Unmarshal(parseResponse(t, created).Data, &note); err != nil {
+		t.Fatal(err)
+	}
+	if note.Title != "" || note.Body != "A quick fact" {
+		t.Fatalf("untitled create response = %+v", note)
+	}
+	var stored models.Note
+	if err := ts.db.First(&stored, note.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Title != nil {
+		t.Fatalf("stored title = %v, want NULL", stored.Title)
+	}
+
+	named := ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d", path, note.ID),
+		`{"title":"Temporary title","body":"A quick fact"}`, token)
+	if named.Code != http.StatusOK {
+		t.Fatalf("named update: %d %s", named.Code, named.Body.String())
+	}
+
+	updated := ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d", path, note.ID),
+		`{"body":"An updated fact"}`, token)
+	if updated.Code != http.StatusOK {
+		t.Fatalf("untitled update: %d %s", updated.Code, updated.Body.String())
+	}
+	if err := json.Unmarshal(parseResponse(t, updated).Data, &note); err != nil {
+		t.Fatal(err)
+	}
+	if note.Title != "" || note.Body != "An updated fact" {
+		t.Fatalf("untitled update response = %+v", note)
+	}
+	if err := ts.db.First(&stored, note.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.Title != nil {
+		t.Fatalf("stored title after removal = %v, want NULL", stored.Title)
+	}
+	for _, payload := range []string{`{"title":"Has title"}`, `{"body":"   \n\t"}`} {
+		invalid := ts.doRequest(http.MethodPost, path, payload, token)
+		if invalid.Code != http.StatusUnprocessableEntity {
+			t.Errorf("create %s: got %d, want 422", payload, invalid.Code)
+		}
+		invalid = ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d", path, note.ID), payload, token)
+		if invalid.Code != http.StatusUnprocessableEntity {
+			t.Errorf("update %s: got %d, want 422", payload, invalid.Code)
+		}
+	}
+}
+
 func TestNoteCreate_Markdown(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "note-markdown@example.com")

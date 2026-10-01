@@ -98,6 +98,55 @@ test.describe("Contact Modules - Notes", () => {
     });
   });
 
+  test("creates and edits a body-only note without inventing a title", async ({
+    page,
+  }) => {
+    await setupVault(page, "note-untitled");
+    await goToContacts(page);
+    await createContact(page, "Quick", "Fact");
+    await navigateToTab(page, "Notes and records", true);
+
+    const notesCard = page.locator(".ant-card").filter({ hasText: /^Notes/ });
+    await notesCard.getByRole("button", { name: /add/i }).click();
+    const modal = page.locator(".ant-modal").filter({ hasText: /add note/i });
+    await expect(modal.getByPlaceholder("Title (optional)")).toBeEmpty();
+    await expect(modal.getByRole("button", { name: /save/i })).toBeDisabled();
+    await modal
+      .getByRole("textbox", { name: /write your note/i })
+      .pressSequentially("Favorite tea is oolong", { delay: 80 });
+
+    const creation = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/notes") && resp.request().method() === "POST",
+    );
+    await modal.getByRole("button", { name: /save/i }).click();
+    const created = await creation;
+    expect(created.status()).toBe(201);
+    const createdNote = (await created.json()).data;
+    expect(createdNote.title).toBe("");
+    expect(createdNote.body.trim()).toBe("Favorite tea is oolong");
+
+    const item = notesCard
+      .locator(".ant-list-item")
+      .filter({ hasText: "Favorite tea is oolong" });
+    await expect(item).toBeVisible();
+    await expect(item.locator(".ant-list-item-meta-title")).toHaveCount(0);
+    await item.getByRole("button", { name: /edit/i }).click();
+    const editModal = page
+      .locator(".ant-modal")
+      .filter({ hasText: /edit note/i });
+    await expect(editModal.getByPlaceholder("Title (optional)")).toBeEmpty();
+    const update = page.waitForResponse(
+      (resp) =>
+        resp.url().includes("/notes/") && resp.request().method() === "PUT",
+    );
+    await editModal.getByRole("button", { name: /update/i }).click();
+    const updated = await update;
+    expect(updated.status()).toBe(200);
+    expect((await updated.json()).data.title).toBe("");
+    await expect(item).toBeVisible();
+  });
+
   test("should delete a note", async ({ page }) => {
     await setupVault(page, "note-delete");
     await goToContacts(page);
