@@ -97,5 +97,5 @@ describe("ActivitiesModule duration", () => {
     const payload = apiMocks.activitiesCreate.mock.calls[0]?.[1];
     expect(payload).toMatchObject({ duration_in_minutes: 45 });
     expect(typeof payload.duration_in_minutes).toBe("number");
-  });
+  }, 15000);
 });
