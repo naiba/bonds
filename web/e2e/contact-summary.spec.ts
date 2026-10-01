@@ -170,12 +170,18 @@ test.describe("Contact Summary Card", () => {
     const infoModal = page.locator(".ant-modal:visible");
     await expect(infoModal).toBeVisible({ timeout: 5000 });
 
-    await infoModal.locator(".ant-select:visible").click();
-    await page
-      .locator(".ant-select-dropdown:visible .ant-select-item-option")
-      .filter({ hasText: /email/i })
-      .first()
-      .click();
+    const emailType = infoModal.locator(".ant-select").first();
+    const emailCombo = emailType.getByRole("combobox");
+    await emailCombo.fill("Email");
+    await expect(
+      page.locator(
+        '.ant-select-dropdown:visible .ant-select-item-option[title="Email address"]',
+      ),
+    ).toBeVisible();
+    await emailCombo.press("Enter");
+    await expect(
+      emailType.locator(".ant-select-content.ant-select-content-has-value"),
+    ).toContainText(/email/i);
 
     const valueInput = infoModal.getByPlaceholder(/value/i);
     await expect(valueInput).toBeVisible({ timeout: 5000 });
@@ -197,11 +203,18 @@ test.describe("Contact Summary Card", () => {
     const valueInput2 = phoneModal.getByPlaceholder(/value/i);
     await expect(valueInput2).toBeVisible({ timeout: 5000 });
     // Switch type to phone
-    await phoneModal.locator(".ant-select").first().click();
-    await page
-      .locator(".ant-select-dropdown:visible .ant-select-item-option")
-      .filter({ hasText: "Phone" })
-      .click();
+    const phoneType = phoneModal.locator(".ant-select").first();
+    const phoneCombo = phoneType.getByRole("combobox");
+    await phoneCombo.fill("Phone");
+    await expect(
+      page.locator(
+        '.ant-select-dropdown:visible .ant-select-item-option[title="Phone"]',
+      ),
+    ).toBeVisible();
+    await phoneCombo.press("Enter");
+    await expect(
+      phoneType.locator(".ant-select-content.ant-select-content-has-value"),
+    ).toHaveText("Phone");
     await valueInput2.fill("+1-555-0123");
 
     const createResp2 = page.waitForResponse(
