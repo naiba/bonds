@@ -227,12 +227,13 @@ func createGothProvider(p models.OAuthProvider, appURL string) (goth.Provider, e
 		if p.DiscoveryURL == "" {
 			return nil, errors.New("oidc: discovery_url required")
 		}
-		oidcProvider, err := openidConnect.New(p.ClientID, p.ClientSecret, callback, p.DiscoveryURL)
+		scopes := splitScopes(p.Scopes, "email", "profile")
+		oidcProvider, err := openidConnect.New(p.ClientID, p.ClientSecret, callback, p.DiscoveryURL, scopes...)
 		if err != nil {
 			return nil, err
 		}
 		oidcProvider.SetName(p.Name)
-		return oidcProvider, nil
+		return &pkceOIDCProvider{Provider: oidcProvider}, nil
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", p.Type)
 	}

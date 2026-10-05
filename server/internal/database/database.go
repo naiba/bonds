@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/models"
@@ -31,7 +32,10 @@ func Connect(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
 	}
 	usePrepareStmt := cfg.Driver != "sqlite"
 	db, err := gorm.Open(dialector, &gorm.Config{
-		Logger:      logger.Default.LogMode(logLevel),
+		Logger: logger.New(log.Default(), logger.Config{
+			LogLevel: logLevel, SlowThreshold: 200 * time.Millisecond,
+			ParameterizedQueries: true,
+		}),
 		PrepareStmt: usePrepareStmt,
 	})
 	if err != nil {

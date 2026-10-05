@@ -2,6 +2,8 @@ package handlers_test
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"mime"
@@ -9,14 +11,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v5"
 	"github.com/markbates/goth"
+	"github.com/markbates/goth/gothic"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/handlers"
@@ -29,6 +35,106 @@ import (
 	"github.com/pquerna/otp/totp"
 	"gorm.io/gorm"
 )
+
+func TestOIDCLoginWithPKCECookieStateAndUserInfo(t *testing.T) {
+	previousProviders, previousStore := goth.GetProviders(), gothic.Store
+	ts := setupTestServer(t)
+	defer func() {
+		goth.ClearProviders()
+		for _, provider := range previousProviders {
+			goth.UseProviders(provider)
+		}
+		gothic.Store = previousStore
+	}()
+	var issuer, challenge string
+	var exchanged bool
+	tokenCalls := 0
+	idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/discovery":
+			_ = json.NewEncoder(w).Encode(map[string]string{"issuer": issuer, "authorization_endpoint": issuer + "/authorize", "token_endpoint": issuer + "/token", "userinfo_endpoint": issuer + "/userinfo"})
+		case "/token":
+			tokenCalls++
+			_ = r.ParseForm()
+			sum := sha256.Sum256([]byte(r.PostForm.Get("code_verifier")))
+			id, secret, ok := r.BasicAuth()
+			if exchanged || !ok || id != "blog-client" || secret != "blog-secret" || base64.RawURLEncoding.EncodeToString(sum[:]) != challenge {
+				http.Error(w, `{"error":"invalid_grant"}`, http.StatusBadRequest)
+				return
+			}
+			exchanged = true
+			token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"iss": issuer, "aud": "blog-client", "sub": "blog-reader", "exp": time.Now().Add(time.Hour).Unix()}).SignedString([]byte("test-idp-signing-key"))
+			if err != nil {
+				t.Error(err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"access_token": "blog-access", "token_type": "Bearer", "expires_in": 3600, "id_token": token})
+		case "/userinfo":
+			if r.Header.Get("Authorization") != "Bearer blog-access" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = w.Write([]byte(`{"sub":"blog-reader","email":"pkce-reader@example.test","email_verified":true,"name":"Blog Reader"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer idp.Close()
+	issuer = idp.URL
+	providers := services.NewOAuthProviderService(ts.db)
+	if _, err := providers.Create(dto.CreateOAuthProviderRequest{Type: "oidc", Name: "blog", ClientID: "blog-client", ClientSecret: "blog-secret", DiscoveryURL: issuer + "/discovery"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"missing-cookie", "tampered-cookie", "wrong-state", "success"} {
+		t.Run(mode, func(t *testing.T) {
+			begin := httptest.NewRecorder()
+			ts.e.ServeHTTP(begin, httptest.NewRequest(http.MethodGet, "/api/auth/blog", nil))
+			authorize, err := url.Parse(begin.Header().Get("Location"))
+			if err != nil || authorize.Query().Get("code_challenge_method") != "S256" {
+				t.Fatal("missing S256 authorization redirect")
+			}
+			challenge = authorize.Query().Get("code_challenge")
+			params := url.Values{"code": {"code"}, "state": {authorize.Query().Get("state")}, "code_verifier": {"attacker-supplied-verifier"}}
+			if mode == "wrong-state" {
+				params.Set("state", "wrong")
+			}
+			req := httptest.NewRequest(http.MethodGet, "/api/auth/blog/callback?"+params.Encode(), nil)
+			if mode != "missing-cookie" {
+				for _, cookie := range begin.Result().Cookies() {
+					if mode == "tampered-cookie" {
+						cookie.Value += "tampered"
+					}
+					req.AddCookie(cookie)
+				}
+			}
+			if mode == "success" {
+				// A signing-only reader must not be able to decode the verifier.
+				if _, err := sessions.NewCookieStore([]byte(ts.cfg.JWT.Secret)).Get(req.Clone(req.Context()), gothic.SessionName); err == nil {
+					t.Fatal("OIDC cookie is not encrypted")
+				}
+			}
+			callback := httptest.NewRecorder()
+			ts.e.ServeHTTP(callback, req)
+			location, err := url.Parse(callback.Header().Get("Location"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mode != "success" {
+				if location.Query().Get("error") != "oauth_failed" || tokenCalls != 0 {
+					t.Fatal("invalid session/state reached token exchange")
+				}
+				return
+			}
+			if location.Path != "/auth/oauth-link" || tokenCalls != 1 {
+				t.Fatalf("login did not reach account binding: %s", location.Path)
+			}
+			info, err := services.NewOAuthService(ts.db, &ts.cfg.JWT).ParseLinkToken(location.Query().Get("link_token"))
+			if err != nil || info.ProviderUserID != "blog-reader" || info.Email != "pkce-reader@example.test" || info.Name != "Blog Reader" {
+				t.Fatalf("wrong OIDC identity: %v", err)
+			}
+		})
+	}
+}
 
 type testServer struct {
 	e   *echo.Echo

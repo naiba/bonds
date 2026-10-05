@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"net/http"
@@ -21,10 +22,13 @@ type OAuthHandler struct {
 }
 
 func NewOAuthHandler(oauthService *services.OAuthService, settings *services.SystemSettingService, jwtSecret string) *OAuthHandler {
-	store := sessions.NewCookieStore([]byte(jwtSecret))
+	// PKCE verifiers and binding tokens must not be readable from the cookie.
+	cookieKey := sha256.Sum256([]byte("bonds:oauth-session:" + jwtSecret))
+	store := sessions.NewCookieStore([]byte(jwtSecret), cookieKey[:])
 	store.MaxAge(86400 * 30)
 	store.Options.Path = "/"
 	store.Options.HttpOnly = true
+	store.Options.SameSite = http.SameSiteLaxMode
 	gothic.Store = store
 
 	return &OAuthHandler{oauthService: oauthService, settings: settings, jwtSecret: []byte(jwtSecret)}

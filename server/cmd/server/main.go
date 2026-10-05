@@ -155,7 +155,7 @@ func main() {
 	e := echo.New()
 
 	if cfg.Debug {
-		e.Use(echoMiddleware.RequestLogger())
+		e.Use(appMiddleware.RequestLogger())
 	}
 	e.Use(echoMiddleware.Recover())
 	e.Use(appMiddleware.Locale())

@@ -106,4 +106,4 @@ Bonds supports generic OIDC providers for enterprise SSO:
 
 Configure your IdP callback URL as `https://{your-bonds-url}/api/auth/{provider-name}/callback`. The `{provider-name}` segment is the provider **Name** / slug configured in Bonds, not the display name shown on the login page. For example, if your Bonds URL is `https://bonds.domain.com` and the provider Name is `nextcloud-sso`, the callback URL is `https://bonds.domain.com/api/auth/nextcloud-sso/callback`.
 
-Compatible with Authentik, Keycloak, Azure AD, Okta, and other OIDC-compliant providers. Configure in the admin panel.
+Configure in the admin panel. Use the full discovery-document URL (usually `https://issuer/.well-known/openid-configuration`), not the issuer homepage. OIDC sign-in uses authorization code + PKCE S256, with `openid email profile` scopes by default; configured custom scopes are also supported.
