@@ -63,11 +63,16 @@ func (b *CardDAVBackend) ListAddressBooks(ctx context.Context) ([]carddav.Addres
 		if err := b.db.First(&vault, "id = ?", uv.VaultID).Error; err != nil {
 			continue
 		}
+		ctag, err := b.addressBookCTag(vault.ID)
+		if err != nil {
+			return nil, err
+		}
 		books = append(books, carddav.AddressBook{
 			Path:                 "/dav/addressbooks/" + userID + "/" + vault.ID + "/",
 			Name:                 vault.Name,
 			Description:          ptrToStr(vault.Description),
 			SupportedAddressData: cardDAVSupportedAddressData(),
+			CTag:                 ctag,
 		})
 	}
 	return books, nil
@@ -95,11 +100,17 @@ func (b *CardDAVBackend) GetAddressBook(ctx context.Context, path string) (*card
 		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address book not found"))
 	}
 
+	ctag, err := b.addressBookCTag(vault.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	return &carddav.AddressBook{
 		Path:                 "/dav/addressbooks/" + userID + "/" + vault.ID + "/",
 		Name:                 vault.Name,
 		Description:          ptrToStr(vault.Description),
 		SupportedAddressData: cardDAVSupportedAddressData(),
+		CTag:                 ctag,
 	}, nil
 }
 
@@ -137,6 +148,101 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 	}
 
 	return contactToAddressObject(&contact, userID)
+}
+
+// ctagStamp renders an aggregated max(updated_at) consistently across the
+// database drivers the project supports.
+func ctagStamp(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case time.Time:
+		return v.UTC().Format(time.RFC3339Nano)
+	case *time.Time:
+		if v == nil {
+			return ""
+		}
+		return v.UTC().Format(time.RFC3339Nano)
+	case []byte:
+		return string(v)
+	case string:
+		return v
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// addressBookCTag returns an opaque collection tag that changes whenever
+// anything the generated vCards depend on changes.
+//
+// Clients poll an address book with a cheap Depth: 0 PROPFIND and skip the far
+// more expensive Depth: 1 enumeration while the CS:getctag they already hold
+// still matches. Advertising no tag means every poll re-reads every card:
+// macOS Contacts and iOS both re-download the whole collection each cycle.
+//
+// The tag aggregates over every table BuildContactCardDAVV3 reads, not just
+// contacts, because related writes do not touch contacts.updated_at --
+// ContactInformationService.Update saves only the contact_information row. That
+// is the same reason address object ETags are derived from the encoded card
+// rather than from ModTime. Tables owned by the vault rather than the contact
+// are aggregated by vault_id, which is deliberately over-inclusive: an unrelated
+// edit costs one extra re-enumeration, whereas a missed edit strands a stale
+// card on every client indefinitely.
+func (b *CardDAVBackend) addressBookCTag(vaultID string) (string, error) {
+	listedContacts := func() *gorm.DB {
+		return b.db.Model(&models.Contact{}).
+			Select("id").
+			Where("vault_id = ? AND listed = ?", vaultID, true)
+	}
+
+	sources := []struct {
+		label string
+		scope func() *gorm.DB
+	}{
+		{"contacts", func() *gorm.DB {
+			return b.db.Model(&models.Contact{}).
+				Where("vault_id = ? AND listed = ?", vaultID, true)
+		}},
+		{"contact_information", func() *gorm.DB {
+			return b.db.Table("contact_information").Where("contact_id IN (?)", listedContacts())
+		}},
+		{"contact_address", func() *gorm.DB {
+			return b.db.Table("contact_address").Where("contact_id IN (?)", listedContacts())
+		}},
+		{"contact_important_dates", func() *gorm.DB {
+			return b.db.Table("contact_important_dates").Where("contact_id IN (?)", listedContacts())
+		}},
+		{"contact_companies", func() *gorm.DB {
+			return b.db.Table("contact_companies").Where("contact_id IN (?)", listedContacts())
+		}},
+		{"addresses", func() *gorm.DB {
+			return b.db.Table("addresses").Where("vault_id = ?", vaultID)
+		}},
+		{"companies", func() *gorm.DB {
+			return b.db.Table("companies").Where("vault_id = ?", vaultID)
+		}},
+		{"files", func() *gorm.DB {
+			return b.db.Table("files").Where("vault_id = ?", vaultID)
+		}},
+	}
+
+	digest := sha256.New()
+	for _, source := range sources {
+		var count int64
+		// SQLite hands back max(updated_at) as a string while PostgreSQL returns
+		// time.Time, and this project supports both. database/sql will scan
+		// either into an any, so the value is normalised in Go rather than cast
+		// in dialect-specific SQL.
+		var updated any
+		row := source.scope().
+			Select("count(*) as count, max(updated_at) as updated").
+			Row()
+		if err := row.Scan(&count, &updated); err != nil {
+			return "", fmt.Errorf("carddav ctag: aggregate %s: %w", source.label, err)
+		}
+		fmt.Fprintf(digest, "%s:%d:%s\n", source.label, count, ctagStamp(updated))
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
