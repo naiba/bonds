@@ -315,12 +315,28 @@ func TestMergeContactsRejectsInvalidSelectionsAndRollsBack(t *testing.T) {
 				}
 				req.SourceContactIDs = append(req.SourceContactIDs, protected.ID)
 			case "database-error":
-				if err := svc.db.Exec("CREATE TRIGGER reject_contact_merge_feed BEFORE INSERT ON contact_feed_items BEGIN SELECT RAISE(ABORT, 'merge audit unavailable'); END").Error; err != nil {
+				// Fail the final audit insert after profiles, associations and source
+				// deletions changed. SQLite trigger syntax is not valid on PostgreSQL;
+				// both CI databases must exercise rollback, not fail during setup.
+				triggerSQL := "CREATE TRIGGER reject_contact_merge_feed BEFORE INSERT ON contact_feed_items BEGIN SELECT RAISE(ABORT, 'merge audit unavailable'); END"
+				if svc.db.Dialector.Name() == "postgres" {
+					if err := svc.db.Exec(`CREATE FUNCTION reject_contact_merge_feed() RETURNS trigger AS $$
+						BEGIN RAISE EXCEPTION 'merge audit unavailable'; END;
+						$$ LANGUAGE plpgsql`).Error; err != nil {
+						t.Fatal(err)
+					}
+					triggerSQL = "CREATE TRIGGER reject_contact_merge_feed BEFORE INSERT ON contact_feed_items FOR EACH ROW EXECUTE FUNCTION reject_contact_merge_feed()"
+				}
+				if err := svc.db.Exec(triggerSQL).Error; err != nil {
 					t.Fatal(err)
 				}
 			}
-			if _, err := svc.MergeContacts(vaultID, userID, req); err == nil {
+			_, err = svc.MergeContacts(vaultID, userID, req)
+			if err == nil {
 				t.Fatal("invalid merge succeeded")
+			}
+			if scenario == "database-error" && !strings.Contains(err.Error(), "merge audit unavailable") {
+				t.Fatalf("merge failed before reaching the audit insert: %v", err)
 			}
 			var active int64
 			if err := svc.db.Model(&models.Contact{}).Where("id IN ?", []string{target.ID, source.ID}).Count(&active).Error; err != nil {
