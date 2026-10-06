@@ -614,6 +614,18 @@
     }
   },
   "contact": {
+    "merge": {
+      "view": "Profil ansehen",
+      "action": "Kontakte zusammenführen",
+      "title": "{{count}} Kontakte zusammenführen",
+      "confirm": "Zusammenführung bestätigen",
+      "keep": "Kontakt auswählen, der erhalten bleibt",
+      "warning": "Die anderen ausgewählten Kontakte werden entfernt. Dies kann nicht rückgängig gemacht werden.",
+      "rules": "Der gewählte Kontakt behält Namen, Sichtbarkeit und Layout. Leere Profilfelder werden aus den anderen Kontakten ergänzt. Notizen, Kontaktdaten, Dateien, Erinnerungen und weitere Einträge werden zusammengeführt. Originalprofile werden als Notizen gespeichert; abweichende Geburtstage bleiben als gewöhnliche wichtige Daten erhalten.",
+      "order": "Wenn mehrere Kontakte dasselbe leere Feld ergänzen, hat der erste in der Liste Vorrang. Es können bis zu 50 Kontakte gleichzeitig zusammengeführt werden.",
+      "load_failed": "Nicht alle ausgewählten Kontakte konnten geladen werden. Schließen Sie diesen Dialog und aktualisieren Sie die Liste, bevor Sie es erneut versuchen.",
+      "success": "Kontakte zusammengeführt"
+    },
     "layout": {
       "title": "Kontaktansichten",
       "description": "Wählen Sie sichtbare Abschnitte, ordnen Sie sie auf Seiten an und verwenden Sie Ansichten im Tresor wieder.",

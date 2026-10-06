@@ -186,7 +186,8 @@ describe("ContactEdit Validation", () => {
     async () => {
       renderWithProviders();
 
-      await screen.findByText("John");
+      // The name also appears in summary fields; wait for the unique profile heading.
+      await screen.findByRole("heading", { name: "John", level: 2 });
 
       fireEvent.click(await screen.findByRole("button", { name: /edit/i }));
 
@@ -216,7 +217,8 @@ describe("ContactEdit Validation", () => {
     async () => {
       renderWithProviders();
 
-      await screen.findByText("John");
+      // The name also appears in summary fields; wait for the unique profile heading.
+      await screen.findByRole("heading", { name: "John", level: 2 });
 
       fireEvent.click(await screen.findByRole("button", { name: /edit/i }));
 
@@ -244,7 +246,8 @@ describe("ContactEdit Validation", () => {
     async () => {
       renderWithProviders();
 
-      await screen.findByText("John");
+      // The name also appears in summary fields; wait for the unique profile heading.
+      await screen.findByRole("heading", { name: "John", level: 2 });
       fireEvent.click(await screen.findByRole("button", { name: /edit/i }));
 
       const labelSelect = await screen.findByRole("combobox", {

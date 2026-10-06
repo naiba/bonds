@@ -614,6 +614,18 @@
     }
   },
   "contact": {
+    "merge": {
+      "view": "View profile",
+      "action": "Merge contacts",
+      "title": "Merge {{count}} contacts",
+      "confirm": "Confirm merge",
+      "keep": "Choose the contact to keep",
+      "warning": "The other selected contacts will be removed. This cannot be undone.",
+      "rules": "The chosen contact keeps its name, visibility and layout. Empty profile fields are filled from the others. Notes, contact details, files, reminders and other records are combined. Original profiles are saved in notes; conflicting birthdays remain as ordinary important dates.",
+      "order": "When several contacts fill the same empty field, the first one in the list takes priority. Up to 50 contacts can be merged at once.",
+      "load_failed": "Could not load all selected contacts. Close this dialog and refresh the list before trying again.",
+      "success": "Contacts merged"
+    },
     "layout": {
       "title": "Contact view layouts",
       "description": "Choose which sections appear, organize them into pages, and reuse layouts across contacts in this vault.",

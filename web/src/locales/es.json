@@ -614,6 +614,18 @@
     }
   },
   "contact": {
+    "merge": {
+      "view": "Ver perfil",
+      "action": "Combinar contactos",
+      "title": "Combinar {{count}} contactos",
+      "confirm": "Confirmar combinación",
+      "keep": "Elige el contacto que deseas conservar",
+      "warning": "Los demás contactos seleccionados se eliminarán. Esta acción no se puede deshacer.",
+      "rules": "El contacto elegido conserva su nombre, visibilidad y diseño. Los campos vacíos se completan con los datos de los demás. Se combinan notas, datos de contacto, archivos, recordatorios y otros registros. Los perfiles originales se guardan en notas; los cumpleaños en conflicto se conservan como fechas importantes normales.",
+      "order": "Si varios contactos pueden completar el mismo campo vacío, se da prioridad al primero de la lista. Se pueden combinar hasta 50 contactos a la vez.",
+      "load_failed": "No se pudieron cargar todos los contactos seleccionados. Cierra este diálogo y actualiza la lista antes de volver a intentarlo.",
+      "success": "Contactos combinados"
+    },
     "layout": {
       "title": "Diseños de vista de contacto",
       "description": "Elige qué secciones aparecen, organízalas en páginas y reutiliza los diseños entre los contactos de esta bóveda.",

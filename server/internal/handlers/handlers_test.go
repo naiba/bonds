@@ -7715,3 +7715,72 @@ func TestAdmin_GetSettings_RedactsSecrets(t *testing.T) {
 		}
 	}
 }
+
+func TestContactMergeAuthorizationValidationAndResponse(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "merge-handler@example.test")
+	vault := ts.createTestVault(t, token, "Merge Vault")
+	target := ts.createTestContact(t, token, vault.ID, "Alice")
+	source := ts.createTestContact(t, token, vault.ID, "Alicia")
+	otherVault := ts.createTestVault(t, token, "Separate Vault")
+	other := ts.createTestContact(t, token, otherVault.ID, "Other")
+	route := fmt.Sprintf("/api/vaults/%s/contacts/merge", vault.ID)
+	body := fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, source.ID)
+	for _, test := range []struct {
+		name, token, body string
+		status            int
+	}{
+		{"anonymous", "", body, http.StatusUnauthorized},
+		{"self", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, target.ID), http.StatusBadRequest},
+		{"empty", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[]}`, target.ID), http.StatusBadRequest},
+		{"other vault", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, other.ID), http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			rec := ts.doRequest(http.MethodPost, route, test.body, test.token)
+			if rec.Code != test.status {
+				t.Fatalf("want %d got %d: %s", test.status, rec.Code, rec.Body.String())
+			}
+			if parseResponse(t, rec).Success {
+				t.Fatal("failure response marked successful")
+			}
+		})
+	}
+	if err := ts.db.Model(&models.UserVault{}).Where("user_id = ? AND vault_id = ?", auth.User.ID, vault.ID).Update("permission", models.PermissionViewer).Error; err != nil {
+		t.Fatal(err)
+	}
+	rec := ts.doRequest(http.MethodPost, route, body, token)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("viewer merge got %d: %s", rec.Code, rec.Body.String())
+	}
+	var count int64
+	if err := ts.db.Model(&models.Contact{}).Where("vault_id = ?", vault.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatal("rejected requests changed contacts")
+	}
+	if err := ts.db.Model(&models.UserVault{}).Where("user_id = ? AND vault_id = ?", auth.User.ID, vault.ID).Update("permission", models.PermissionEditor).Error; err != nil {
+		t.Fatal(err)
+	}
+	rec = ts.doRequest(http.MethodPost, route, body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("editor merge got %d: %s", rec.Code, rec.Body.String())
+	}
+	response := parseResponse(t, rec)
+	var merged dto.ContactResponse
+	if err := json.Unmarshal(response.Data, &merged); err != nil {
+		t.Fatal(err)
+	}
+	if !response.Success || merged.ID != target.ID || merged.FirstName != "Alice" {
+		t.Fatalf("wrong merge response: %+v", merged)
+	}
+	for _, test := range []struct {
+		id     string
+		status int
+	}{{target.ID, http.StatusOK}, {source.ID, http.StatusNotFound}} {
+		rec := ts.doRequest(http.MethodGet, fmt.Sprintf("/api/vaults/%s/contacts/%s", vault.ID, test.id), "", token)
+		if rec.Code != test.status {
+			t.Fatalf("contact %s: want %d got %d", test.id, test.status, rec.Code)
+		}
+	}
+}

@@ -522,5 +522,7 @@
   "err.invalid_geocoding_settings": "Invalid geocoding provider or configuration",
   "err.failed_to_update_geocoding_settings": "Failed to update geocoding settings",
   "err.failed_to_update_geocoding_provider": "Failed to update the geocoding provider",
-  "err.failed_to_delete_geocoding_provider": "Failed to reset the geocoding provider"
+  "err.failed_to_delete_geocoding_provider": "Failed to reset the geocoding provider",
+  "err.contact_merge_selection": "Select a contact to keep and 1 to 49 distinct contacts to merge into it.",
+  "err.failed_to_merge_contacts": "Could not merge contacts."
 }

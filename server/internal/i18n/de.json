@@ -511,5 +511,7 @@
   "err.invalid_geocoding_settings": "Ungültiger Geocoding-Anbieter oder ungültige Konfiguration",
   "err.failed_to_update_geocoding_settings": "Geocoding-Einstellungen konnten nicht aktualisiert werden",
   "err.failed_to_update_geocoding_provider": "Geocoding-Anbieter konnte nicht aktualisiert werden",
-  "err.failed_to_delete_geocoding_provider": "Geocoding-Anbieter konnte nicht zurückgesetzt werden"
+  "err.failed_to_delete_geocoding_provider": "Geocoding-Anbieter konnte nicht zurückgesetzt werden",
+  "err.contact_merge_selection": "Wählen Sie einen Kontakt zum Behalten und 1 bis 49 unterschiedliche Kontakte zum Zusammenführen aus.",
+  "err.failed_to_merge_contacts": "Kontakte konnten nicht zusammengeführt werden."
 }

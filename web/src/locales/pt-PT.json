@@ -614,6 +614,18 @@
     }
   },
   "contact": {
+    "merge": {
+      "view": "Ver perfil",
+      "action": "Unir contactos",
+      "title": "Unir {{count}} contactos",
+      "confirm": "Confirmar união",
+      "keep": "Escolha o contacto a manter",
+      "warning": "Os outros contactos selecionados serão removidos. Esta ação não pode ser anulada.",
+      "rules": "O contacto escolhido mantém o nome, a visibilidade e a disposição. Os campos vazios são preenchidos com dados dos outros contactos. Notas, informações de contacto, ficheiros, lembretes e outros registos são combinados. Os perfis originais são guardados em notas; aniversários em conflito são mantidos como datas importantes comuns.",
+      "order": "Quando vários contactos podem preencher o mesmo campo vazio, o primeiro da lista tem prioridade. É possível unir até 50 contactos de cada vez.",
+      "load_failed": "Não foi possível carregar todos os contactos selecionados. Feche esta janela e atualize a lista antes de tentar novamente.",
+      "success": "Contactos unidos"
+    },
     "layout": {
       "title": "Esquemas da vista de contactos",
       "description": "Escolha as secções apresentadas, organize-as em páginas e reutilize esquemas entre os contactos deste cofre.",

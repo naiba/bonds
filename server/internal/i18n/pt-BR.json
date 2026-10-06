@@ -454,5 +454,7 @@
   "err.invalid_geocoding_settings": "Provedor ou configuração de geocodificação inválidos",
   "err.failed_to_update_geocoding_settings": "Falha ao atualizar as configurações de geocodificação",
   "err.failed_to_update_geocoding_provider": "Falha ao atualizar o provedor de geocodificação",
-  "err.failed_to_delete_geocoding_provider": "Falha ao redefinir o provedor de geocodificação"
+  "err.failed_to_delete_geocoding_provider": "Falha ao redefinir o provedor de geocodificação",
+  "err.contact_merge_selection": "Selecione um contato para manter e de 1 a 49 contatos diferentes para mesclar.",
+  "err.failed_to_merge_contacts": "Não foi possível mesclar os contatos."
 }

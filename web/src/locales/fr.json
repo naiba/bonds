@@ -614,6 +614,18 @@
     }
   },
   "contact": {
+    "merge": {
+      "view": "Voir le profil",
+      "action": "Fusionner les contacts",
+      "title": "Fusionner {{count}} contacts",
+      "confirm": "Confirmer la fusion",
+      "keep": "Choisissez le contact à conserver",
+      "warning": "Les autres contacts sélectionnés seront supprimés. Cette action est irréversible.",
+      "rules": "Le contact choisi conserve son nom, sa visibilité et sa mise en page. Les champs vides sont complétés à partir des autres contacts. Les notes, coordonnées, fichiers, rappels et autres données sont regroupés. Les profils originaux sont enregistrés dans des notes ; les anniversaires en conflit sont conservés comme dates importantes ordinaires.",
+      "order": "Si plusieurs contacts peuvent compléter le même champ vide, le premier de la liste est prioritaire. Vous pouvez fusionner jusqu’à 50 contacts à la fois.",
+      "load_failed": "Impossible de charger tous les contacts sélectionnés. Fermez cette fenêtre et actualisez la liste avant de réessayer.",
+      "success": "Contacts fusionnés"
+    },
     "layout": {
       "title": "Mises en page des contacts",
       "description": "Choisissez les sections affichées, organisez-les en pages et réutilisez les mises en page dans ce coffre.",

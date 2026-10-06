@@ -103,3 +103,11 @@ Relationships can span across vaults. When adding a relationship, the contact se
 - If you have **Editor** permission on the target vault, a **bidirectional** relationship is created automatically (both contacts see the relationship).
 - If you only have **Viewer** permission, a **one-way** relationship is created, with a hint in the UI explaining why.
 - Deleting a cross-vault relationship automatically cleans up the reverse record on the other side.
+
+## Merge duplicate contacts
+
+Select two to fifty contacts in the same vault, then choose **Merge contacts**. Review the selection and choose the contact to keep before confirming. Editors and managers can merge contacts, including archived contacts selected using the list filters.
+
+The retained contact keeps its ID, visibility and layout. Empty profile fields are filled from the other contacts in selection order; the latest conversation date is kept. Original source profiles are saved as notes, so conflicting names and other profile values remain available. Notes, contact information, files, addresses, jobs, quick facts, tasks, activities, reminders and other records move to the retained contact. Shared memberships and identical relationships are combined, and incoming references point to the retained contact. Conflicting birthdays or deceased dates are retained as ordinary important dates with their reminders intact.
+
+The other contacts are removed from the list. This operation cannot be undone. Merging does not automatically find duplicates or deduplicate independent notes, phone numbers or reminders. CardDAV changes use the existing asynchronous synchronization; a read-only remote address book or a later reimport can recreate a source contact.

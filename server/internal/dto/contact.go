@@ -194,3 +194,10 @@ type ContactJobResponse struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
+
+// MergeContactsRequest keeps the target's identity and fills empty profile fields
+// from sources in the supplied order. All contacts must belong to the route vault.
+type MergeContactsRequest struct {
+	TargetContactID  string   `json:"target_contact_id" validate:"required,uuid"`
+	SourceContactIDs []string `json:"source_contact_ids" validate:"required,min=1,max=49,dive,required,uuid"`
+}

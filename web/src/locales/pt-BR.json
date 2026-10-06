@@ -614,6 +614,18 @@
     }
   },
   "contact": {
+    "merge": {
+      "view": "Ver perfil",
+      "action": "Mesclar contatos",
+      "title": "Mesclar {{count}} contatos",
+      "confirm": "Confirmar mesclagem",
+      "keep": "Escolha o contato a manter",
+      "warning": "Os outros contatos selecionados serão removidos. Esta ação não pode ser desfeita.",
+      "rules": "O contato escolhido mantém o nome, a visibilidade e o layout. Os campos vazios são preenchidos com dados dos outros contatos. Notas, informações de contato, arquivos, lembretes e outros registros são combinados. Os perfis originais são salvos em notas; aniversários conflitantes são mantidos como datas importantes comuns.",
+      "order": "Quando vários contatos podem preencher o mesmo campo vazio, o primeiro da lista tem prioridade. É possível mesclar até 50 contatos por vez.",
+      "load_failed": "Não foi possível carregar todos os contatos selecionados. Feche esta janela e atualize a lista antes de tentar novamente.",
+      "success": "Contatos mesclados"
+    },
     "layout": {
       "title": "Layouts da visualização de contatos",
       "description": "Escolha as seções exibidas, organize-as em páginas e reutilize layouts entre os contatos deste cofre.",
