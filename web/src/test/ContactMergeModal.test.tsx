@@ -111,6 +111,11 @@ describe("Contact merge review", () => {
     expect(
       screen.getByText("Redirect 2 relationship(s) to the retained contact."),
     ).toBeVisible();
+    expect(
+      screen.getByText(
+        /Unsafe remote replacements are rejected; check the subscription sync log/,
+      ),
+    ).toBeVisible();
     const confirm = screen.getByRole("button", { name: "Confirm merge" });
     expect(confirm).toBeDisabled();
     await user.click(screen.getByRole("checkbox"));

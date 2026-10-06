@@ -633,7 +633,7 @@
       "default_template": "Default layout",
       "partial_date": "Year {{year}}, month {{month}}, day {{day}}",
       "record_rules": "Individual notes, addresses, phone numbers and reminders are kept, even when similar. Identical memberships are combined. Favorites and view counts are combined; the latest last-contact date is kept. Verification and quick-fact flags stay enabled if enabled in any profile. Source records follow the existing soft-delete lifecycle. There is no merge undo.",
-      "import_rules": "Monica imports with the same source UUID skip deleted contacts. Importing a vCard file again can create new duplicates; it does not overwrite this merged contact. DAV clients retain unchanged details. Edit important dates, typed contact details and address history in Bonds.",
+      "import_rules": "Monica imports with the same source UUID skip deleted contacts. Importing a vCard file again can create new duplicates; it does not overwrite this merged contact. DAV subscriptions and clients retain unchanged details. Unsafe remote replacements are rejected; check the subscription sync log and edit important dates, typed contact details and address history in Bonds.",
       "accept": "I reviewed these changes and accept discarding unselected profile values.",
       "fields": {
         "first_name": "First name",

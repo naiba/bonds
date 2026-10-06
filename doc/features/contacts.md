@@ -117,3 +117,5 @@ Contacts linked to CardDAV cannot be merged, including paused and read-only subs
 For Bonds' own CardDAV address book, deleted source paths return not found on reads and reject subsequent writes. Conditional target writes enforce the current ETag, so stale conditional updates cannot overwrite a merge. Clients that intentionally write without a precondition retain the standard unconditional update behavior.
 
 Unchanged DAV phone/address/date groups retain their original records and metadata. Edits that would replace existing dates, typed contact details or shared/historical/detailed addresses return a conflict; use the Bonds editor for those changes. This also protects reminder links and address history after merging.
+
+The same record-preservation rules apply to incoming DAV subscription updates, including after pausing, merging local contacts and resuming synchronization. An unrelated remote edit retains the original local date, reminder, typed-contact and address-history records. Unsafe replacements are rolled back and appear in the subscription sync log with instructions to edit in Bonds; the failed batch does not advance its sync checkpoint.

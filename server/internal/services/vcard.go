@@ -653,7 +653,7 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 			return "", "", err
 		}
 
-		if err := replaceVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
+		if err := ReplaceContactVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
 			return "", "", err
 		}
 		return existing.ID, "updated", nil
@@ -698,23 +698,4 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 	}
 
 	return contact.ID, "created", nil
-}
-
-func replaceVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	tx.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{})
-
-	var pivots []models.ContactAddress
-	tx.Where("contact_id = ?", contactID).Find(&pivots)
-	if len(pivots) > 0 {
-		addressIDs := make([]uint, len(pivots))
-		for i, p := range pivots {
-			addressIDs[i] = p.AddressID
-		}
-		tx.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{})
-		tx.Where("id IN ?", addressIDs).Delete(&models.Address{})
-	}
-
-	tx.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{})
-
-	return importVCardFields(tx, card, contactID, vaultID, accountID)
 }
