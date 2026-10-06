@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // CardDAVBackend implements the carddav.Backend interface.
@@ -200,7 +202,19 @@ func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, q
 	return filtered, nil
 }
 
-func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, _ *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
+func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
+	var result *carddav.AddressObject
+	err := b.db.Transaction(func(tx *gorm.DB) error {
+		backend := *b
+		backend.db = tx
+		var err error
+		result, err = backend.putAddressObject(ctx, path, card, options)
+		return err
+	})
+	return result, err
+}
+
+func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
 	// Keep PUT input aligned with the vCard 3.0 representation advertised by this address book.
 	if card.Value(vcard.FieldVersion) != "3.0" {
 		return nil, carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
@@ -240,11 +254,40 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 
 	var contact models.Contact
 	if contactID != "" {
-		err := b.db.First(&contact, "id = ?", contactID).Error
+		err := b.db.Unscoped().Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).First(&contact, "id = ?", contactID).Error
 		if err == nil {
 			// A global object ID must still belong to the DAV collection vault; otherwise a guessed ID could overwrite another vault's contact.
 			if contact.VaultID != vaultID {
 				return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+			}
+			// Deleted contact IDs remain tombstones. An offline client must
+			// not recreate a merged source at its obsolete DAV object path.
+			if contact.DeletedAt.Valid {
+				return nil, webdav.NewHTTPError(http.StatusGone, fmt.Errorf("address object was deleted"))
+			}
+			if options != nil {
+				var current models.Contact
+				if err := preloadContactForCardDAV(b.db).First(&current, "id = ?", contact.ID).Error; err != nil {
+					return nil, err
+				}
+				object, err := contactToAddressObject(&current, userID)
+				if err != nil {
+					return nil, err
+				}
+				// Honor conditional writes while holding the same row lock as a
+				// merge. A stale ETag must not overwrite newly combined fields.
+				if options.IfMatch.IsSet() {
+					match, err := options.IfMatch.MatchETag(object.ETag)
+					if err != nil || !match {
+						return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("address object changed"))
+					}
+				}
+				if options.IfNoneMatch.IsSet() {
+					match, err := options.IfNoneMatch.MatchETag(object.ETag)
+					if err != nil || match {
+						return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("address object exists"))
+					}
+				}
 			}
 			contact.FirstName = strPtrOrNil(firstName)
 			contact.LastName = strPtrOrNil(lastName)
@@ -268,6 +311,10 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
+	}
+
+	if options != nil && options.IfMatch.IsSet() {
+		return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("address object does not exist"))
 	}
 
 	contact = models.Contact{
@@ -532,10 +579,49 @@ func saveContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, ac
 	return nil
 }
 
-// replaceContactVCardFields deletes existing records and recreates from vCard.
+// replaceContactVCardFields preserves unchanged groups and replaces only groups
+// whose stored information can be represented safely by the incoming vCard.
 func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{}).Error; err != nil {
+	var current models.Contact
+	if err := preloadContactForCardDAV(db).First(&current, "id = ?", contactID).Error; err != nil {
 		return err
+	}
+	previous := services.BuildContactCardDAVV3(&current)
+	keepInformation := reflect.DeepEqual(previous[vcard.FieldTelephone], card[vcard.FieldTelephone]) && reflect.DeepEqual(previous[vcard.FieldEmail], card[vcard.FieldEmail])
+	keepAddresses := reflect.DeepEqual(previous.Addresses(), card.Addresses())
+	// A vCard cannot represent extra important dates, reminder links, address
+	// history or all typed contact facts. An unchanged group must retain its rows;
+	// destructive edits to richer groups require the full Bonds editor.
+	updates := make(vcard.Card, len(card))
+	for key, fields := range card {
+		updates[key] = fields
+	}
+	if len(current.ImportantDates) > 0 {
+		if previous.Value(vcard.FieldBirthday) != card.Value(vcard.FieldBirthday) {
+			return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("edit important dates in Bonds to preserve dates and reminders"))
+		}
+		delete(updates, vcard.FieldBirthday)
+	}
+	if keepInformation {
+		delete(updates, vcard.FieldTelephone)
+		delete(updates, vcard.FieldEmail)
+	} else {
+		for _, info := range current.ContactInformations {
+			kind := ""
+			if info.ContactInformationType.Type != nil {
+				kind = *info.ContactInformationType.Type
+			}
+			if (kind == "phone" || kind == "email") && (info.Kind != nil || !info.Pref) {
+				return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("edit typed contact information in Bonds to preserve its metadata"))
+			}
+		}
+		types := db.Model(&models.ContactInformationType{}).Select("id").Where("type IN ?", []string{"phone", "email"})
+		if err := db.Where("contact_id = ? AND type_id IN (?)", contactID, types).Delete(&models.ContactInformation{}).Error; err != nil {
+			return err
+		}
+	}
+	if keepAddresses {
+		delete(updates, vcard.FieldAddress)
 	}
 
 	// vCards do not carry coordinates, so the delete-and-recreate below would
@@ -548,9 +634,19 @@ func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 	if err := db.Where("contact_id = ?", contactID).Find(&pivots).Error; err != nil {
 		return err
 	}
-	if len(pivots) > 0 {
+	if len(pivots) > 0 && !keepAddresses {
 		addressIDs := make([]uint, len(pivots))
 		for i, p := range pivots {
+			if p.IsPastAddress || p.DateFrom != nil || p.DateTo != nil {
+				return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("edit address history in Bonds"))
+			}
+			var otherLinks int64
+			if err := db.Model(&models.ContactAddress{}).Where("address_id = ? AND contact_id <> ?", p.AddressID, contactID).Count(&otherLinks).Error; err != nil {
+				return err
+			}
+			if otherLinks > 0 {
+				return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("edit shared addresses in Bonds"))
+			}
 			addressIDs[i] = p.AddressID
 		}
 		var previous []models.Address
@@ -559,6 +655,9 @@ func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 		}
 		for i := range previous {
 			address := &previous[i]
+			if address.AddressTypeID != nil || address.Line2 != nil {
+				return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("edit detailed addresses in Bonds"))
+			}
 			if address.Latitude == nil || address.Longitude == nil {
 				continue
 			}
@@ -572,11 +671,7 @@ func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 		}
 	}
 
-	if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{}).Error; err != nil {
-		return err
-	}
-
-	if err := saveContactVCardFields(db, card, contactID, vaultID, accountID); err != nil {
+	if err := saveContactVCardFields(db, updates, contactID, vaultID, accountID); err != nil {
 		return err
 	}
 

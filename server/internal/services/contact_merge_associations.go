@@ -66,8 +66,8 @@ func mergeContactAssociations(tx *gorm.DB, sourceID, targetID string) error {
 			return err
 		}
 	}
-	// Redirect both directions, including incoming cross-vault links, without
-	// creating any new relationship or granting access to another vault.
+	// The review checks Editor access to every incoming reference owner before
+	// these updates; an existing link is not permission to edit another vault.
 	if err := tx.Where("contact_id = ? AND related_contact_id = ?", targetID, targetID).Delete(&models.Relationship{}).Error; err != nil {
 		return err
 	}

@@ -113,6 +113,9 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 			continue
 		}
 
+		if contactID == "" {
+			continue
+		}
 		contactUUIDMap[mc.UUID] = contactID
 		if imported {
 			resp.ImportedContacts++
@@ -215,9 +218,18 @@ func (s *MonicaImportService) importContact(
 	genderByUUID map[string]MonicaGenderRef, resp *dto.MonicaImportResponse,
 ) (string, bool, error) {
 	var existingContact models.Contact
-	if err := tx.Where("vault_id = ? AND distant_uuid = ?", vaultID, mc.UUID).First(&existingContact).Error; err == nil {
+	// A deleted source UUID is still an import identity. Reimporting it must not
+	// recreate a merged contact or attach fresh child rows to its tombstone.
+	err := tx.Unscoped().Where("vault_id = ? AND distant_uuid = ?", vaultID, mc.UUID).First(&existingContact).Error
+	if err == nil {
 		resp.SkippedCount++
+		if existingContact.DeletedAt.Valid {
+			return "", false, nil
+		}
 		return existingContact.ID, false, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", false, err
 	}
 
 	var genderID *uint

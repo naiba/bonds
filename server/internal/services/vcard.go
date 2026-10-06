@@ -520,6 +520,13 @@ func contactPhotoVCardValue(file *models.File) (string, string) {
 }
 
 func contactBirthdayVCardValue(dates []models.ContactImportantDate) string {
+	// A merge keeps extra birthdays as ordinary dates. Prefer the explicit
+	// primary type before legacy label matching, regardless of original row order.
+	for _, date := range dates {
+		if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil && *date.ContactImportantDateType.InternalType == "birthdate" && date.Month != nil && date.Day != nil {
+			return formatImportantDateVCardValue(&date)
+		}
+	}
 	for _, date := range dates {
 		if !isBirthdateImportantDate(&date) || date.Month == nil || date.Day == nil {
 			continue

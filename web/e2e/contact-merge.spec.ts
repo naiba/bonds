@@ -12,6 +12,8 @@ for (const viewport of [
     request,
   }) => {
     await page.setViewportSize(viewport);
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
     const email = `contact-merge-${viewport.name}-${Date.now()}@example.test`;
     const registration = await request.post(apiUrl("/auth/register"), {
       data: {
@@ -84,9 +86,14 @@ for (const viewport of [
       .getByRole("button", { name: "Merge contacts", exact: true })
       .click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("radio")).toHaveCount(3);
+    await expect(
+      dialog
+        .getByRole("radiogroup", { name: "Choose the contact to keep" })
+        .getByRole("radio"),
+    ).toHaveCount(3);
     await dialog
-      .getByRole("radio", { name: "Alicia Chen — Ally", exact: true })
+      .getByRole("radiogroup", { name: "Choose the contact to keep" })
+      .getByRole("radio", { name: "Alicia Chen", exact: true })
       .check();
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(dialog).not.toBeVisible();
@@ -98,9 +105,54 @@ for (const viewport of [
     await page
       .getByRole("button", { name: "Merge contacts", exact: true })
       .click();
+    const targetIndex = viewport.name === "mobile" ? 1 : 0;
+    const retainedId = contacts[targetIndex].id;
     await dialog
-      .getByRole("radio", { name: "Alice Chen", exact: true })
+      .getByRole("radiogroup", { name: "Choose the contact to keep" })
+      .getByRole("radio", {
+        name: targetIndex === 0 ? "Alice Chen" : "Alicia Chen",
+        exact: true,
+      })
       .check();
+    const chooseFields = async () => {
+      const confirm = dialog.getByRole("button", {
+        name: "Confirm merge",
+        exact: true,
+      });
+      await expect(confirm).toBeDisabled();
+      await dialog
+        .getByRole("radiogroup", { name: "First name", exact: true })
+        .getByRole("radio", { name: "Alice (Alice Chen)", exact: true })
+        .check();
+      await dialog
+        .getByRole("radiogroup", { name: "Last name", exact: true })
+        .getByRole("radio", {
+          name: targetIndex === 0 ? "Chen (Alice Chen)" : "Chen (Alicia Chen)",
+          exact: true,
+        })
+        .check();
+      await dialog
+        .getByRole("radiogroup", { name: "Nickname", exact: true })
+        .getByRole("radio", { name: "Ally (Alicia Chen)", exact: true })
+        .check();
+      await expect(confirm).toBeDisabled();
+      await dialog
+        .getByRole("checkbox", {
+          name: "I reviewed these changes and accept discarding unselected profile values.",
+        })
+        .check();
+      await expect(confirm).toBeEnabled();
+    };
+    await chooseFields();
+    await expect(
+      dialog.getByText("Remove 2 source contact(s).", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByText(
+        targetIndex === 0 ? "Move 1 note(s)." : "What will change",
+        { exact: true },
+      ),
+    ).toBeVisible();
     await expect(
       dialog.getByText(
         "The other selected contacts will be removed. This cannot be undone.",
@@ -112,9 +164,20 @@ for (const viewport of [
       await page.screenshot({
         path: join(
           evidenceDirectory,
+          `contact-merge-${viewport.name}-effects.png`,
+        ),
+        fullPage: false,
+        animations: "disabled",
+      });
+      await dialog
+        .getByRole("radiogroup", { name: "Choose the contact to keep" })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: join(
+          evidenceDirectory,
           `contact-merge-${viewport.name}-review.png`,
         ),
-        fullPage: true,
+        fullPage: false,
         animations: "disabled",
       });
     }
@@ -144,27 +207,28 @@ for (const viewport of [
         { headers },
       );
       expect((await unchanged.json()).data).toHaveLength(3);
+      await chooseFields();
     }
     await dialog
       .getByRole("button", { name: "Confirm merge", exact: true })
       .click();
-    await expect(page).toHaveURL(new RegExp(`/contacts/${contacts[0].id}$`));
+    await expect(page).toHaveURL(new RegExp(`/contacts/${retainedId}$`));
     await expect(
       page.getByText("Alice Chen", { exact: true }).first(),
     ).toBeVisible();
     const merged = await request.get(
-      apiUrl(`/vaults/${vaultId}/contacts/${contacts[0].id}`),
+      apiUrl(`/vaults/${vaultId}/contacts/${retainedId}`),
       { headers },
     );
     expect(merged.status()).toBe(200);
     expect((await merged.json()).data).toMatchObject({
-      id: contacts[0].id,
+      id: retainedId,
       first_name: "Alice",
       last_name: "Chen",
       nickname: "Ally",
     });
     const notes = await request.get(
-      apiUrl(`/vaults/${vaultId}/contacts/${contacts[0].id}/notes`),
+      apiUrl(`/vaults/${vaultId}/contacts/${retainedId}/notes`),
       { headers },
     );
     expect(notes.status()).toBe(200);
@@ -181,8 +245,11 @@ for (const viewport of [
       noteData.filter((note: { title: string }) =>
         note.title.startsWith("Merged contact:"),
       ),
-    ).toHaveLength(2);
-    for (const contact of contacts.slice(1)) {
+    ).toHaveLength(0);
+    expect(noteData).toHaveLength(1);
+    for (const contact of contacts.filter(
+      (contact) => contact.id !== retainedId,
+    )) {
       const removed = await request.get(
         apiUrl(`/vaults/${vaultId}/contacts/${contact.id}`),
         { headers },
@@ -192,13 +259,14 @@ for (const viewport of [
     await page.goto(`/vaults/${vaultId}/contacts`);
     await expect(table.getByText("Alice Chen", { exact: true })).toBeVisible();
     await expect(table.getByRole("row")).toHaveCount(2);
+    expect(pageErrors).toEqual([]);
     if (evidenceDirectory)
       await page.screenshot({
         path: join(
           evidenceDirectory,
           `contact-merge-${viewport.name}-result.png`,
         ),
-        fullPage: true,
+        fullPage: false,
         animations: "disabled",
       });
   });

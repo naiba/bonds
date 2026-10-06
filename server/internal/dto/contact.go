@@ -195,9 +195,36 @@ type ContactJobResponse struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// MergeContactsRequest keeps the target's identity and fills empty profile fields
-// from sources in the supplied order. All contacts must belong to the route vault.
+// MergeContactsRequest keeps the target identity and applies reviewed field choices.
+// All contacts must belong to the route vault; confirmation requires a current token.
 type MergeContactsRequest struct {
-	TargetContactID  string   `json:"target_contact_id" validate:"required,uuid"`
-	SourceContactIDs []string `json:"source_contact_ids" validate:"required,min=1,max=49,dive,required,uuid"`
+	TargetContactID  string            `json:"target_contact_id" validate:"required,uuid"`
+	SourceContactIDs []string          `json:"source_contact_ids" validate:"required,min=1,max=49,dive,required,uuid"`
+	ReviewToken      string            `json:"review_token"`
+	FieldChoices     map[string]string `json:"field_choices"`
+}
+
+// ContactMergePreview is transient; no review data or profile copies are stored.
+type ContactMergePreview struct {
+	ReviewToken string                  `json:"review_token"`
+	Contacts    []ContactMergeCandidate `json:"contacts"`
+	Fields      []ContactMergeField     `json:"fields"`
+	Effects     map[string]int64        `json:"effects"`
+	Blockers    []string                `json:"blockers"`
+	Dates       []ImportantDateResponse `json:"dates"`
+}
+type ContactMergeCandidate struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Listed   bool   `json:"listed"`
+	Template string `json:"template"`
+}
+type ContactMergeField struct {
+	Key      string               `json:"key"`
+	Options  []ContactMergeOption `json:"options"`
+	Conflict bool                 `json:"conflict"`
+}
+type ContactMergeOption struct {
+	ContactID string `json:"contact_id"`
+	Value     string `json:"value"`
 }

@@ -7762,6 +7762,22 @@ func TestContactMergeAuthorizationValidationAndResponse(t *testing.T) {
 	if err := ts.db.Model(&models.UserVault{}).Where("user_id = ? AND vault_id = ?", auth.User.ID, vault.ID).Update("permission", models.PermissionEditor).Error; err != nil {
 		t.Fatal(err)
 	}
+	previewResponse := ts.doRequest(http.MethodPost, route+"/preview", body, token)
+	if previewResponse.Code != http.StatusOK {
+		t.Fatalf("preview: %s", previewResponse.Body.String())
+	}
+	var preview dto.ContactMergePreview
+	if err := json.Unmarshal(parseResponse(t, previewResponse).Data, &preview); err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Blockers) != 0 || preview.ReviewToken == "" {
+		t.Fatalf("invalid review: %+v", preview)
+	}
+	requestBody, err := json.Marshal(dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}, ReviewToken: preview.ReviewToken, FieldChoices: map[string]string{"first_name": target.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = string(requestBody)
 	rec = ts.doRequest(http.MethodPost, route, body, token)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("editor merge got %d: %s", rec.Code, rec.Body.String())

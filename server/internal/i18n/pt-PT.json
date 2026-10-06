@@ -456,5 +456,7 @@
   "err.failed_to_update_geocoding_provider": "Falha ao atualizar o fornecedor de geocodificação",
   "err.failed_to_delete_geocoding_provider": "Falha ao repor o fornecedor de geocodificação",
   "err.contact_merge_selection": "Selecione um contacto para manter e entre 1 e 49 contactos diferentes para unir.",
-  "err.failed_to_merge_contacts": "Não foi possível unir os contactos."
+  "err.failed_to_merge_contacts": "Não foi possível unir os contactos.",
+  "err.contact_merge_blocked": "Resolve the restrictions shown in the merge review before merging.",
+  "err.contact_merge_review_changed": "The merge review has changed or a conflict choice is missing. Review again before merging."
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/emersion/go-vcard"
+	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/carddav"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -539,4 +540,147 @@ func TestDeleteAddressBookNotSupported(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for DeleteAddressBook")
 	}
+}
+
+func TestCardDAVMergeRejectsStaleSourceAndTargetWrites(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+	target := createTestContact(t, db, vaultID, userID, "Alice", "Chen")
+	source := createTestContact(t, db, vaultID, userID, "Alicia", "Chen")
+	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/" + target.ID + ".vcf"
+	original, err := backend.GetAddressObject(ctx, path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := services.NewContactService(db)
+	req := dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}, FieldChoices: map[string]string{"first_name": source.ID}}
+	preview, err := svc.PreviewContactMerge(vaultID, userID, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.ReviewToken = preview.ReviewToken
+	if _, err := svc.MergeContacts(vaultID, userID, req); err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := "/dav/addressbooks/" + userID + "/" + vaultID + "/" + source.ID + ".vcf"
+	if _, err := backend.GetAddressObject(ctx, sourcePath, nil); err == nil {
+		t.Fatal("deleted source remains in DAV")
+	}
+	if err := backend.DeleteAddressObject(ctx, sourcePath); err == nil {
+		t.Fatal("stale delete unexpectedly succeeded")
+	}
+	if _, err := backend.PutAddressObject(ctx, sourcePath, original.Card, nil); err == nil {
+		t.Error("stale source PUT recreated a duplicate")
+	}
+	options := &carddav.PutAddressObjectOptions{IfMatch: webdav.ConditionalMatch(`"` + original.ETag + `"`)}
+	if _, err := backend.PutAddressObject(ctx, path, original.Card, options); err == nil {
+		t.Error("stale target PUT overwrote merged profile")
+	}
+	var retained models.Contact
+	if err := db.First(&retained, "id = ?", target.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if retained.FirstName == nil || *retained.FirstName != "Alicia" {
+		t.Fatal("merged value lost to stale DAV write")
+	}
+	var count int64
+	if err := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("stale DAV write recreated duplicates: %d", count)
+	}
+	current, err := backend.GetAddressObject(ctx, path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options.IfMatch = webdav.ConditionalMatch(`"` + current.ETag + `"`)
+	if _, err := backend.PutAddressObject(ctx, path, current.Card, options); err != nil {
+		t.Fatalf("fresh DAV update rejected: %v", err)
+	}
+}
+
+func TestCardDAVMergeRoundTripPreservesDatesAndReminderLinks(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+	target := createTestContact(t, db, vaultID, userID, "Alice", "Chen")
+	source := createTestContact(t, db, vaultID, userID, "Alice", "Chen")
+	year, month, day := 1990, 3, 2
+	date := models.ContactImportantDate{ContactID: source.ID, Label: "Birthday from another source", Year: &year, Month: &month, Day: &day, DatePrecision: "full"}
+	if err := db.Create(&date).Error; err != nil {
+		t.Fatal(err)
+	}
+	reminder := models.ContactReminder{ContactID: source.ID, Label: "Remember", Type: "recurring_year", ImportantDateID: &date.ID}
+	if err := db.Create(&reminder).Error; err != nil {
+		t.Fatal(err)
+	}
+	var phoneType models.ContactInformationType
+	if err := db.Where("type = ?", "phone").First(&phoneType).Error; err != nil {
+		t.Fatal(err)
+	}
+	kind := "mobile"
+	phone := models.ContactInformation{ContactID: source.ID, TypeID: phoneType.ID, Data: "+15550101010", Kind: &kind, Pref: true}
+	address := models.Address{VaultID: vaultID, Line1: strPtrOrNil("Synthetic garden road"), Line2: strPtrOrNil("Apartment A")}
+	for _, row := range []any{&phone, &address} {
+		if err := db.Create(row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Date(2025, 3, 2, 12, 0, 0, 0, time.UTC)
+	addressLink := models.ContactAddress{ContactID: source.ID, AddressID: address.ID, DateFrom: &now}
+	if err := db.Create(&addressLink).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	svc := services.NewContactService(db)
+	req := dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}}
+	preview, err := svc.PreviewContactMerge(vaultID, userID, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.ReviewToken = preview.ReviewToken
+	if _, err := svc.MergeContacts(vaultID, userID, req); err != nil {
+		t.Fatal(err)
+	}
+	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/" + target.ID + ".vcf"
+	object, err := backend.GetAddressObject(ctx, path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.PutAddressObject(ctx, path, object.Card, &carddav.PutAddressObjectOptions{IfMatch: webdav.ConditionalMatch(`"` + object.ETag + `"`)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.First(&date, date.ID).Error; err != nil {
+		t.Fatalf("DAV round trip deleted a merged important date: %v", err)
+	}
+	if err := db.First(&reminder, reminder.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if date.ContactID != target.ID || date.Year == nil || *date.Year != year || reminder.ImportantDateID == nil || *reminder.ImportantDateID != date.ID {
+		t.Fatal("merged date or reminder link changed")
+	}
+	if err := db.First(&phone, phone.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if phone.ContactID != target.ID || phone.Kind == nil || *phone.Kind != "mobile" || phone.Data != "+15550101010" {
+		t.Fatal("typed phone metadata changed on roundtrip")
+	}
+	if err := db.First(&addressLink, addressLink.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if addressLink.ContactID != target.ID || addressLink.DateFrom == nil || !addressLink.DateFrom.Equal(now) {
+		t.Fatal("address history changed on roundtrip")
+	}
+	if err := db.First(&address, address.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if address.Line2 == nil || *address.Line2 != "Apartment A" {
+		t.Fatal("unrepresented address detail lost")
+	}
+	object.Card.SetValue(vcard.FieldBirthday, "2000-01-01")
+	if _, err := backend.PutAddressObject(ctx, path, object.Card, nil); err == nil {
+		t.Fatal("unsafe replacement of important dates accepted")
+	}
+	if err := db.First(&date, date.ID).Error; err != nil {
+		t.Fatal("rejected write removed date", err)
+	}
+
 }

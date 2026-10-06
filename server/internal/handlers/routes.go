@@ -421,6 +421,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	contacts.POST("/move", contactMoveHandler.MoveMany, requireEditor)
 	contacts.POST("", contactHandler.Create, requireEditor)
 	contacts.POST("/merge", contactHandler.Merge, requireEditor)
+	contacts.POST("/merge/preview", contactHandler.PreviewMerge, requireEditor)
 	contacts.DELETE("", contactHandler.DeleteMany, requireEditor)
 	contacts.GET("/:id", contactHandler.Get)
 	contacts.PUT("/:id", contactHandler.Update, requireEditor)

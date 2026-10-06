@@ -1,14 +1,11 @@
 package services
 
 import (
-	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/emersion/go-vcard"
-	"github.com/emersion/go-webdav/carddav"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/search"
@@ -29,7 +26,7 @@ func TestMergeContactsPreservesInformation(t *testing.T) {
 	if err := svc.db.Create(&note).Error; err != nil {
 		t.Fatal(err)
 	}
-	result, err := svc.MergeContacts(vaultID, userID, dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}})
+	result, err := svc.MergeContacts(vaultID, userID, reviewedContactMerge(t, svc, vaultID, userID, target.ID, source.ID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,8 +43,8 @@ func TestMergeContactsPreservesInformation(t *testing.T) {
 	if err := svc.db.Where("contact_id = ? AND source_type = ?", target.ID, "contact_merge").Find(&snapshots).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(snapshots) != 1 || !strings.Contains(snapshots[0].Body, "Alicia") {
-		t.Fatalf("missing original profile: %+v", snapshots)
+	if len(snapshots) != 0 {
+		t.Fatalf("unexpected profile copy: %+v", snapshots)
 	}
 	var deleted models.Contact
 	if err := svc.db.First(&deleted, "id = ?", source.ID).Error; !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -157,7 +154,7 @@ func TestMergeContactsAssociations(t *testing.T) {
 	}
 	externalContact := models.Contact{VaultID: externalVault.ID, FirstName: strPtrOrNil("External friend")}
 	create(&externalContact)
-	if err := svc.db.Model(&models.UserVault{}).Where("vault_id = ? AND user_id = ?", externalVault.ID, userID).Update("permission", models.PermissionViewer).Error; err != nil {
+	if err := svc.db.Model(&models.UserVault{}).Where("vault_id = ? AND user_id = ?", externalVault.ID, userID).Update("permission", models.PermissionEditor).Error; err != nil {
 		t.Fatal(err)
 	}
 	for _, pair := range [][2]string{{source.ID, third.ID}, {third.ID, source.ID}, {target.ID, third.ID}, {target.ID, source.ID}, {source.ID, target.ID}, {source.ID, externalContact.ID}, {externalContact.ID, source.ID}} {
@@ -175,7 +172,7 @@ func TestMergeContactsAssociations(t *testing.T) {
 	}
 	fact := models.QuickFact{ContactID: source.ID, VaultQuickFactsTemplateID: template.ID, Content: "Tea"}
 	create(&fact)
-	result, err := svc.MergeContacts(vaultID, userID, dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}})
+	result, err := svc.MergeContacts(vaultID, userID, reviewedContactMerge(t, svc, vaultID, userID, target.ID, source.ID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,6 +312,7 @@ func TestMergeContactsRejectsInvalidSelectionsAndRollsBack(t *testing.T) {
 				}
 				req.SourceContactIDs = append(req.SourceContactIDs, protected.ID)
 			case "database-error":
+				req = reviewedContactMerge(t, svc, vaultID, userID, target.ID, source.ID)
 				// Fail the final audit insert after profiles, associations and source
 				// deletions changed. SQLite trigger syntax is not valid on PostgreSQL;
 				// both CI databases must exercise rollback, not fail during setup.
@@ -369,8 +367,8 @@ func TestMergeContactsRejectsInvalidSelectionsAndRollsBack(t *testing.T) {
 	}
 }
 
-func TestMergeContactsSearchAndDAV(t *testing.T) {
-	push, client, _, svc, vaultID, userID, _ := setupDavPushTest(t)
+func TestMergeContactsSearch(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
 	engine, err := search.NewBleveEngine(t.TempDir() + "/merge.bleve")
 	if err != nil {
 		t.Fatal(err)
@@ -393,53 +391,8 @@ func TestMergeContactsSearchAndDAV(t *testing.T) {
 	if err := searchService.IndexNote(&note); err != nil {
 		t.Fatal(err)
 	}
-	sub := createPushSubscription(t, client, vaultID, userID, SyncWayPush)
-	remoteURI := "https://dav.example.com/contacts/" + source.ID + ".vcf"
-	state := models.ContactSubscriptionState{ContactID: source.ID, AddressBookSubscriptionID: sub.ID, DistantURI: remoteURI, DistantEtag: "source-etag"}
-	if err := svc.db.Create(&state).Error; err != nil {
+	if _, err := svc.MergeContacts(vaultID, userID, reviewedContactMerge(t, svc, vaultID, userID, target.ID, source.ID)); err != nil {
 		t.Fatal(err)
-	}
-	events := make(chan string, 2)
-	push.SetClientFactory(&mockCardDAVClientFactory{client: &mockCardDAVClient{
-		removeAllFn: func(_ context.Context, path string) error {
-			var count int64
-			if err := svc.db.Model(&models.Contact{}).Where("id = ?", source.ID).Count(&count).Error; err != nil || count != 0 {
-				t.Errorf("DAV deletion preceded commit: count=%d err=%v", count, err)
-			}
-			events <- "DELETE " + path
-			return nil
-		},
-		putAddrObjFn: func(_ context.Context, path string, card vcard.Card) (*carddav.AddressObject, error) {
-			if card.Value(vcard.FieldFormattedName) != "Alice" {
-				t.Errorf("wrong merged vCard name: %s", card.Value(vcard.FieldFormattedName))
-			}
-			events <- "PUT " + path
-			return &carddav.AddressObject{Path: path, ETag: "merged-etag"}, nil
-		},
-	}})
-	svc.SetDavPushService(push)
-	if _, err := svc.MergeContacts(vaultID, userID, dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}}); err != nil {
-		t.Fatal(err)
-	}
-	for _, expected := range []string{"DELETE " + remoteURI, "PUT https://dav.example.com/contacts/" + target.ID + ".vcf"} {
-		select {
-		case actual := <-events:
-			if actual != expected {
-				t.Fatalf("DAV event %q, want %q", actual, expected)
-			}
-		case <-time.After(5 * time.Second):
-			t.Fatal("DAV merge lifecycle did not finish")
-		}
-	}
-	// Wait for the worker to persist its final remote state and release its lock.
-	release := push.operationLocks.lock(target.ID)
-	release()
-	var states []models.ContactSubscriptionState
-	if err := svc.db.Find(&states).Error; err != nil {
-		t.Fatal(err)
-	}
-	if len(states) != 1 || states[0].ContactID != target.ID || states[0].DistantEtag != "merged-etag" {
-		t.Fatalf("unexpected remote state: %+v", states)
 	}
 	result, err := searchService.Search(vaultID, "orchard", 1, 20)
 	if err != nil {
@@ -452,12 +405,12 @@ func TestMergeContactsSearchAndDAV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Contacts) != 0 || len(result.Notes) != 1 || result.Notes[0].ContactID != target.ID {
-		t.Fatalf("source search or snapshot indexing incorrect: %+v", result)
+	if len(result.Contacts) != 0 || len(result.Notes) != 0 {
+		t.Fatalf("unselected name must not be copied into search notes: %+v", result)
 	}
 }
 
-func TestMergeContactsSnapshotsBeforeRedirectingRelationships(t *testing.T) {
+func TestMergeContactsReviewsSelfRelationships(t *testing.T) {
 	svc, vaultID, userID, _ := setupContactTest(t)
 	contacts := make([]*dto.ContactResponse, 0, 3)
 	for _, name := range []string{"Primary", "First duplicate", "Second duplicate"} {
@@ -475,14 +428,41 @@ func TestMergeContactsSnapshotsBeforeRedirectingRelationships(t *testing.T) {
 	if err := svc.db.Create(&relation).Error; err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.MergeContacts(vaultID, userID, dto.MergeContactsRequest{TargetContactID: contacts[0].ID, SourceContactIDs: []string{contacts[1].ID, contacts[2].ID}}); err != nil {
+	req := reviewedContactMerge(t, svc, vaultID, userID, contacts[0].ID, contacts[1].ID, contacts[2].ID)
+	preview, err := svc.PreviewContactMerge(vaultID, userID, req)
+	if err != nil {
 		t.Fatal(err)
 	}
-	var snapshot models.Note
-	if err := svc.db.Where("contact_id = ? AND source_type = ? AND source_uuid = ?", contacts[0].ID, "contact_merge", contacts[2].ID).First(&snapshot).Error; err != nil {
+	if preview.Effects["self_relationships"] != 1 {
+		t.Fatalf("self relationship removal missing from preview: %+v", preview)
+	}
+	if _, err := svc.MergeContacts(vaultID, userID, req); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(snapshot.Body, "Relationship from "+contacts[2].ID+" to "+contacts[1].ID) {
-		t.Fatal("snapshot no longer contains the original relationship between sources")
+	var remaining int64
+	if err := svc.db.Model(&models.Relationship{}).Where("id = ?", relation.ID).Count(&remaining).Error; err != nil {
+		t.Fatal(err)
 	}
+	if remaining != 0 {
+		t.Fatal("reviewed self relationship was not removed")
+	}
+}
+
+func reviewedContactMerge(t *testing.T, svc *ContactService, vaultID, userID, targetID string, sourceIDs ...string) dto.MergeContactsRequest {
+	t.Helper()
+	req := dto.MergeContactsRequest{TargetContactID: targetID, SourceContactIDs: sourceIDs, FieldChoices: map[string]string{}}
+	preview, err := svc.PreviewContactMerge(vaultID, userID, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Blockers) > 0 {
+		t.Fatalf("unexpected merge blockers: %v", preview.Blockers)
+	}
+	req.ReviewToken = preview.ReviewToken
+	for _, field := range preview.Fields {
+		if field.Conflict {
+			req.FieldChoices[field.Key] = field.Options[0].ContactID
+		}
+	}
+	return req
 }

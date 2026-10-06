@@ -554,3 +554,5 @@ export type { GithubComNaibaBondsInternalDtoSystemSettingItem as SystemSettingIt
 export type { GithubComNaibaBondsInternalDtoGeocodingAdminResponse as GeocodingAdminSettings } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoGeocodingProviderResponse as GeocodingProvider } from "./generated/data-contracts";
 export type { GithubComNaibaBondsInternalDtoInstanceInfoResponse as InstanceInfo } from "./generated/data-contracts";
+
+export type { GithubComNaibaBondsInternalDtoContactMergePreview as ContactMergePreview } from "./generated/data-contracts";

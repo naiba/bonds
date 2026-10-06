@@ -513,5 +513,7 @@
   "err.failed_to_update_geocoding_provider": "Geocoding-Anbieter konnte nicht aktualisiert werden",
   "err.failed_to_delete_geocoding_provider": "Geocoding-Anbieter konnte nicht zurückgesetzt werden",
   "err.contact_merge_selection": "Wählen Sie einen Kontakt zum Behalten und 1 bis 49 unterschiedliche Kontakte zum Zusammenführen aus.",
-  "err.failed_to_merge_contacts": "Kontakte konnten nicht zusammengeführt werden."
+  "err.failed_to_merge_contacts": "Kontakte konnten nicht zusammengeführt werden.",
+  "err.contact_merge_blocked": "Resolve the restrictions shown in the merge review before merging.",
+  "err.contact_merge_review_changed": "The merge review has changed or a conflict choice is missing. Review again before merging."
 }
