@@ -1,0 +1,48 @@
+{
+  "source_sha": "13e03af2af43cf7ca46026ed761c0681ef764992",
+  "synthetic_data_only": true,
+  "files": {
+    "contact-merge-desktop-effects.png": {
+      "sha256": "2c0b90e2038a46b33e3ceeb42109c7d5829d6bb728e048a26fe51d93cd0922d8",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    "contact-merge-desktop-review.png": {
+      "sha256": "1a5e0314d2ea61f4991590ec519a35bcfd6cb3da3b9f5e8bcf68d79c63a84cab",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    "contact-merge-desktop-result.png": {
+      "sha256": "2679ce009cf6aa8e726f8ca96b53bd0da10e6844cc68c1821f8e620a439cd729",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    "contact-merge-mobile-effects.png": {
+      "sha256": "811836c6cdb9e02bc78871aef8052b6c780ac986bfd268e1cccd4e8789f02c19",
+      "dimensions": [
+        390,
+        844
+      ]
+    },
+    "contact-merge-mobile-review.png": {
+      "sha256": "5c18263f683a641efcdee7440d7869f2bc8615e7ea71dc89e8fec7c12868751d",
+      "dimensions": [
+        390,
+        844
+      ]
+    },
+    "contact-merge-mobile-result.png": {
+      "sha256": "967e80fa0a5ff9596db45cf8654dc03ed28f4bda3d3229669ab4e35bd164b58a",
+      "dimensions": [
+        390,
+        844
+      ]
+    }
+  }
+}
