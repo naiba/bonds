@@ -136,7 +136,10 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	// the person it points to. FirstMetThrough follows the same authorization rule.
 	var owners []models.Contact
 	incoming := tx.Model(&models.Relationship{}).Select("contact_id").Where("related_contact_id IN ?", ids)
-	if err := tx.Where("id IN (?) OR first_met_through_contact_id IN ?", incoming, req.SourceContactIDs).Order("id ASC").Find(&owners).Error; err != nil {
+	// Soft deletion retains relationships, and the merge still redirects those
+	// rows. Include their deleted owners in authorization; only live introducer
+	// references are updated by MergeContacts and Contact.BeforeDelete.
+	if err := tx.Unscoped().Where("id IN (?) OR (deleted_at IS NULL AND first_met_through_contact_id IN ?)", incoming, req.SourceContactIDs).Order("id ASC").Find(&owners).Error; err != nil {
 		return nil, err
 	}
 	checked := map[string]bool{vaultID: true}

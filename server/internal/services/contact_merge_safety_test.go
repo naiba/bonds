@@ -431,3 +431,85 @@ func TestMergeContactsPreservesIntroducerOrBlocksUnavailableReference(t *testing
 		})
 	}
 }
+
+func TestMergeContactsChecksDeletedIncomingRelationshipOwner(t *testing.T) {
+	for _, access := range []struct {
+		name       string
+		permission int
+	}{{"no_membership", 0}, {"viewer", models.PermissionViewer}, {"editor", models.PermissionEditor}} {
+		t.Run(access.name, func(t *testing.T) {
+			permission := access.permission
+			svc, vaultID, userID, accountID := setupContactTest(t)
+			external, err := NewVaultService(svc.db).CreateVault(accountID, userID, dto.CreateVaultRequest{Name: "Restricted history"}, "en")
+			if err != nil {
+				t.Fatal(err)
+			}
+			target := models.Contact{VaultID: vaultID, FirstName: strPtrOrNil("Alice")}
+			source := models.Contact{VaultID: vaultID, FirstName: strPtrOrNil("Alice")}
+			owner := models.Contact{VaultID: external.ID, FirstName: strPtrOrNil("Private deleted friend")}
+			for _, row := range []any{&target, &source, &owner} {
+				if err := svc.db.Create(row).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			var kind models.RelationshipType
+			if err := svc.db.First(&kind).Error; err != nil {
+				t.Fatal(err)
+			}
+			relation := models.Relationship{ContactID: owner.ID, RelatedContactID: source.ID, RelationshipTypeID: kind.ID}
+			if err := svc.db.Create(&relation).Error; err != nil {
+				t.Fatal(err)
+			}
+			// Normal contact deletion retains relationship history in its owning vault.
+			if err := svc.DeleteContact(owner.ID, external.ID); err != nil {
+				t.Fatal(err)
+			}
+			membership := svc.db.Where("user_id = ? AND vault_id = ?", userID, external.ID)
+			if permission == 0 {
+				if err := membership.Delete(&models.UserVault{}).Error; err != nil {
+					t.Fatal(err)
+				}
+			} else if err := membership.Model(&models.UserVault{}).Update("permission", permission).Error; err != nil {
+				t.Fatal(err)
+			}
+			req := dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}}
+			preview, err := svc.PreviewContactMerge(vaultID, userID, req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.ReviewToken = preview.ReviewToken
+			_, err = svc.MergeContacts(vaultID, userID, req)
+			if permission == models.PermissionEditor {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if !errors.Is(err, ErrContactMergeBlocked) {
+					t.Errorf("unauthorized historical relationship merge: %v", err)
+				}
+				if !slices.Contains(preview.Blockers, "incoming_permission") {
+					t.Error("review omitted historical relationship permission blocker")
+				}
+				if err := svc.db.First(&source, "id = ?", source.ID).Error; err != nil {
+					t.Errorf("blocked merge deleted source: %v", err)
+				}
+			}
+			if err := svc.db.First(&relation, relation.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			expectedRelatedID := source.ID
+			if permission == models.PermissionEditor {
+				expectedRelatedID = target.ID
+			}
+			if relation.ContactID != owner.ID || relation.RelatedContactID != expectedRelatedID {
+				t.Fatalf("historical relationship owner=%s related=%s, want owner=%s related=%s", relation.ContactID, relation.RelatedContactID, owner.ID, expectedRelatedID)
+			}
+			if err := svc.db.Unscoped().First(&owner, "id = ?", owner.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if !owner.DeletedAt.Valid {
+				t.Fatal("merge restored deleted relationship owner")
+			}
+		})
+	}
+}
