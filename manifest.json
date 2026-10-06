@@ -1,0 +1,40 @@
+{
+  "source_sha": "cee784274fe8f072328c1f5bbf92f35c944e635a",
+  "synthetic_data_only": true,
+  "product_worktree": "/root/bonds-contact-merge-autonomous",
+  "capture_test": "web/e2e/contact-merge.spec.ts",
+  "files": {
+    "contact-merge-desktop-effects.png": "0493c62a9db9cba174e46ec9da31714e848bac3eed3ac85858d282d968c56335",
+    "contact-merge-desktop-result.png": "90180a00d6320c03a8068ca073ebfc7f37432e45eaa737b128cfcee0038c00ed",
+    "contact-merge-desktop-review.png": "cf91627d241ccd37f6ef92d516478b7ea9361a22f1997ad9f6990fea6b9ec146",
+    "contact-merge-mobile-effects.png": "09ec1985cd44b4165da3be0aabb73c6d68bc387159c6e3b6426c1f12e17425c4",
+    "contact-merge-mobile-result.png": "967e80fa0a5ff9596db45cf8654dc03ed28f4bda3d3229669ab4e35bd164b58a",
+    "contact-merge-mobile-review.png": "fa247c0eefdbc6511d592bd74753a5564b137d6f6b0427e8d7bfb8ca08eaa338"
+  },
+  "dimensions": {
+    "contact-merge-desktop-effects.png": [
+      1440,
+      1000
+    ],
+    "contact-merge-desktop-result.png": [
+      1440,
+      1000
+    ],
+    "contact-merge-desktop-review.png": [
+      1440,
+      1000
+    ],
+    "contact-merge-mobile-effects.png": [
+      390,
+      844
+    ],
+    "contact-merge-mobile-result.png": [
+      390,
+      844
+    ],
+    "contact-merge-mobile-review.png": [
+      390,
+      844
+    ]
+  }
+}
