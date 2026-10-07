@@ -85,13 +85,22 @@ func (s *CallService) Create(contactID, vaultID, authorID string, req dto.Create
 		CallReasonID: req.CallReasonID,
 		EmotionID:    req.EmotionID,
 	}
-	if err := s.db.Create(&call).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Create(&call).Error; err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			entityType := "Call"
+			if err := NewFeedRecorder(tx).Record(contactID, authorID, ActionCallLogged, "Logged a call", &call.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Call"
-		s.feedRecorder.Record(contactID, authorID, ActionCallLogged, "Logged a call", &call.ID, &entityType)
 	}
 
 	resp := toCallResponse(&call)

@@ -187,14 +187,30 @@ func (s *VaultFileService) Upload(vaultID string, contactID string, authorID str
 		file.UfileableID = &contactID
 	}
 
-	if err := s.db.Create(&file).Error; err != nil {
+	// Stream the upload before taking a database lock; remove it if its owner
+	// was merged while the bytes were arriving.
+	if contactID == "" {
+		err = s.db.Create(&file).Error
+	} else {
+		err = s.db.Transaction(func(tx *gorm.DB) error {
+			if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+				return err
+			}
+			if err := tx.Create(&file).Error; err != nil {
+				return err
+			}
+			if s.feedRecorder != nil && contactID != "" {
+				entityType := "File"
+				if err := NewFeedRecorder(tx).Record(contactID, authorID, ActionFileUploaded, "Uploaded "+fileType+": "+filename, &file.ID, &entityType); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
+	if err != nil {
 		os.Remove(destPath)
 		return nil, fmt.Errorf("failed to save file record: %w", err)
-	}
-
-	if s.feedRecorder != nil && contactID != "" {
-		entityType := "File"
-		s.feedRecorder.Record(contactID, authorID, ActionFileUploaded, "Uploaded "+fileType+": "+filename, &file.ID, &entityType)
 	}
 
 	resp := toVaultFileResponse(&file)

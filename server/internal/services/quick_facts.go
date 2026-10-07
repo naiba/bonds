@@ -120,7 +120,7 @@ func (s *QuickFactService) Create(contactID, vaultID string, templateID uint, re
 	if err != nil {
 		return nil, err
 	}
-	if err := s.db.Create(fact).Error; err != nil {
+	if err := createContactRecord(s.db, fact, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	fact.VaultQuickFactsTemplate = *template
@@ -188,6 +188,9 @@ func (s *QuickFactService) UploadFile(contactID, vaultID string, templateID uint
 
 	var createdFact *models.QuickFact
 	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		fact := models.QuickFact{
 			VaultQuickFactsTemplateID: template.ID,
 			ContactID:                 contactID,

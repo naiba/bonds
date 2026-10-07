@@ -139,6 +139,9 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 
 	var pivot models.ContactAddress
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Create(&address).Error; err != nil {
 			return err
 		}
@@ -155,7 +158,16 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 			return err
 		}
 		if !isPast {
-			return tx.Model(&pivot).Update("is_past_address", false).Error
+			if err := tx.Model(&pivot).Update("is_past_address", false).Error; err != nil {
+				return err
+			}
+		}
+
+		if s.feedRecorder != nil {
+			entityType := "Address"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionAddressAdded, "Added an address", &address.ID, &entityType); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -168,11 +180,6 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 	// about whose coordinates win.
 	if address.Latitude == nil || address.Longitude == nil {
 		s.tryGeocode(&address, s.geocodingSnapshot())
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Address"
-		s.feedRecorder.Record(contactID, "", ActionAddressAdded, "Added an address", &address.ID, &entityType)
 	}
 
 	resp := toAddressResponse(&address, &pivot)

@@ -22,6 +22,7 @@ type contactMergeReview struct {
 	*dto.ContactMergePreview
 	relationshipChanges []contactMergeRelationshipChange
 	payerChanges        []models.Activity
+	referenceOwners     []models.Contact
 }
 
 func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.MergeContactsRequest) (*dto.ContactMergePreview, error) {
@@ -170,6 +171,8 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	if err := tx.Unscoped().Where("id IN ? OR (deleted_at IS NULL AND first_met_through_contact_id IN ?)", ownerIDs, req.SourceContactIDs).Order("id ASC").Find(&owners).Error; err != nil {
 		return nil, err
 	}
+
+	review.referenceOwners = owners
 
 	// A moved contact can still pay for an activity in its former vault.
 	// Authorize and lock only source references, then execute this exact plan.

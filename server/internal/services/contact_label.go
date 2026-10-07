@@ -74,7 +74,7 @@ func (s *ContactLabelService) Add(contactID, vaultID string, req dto.AddContactL
 		LabelID:   req.LabelID,
 		ContactID: contactID,
 	}
-	if err := s.db.Create(&pivot).Error; err != nil {
+	if err := createContactRecord(s.db, &pivot, contactID, vaultID); err != nil {
 		return nil, err
 	}
 

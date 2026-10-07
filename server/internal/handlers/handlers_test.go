@@ -7853,6 +7853,21 @@ func TestAddressHistorySelectorPreservesSharedResidences(t *testing.T) {
 	if rec.Code != 200 {
 		t.Fatalf("update: %d %s", rec.Code, rec.Body.String())
 	}
+	var updated dto.AddressResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &updated); err != nil {
+		t.Fatal(err)
+	}
+	wantDate := time.Date(2010, time.January, 1, 0, 0, 0, 0, time.UTC)
+	if updated.ContactAddressID != first.ID || updated.DateFrom == nil || !updated.DateFrom.Equal(wantDate) || !updated.IsPastAddress {
+		t.Fatalf("selected period response was not updated: %+v", updated)
+	}
+	var selectedHistory models.ContactAddress
+	if err := ts.db.First(&selectedHistory, first.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if selectedHistory.ContactID != contact.ID || selectedHistory.AddressID != address.ID || selectedHistory.DateFrom == nil || !selectedHistory.DateFrom.Equal(wantDate) || !selectedHistory.IsPastAddress {
+		t.Fatalf("selected period was not persisted: %+v", selectedHistory)
+	}
 	var saved models.ContactAddress
 	if err := ts.db.First(&saved, second.ID).Error; err != nil {
 		t.Fatal(err)

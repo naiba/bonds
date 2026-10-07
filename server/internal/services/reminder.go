@@ -65,6 +65,9 @@ func (s *ReminderService) Create(contactID, vaultID string, req dto.CreateRemind
 		return nil, err
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		if err := validateReminderAudienceUsers(tx, vaultID, audience, selectedUserIDs); err != nil {
 			return err
 		}
@@ -74,14 +77,18 @@ func (s *ReminderService) Create(contactID, vaultID string, req dto.CreateRemind
 		if err := replaceReminderSelectedUsers(tx, reminder.ID, selectedUserIDs); err != nil {
 			return err
 		}
-		return scheduleReminderForVaultUsers(tx, &reminder)
+		if err := scheduleReminderForVaultUsers(tx, &reminder); err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			entityType := "ContactReminder"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionReminderCreated, "Created reminder: "+req.Label, &reminder.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "ContactReminder"
-		s.feedRecorder.Record(contactID, "", ActionReminderCreated, "Created reminder: "+req.Label, &reminder.ID, &entityType)
 	}
 
 	resp := toReminderResponse(&reminder)

@@ -39,14 +39,9 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 		if err := NewVaultService(tx).CheckUserVaultAccess(userID, vaultID, models.PermissionEditor); err != nil {
 			return err
 		}
-		// Stable row locking prevents overlapping PostgreSQL merges from consuming
-		// the same source twice. SQLite serializes writes and rolls back a loser.
-		var contacts []models.Contact
-		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("vault_id = ? AND id IN ?", vaultID, ids).Order("id ASC").Find(&contacts).Error; err != nil {
+		contacts, lockedOwners, err := lockContactMergeOwners(tx, vaultID, req)
+		if err != nil {
 			return err
-		}
-		if len(contacts) != len(ids) {
-			return ErrContactNotFound
 		}
 		byID := make(map[string]models.Contact, len(contacts))
 		for _, contact := range contacts {
@@ -55,6 +50,14 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 		review, err := buildContactMergePreview(tx, vaultID, userID, req, contacts)
 		if err != nil {
 			return err
+		}
+		// A new incoming owner may appear between candidate discovery and the
+		// parent locks. Retry from a fresh review instead of acquiring late locks
+		// or writing references whose current vault was never fixed in place.
+		for _, owner := range review.referenceOwners {
+			if !lockedOwners[owner.ID] {
+				return ErrContactMergeReviewChanged
+			}
 		}
 		if len(review.Blockers) != 0 {
 			return ErrContactMergeBlocked
@@ -101,7 +104,11 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 			return err
 		}
 		// Redirect inbound references before soft deletion invokes Contact.BeforeDelete.
-		if err := tx.Model(&models.Contact{}).Where("first_met_through_contact_id IN ? AND id NOT IN ?", req.SourceContactIDs, ids).Update("first_met_through_contact_id", target.ID).Error; err != nil {
+		referenceOwnerIDs := make([]string, 0, len(review.referenceOwners))
+		for _, owner := range review.referenceOwners {
+			referenceOwnerIDs = append(referenceOwnerIDs, owner.ID)
+		}
+		if err := tx.Model(&models.Contact{}).Where("id IN ? AND first_met_through_contact_id IN ? AND id NOT IN ?", referenceOwnerIDs, req.SourceContactIDs, ids).Update("first_met_through_contact_id", target.ID).Error; err != nil {
 			return err
 		}
 		for _, sourceID := range req.SourceContactIDs {

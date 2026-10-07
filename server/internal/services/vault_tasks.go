@@ -88,22 +88,29 @@ func (s *VaultTaskService) Create(vaultID, authorID string, req dto.CreateVaultT
 	// scheduler can re-resolve future recurrences in the same calendar.
 	applyTaskCalendarFields(&task, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, req.ContactIDs, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Create(&task).Error; err != nil {
 			return err
 		}
-		return replaceTaskAssigneesLocked(tx, task.ID, req.ContactIDs)
+		if err := replaceTaskAssigneesLocked(tx, task.ID, req.ContactIDs); err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			entityType := "ContactTask"
+			// Feed entry is per-assignee so each contact's feed reflects the
+			// task that was just created for them.
+			for _, cid := range req.ContactIDs {
+				if err := NewFeedRecorder(tx).Record(cid, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "ContactTask"
-		// Feed entry is per-assignee so each contact's feed reflects the
-		// task that was just created for them.
-		for _, cid := range req.ContactIDs {
-			s.feedRecorder.Record(cid, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType)
-		}
 	}
 
 	resps, err := s.buildResponses([]models.ContactTask{task}, authorID)
@@ -172,6 +179,11 @@ func (s *VaultTaskService) Update(id uint, vaultID string, req dto.UpdateVaultTa
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if req.ContactIDs != nil {
+			if err := lockContactsBelongToVault(tx, *req.ContactIDs, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := tx.Model(&task).Updates(updates).Error; err != nil {
 			return err
 		}

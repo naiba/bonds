@@ -47,7 +47,7 @@ func (s *PetService) Create(contactID, vaultID string, req dto.CreatePetRequest)
 		PetCategoryID: req.PetCategoryID,
 		Name:          strPtrOrNil(req.Name),
 	}
-	if err := s.db.Create(&pet).Error; err != nil {
+	if err := createContactRecord(s.db, &pet, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	pet.PetCategory = *petCategory

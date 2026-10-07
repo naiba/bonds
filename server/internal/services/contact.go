@@ -186,6 +186,11 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if contact.FirstMetThroughContactID != nil {
+			if err := lockContactsBelongToVault(tx, []string{*contact.FirstMetThroughContactID}, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := tx.Create(&contact).Error; err != nil {
 			return err
 		}
@@ -209,6 +214,13 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 				return err
 			}
 		}
+
+		if s.feedRecorder != nil {
+			desc := "Created contact " + req.FirstName
+			if err := NewFeedRecorder(tx).Record(contact.ID, userID, ActionContactCreated, desc, nil, nil); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -221,11 +233,6 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	formatter, err := newContactNameFormatter(s.db, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		desc := "Created contact " + req.FirstName
-		s.feedRecorder.Record(contact.ID, userID, ActionContactCreated, desc, nil, nil)
 	}
 
 	if s.searchService != nil {
@@ -328,6 +335,13 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	}
 
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		owners := []string{contactID}
+		if contact.FirstMetThroughContactID != nil {
+			owners = append(owners, *contact.FirstMetThroughContactID)
+		}
+		if err := lockContactsBelongToVault(tx, owners, vaultID); err != nil {
+			return err
+		}
 		if err := updateContactProfile(tx, &contact, vaultID,
 			"first_name", "last_name", "middle_name", "nickname",
 			"maiden_name", "prefix", "suffix", "gender_id",
@@ -338,7 +352,17 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 		); err != nil {
 			return err
 		}
-		return applyContactImportantDateChanges(tx, contactID, vaultID, req.ImportantDateChanges)
+		if err := applyContactImportantDateChanges(tx, contactID, vaultID, req.ImportantDateChanges); err != nil {
+			return err
+		}
+
+		if s.feedRecorder != nil {
+			desc := "Updated contact " + req.FirstName
+			if err := NewFeedRecorder(tx).Record(contact.ID, "", ActionContactUpdated, desc, nil, nil); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -348,11 +372,6 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	formatter, err := newContactNameFormatter(s.db, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		desc := "Updated contact " + req.FirstName
-		s.feedRecorder.Record(contact.ID, "", ActionContactUpdated, desc, nil, nil)
 	}
 
 	if s.searchService != nil {

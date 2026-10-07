@@ -110,6 +110,9 @@ func (s *ActivityService) CreateForUser(vaultID, userID string, req dto.Activity
 		event.SubjectUserName = &subjectName
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Create(&event).Error; err != nil {
 			return err
 		}
@@ -119,14 +122,20 @@ func (s *ActivityService) CreateForUser(vaultID, userID string, req dto.Activity
 		if err := replaceActivityParticipants(tx, event.ID, contactIDs); err != nil {
 			return err
 		}
-		return updateInteractionLastTalkedTo(tx, event.ActivityTypeID, event.StartDate, contactIDs)
+		if err := updateInteractionLastTalkedTo(tx, event.ActivityTypeID, event.StartDate, contactIDs); err != nil {
+			return err
+		}
+		if s.feedRecorder != nil && req.PrimaryContactID != "" {
+			entityType := "Activity"
+			if err := NewFeedRecorder(tx).Record(req.PrimaryContactID, "", ActionActivityCreated, "Created an activity", &event.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
-	if s.feedRecorder != nil && req.PrimaryContactID != "" {
-		entityType := "Activity"
-		s.feedRecorder.Record(req.PrimaryContactID, "", ActionActivityCreated, "Created an activity", &event.ID, &entityType)
-	}
+
 	return s.get(vaultID, event.ID, userID)
 }
 
@@ -160,6 +169,9 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 		return nil, ErrInvalidActivityTime
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Save(&replacement).Error; err != nil {
 			return err
 		}

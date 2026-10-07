@@ -44,6 +44,9 @@ func (s *ImportantDateService) List(contactID, vaultID string) ([]dto.ImportantD
 func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateImportantDateRequest) (*dto.ImportantDateResponse, error) {
 	var result *dto.ImportantDateResponse
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		var err error
 		result, err = NewImportantDateService(tx).create(contactID, vaultID, req)
 		return err
@@ -117,6 +120,12 @@ func (s *ImportantDateService) create(contactID, vaultID string, req dto.CreateI
 func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dto.UpdateImportantDateRequest) (*dto.ImportantDateResponse, error) {
 	var result *dto.ImportantDateResponse
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Reminder creation takes a contact FK lock. Acquire the parent before
+		// the date row, matching merge order instead of forming a lock cycle.
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+
 		var err error
 		result, err = NewImportantDateService(tx).update(id, contactID, vaultID, req)
 		return err
@@ -223,6 +232,11 @@ func (s *ImportantDateService) update(id uint, contactID, vaultID string, req dt
 
 func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Deleting reminders before their date must not race a merge that moves
+		// the date before its reminders; both operations lock the parent first.
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		return NewImportantDateService(tx).delete(id, contactID, vaultID)
 	})
 }

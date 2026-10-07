@@ -61,7 +61,7 @@ func (s *GiftService) Create(contactID, vaultID string, req dto.CreateGiftReques
 		GivenAt:        req.GivenAt,
 		BoughtAt:       req.BoughtAt,
 	}
-	if err := s.db.Create(&gift).Error; err != nil {
+	if err := createContactRecord(s.db, &gift, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	gift.GiftOccasion = occasion

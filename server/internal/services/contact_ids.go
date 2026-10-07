@@ -31,6 +31,10 @@ func validateAndDedupeContactIDs(contactIDs []string) ([]string, error) {
 	return dedupeContactIDs(contactIDs), nil
 }
 
+// lockContactsBelongToVault must run inside the caller's write transaction,
+// before inserting associations or locking their rows. Validation outside that
+// transaction cannot prevent a merge from deleting the owner before insertion.
+// Use the same contact-ID order as merging to avoid opposing parent locks.
 func lockContactsBelongToVault(tx *gorm.DB, contactIDs []string, vaultID string) error {
 	lockedContactIDs := dedupeContactIDs(append([]string(nil), contactIDs...))
 	if len(lockedContactIDs) == 0 {

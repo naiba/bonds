@@ -169,6 +169,11 @@ func (s *CSVImportService) importRow(
 		if err := tx.Create(&cvu).Error; err != nil {
 			return fmt.Errorf("vault user link: %w", err)
 		}
+		if s.feedRecorder != nil {
+			if err := NewFeedRecorder(tx).Record(contact.ID, userID, ActionContactCreated, "Imported contact "+firstName, nil, nil); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -179,12 +184,12 @@ func (s *CSVImportService) importRow(
 
 	// Email.
 	if emailVal := col(row, colIndex, m.Email); emailVal != "" {
-		s.createContactInfo(accountID, contact.ID, emailVal, "seed.contact_info_types.email_address", resp, rowNum)
+		s.createContactInfo(accountID, vaultID, contact.ID, emailVal, "seed.contact_info_types.email_address", resp, rowNum)
 	}
 
 	// Phone.
 	if phoneVal := col(row, colIndex, m.Phone); phoneVal != "" {
-		s.createContactInfo(accountID, contact.ID, phoneVal, "seed.contact_info_types.phone", resp, rowNum)
+		s.createContactInfo(accountID, vaultID, contact.ID, phoneVal, "seed.contact_info_types.phone", resp, rowNum)
 	}
 
 	// Birthday.
@@ -200,7 +205,7 @@ func (s *CSVImportService) importRow(
 				resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: tag %q: %v", rowNum, tag, err))
 				continue
 			}
-			if err := s.db.Create(&models.ContactLabel{ContactID: contact.ID, LabelID: label.ID}).Error; err != nil {
+			if err := createContactRecord(s.db, &models.ContactLabel{ContactID: contact.ID, LabelID: label.ID}, contact.ID, vaultID); err != nil {
 				resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: tag %q link: %v", rowNum, tag, err))
 			}
 		}
@@ -211,7 +216,12 @@ func (s *CSVImportService) importRow(
 		for _, groupName := range splitCSVList(groupsVal) {
 			var group models.Group
 			if s.db.Where("vault_id = ? AND name = ?", vaultID, groupName).First(&group).Error == nil {
-				if err := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ContactGroup{GroupID: group.ID, ContactID: contact.ID}).Error; err != nil {
+				if err := s.db.Transaction(func(tx *gorm.DB) error {
+					if err := lockContactsBelongToVault(tx, []string{contact.ID}, vaultID); err != nil {
+						return err
+					}
+					return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&models.ContactGroup{GroupID: group.ID, ContactID: contact.ID}).Error
+				}); err != nil {
 					resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: group %q link: %v", rowNum, groupName, err))
 				}
 			} else {
@@ -240,7 +250,21 @@ func (s *CSVImportService) importRow(
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
-		if err := s.db.Create(&note).Error; err != nil {
+		if err := s.db.Transaction(func(tx *gorm.DB) error {
+			if err := lockContactsBelongToVault(tx, []string{contact.ID}, vaultID); err != nil {
+				return err
+			}
+			if err := tx.Create(&note).Error; err != nil {
+				return err
+			}
+			if s.feedRecorder != nil {
+				entityType := "Note"
+				if err := NewFeedRecorder(tx).Record(contact.ID, userID, ActionNoteCreated, "Created a note", &note.ID, &entityType); err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
 			resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: note: %v", rowNum, err))
 		} else {
 			createdNote = &note
@@ -251,9 +275,7 @@ func (s *CSVImportService) importRow(
 	s.createAddress(accountID, vaultID, contact.ID, row, colIndex, m, resp, rowNum)
 
 	// Side effects: feed, search index, DAV push — mirror ContactService.CreateContact.
-	if s.feedRecorder != nil {
-		s.feedRecorder.Record(contact.ID, userID, ActionContactCreated, "Imported contact "+firstName, nil, nil)
-	}
+
 	if s.searchService != nil {
 		s.searchService.IndexContact(&contact)
 	}
@@ -263,10 +285,7 @@ func (s *CSVImportService) importRow(
 
 	// Note side effects: mirror NoteService.Create.
 	if createdNote != nil {
-		if s.feedRecorder != nil {
-			entityType := "Note"
-			s.feedRecorder.Record(contact.ID, userID, ActionNoteCreated, "Created a note", &createdNote.ID, &entityType)
-		}
+
 		if s.searchService != nil {
 			s.searchService.IndexNote(createdNote)
 		}
@@ -275,7 +294,7 @@ func (s *CSVImportService) importRow(
 	return nil
 }
 
-func (s *CSVImportService) createContactInfo(accountID, contactID, value, translationKey string, resp *dto.CSVImportResponse, rowNum int) {
+func (s *CSVImportService) createContactInfo(accountID, vaultID, contactID, value, translationKey string, resp *dto.CSVImportResponse, rowNum int) {
 	var ciType models.ContactInformationType
 	if err := s.db.Where("account_id = ? AND name_translation_key = ?", accountID, translationKey).First(&ciType).Error; err != nil {
 		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: contact info type %q not found", rowNum, translationKey))
@@ -286,7 +305,7 @@ func (s *CSVImportService) createContactInfo(accountID, contactID, value, transl
 		TypeID:    ciType.ID,
 		Data:      value,
 	}
-	if err := s.db.Create(&ci).Error; err != nil {
+	if err := createContactRecord(s.db, &ci, contactID, vaultID); err != nil {
 		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: contact info: %v", rowNum, err))
 	}
 }
@@ -311,7 +330,7 @@ func (s *CSVImportService) createBirthday(vaultID, contactID, value string, resp
 		Year:                       &year,
 		CalendarType:               "gregorian",
 	}
-	if err := s.db.Create(&date).Error; err != nil {
+	if err := createContactRecord(s.db, &date, contactID, vaultID); err != nil {
 		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: birthday: %v", rowNum, err))
 	}
 }
@@ -345,14 +364,18 @@ func (s *CSVImportService) createAddress(accountID, vaultID, contactID string, r
 		PostalCode:    strPtrOrNil(postal),
 		Country:       strPtrOrNil(country),
 	}
-	if err := s.db.Create(&addr).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Create(&addr).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.ContactAddress{ContactID: contactID, AddressID: addr.ID}).Error
+	}); err != nil {
 		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: address: %v", rowNum, err))
-		return
 	}
 
-	if err := s.db.Create(&models.ContactAddress{ContactID: contactID, AddressID: addr.ID}).Error; err != nil {
-		resp.Errors = append(resp.Errors, fmt.Sprintf("row %d: address link: %v", rowNum, err))
-	}
 }
 
 func (s *CSVImportService) findOrCreateLabel(tx *gorm.DB, vaultID, name string) (*models.Label, error) {

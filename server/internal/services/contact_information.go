@@ -48,7 +48,7 @@ func (s *ContactInformationService) Create(contactID, vaultID string, req dto.Cr
 		Kind:      strPtrOrNil(req.Kind),
 		Pref:      pref,
 	}
-	if err := s.db.Create(&item).Error; err != nil {
+	if err := createContactRecord(s.db, &item, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	resp := toContactInformationResponse(&item)
