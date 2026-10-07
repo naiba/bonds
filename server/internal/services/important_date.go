@@ -387,3 +387,33 @@ func validateImportantDateCalendarDay(date *models.ContactImportantDate) error {
 	}
 	return nil
 }
+
+// UpdateCalendarFields applies the fields writable through a calendar projection.
+// Re-read under the parent lock: saving a preloaded date after a merge would
+// restore its old ContactID and detach it from its migrated reminders.
+func (s *ImportantDateService) UpdateCalendarFields(id uint, contactID, vaultID, label string, day, month, year *int) (*models.ContactImportantDate, error) {
+	var date models.ContactImportantDate
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Where("id = ? AND contact_id = ?", id, contactID).First(&date).Error; err != nil {
+			return err
+		}
+		date.Label, date.Day, date.Month, date.Year = label, day, month, year
+		if err := updateContactRecord(tx, &date, contactID, vaultID, ErrImportantDateNotFound, "label", "day", "month", "year"); err != nil {
+			return err
+		}
+		if date.RemindMe {
+			if importantDateCanScheduleReminder(&date) {
+				return NewImportantDateService(tx).ensureReminder(contactID, &date)
+			}
+			if err := tx.Model(&date).Update("remind_me", false).Error; err != nil {
+				return err
+			}
+			return NewImportantDateService(tx).removeReminder(contactID, date.ID)
+		}
+		return nil
+	})
+	return &date, err
+}

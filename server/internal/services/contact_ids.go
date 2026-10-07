@@ -54,3 +54,10 @@ func lockContactsBelongToVault(tx *gorm.DB, contactIDs []string, vaultID string)
 	}
 	return nil
 }
+
+// LockContactForWrite lets protocol adapters use the same ownership boundary as
+// service writes. The caller must keep the transaction open through all child
+// writes; a pre-transaction contact lookup is only discovery, not validation.
+func LockContactForWrite(tx *gorm.DB, contactID, vaultID string) error {
+	return lockContactsBelongToVault(tx, []string{contactID}, vaultID)
+}
