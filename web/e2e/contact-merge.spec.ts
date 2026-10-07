@@ -1,7 +1,15 @@
 import { test, expect } from "@playwright/test";
+import type { Locator } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { apiUrl } from "./api-base-url";
+
+// React controls these radios. Assert the committed state with Playwright's
+// retrying assertion instead of check()'s immediate post-click DOM inspection.
+async function selectMergeOption(option: Locator) {
+  await option.click();
+  await expect(option).toBeChecked();
+}
 
 for (const viewport of [
   { name: "desktop", width: 1440, height: 1000 },
@@ -91,10 +99,11 @@ for (const viewport of [
         .getByRole("radiogroup", { name: "Choose the contact to keep" })
         .getByRole("radio"),
     ).toHaveCount(3);
-    await dialog
-      .getByRole("radiogroup", { name: "Choose the contact to keep" })
-      .getByRole("radio", { name: "Alicia Chen", exact: true })
-      .check();
+    await selectMergeOption(
+      dialog
+        .getByRole("radiogroup", { name: "Choose the contact to keep" })
+        .getByRole("radio", { name: "Alicia Chen", exact: true }),
+    );
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(dialog).not.toBeVisible();
     const beforeMerge = await request.get(
@@ -107,34 +116,39 @@ for (const viewport of [
       .click();
     const targetIndex = viewport.name === "mobile" ? 1 : 0;
     const retainedId = contacts[targetIndex].id;
-    await dialog
-      .getByRole("radiogroup", { name: "Choose the contact to keep" })
-      .getByRole("radio", {
-        name: targetIndex === 0 ? "Alice Chen" : "Alicia Chen",
-        exact: true,
-      })
-      .check();
+    await selectMergeOption(
+      dialog
+        .getByRole("radiogroup", { name: "Choose the contact to keep" })
+        .getByRole("radio", {
+          name: targetIndex === 0 ? "Alice Chen" : "Alicia Chen",
+          exact: true,
+        }),
+    );
     const chooseFields = async () => {
       const confirm = dialog.getByRole("button", {
         name: "Confirm merge",
         exact: true,
       });
       await expect(confirm).toBeDisabled();
-      await dialog
-        .getByRole("radiogroup", { name: "First name", exact: true })
-        .getByRole("radio", { name: "Alice (Alice Chen)", exact: true })
-        .check();
-      await dialog
-        .getByRole("radiogroup", { name: "Last name", exact: true })
-        .getByRole("radio", {
-          name: targetIndex === 0 ? "Chen (Alice Chen)" : "Chen (Alicia Chen)",
-          exact: true,
-        })
-        .check();
-      await dialog
-        .getByRole("radiogroup", { name: "Nickname", exact: true })
-        .getByRole("radio", { name: "Ally (Alicia Chen)", exact: true })
-        .check();
+      await selectMergeOption(
+        dialog
+          .getByRole("radiogroup", { name: "First name", exact: true })
+          .getByRole("radio", { name: "Alice (Alice Chen)", exact: true }),
+      );
+      await selectMergeOption(
+        dialog
+          .getByRole("radiogroup", { name: "Last name", exact: true })
+          .getByRole("radio", {
+            name:
+              targetIndex === 0 ? "Chen (Alice Chen)" : "Chen (Alicia Chen)",
+            exact: true,
+          }),
+      );
+      await selectMergeOption(
+        dialog
+          .getByRole("radiogroup", { name: "Nickname", exact: true })
+          .getByRole("radio", { name: "Ally (Alicia Chen)", exact: true }),
+      );
       await expect(confirm).toBeDisabled();
       await dialog
         .getByRole("checkbox", {

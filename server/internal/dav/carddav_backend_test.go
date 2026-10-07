@@ -676,11 +676,72 @@ func TestCardDAVMergeRoundTripPreservesDatesAndReminderLinks(t *testing.T) {
 		t.Fatal("unrepresented address detail lost")
 	}
 	object.Card.SetValue(vcard.FieldBirthday, "2000-01-01")
+	if _, err := backend.PutAddressObject(ctx, path, object.Card, nil); err != nil {
+		t.Fatalf("adding a birthday beside a merged date failed: %v", err)
+	}
+	var birthday models.ContactImportantDate
+	if err := db.Where("contact_id = ? AND label = ?", target.ID, "Birthdate").First(&birthday).Error; err != nil || birthday.Year == nil || *birthday.Year != 2000 {
+		t.Fatalf("birthday not saved: %+v, %v", birthday, err)
+	}
+	if err := db.Model(&birthday).Update("calendar_type", "lunar").Error; err != nil {
+		t.Fatal(err)
+	}
+	object.Card.SetValue(vcard.FieldBirthday, "2001-01-01")
 	if _, err := backend.PutAddressObject(ctx, path, object.Card, nil); err == nil {
-		t.Fatal("unsafe replacement of important dates accepted")
+		t.Fatal("Gregorian DAV edit overwrote lunar birthday")
+	}
+	if err := db.First(&birthday, birthday.ID).Error; err != nil || birthday.Year == nil || *birthday.Year != 2000 {
+		t.Fatalf("rejected edit changed birthday: %+v, %v", birthday, err)
 	}
 	if err := db.First(&date, date.ID).Error; err != nil {
 		t.Fatal("rejected write removed date", err)
 	}
 
+}
+
+func TestCardDAVPhoneMetadataSurvivesCreationAndEmailEdit(t *testing.T) {
+	for _, version := range []string{"3.0", "4.0"} {
+		t.Run(version, func(t *testing.T) {
+			backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+			card := vcard.Card{}
+			card.SetValue(vcard.FieldVersion, version)
+			card.SetName(&vcard.Name{GivenName: "Synthetic"})
+			card.SetValue(vcard.FieldFormattedName, "Synthetic")
+			card.Add(vcard.FieldTelephone, &vcard.Field{Value: "+15550101010", Params: vcard.Params{vcard.ParamType: []string{"CELL", "VOICE"}}})
+			path := "/dav/addressbooks/" + userID + "/" + vaultID + "/synthetic-phone.vcf"
+			object, err := backend.PutAddressObject(ctx, path, card, nil)
+			// Bonds advertises vCard 3.0 for its own CardDAV endpoint; subscription
+			// vCard 4.0 parsing is covered separately without widening this protocol.
+			if version == "4.0" {
+				if err == nil || !strings.Contains(err.Error(), "supported-address-data") {
+					t.Fatalf("unexpected unsupported-version result: %v", err)
+				}
+				var count int64
+				if err := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&count).Error; err != nil || count != 0 {
+					t.Fatalf("rejected version created contact: %d, %v", count, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var phone models.ContactInformation
+			if err := db.Where("data = ?", "+15550101010").First(&phone).Error; err != nil || phone.Kind == nil || *phone.Kind != "mobile" || phone.Pref {
+				t.Fatalf("new phone metadata lost: %+v, %v", phone, err)
+			}
+			path = "/dav/addressbooks/" + userID + "/" + vaultID + "/" + phone.ContactID + ".vcf"
+			object.Card.SetValue(vcard.FieldEmail, "synthetic@example.test")
+			if _, err := backend.PutAddressObject(ctx, path, object.Card, nil); err != nil {
+				t.Fatalf("email edit blocked by typed phone: %v", err)
+			}
+			var saved models.ContactInformation
+			if err := db.First(&saved, phone.ID).Error; err != nil || saved.Kind == nil || *saved.Kind != "mobile" || saved.Pref || saved.Data != phone.Data {
+				t.Fatalf("email edit replaced phone: %+v, %v", saved, err)
+			}
+			var count int64
+			if err := db.Model(&models.ContactInformation{}).Where("contact_id = ? AND data = ?", phone.ContactID, "synthetic@example.test").Count(&count).Error; err != nil || count != 1 {
+				t.Fatalf("email not saved: %d, %v", count, err)
+			}
+		})
+	}
 }

@@ -113,7 +113,7 @@ describe("Contact merge review", () => {
     ).toBeVisible();
     expect(
       screen.getByText(
-        /Unsafe remote replacements are rejected; check the subscription sync log/,
+        /DAV accepts ordinary edits and retains unchanged details/,
       ),
     ).toBeVisible();
     const confirm = screen.getByRole("button", { name: "Confirm merge" });

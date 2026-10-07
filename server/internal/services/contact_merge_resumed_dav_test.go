@@ -114,6 +114,10 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 		t.Fatalf("push did not save mapping: %+v", state)
 	}
 	remote.Card.SetValue(vcard.FieldNickname, "Remote nickname")
+	// Ordinary additions and parameter normalization must not block a resumed pull.
+	remote.Card.SetValue(vcard.FieldBirthday, "2000-01-01")
+	remote.Card.SetValue(vcard.FieldEmail, "alice@example.test")
+	remote.Card[vcard.FieldTelephone][0].Params[vcard.ParamType] = []string{"VOICE", "CELL"}
 	remote.ETag = "after-nickname-edit"
 	syncer := NewDavSyncService(svc.db, client, cards)
 	syncer.SetClientFactory(&mockCardDAVClientFactory{client: remoteClient})
@@ -144,7 +148,7 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 		t.Errorf("reminder %d points to inactive merged date %d", reminder.ID, *reminder.ImportantDateID)
 	}
 	var phones []models.ContactInformation
-	if err := svc.db.Where("contact_id = ?", target.ID).Find(&phones).Error; err != nil {
+	if err := svc.db.Where("contact_id = ? AND type_id = ?", target.ID, phoneType.ID).Find(&phones).Error; err != nil {
 		t.Fatal(err)
 	}
 	if len(phones) != 1 || phones[0].ID != phone.ID || ptrToStr(phones[0].Kind) != "mobile" {
@@ -190,11 +194,20 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 		}
 	}
 	assertRetained()
+	var birthdays int64
+	if err := svc.db.Model(&models.ContactImportantDate{}).Where("contact_id = ? AND label = ?", target.ID, "Birthdate").Count(&birthdays).Error; err != nil || birthdays != 1 {
+		t.Fatalf("new birthday missing: %d, %v", birthdays, err)
+	}
+	var emails []models.ContactInformation
+	if err := svc.db.Where("contact_id = ? AND data = ?", target.ID, "alice@example.test").Find(&emails).Error; err != nil || len(emails) != 1 {
+		t.Fatalf("new email missing: %+v, %v", emails, err)
+	}
 	var acceptedSub models.AddressBookSubscription
 	if err := svc.db.First(&acceptedSub, "id = ?", sub.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	acceptedCard := remote.Card
+	acceptedETag := "after-nickname-edit"
 	for _, mode := range []string{"incremental", "full", "query"} {
 		queryFallback = mode == "query"
 		checkpoint := "remote-token"
@@ -205,7 +218,7 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 			t.Fatal(err)
 		}
 		acceptedSub.DistantSyncToken = strPtrOrNil(checkpoint)
-		for _, field := range []string{vcard.FieldBirthday, vcard.FieldTelephone, vcard.FieldAddress} {
+		for _, field := range []string{vcard.FieldAddress} {
 			t.Run(mode+"_reject_"+field, func(t *testing.T) {
 				remote.Card = make(vcard.Card)
 				for key, values := range acceptedCard {
@@ -213,10 +226,6 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 				}
 				remote.Card.SetValue(vcard.FieldNickname, "Uncommitted nickname")
 				switch field {
-				case vcard.FieldBirthday:
-					remote.Card.SetValue(field, "2000-01-01")
-				case vcard.FieldTelephone:
-					remote.Card.SetValue(field, "+15550101888")
 				case vcard.FieldAddress:
 					remote.Card.SetValue(field, ";;Different street;City;Region;12345;Country")
 				}
@@ -232,13 +241,13 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 				if err := svc.db.First(&target, "id = ?", target.ID).Error; err != nil {
 					t.Fatal(err)
 				}
-				if ptrToStr(target.Nickname) != "Remote nickname" || ptrToStr(target.DistantEtag) != "after-nickname-edit" {
+				if ptrToStr(target.Nickname) != "Remote nickname" || ptrToStr(target.DistantEtag) != acceptedETag {
 					t.Fatal("rejected pull partially committed profile or etag")
 				}
 				if err := svc.db.First(&state, state.ID).Error; err != nil {
 					t.Fatal(err)
 				}
-				if state.DistantEtag != "after-nickname-edit" {
+				if state.DistantEtag != acceptedETag {
 					t.Fatal("rejected pull acknowledged remote mapping")
 				}
 				var storedSub models.AddressBookSubscription
@@ -259,6 +268,25 @@ func TestMergeContactsResumedDAVPreservesMergedRecords(t *testing.T) {
 			})
 		}
 
+		// A failure is recoverable without dropping mappings or restarting the
+		// subscription. A safe subsequent representation must advance the checkpoint.
+		remote.Card = acceptedCard
+		remote.ETag = "recovered-" + mode
+		remoteToken = "recovered-token-" + mode
+		result, err := syncer.SyncSubscription(context.Background(), sub.ID, vaultID)
+		if err != nil || result.Errors != 0 || result.Updated != 1 {
+			t.Fatalf("safe retry failed: %+v, %v", result, err)
+		}
+		acceptedETag = remote.ETag
+		if err := svc.db.First(&acceptedSub, "id = ?", sub.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+		if !queryFallback && ptrToStr(acceptedSub.DistantSyncToken) != remoteToken {
+			t.Fatal("successful retry did not advance checkpoint")
+		}
+		if err := svc.db.First(&state, state.ID).Error; err != nil || state.DistantEtag != acceptedETag {
+			t.Fatalf("successful retry did not acknowledge mapping: %v", err)
+		}
+		assertRetained()
 	}
-
 }
