@@ -230,14 +230,18 @@ func TestContactMergeMissingPostAssociationRollsBackOnRepairFailure(t *testing.T
 }
 
 func TestPostContactOnlyUpdateRechecksBodyAfterConcurrentWrite(t *testing.T) {
-	for _, operation := range []string{"merge", "replace_mention"} {
+	for _, operation := range []string{"merge", "replace_mention", "metadata_merge", "metadata_replace_mention"} {
 		t.Run(operation, func(t *testing.T) {
 			f := setupContactMergePost(t)
 			if f.svc.db.Dialector.Name() != "postgres" {
 				t.Skip("PostgreSQL contact and journal lock waits")
 			}
-			if err := f.svc.db.Where("post_id = ?", f.post.ID).Delete(&models.ContactPost{}).Error; err != nil {
-				t.Fatal(err)
+			metadataOnly := strings.HasPrefix(operation, "metadata_")
+			operation = strings.TrimPrefix(operation, "metadata_")
+			if !metadataOnly {
+				if err := f.svc.db.Where("post_id = ?", f.post.ID).Delete(&models.ContactPost{}).Error; err != nil {
+					t.Fatal(err)
+				}
 			}
 			request := reviewedContactMerge(t, f.svc, f.vault, f.user, f.target, f.source)
 			locked, resume := make(chan struct{}), make(chan struct{})
@@ -290,7 +294,11 @@ func TestPostContactOnlyUpdateRechecksBodyAfterConcurrentWrite(t *testing.T) {
 			updated := make(chan error, 1)
 			writtenAt := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
 			go func() {
-				_, err := NewPostService(f.svc.db.WithContext(ctx)).Update(f.post.ID, f.journal, f.vault, dto.UpdatePostRequest{Title: "Partial update", WrittenAt: writtenAt, ContactIDs: []string{}, UpdateLastContacted: true})
+				request := dto.UpdatePostRequest{Title: "Partial update", WrittenAt: writtenAt, UpdateLastContacted: true}
+				if !metadataOnly {
+					request.ContactIDs = []string{}
+				}
+				_, err := NewPostService(f.svc.db.WithContext(ctx)).Update(f.post.ID, f.journal, f.vault, request)
 				updated <- err
 			}()
 			var waited bool

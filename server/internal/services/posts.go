@@ -305,6 +305,14 @@ func postContactIDsFromSections(sections []dto.PostSectionInput, fallback []stri
 // locking. Comparing the effective IDs allows partial updates to retry safely
 // when another editor or merge changes the body while they wait.
 func storedPostContactIDs(db *gorm.DB, postID uint, vaultID string, fallback []string) ([]string, error) {
+	// With neither sections nor contact_ids submitted, this is only advancing
+	// existing associations. Historical prose may mention a moved/deleted contact;
+	// do not revalidate that untouched text or write outside the current vault.
+	// Use the same scoped lookup on every lock/retry pass. An explicit list,
+	// including [], still requires validating the stored authoritative mentions.
+	if fallback == nil {
+		return inVaultPostContactIDs(db, postID, vaultID)
+	}
 	var sections []models.PostSection
 	if err := db.Select("content").Where("post_id = ?", postID).Find(&sections).Error; err != nil {
 		return nil, err
@@ -312,13 +320,6 @@ func storedPostContactIDs(db *gorm.DB, postID uint, vaultID string, fallback []s
 	inputs := make([]dto.PostSectionInput, len(sections))
 	for i, section := range sections {
 		inputs[i].Content = ptrToStr(section.Content)
-	}
-	if fallback == nil {
-		var err error
-		fallback, err = inVaultPostContactIDs(db, postID, vaultID)
-		if err != nil {
-			return nil, err
-		}
 	}
 	ids, err := validateAndDedupeContactIDs(postContactIDsFromSections(inputs, fallback))
 	if err != nil {
