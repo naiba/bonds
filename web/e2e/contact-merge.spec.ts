@@ -65,6 +65,35 @@ for (const viewport of [
     );
     expect(noteResponse.status()).toBe(201);
     const noteId = (await noteResponse.json()).data.id;
+    const journalResponse = await request.post(
+      apiUrl(`/vaults/${vaultId}/journals`),
+      {
+        headers,
+        data: { name: "Synthetic merge memories" },
+      },
+    );
+    expect(journalResponse.status()).toBe(201);
+    const journalId = (await journalResponse.json()).data.id;
+    const postPath = `/vaults/${vaultId}/journals/${journalId}/posts`;
+    const postContentFormat =
+      viewport.name === "desktop" ? "markdown" : "plain";
+    const postResponse = await request.post(apiUrl(postPath), {
+      headers,
+      data: {
+        title: "Garden walk before merging",
+        written_at: "2026-01-02T00:00:00Z",
+        sections: [
+          {
+            position: 1,
+            label: "Memory",
+            content: `Walked with @[Alice Work](contact:${contacts[2].id}).`,
+            content_format: postContentFormat,
+          },
+        ],
+      },
+    });
+    expect(postResponse.status()).toBe(201);
+    const postId = (await postResponse.json()).data.id;
     await page.goto("/login");
     await page.getByPlaceholder("Email").fill(email);
     await page
@@ -279,6 +308,63 @@ for (const viewport of [
         path: join(
           evidenceDirectory,
           `contact-merge-${viewport.name}-result.png`,
+        ),
+        fullPage: false,
+        animations: "disabled",
+      });
+    // A refreshed article must remain editable: its body is authoritative for
+    // contact associations, so moving only contact_post is insufficient.
+    const mergedPost = await request.get(apiUrl(`${postPath}/${postId}`), {
+      headers,
+    });
+    expect(mergedPost.status()).toBe(200);
+    const mergedArticle = (await mergedPost.json()).data;
+    expect(mergedArticle.sections).toHaveLength(1);
+    expect(mergedArticle.sections[0].content).toBe(
+      `Walked with @[Alice Work](contact:${retainedId}).`,
+    );
+    expect(mergedArticle.sections[0].content_format).toBe(postContentFormat);
+    await page.goto(`${postPath}/${postId}`);
+    await expect(
+      page.getByText("Garden walk before merging", { exact: true }).first(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "edit Edit", exact: true }).click();
+    await page.getByPlaceholder("Post title").fill("Garden walk after merging");
+    const saved = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`${postPath}/${postId}`) &&
+        response.request().method() === "PUT",
+    );
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    expect((await saved).status()).toBe(200);
+    await expect(
+      page.getByText("Garden walk after merging", { exact: true }).first(),
+    ).toBeVisible();
+    const refreshedPost = await request.get(apiUrl(`${postPath}/${postId}`), {
+      headers,
+    });
+    expect(refreshedPost.status()).toBe(200);
+    const article = (await refreshedPost.json()).data;
+    expect(article.contacts).toEqual([
+      expect.objectContaining({ id: retainedId }),
+    ]);
+    expect(article.sections).toHaveLength(1);
+    // The existing editor upgrades plain text to Markdown and escapes prose
+    // punctuation. The merge itself preserves the original format above.
+    expect(article.sections[0].content).toBe(
+      `Walked with @[Alice Work](contact:${retainedId})${postContentFormat === "plain" ? "\\." : "."}`,
+    );
+    expect(article.sections[0].content_format).toBe("markdown");
+    expect(article.title).toBe("Garden walk after merging");
+    await expect(
+      page.locator("p").filter({ hasText: "Walked with" }),
+    ).toHaveText("Walked with Alice Chen.");
+    expect(pageErrors).toEqual([]);
+    if (evidenceDirectory)
+      await page.screenshot({
+        path: join(
+          evidenceDirectory,
+          `contact-merge-${viewport.name}-journal.png`,
         ),
         fullPage: false,
         animations: "disabled",

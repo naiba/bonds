@@ -71,6 +71,9 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 		if err := applyContactMergeChoices(&target, byID, review.Fields, req.FieldChoices); err != nil {
 			return err
 		}
+		if err := mergeContactPostMentions(tx, review.postSections, req.SourceContactIDs, target.ID); err != nil {
+			return err
+		}
 		for _, sourceID := range req.SourceContactIDs {
 			source := byID[sourceID]
 			fillMergedContactProfile(&target, &source)

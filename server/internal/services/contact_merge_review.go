@@ -23,6 +23,7 @@ type contactMergeReview struct {
 	relationshipChanges []contactMergeRelationshipChange
 	payerChanges        []models.Activity
 	referenceOwners     []models.Contact
+	postSections        []models.PostSection
 }
 
 func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.MergeContactsRequest) (*dto.ContactMergePreview, error) {
@@ -63,6 +64,11 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	ids := append([]string{req.TargetContactID}, req.SourceContactIDs...)
 	byID := map[string]models.Contact{}
 	review := &contactMergeReview{ContactMergePreview: &dto.ContactMergePreview{Contacts: []dto.ContactMergeCandidate{}, Fields: []dto.ContactMergeField{}, Effects: map[string]int64{"removed_contacts": int64(len(req.SourceContactIDs))}, Blockers: []string{}}}
+	sections, err := lockContactMergePostSections(tx, vaultID, req.SourceContactIDs)
+	if err != nil {
+		return nil, err
+	}
+	review.postSections = sections
 	for _, contact := range contacts {
 		byID[contact.ID] = contact
 	}
@@ -270,7 +276,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	}
 	// Hashes are only concurrency guards, never persisted snapshots. Include all
 	// contact versions and affected reference contents, even if counts are equal.
-	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges})
+	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges, review.postSections})
 	if err != nil {
 		return nil, err
 	}
