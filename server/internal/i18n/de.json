@@ -516,5 +516,6 @@
   "err.failed_to_merge_contacts": "Kontakte konnten nicht zusammengeführt werden.",
   "err.contact_merge_blocked": "Resolve the restrictions shown in the merge review before merging.",
   "err.contact_merge_review_changed": "The merge review has changed or a conflict choice is missing. Review again before merging.",
-  "err.address_history_ambiguous": "Wählen Sie einen Wohnzeitraum, um diese gemeinsame Adresse zu bearbeiten oder zu löschen."
+  "err.address_history_ambiguous": "Wählen Sie einen Wohnzeitraum, um diese gemeinsame Adresse zu bearbeiten oder zu löschen.",
+  "err.contact_delete_changed": "Die Kontaktverweise haben sich während des Löschens geändert. Bitte versuchen Sie es erneut."
 }

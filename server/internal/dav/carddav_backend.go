@@ -377,7 +377,29 @@ func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) e
 		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("contact cannot be deleted"))
 	}
 
-	return b.db.Delete(&contact).Error
+	// DAV deletion reaches the same introducer-clearing model hook as the
+	// REST API. Reuse its parent lock protocol rather than locking referrers
+	// inside the hook before the selected contact, opposite to merge.
+	err := b.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		contacts, err := services.LockContactDeletionOwners(tx, []string{contactID}, contact.VaultID)
+		if err != nil {
+			return err
+		}
+		if !contacts[0].CanBeDeleted {
+			return services.ErrContactCannotBeDeleted
+		}
+		return tx.Delete(&contacts[0]).Error
+	})
+	switch {
+	case errors.Is(err, services.ErrContactNotFound):
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+	case errors.Is(err, services.ErrContactCannotBeDeleted):
+		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("contact cannot be deleted"))
+	case errors.Is(err, services.ErrContactDeleteChanged):
+		return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("contact references changed; retry deletion"))
+	default:
+		return err
+	}
 }
 
 func (b *CardDAVBackend) verifyVaultAccess(userID, vaultID string) error {

@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -7904,5 +7905,242 @@ func TestAddressHistorySelectorPreservesSharedResidences(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatal("unused address retained")
+	}
+}
+
+func TestAvatarRoutesPreserveConcurrentMerge(t *testing.T) {
+	for _, method := range []string{http.MethodPut, http.MethodDelete} {
+		for _, editSource := range []bool{true, false} {
+			name := "survivor"
+			if editSource {
+				name = "source"
+			}
+			t.Run(method+"/"+name, func(t *testing.T) {
+				ts := setupTestServerWithStorage(t)
+				token, auth := ts.registerTestUser(t, "avatar-merge@example.test")
+				vault := ts.createTestVault(t, token, "Avatar Merge")
+				target := ts.createTestContact(t, token, vault.ID, "Survivor")
+				source := ts.createTestContact(t, token, vault.ID, "Duplicate")
+				if err := ts.db.Model(&models.Contact{}).Where("id = ?", source.ID).Update("nickname", "Adopted nickname").Error; err != nil {
+					t.Fatal(err)
+				}
+				requestedID := target.ID
+				if editSource {
+					requestedID = source.ID
+				}
+				loaded, resume := make(chan struct{}), make(chan struct{})
+				var paused atomic.Bool
+				hook := "avatar:pause_route_contact_read"
+				if err := ts.db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
+					if contact, ok := tx.Statement.Dest.(*models.Contact); ok && contact.ID == requestedID && tx.Error == nil && paused.CompareAndSwap(false, true) {
+						close(loaded)
+						select {
+						case <-resume:
+						case <-time.After(10 * time.Second):
+							tx.AddError(fmt.Errorf("avatar test scheduling timeout"))
+						}
+					}
+				}); err != nil {
+					t.Fatal(err)
+				}
+				defer ts.db.Callback().Query().Remove(hook)
+				var body bytes.Buffer
+				writer := multipart.NewWriter(&body)
+				headers := make(textproto.MIMEHeader)
+				headers.Set("Content-Disposition", `form-data; name="file"; filename="synthetic.png"`)
+				headers.Set("Content-Type", "image/png")
+				part, err := writer.CreatePart(headers)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := part.Write([]byte("synthetic-avatar")); err != nil {
+					t.Fatal(err)
+				}
+				if err := writer.Close(); err != nil {
+					t.Fatal(err)
+				}
+				request := httptest.NewRequest(method, "/api/vaults/"+vault.ID+"/contacts/"+requestedID+"/avatar", &body)
+				request.Header.Set("Authorization", "Bearer "+token)
+				request.Header.Set("Content-Type", writer.FormDataContentType())
+				result := make(chan *httptest.ResponseRecorder, 1)
+				go func() { record := httptest.NewRecorder(); ts.e.ServeHTTP(record, request); result <- record }()
+				select {
+				case <-loaded:
+				case <-time.After(10 * time.Second):
+					close(resume)
+					t.Fatal("avatar route did not read contact")
+				}
+				svc := services.NewContactService(ts.db)
+				mergeRequest := dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}, FieldChoices: map[string]string{"first_name": target.ID}}
+				preview, err := svc.PreviewContactMerge(vault.ID, auth.User.ID, mergeRequest)
+				if err != nil {
+					close(resume)
+					t.Fatal(err)
+				}
+				mergeRequest.ReviewToken = preview.ReviewToken
+				_, mergeErr := svc.MergeContacts(vault.ID, auth.User.ID, mergeRequest)
+				close(resume)
+				if mergeErr != nil {
+					t.Fatal(mergeErr)
+				}
+				var response *httptest.ResponseRecorder
+				select {
+				case response = <-result:
+				case <-time.After(10 * time.Second):
+					t.Fatal("avatar request did not finish")
+				}
+				expected := http.StatusNoContent
+				if method == http.MethodPut {
+					expected = http.StatusOK
+				}
+				if editSource {
+					expected = http.StatusNotFound
+				}
+				if response.Code != expected {
+					t.Fatalf("expected %d got %d: %s", expected, response.Code, response.Body.String())
+				}
+				var tombstone, survivor models.Contact
+				if err := ts.db.Unscoped().First(&tombstone, "id = ?", source.ID).Error; err != nil {
+					t.Fatal(err)
+				}
+				if !tombstone.DeletedAt.Valid {
+					t.Fatal("avatar route resurrected merged source")
+				}
+				if err := ts.db.First(&survivor, "id = ?", target.ID).Error; err != nil {
+					t.Fatal(err)
+				}
+				if survivor.Nickname == nil || *survivor.Nickname != "Adopted nickname" {
+					t.Fatal("avatar route overwrote merged profile")
+				}
+				var files []models.File
+				if err := ts.db.Where("vault_id = ?", vault.ID).Find(&files).Error; err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles := 0
+				if method == http.MethodPut && !editSource {
+					expectedFiles = 1
+				}
+				if len(files) != expectedFiles {
+					t.Fatalf("file rows=%d expected=%d", len(files), expectedFiles)
+				}
+				entries, err := os.ReadDir(ts.cfg.Storage.UploadDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(entries) != expectedFiles {
+					t.Fatalf("upload cleanup left %d files expected %d", len(entries), expectedFiles)
+				}
+				if expectedFiles == 1 && (survivor.FileID == nil || *survivor.FileID != files[0].ID || files[0].UfileableID == nil || *files[0].UfileableID != target.ID) {
+					t.Fatal("avatar was not assigned to survivor")
+				}
+				stalePhoto := ts.doRequest(http.MethodDelete, "/api/vaults/"+vault.ID+"/contacts/"+source.ID+"/photos/999999", "", token)
+				if stalePhoto.Code != http.StatusNotFound {
+					t.Fatalf("stale photo route returned %d", stalePhoto.Code)
+				}
+			})
+		}
+	}
+}
+
+func TestContactDeletionRoutesRejectNewIntroducerReferences(t *testing.T) {
+	for _, bulk := range []bool{false, true} {
+		name := "single"
+		if bulk {
+			name = "bulk"
+		}
+		t.Run(name, func(t *testing.T) {
+			ts := setupTestServer(t)
+			if ts.db.Dialector.Name() != "postgres" {
+				t.Skip("PostgreSQL reference creation between discovery and parent locks")
+			}
+			token, auth := ts.registerTestUser(t, "delete-references@example.test")
+			vault := ts.createTestVault(t, token, "Deletion references")
+			source := ts.createTestContact(t, token, vault.ID, "Introducer")
+			discovered, resume := make(chan struct{}), make(chan struct{})
+			var paused atomic.Bool
+			hook := "deletion:pause_reference_discovery"
+			if err := ts.db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
+				if _, ok := tx.Statement.Dest.(*[]string); !ok {
+					return
+				}
+				if tx.Statement.Table == "contacts" && strings.Contains(tx.Statement.SQL.String(), "first_met_through_contact_id") && tx.Error == nil && paused.CompareAndSwap(false, true) {
+					close(discovered)
+					select {
+					case <-resume:
+					case <-time.After(10 * time.Second):
+						tx.AddError(fmt.Errorf("reference discovery timeout"))
+					}
+				}
+			}); err != nil {
+				t.Fatal(err)
+			}
+			defer ts.db.Callback().Query().Remove(hook)
+			path := "/api/vaults/" + vault.ID + "/contacts/" + source.ID
+			body := ""
+			if bulk {
+				path = "/api/vaults/" + vault.ID + "/contacts"
+				body = fmt.Sprintf(`{"contact_ids":[%q]}`, source.ID)
+			}
+			finished := make(chan *httptest.ResponseRecorder, 1)
+			go func() { finished <- ts.doRequest(http.MethodDelete, path, body, token) }()
+			select {
+			case <-discovered:
+			case <-time.After(10 * time.Second):
+				close(resume)
+				t.Fatal("deletion did not discover references")
+			}
+			late, err := services.NewContactService(ts.db).CreateContact(vault.ID, auth.User.ID, dto.CreateContactRequest{FirstName: "New referrer", FirstMetThroughContactID: &source.ID})
+			close(resume)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var result *httptest.ResponseRecorder
+			select {
+			case result = <-finished:
+			case <-time.After(10 * time.Second):
+				t.Fatal("deletion did not finish")
+			}
+			if result.Code != http.StatusConflict {
+				t.Fatalf("expected conflict got %d: %s", result.Code, result.Body.String())
+			}
+			response := parseResponse(t, result)
+			if response.Success || response.Error == nil || response.Error.Code != "CONFLICT" || response.Error.Message != "Contact references changed during deletion. Please try again." {
+				t.Fatalf("unexpected conflict response: %+v", response)
+			}
+			var stored models.Contact
+			if err := ts.db.First(&stored, "id = ?", late.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.FirstMetThroughContactID == nil || *stored.FirstMetThroughContactID != source.ID {
+				t.Fatal("rejected deletion cleared new reference")
+			}
+			var count int64
+			if err := ts.db.Model(&models.Contact{}).Where("id = ?", source.ID).Count(&count).Error; err != nil {
+				t.Fatal(err)
+			}
+			if count != 1 {
+				t.Fatal("rejected deletion removed source")
+			}
+			retry := ts.doRequest(http.MethodDelete, path, body, token)
+			expected := http.StatusNoContent
+			if bulk {
+				expected = http.StatusOK
+			}
+			if retry.Code != expected {
+				t.Fatalf("retry failed: %d %s", retry.Code, retry.Body.String())
+			}
+			if err := ts.db.First(&stored, "id = ?", late.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.FirstMetThroughContactID != nil {
+				t.Fatal("retry did not clear reference")
+			}
+			if err := ts.db.Model(&models.Contact{}).Where("id = ?", source.ID).Count(&count).Error; err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatal("retry left source active")
+			}
+		})
 	}
 }

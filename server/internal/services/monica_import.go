@@ -708,10 +708,18 @@ func (s *MonicaImportService) importReminders(
 		if t, ok := parseMonicaTimestamp(mr.UpdatedAt); ok {
 			reminder.UpdatedAt = t
 		}
-		if err := createMonicaContactRecord(tx, &reminder, contactID, vaultID, "reminder", resp); err == nil {
-			resp.ImportedReminders++
-			if err := scheduleReminderForVaultUsers(tx, &reminder); err != nil {
-				resp.Errors = append(resp.Errors, fmt.Sprintf("reminder %s: could not schedule reminder", mr.UUID))
+		// Keep a reminder, its description and its first schedules inside the
+		// owner lock. A merge between insert and scheduling would leave a
+		// successfully imported reminder that never sends a notification.
+		if err := tx.Transaction(func(itx *gorm.DB) error {
+			if err := lockContactsBelongToVault(itx, []string{contactID}, vaultID); err != nil {
+				return err
+			}
+			if err := itx.Create(&reminder).Error; err != nil {
+				return err
+			}
+			if err := scheduleReminderForVaultUsers(itx, &reminder); err != nil {
+				return err
 			}
 			if mr.Properties.Description != "" {
 				sourceType := "monica_reminder_description"
@@ -732,10 +740,18 @@ func (s *MonicaImportService) importReminders(
 				if t, ok := parseMonicaTimestamp(mr.UpdatedAt); ok {
 					note.UpdatedAt = t
 				}
-				if err := createMonicaContactRecord(tx, &note, contactID, vaultID, "note", resp); err == nil {
-					resp.ImportedNotes++
+				if err := itx.Create(&note).Error; err != nil {
+					return err
 				}
 			}
+			return nil
+		}); err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("reminder %s: could not import and schedule reminder", mr.UUID))
+			continue
+		}
+		resp.ImportedReminders++
+		if mr.Properties.Description != "" {
+			resp.ImportedNotes++
 		}
 	}
 }

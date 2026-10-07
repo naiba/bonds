@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"io"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -70,4 +71,14 @@ func (s *ContactAvatarService) DeleteAvatar(contactID, vaultID, userID string) (
 		return nil, err
 	}
 	return &resp, nil
+}
+
+// UploadContactAvatar commits the file and profile reference together. The
+// HTTP route must not Save an earlier contact snapshot after upload: a merge
+// may have deleted that source or filled the survivor's other profile fields.
+func (s *VaultFileService) UploadContactAvatar(contactID, vaultID, userID, filename, mimeType string, size int64, data io.Reader) (*dto.VaultFileResponse, error) {
+	return s.upload(vaultID, contactID, userID, "avatar", filename, mimeType, size, data, func(tx *gorm.DB, file *models.File) error {
+		contact := models.Contact{ID: contactID, FileID: &file.ID}
+		return updateContactProfile(tx, &contact, vaultID, "file_id")
+	})
 }

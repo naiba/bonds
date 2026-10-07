@@ -551,7 +551,16 @@ func (s *DavSyncService) processDeletedPaths(
 			continue
 		}
 
-		if err := s.db.Delete(&contact).Error; err != nil {
+		// Remote deletion also invokes the introducer cleanup hook. Keep the
+		// same ordered parent locks as local deletion without adding REST-only
+		// cleanup or changing pull-only unlink semantics.
+		if err := s.db.Transaction(func(tx *gorm.DB) error {
+			owners, err := LockContactDeletionOwners(tx, []string{contactID}, vaultID)
+			if err != nil {
+				return err
+			}
+			return tx.Delete(&owners[0]).Error
+		}); err != nil {
 			errMsg := fmt.Sprintf("delete failed: %v", err)
 			s.logSyncAction(subID, &contactID, ptrToStr(contact.DistantURI), "", "error", errMsg)
 			result.Errors++

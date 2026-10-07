@@ -17,6 +17,7 @@ var (
 	ErrContactNotFound        = errors.New("contact not found")
 	ErrContactNameRequired    = errors.New("contact first name or nickname required")
 	ErrContactDeleteEmpty     = errors.New("contact delete list is empty")
+	ErrContactDeleteChanged   = errors.New("contact references changed during deletion")
 	ErrContactCannotBeDeleted = errors.New("contact cannot be deleted")
 )
 

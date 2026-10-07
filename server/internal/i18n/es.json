@@ -461,5 +461,6 @@
   "err.failed_to_merge_contacts": "No se pudieron combinar los contactos.",
   "err.contact_merge_blocked": "Resolve the restrictions shown in the merge review before merging.",
   "err.contact_merge_review_changed": "The merge review has changed or a conflict choice is missing. Review again before merging.",
-  "err.address_history_ambiguous": "Selecciona un período de residencia para editar o eliminar esta dirección compartida."
+  "err.address_history_ambiguous": "Selecciona un período de residencia para editar o eliminar esta dirección compartida.",
+  "err.contact_delete_changed": "Las referencias del contacto cambiaron durante la eliminación. Inténtalo de nuevo."
 }

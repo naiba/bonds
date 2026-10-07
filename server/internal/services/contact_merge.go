@@ -113,6 +113,12 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 		}
 		for _, sourceID := range req.SourceContactIDs {
 			source := byID[sourceID]
+			// Soft-deleted rows still enforce their avatar FK. Ownership has
+			// moved to the survivor; detach the tombstone so later photo deletion
+			// cannot remove bytes and then fail on this obsolete reference.
+			if err := tx.Model(&source).Update("file_id", nil).Error; err != nil {
+				return err
+			}
 			if err := tx.Delete(&source).Error; err != nil {
 				return err
 			}

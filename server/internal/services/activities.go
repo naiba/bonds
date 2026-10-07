@@ -189,14 +189,17 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 }
 
 func (s *ActivityService) Delete(vaultID string, id uint) error {
-	var event models.Activity
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&event).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrActivityNotFound
-		}
-		return err
-	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockActivitiesBeforeParticipantRemoval(tx, []uint{id}); err != nil {
+			return err
+		}
+		var event models.Activity
+		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&event).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrActivityNotFound
+			}
+			return err
+		}
 		if err := tx.Model(&models.Activity{}).Where("parent_id = ?", id).Update("parent_id", nil).Error; err != nil {
 			return err
 		}
@@ -474,4 +477,17 @@ func contactRefs(contacts []models.Contact) []dto.TaskContactRef {
 		return refs[i].Name < refs[j].Name
 	})
 	return refs
+}
+
+// Merge locks legacy payer activities before moving their participant rows.
+// Deletion and vault moves must use the same activity-before-pivot order.
+// Include child activities in ID order before clearing their parent links.
+func lockActivitiesBeforeParticipantRemoval(tx *gorm.DB, activityIDs []uint) error {
+	if len(activityIDs) == 0 {
+		return nil
+	}
+	var activities []models.Activity
+	return tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		Select("id").Where("id IN ? OR parent_id IN ?", activityIDs, activityIDs).
+		Order("id ASC").Find(&activities).Error
 }
