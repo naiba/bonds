@@ -61,34 +61,7 @@ func mergeContactAssociations(tx *gorm.DB, sourceID, targetID string) error {
 			}
 		}
 	}
-	for _, column := range []string{"contact_id", "related_contact_id"} {
-		if err := tx.Model(&models.Relationship{}).Where(column+" = ?", sourceID).Update(column, targetID).Error; err != nil {
-			return err
-		}
-	}
-	// The review checks Editor access to every incoming reference owner before
-	// these updates; an existing link is not permission to edit another vault.
-	if err := tx.Where("contact_id = ? AND related_contact_id = ?", targetID, targetID).Delete(&models.Relationship{}).Error; err != nil {
-		return err
-	}
-	var relationships []models.Relationship
-	if err := tx.Where("contact_id = ? OR related_contact_id = ?", targetID, targetID).Order("id ASC").Find(&relationships).Error; err != nil {
-		return err
-	}
-	type relationshipKey struct {
-		contactID, relatedID string
-		typeID               uint
-	}
-	seen := map[relationshipKey]bool{}
-	for _, relationship := range relationships {
-		key := relationshipKey{relationship.ContactID, relationship.RelatedContactID, relationship.RelationshipTypeID}
-		if seen[key] {
-			if err := tx.Delete(&relationship).Error; err != nil {
-				return err
-			}
-		}
-		seen[key] = true
-	}
+
 	return nil
 }
 

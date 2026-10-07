@@ -534,19 +534,17 @@ func contactBirthdayVCardValue(dates []models.ContactImportantDate) string {
 }
 
 func contactBirthdayImportantDate(dates []models.ContactImportantDate) *models.ContactImportantDate {
-	// Prefer the explicit primary birthday; merged alternate birthdays remain
-	// ordinary dates and must not replace the primary just because their ID is lower.
+	// Only the explicit singleton type is a birthday. Label fallback would
+	// re-promote an ordinary merged date after deletion and a repeated DAV PUT
+	// would then delete that date and its reminders. Legacy labels are classified
+	// once by the database migration, preserving their former BDAY projection.
 	for i := range dates {
 		date := &dates[i]
 		if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil && *date.ContactImportantDateType.InternalType == "birthdate" {
 			return date
 		}
 	}
-	for i := range dates {
-		if isBirthdateImportantDate(&dates[i]) {
-			return &dates[i]
-		}
-	}
+
 	return nil
 }
 
@@ -565,13 +563,6 @@ func formatImportantDateVCardValue(date *models.ContactImportantDate) string {
 		return fmt.Sprintf("%04d-%02d-%02d", *date.Year, *date.Month, *date.Day)
 	}
 	return fmt.Sprintf("--%02d-%02d", *date.Month, *date.Day)
-}
-
-func isBirthdateImportantDate(date *models.ContactImportantDate) bool {
-	if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil {
-		return *date.ContactImportantDateType.InternalType == "birthdate"
-	}
-	return strings.EqualFold(date.Label, "Birthdate") || strings.EqualFold(date.Label, "Birthday")
 }
 
 func isAnniversaryImportantDate(date *models.ContactImportantDate) bool {

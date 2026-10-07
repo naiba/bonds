@@ -82,6 +82,9 @@ func AutoMigrate(db *gorm.DB) error {
 }
 
 func runPostAutoMigrateBackfills(db *gorm.DB) error {
+	if err := migrateLegacyBirthdateTypes(db); err != nil {
+		return err
+	}
 	if err := backfillAccountMemberships(db); err != nil {
 		return err
 	}

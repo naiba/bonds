@@ -10,12 +10,18 @@ import (
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var errContactMergeIntroducerUnavailable = errors.New("contact introducer is unavailable in this vault")
 
 var ErrContactMergeBlocked = errors.New("contact merge has unresolved safety restrictions")
 var ErrContactMergeReviewChanged = errors.New("contact merge requires a current review and a choice for every conflict")
+
+type contactMergeReview struct {
+	*dto.ContactMergePreview
+	relationshipChanges []contactMergeRelationshipChange
+}
 
 func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.MergeContactsRequest) (*dto.ContactMergePreview, error) {
 	ids := append([]string{req.TargetContactID}, req.SourceContactIDs...)
@@ -41,17 +47,20 @@ func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.Mer
 		if len(contacts) != len(ids) {
 			return ErrContactNotFound
 		}
-		var err error
-		result, err = buildContactMergePreview(tx, vaultID, userID, req, contacts)
-		return err
+		review, err := buildContactMergePreview(tx, vaultID, userID, req, contacts)
+		if err != nil {
+			return err
+		}
+		result = review.ContactMergePreview
+		return nil
 	})
 	return result, err
 }
 
-func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.MergeContactsRequest, contacts []models.Contact) (*dto.ContactMergePreview, error) {
+func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.MergeContactsRequest, contacts []models.Contact) (*contactMergeReview, error) {
 	ids := append([]string{req.TargetContactID}, req.SourceContactIDs...)
 	byID := map[string]models.Contact{}
-	review := &dto.ContactMergePreview{Contacts: []dto.ContactMergeCandidate{}, Fields: []dto.ContactMergeField{}, Effects: map[string]int64{"removed_contacts": int64(len(req.SourceContactIDs))}, Blockers: []string{}}
+	review := &contactMergeReview{ContactMergePreview: &dto.ContactMergePreview{Contacts: []dto.ContactMergeCandidate{}, Fields: []dto.ContactMergeField{}, Effects: map[string]int64{"removed_contacts": int64(len(req.SourceContactIDs))}, Blockers: []string{}}}
 	for _, contact := range contacts {
 		byID[contact.ID] = contact
 	}
@@ -132,16 +141,35 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	if pushing > 0 {
 		review.Blockers = append(review.Blockers, "dav_push")
 	}
-	// Incoming relationship ownership is the CONTACT's vault, not the vault of
-	// the person it points to. FirstMetThrough follows the same authorization rule.
-	var owners []models.Contact
-	incoming := tx.Model(&models.Relationship{}).Select("contact_id").Where("related_contact_id IN ?", ids)
-	// Soft deletion retains relationships, and the merge still redirects those
-	// rows. Include their deleted owners in authorization; only live introducer
-	// references are updated by MergeContacts and Contact.BeforeDelete.
-	if err := tx.Unscoped().Where("id IN (?) OR (deleted_at IS NULL AND first_met_through_contact_id IN ?)", incoming, req.SourceContactIDs).Order("id ASC").Find(&owners).Error; err != nil {
+	var relationships []models.Relationship
+	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("contact_id IN ? OR related_contact_id IN ?", ids, ids).Order("id ASC").Find(&relationships).Error; err != nil {
 		return nil, err
 	}
+	// Lock existing rows and carry this exact plan into the write phase. A
+	// second query after authorization must not expand the set of edited owners.
+	changes := planContactMergeRelationships(relationships, req.TargetContactID, req.SourceContactIDs)
+	review.relationshipChanges = changes
+	ownerIDs := []string{}
+	for _, change := range changes {
+		ownerIDs = append(ownerIDs, change.original.ContactID)
+		if change.remove {
+			if change.contactID == change.relatedID {
+				review.Effects["self_relationships"]++
+			} else {
+				review.Effects["duplicate_relationships"]++
+			}
+		} else {
+			review.Effects["redirected_relationships"]++
+		}
+	}
+	// Check the original owning vault of every row that will change, including
+	// soft-deleted owners. Unchanged target references do not grant or require
+	// permission. Only live introducer references are actually redirected.
+	var owners []models.Contact
+	if err := tx.Unscoped().Where("id IN ? OR (deleted_at IS NULL AND first_met_through_contact_id IN ?)", ownerIDs, req.SourceContactIDs).Order("id ASC").Find(&owners).Error; err != nil {
+		return nil, err
+	}
+
 	checked := map[string]bool{vaultID: true}
 	for _, owner := range owners {
 		if checked[owner.VaultID] {
@@ -199,29 +227,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 		}
 		roles[group.GroupID] = *group.GroupTypeRoleID
 	}
-	var relationships []models.Relationship
-	if err := tx.Where("contact_id IN ? OR related_contact_id IN ?", ids, ids).Order("id ASC").Find(&relationships).Error; err != nil {
-		return nil, err
-	}
-	seenRelations := map[string]bool{}
-	for _, relation := range relationships {
-		from, to := relation.ContactID, relation.RelatedContactID
-		if _, ok := byID[from]; ok {
-			from = req.TargetContactID
-		}
-		if _, ok := byID[to]; ok {
-			to = req.TargetContactID
-		}
-		key := fmt.Sprintf("%s/%s/%d", from, to, relation.RelationshipTypeID)
-		if from == to {
-			review.Effects["self_relationships"]++
-		} else if seenRelations[key] {
-			review.Effects["duplicate_relationships"]++
-		} else if from != relation.ContactID || to != relation.RelatedContactID {
-			review.Effects["redirected_relationships"]++
-		}
-		seenRelations[key] = true
-	}
+
 	if err := tx.Model(&models.Contact{}).Where("first_met_through_contact_id IN ? AND id NOT IN ?", req.SourceContactIDs, ids).Count(&linked).Error; err != nil {
 		return nil, err
 	}

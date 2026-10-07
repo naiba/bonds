@@ -75,6 +75,15 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 				return err
 			}
 		}
+		for _, change := range review.relationshipChanges {
+			if change.remove {
+				if err := tx.Delete(&change.original).Error; err != nil {
+					return err
+				}
+			} else if err := tx.Model(&models.Relationship{}).Where("id = ?", change.original.ID).Updates(map[string]any{"contact_id": change.contactID, "related_contact_id": change.relatedID}).Error; err != nil {
+				return err
+			}
+		}
 		if target.FirstMetThroughContactID != nil && seen[*target.FirstMetThroughContactID] {
 			target.FirstMetThroughContactID = nil
 		}
