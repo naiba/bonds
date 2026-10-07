@@ -1,0 +1,15 @@
+{
+  "acceptance_sha": "26b24aef87b09c4dfa69f9443dc0ba207fb08143",
+  "capture_sha": "7396f44038804d7614de1f27d20772715fcdda79",
+  "frontend_tree": "e6e5011d1544b22a21bd887462db51fdf736e9f9",
+  "synthetic_data_only": true,
+  "reuse_reason": "Only migration SQL, migration regression tests and documentation changed; browser/UI and API definitions unchanged.",
+  "screenshots": {
+    "contact-merge-desktop-effects.png": "ad147f6b3f2ce9caebebe5b1edc84929fb0952c02d6b7dbaac634c79b2af18f9",
+    "contact-merge-desktop-result.png": "690b1de33b190cde0c8d875636cf8c8e40ca423f0b64e670f54eda69c82f4f9d",
+    "contact-merge-desktop-review.png": "28c82dc8a606bf9a243a70d4c4d39a8695bf19f59bb761d75670d4038c7845ab",
+    "contact-merge-mobile-effects.png": "562e572dcd3c97b2b35ea84157ddff8a3fcb84f7ea0afb7106679404882a9eb9",
+    "contact-merge-mobile-result.png": "967e80fa0a5ff9596db45cf8654dc03ed28f4bda3d3229669ab4e35bd164b58a",
+    "contact-merge-mobile-review.png": "a244be3673cf9138a99fdf61f49e81c682c601d6fe69ec47ae6c91b0f346e274"
+  }
+}
