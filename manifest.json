@@ -1,0 +1,18 @@
+{
+  "acceptance_sha": "01c63d2d5824330e13b4efa306d52bfcac4ca45a",
+  "issue": "https://github.com/naiba/bonds/issues/291",
+  "pr": "https://github.com/naiba/bonds/pull/292",
+  "synthetic_data_only": true,
+  "checked_for_secrets_and_real_personal_data": true,
+  "source": "Independent acceptance browser run: current backend SHA, unchanged verified frontend build. Footer reflects frontend build version, not backend SHA. Desktop 1440x1000; mobile 390x844.",
+  "sha256": {
+    "contact-merge-desktop-effects.png": "1a9df2bdad9806e3fcd547f0cf0aa0cb012abd551566f8fed1522dd6e63c740b",
+    "contact-merge-desktop-journal.png": "8107553a35cc75fb82688b143039159e6711f80538815266adabdecd4f109dc1",
+    "contact-merge-desktop-result.png": "b7da990c670bea6ad05514efa5da6a5d06bde3486ff1d6e932563ec931e6e580",
+    "contact-merge-desktop-review.png": "a85b0a452d1a9dcce166aeeed639db8e2730c575a997936293decf6d1249030c",
+    "contact-merge-mobile-effects.png": "fd4a578bcb4617125e41b0b790df45c7fc6bf2368a7760e29870275bcfe11fd8",
+    "contact-merge-mobile-journal.png": "02568557f97e3c3fc63a22c94c8b2e6259999ac2490f032f7bb6dc70fca286a1",
+    "contact-merge-mobile-result.png": "967e80fa0a5ff9596db45cf8654dc03ed28f4bda3d3229669ab4e35bd164b58a",
+    "contact-merge-mobile-review.png": "a244be3673cf9138a99fdf61f49e81c682c601d6fe69ec47ae6c91b0f346e274"
+  }
+}
