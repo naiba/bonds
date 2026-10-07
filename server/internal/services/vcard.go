@@ -643,8 +643,6 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		nameComponents := extractFullNameFromCard(card)
 		nickname := card.Value(vcard.FieldNickname)
 		title := card.Value(vcard.FieldTitle)
-		now := time.Now()
-
 		existing.FirstName = strPtrOrNil(nameComponents.firstName)
 		existing.LastName = strPtrOrNil(nameComponents.lastName)
 		existing.MiddleName = strPtrOrNil(nameComponents.middleName)
@@ -653,7 +651,10 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		existing.Nickname = strPtrOrNil(nickname)
 		existing.JobPosition = strPtrOrNil(title)
 		existing.DistantEtag = strPtrOrNil(distantEtag)
-		existing.LastUpdatedAt = &now
+		// LastUpdatedAt detects local edits, not accepted remote revisions. A
+		// partially failed batch retains lastSyncAt, so advancing this marker on
+		// a successful pull would falsely discard later remote changes on retry.
+		// Save still advances UpdatedAt for the changed contact representation.
 		if err := tx.Save(&existing).Error; err != nil {
 			return "", "", err
 		}
@@ -667,23 +668,20 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 	nameComponents := extractFullNameFromCard(card)
 	nickname := card.Value(vcard.FieldNickname)
 	title := card.Value(vcard.FieldTitle)
-	now := time.Now()
-
 	uid := card.Value("UID")
 
 	contact := models.Contact{
-		VaultID:       vaultID,
-		FirstName:     strPtrOrNil(nameComponents.firstName),
-		LastName:      strPtrOrNil(nameComponents.lastName),
-		MiddleName:    strPtrOrNil(nameComponents.middleName),
-		Prefix:        strPtrOrNil(nameComponents.prefix),
-		Suffix:        strPtrOrNil(nameComponents.suffix),
-		Nickname:      strPtrOrNil(nickname),
-		JobPosition:   strPtrOrNil(title),
-		DistantUUID:   strPtrOrNil(uid),
-		DistantURI:    strPtrOrNil(distantURI),
-		DistantEtag:   strPtrOrNil(distantEtag),
-		LastUpdatedAt: &now,
+		VaultID:     vaultID,
+		FirstName:   strPtrOrNil(nameComponents.firstName),
+		LastName:    strPtrOrNil(nameComponents.lastName),
+		MiddleName:  strPtrOrNil(nameComponents.middleName),
+		Prefix:      strPtrOrNil(nameComponents.prefix),
+		Suffix:      strPtrOrNil(nameComponents.suffix),
+		Nickname:    strPtrOrNil(nickname),
+		JobPosition: strPtrOrNil(title),
+		DistantUUID: strPtrOrNil(uid),
+		DistantURI:  strPtrOrNil(distantURI),
+		DistantEtag: strPtrOrNil(distantEtag),
 	}
 	if err := tx.Create(&contact).Error; err != nil {
 		return "", "", err

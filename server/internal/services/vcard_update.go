@@ -200,16 +200,24 @@ func reconcileVCardAddresses(db *gorm.DB, card vcard.Card, current *models.Conta
 	if err := db.Where("contact_id = ?", current.ID).Find(&pivots).Error; err != nil {
 		return err
 	}
+	addressesByID := make(map[uint]models.Address, len(current.Addresses))
+	for _, address := range current.Addresses {
+		addressesByID[address.ID] = address
+	}
+	// A merge can retain multiple histories for the same shared Address row.
+	// Match each projected occurrence to its association, not the address ID;
+	// otherwise an unchanged second ADR creates another address on every sync.
 	retained := map[uint]bool{}
 	pending := make(vcard.Card)
 	for _, incoming := range card.Addresses() {
 		found := false
-		for _, address := range current.Addresses {
-			if retained[address.ID] {
+		for _, pivot := range pivots {
+			if retained[pivot.ID] {
 				continue
 			}
-			if sameVCardAddress(&address, incoming) {
-				retained[address.ID], found = true, true
+			address, exists := addressesByID[pivot.AddressID]
+			if exists && sameVCardAddress(&address, incoming) {
+				retained[pivot.ID], found = true, true
 				break
 			}
 		}
@@ -218,7 +226,7 @@ func reconcileVCardAddresses(db *gorm.DB, card vcard.Card, current *models.Conta
 		}
 	}
 	for _, pivot := range pivots {
-		if retained[pivot.AddressID] {
+		if retained[pivot.ID] {
 			continue
 		}
 		var address models.Address
