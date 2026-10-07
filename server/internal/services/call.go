@@ -119,7 +119,10 @@ func (s *CallService) Update(id uint, contactID, vaultID string, req dto.UpdateC
 	if req.Answered != nil {
 		call.Answered = *req.Answered
 	}
-	if err := s.db.Save(&call).Error; err != nil {
+	if err := updateContactRecord(s.db, &call, contactID, vaultID, ErrCallNotFound,
+		"called_at", "type", "who_initiated", "description",
+		"duration", "call_reason_id", "emotion_id", "answered",
+	); err != nil {
 		return nil, err
 	}
 	resp := toCallResponse(&call)

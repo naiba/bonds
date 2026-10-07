@@ -36,7 +36,9 @@ vi.mock("@/api", () => ({
       // The lookup control probes availability as soon as the form opens; an
       // instance with lookup withdrawn answers enabled=false and the control
       // stays out of these tests' way.
-      addressesSuggestList: vi.fn().mockResolvedValue({ data: { enabled: false, suggestions: [], attribution: [] } }),
+      addressesSuggestList: vi.fn().mockResolvedValue({
+        data: { enabled: false, suggestions: [], attribution: [] },
+      }),
     },
     preferences: {
       preferencesList: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock("@/api", () => ({
 
 const existingAddress = {
   id: 1,
+  contact_address_id: 11,
   line_1: "123 Main St",
   city: "Paris",
   country: "France",
@@ -234,6 +237,57 @@ describe("AddressesModule mutation invalidation", () => {
     expect(screen.queryByDisplayValue("456 New Ave")).not.toBeInTheDocument();
   }, 10_000);
 
+  it("edits and deletes the selected period when histories share an address", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.addresses.contactsAddressesList).mockResolvedValue({
+      data: [
+        {
+          ...existingAddress,
+          date_from: "2010-01-01T00:00:00Z",
+          is_past_address: true,
+        },
+        {
+          ...existingAddress,
+          contact_address_id: 12,
+          date_from: "2020-01-01T00:00:00Z",
+        },
+      ],
+    });
+    renderModule();
+    expect(
+      await screen.findAllByText("123 Main St, Paris, France"),
+    ).toHaveLength(2);
+    await user.click(screen.getAllByRole("button", { name: "edit" })[1]);
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("button", { name: "OK" }));
+    await waitFor(() =>
+      expect(api.addresses.contactsAddressesUpdate).toHaveBeenCalledWith(
+        "101",
+        "202",
+        1,
+        expect.objectContaining({ city: "Paris" }),
+        { contact_address_id: 12 },
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByDisplayValue("123 Main St")).not.toBeInTheDocument(),
+    );
+    await user.click(screen.getAllByRole("button", { name: "delete" })[0]);
+    await user.click(
+      within(await screen.findByRole("tooltip")).getByRole("button", {
+        name: "OK",
+      }),
+    );
+    await waitFor(() =>
+      expect(api.addresses.contactsAddressesDelete).toHaveBeenCalledWith(
+        "101",
+        "202",
+        1,
+        { contact_address_id: 11 },
+      ),
+    );
+  });
+
   it("keeps a pending update local and reports update success after edit state changes", async () => {
     const user = userEvent.setup();
     let resolveUpdate: (() => void) | undefined;
@@ -326,6 +380,7 @@ describe("AddressesModule mutation invalidation", () => {
         "101",
         "202",
         1,
+        { contact_address_id: 11 },
       ),
     );
     view.rerender(addressesView(queryClient, 404, 505));

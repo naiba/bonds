@@ -71,7 +71,10 @@ func reconcileVCardBirthday(db *gorm.DB, card vcard.Card, current *models.Contac
 		birthday.Year = &year
 		birthday.DatePrecision = importantDatePrecisionFull
 	}
-	if err := db.Omit("ContactImportantDateType").Save(birthday).Error; err != nil {
+	if err := updateContactRecord(db, birthday, current.ID, current.VaultID, ErrImportantDateNotFound,
+		"year", "month", "day", "date_precision",
+		"is_year_unknown",
+	); err != nil {
 		return err
 	}
 	// Keep reminder identities, recipients and delivery history; pending schedules
@@ -83,7 +86,7 @@ func reconcileVCardBirthday(db *gorm.DB, card vcard.Card, current *models.Contac
 	for i := range reminders {
 		reminder := &reminders[i]
 		reminder.Year, reminder.Month, reminder.Day = birthday.Year, birthday.Month, birthday.Day
-		if err := db.Save(reminder).Error; err != nil {
+		if err := updateContactRecord(db, reminder, current.ID, current.VaultID, ErrReminderNotFound, "year", "month", "day"); err != nil {
 			return err
 		}
 		if err := reschedulePendingReminder(db, reminder); err != nil {

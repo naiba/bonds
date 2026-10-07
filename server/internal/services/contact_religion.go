@@ -26,7 +26,7 @@ func (s *ContactReligionService) Update(contactID, vaultID, userID string, req d
 	}
 
 	contact.ReligionID = req.ReligionID
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "religion_id"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {

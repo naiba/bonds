@@ -3,6 +3,7 @@ package services
 import (
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func mergeContactAssociations(tx *gorm.DB, sourceID, targetID string) error {
@@ -51,9 +52,6 @@ func mergeContactAssociations(tx *gorm.DB, sourceID, targetID string) error {
 	if err := tx.Model(&models.File{}).Where("ufileable_id = ?", sourceID).Update("ufileable_id", targetID).Error; err != nil {
 		return err
 	}
-	if err := tx.Model(&models.Activity{}).Where("paid_by_contact_id = ?", sourceID).Update("paid_by_contact_id", targetID).Error; err != nil {
-		return err
-	}
 	for _, model := range []any{&models.ContactLoan{}, &models.ContactGift{}} {
 		for _, column := range []string{"loaner_id", "loanee_id"} {
 			if err := tx.Model(model).Where(column+" = ?", sourceID).Update(column, targetID).Error; err != nil {
@@ -100,7 +98,7 @@ func mergeContactImportantDates(tx *gorm.DB, sourceID, targetID string) error {
 
 func mergeContactUserHistory(tx *gorm.DB, sourceID, targetID string) error {
 	var histories []models.ContactVaultUser
-	if err := tx.Where("contact_id IN ?", []string{targetID, sourceID}).Order("id ASC").Find(&histories).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("contact_id IN ?", []string{targetID, sourceID}).Order("id ASC").Find(&histories).Error; err != nil {
 		return err
 	}
 	byUser := map[string]models.ContactVaultUser{}

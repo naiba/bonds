@@ -176,7 +176,11 @@ func (s *ImportantDateService) update(id uint, contactID, vaultID string, req dt
 	if err := validateImportantDateCalendarDay(&date); err != nil {
 		return nil, err
 	}
-	if err := s.db.Save(&date).Error; err != nil {
+	if err := updateContactRecord(s.db, &date, contactID, vaultID, ErrImportantDateNotFound,
+		"label", "date_precision", "is_year_unknown", "day",
+		"month", "year", "contact_important_date_type_id", "calendar_type",
+		"original_day", "original_month", "original_year",
+	); err != nil {
 		return nil, err
 	}
 
@@ -289,7 +293,7 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 		existing.OriginalDay = date.OriginalDay
 		existing.OriginalMonth = date.OriginalMonth
 		existing.OriginalYear = date.OriginalYear
-		if err := s.db.Save(&existing).Error; err != nil {
+		if err := s.db.Model(&existing).Select("label", "day", "month", "year", "calendar_type", "original_day", "original_month", "original_year", "updated_at").Updates(&existing).Error; err != nil {
 			return err
 		}
 		return reschedulePendingReminder(s.db, &existing)

@@ -65,11 +65,13 @@ type AddressSaveMutationOperation =
     readonly scope: ContactQueryScope;
     // Route props can change while the request is pending, so success must use the submitted list identity.
     readonly listQueryKey: QueryKey;
+    readonly contactAddressId?: number;
   };
 
 type AddressDeleteMutationOperation = {
   readonly source: ContactQueryScope;
   readonly listQueryKey: QueryKey;
+  readonly contactAddressId?: number;
   readonly id: number;
 };
 
@@ -111,7 +113,8 @@ export default function AddressesModule({
   target?: Extract<NormalizedFeedSource, { readonly module: "addresses" }>;
 }) {
   const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const editingId = editingAddress?.id ?? null;
   const [mapAddress, setMapAddress] = useState<GeocodedAddress | null>(null);
   const [form] = Form.useForm<AddressFormValues>();
   const queryClient = useQueryClient();
@@ -181,6 +184,9 @@ export default function AddressesModule({
             operation.scope.contactId,
             operation.id,
             payload,
+            operation.contactAddressId === undefined
+              ? undefined
+              : { contact_address_id: operation.contactAddressId },
           );
         default: {
           const unreachableOperation: never = operation;
@@ -227,6 +233,9 @@ export default function AddressesModule({
         operation.source.vaultId,
         operation.source.contactId,
         operation.id,
+        operation.contactAddressId === undefined
+          ? undefined
+          : { contact_address_id: operation.contactAddressId },
       ),
     onSuccess: async (_data, operation) => {
       // Historical Feed rows query source availability, so deletion must refresh both projections.
@@ -243,7 +252,7 @@ export default function AddressesModule({
   });
 
   function openEdit(a: Address) {
-    setEditingId(a.id ?? null);
+    setEditingAddress(a);
     // Address fields in the API are ISO strings; DatePicker expects Dayjs.
     form.setFieldsValue({
       line_1: a.line_1 ?? "",
@@ -261,7 +270,7 @@ export default function AddressesModule({
 
   function closeModal() {
     setOpen(false);
-    setEditingId(null);
+    setEditingAddress(null);
     form.resetFields();
   }
 
@@ -302,6 +311,9 @@ export default function AddressesModule({
       }
     >
       <List
+        rowKey={(address: Address) =>
+          String(address.contact_address_id ?? address.id)
+        }
         loading={isLoading}
         dataSource={addresses}
         locale={{
@@ -342,6 +354,7 @@ export default function AddressesModule({
                   source: scope,
                   listQueryKey: qk,
                   id: a.id,
+                  contactAddressId: a.contact_address_id,
                 });
               }}
             >
@@ -476,6 +489,7 @@ export default function AddressesModule({
           onFinish={(values) =>
             saveMutation.mutate({
               ...createContactSaveMutationOperation(editingId, values),
+              contactAddressId: editingAddress?.contact_address_id,
               scope,
               listQueryKey: qk,
             })

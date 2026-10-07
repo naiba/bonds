@@ -81,7 +81,7 @@ func (s *GoalService) Update(id uint, contactID, vaultID string, req dto.UpdateG
 	if req.Active != nil {
 		goal.Active = *req.Active
 	}
-	if err := s.db.Save(&goal).Error; err != nil {
+	if err := updateContactRecord(s.db, &goal, contactID, vaultID, ErrGoalNotFound, "name", "active"); err != nil {
 		return nil, err
 	}
 	resp := toGoalResponse(&goal)

@@ -166,9 +166,10 @@ func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto
 		}
 		return nil, err
 	}
+	originalRelatedID := relationship.RelatedContactID
 	relationship.RelationshipTypeID = req.RelationshipTypeID
 	relationship.RelatedContactID = req.RelatedContactID
-	if err := s.db.Save(&relationship).Error; err != nil {
+	if err := updateContactRecord(s.db.Where("related_contact_id = ?", originalRelatedID), &relationship, contactID, vaultID, ErrRelationshipNotFound, "relationship_type_id", "related_contact_id"); err != nil {
 		return nil, err
 	}
 	if err := s.db.Preload("RelationshipType").Preload("RelatedContact").Preload("RelatedContact.Vault").First(&relationship, relationship.ID).Error; err != nil {

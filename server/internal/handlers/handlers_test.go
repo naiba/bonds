@@ -7800,3 +7800,94 @@ func TestContactMergeAuthorizationValidationAndResponse(t *testing.T) {
 		}
 	}
 }
+
+func TestAddressHistorySelectorPreservesSharedResidences(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "residence-history@example.test")
+	vault := ts.createTestVault(t, token, "Residence histories")
+	contact := ts.createTestContact(t, token, vault.ID, "Alice")
+	neighbor := ts.createTestContact(t, token, vault.ID, "Bob")
+	address := models.Address{VaultID: vault.ID, City: func() *string { v := "London"; return &v }()}
+	if err := ts.db.Create(&address).Error; err != nil {
+		t.Fatal(err)
+	}
+	first := models.ContactAddress{ContactID: contact.ID, AddressID: address.ID, IsPastAddress: true}
+	second := models.ContactAddress{ContactID: contact.ID, AddressID: address.ID}
+	shared := models.ContactAddress{ContactID: neighbor.ID, AddressID: address.ID}
+	for _, p := range []*models.ContactAddress{&first, &second, &shared} {
+		if err := ts.db.Create(p).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := fmt.Sprintf("/api/vaults/%s/contacts/%s/addresses", vault.ID, contact.ID)
+	rec := ts.doRequest(http.MethodGet, base, "", token)
+	if rec.Code != 200 {
+		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
+	}
+	var listed []dto.AddressResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 2 || listed[0].ID != address.ID || listed[1].ID != address.ID || listed[0].ContactAddressID == listed[1].ContactAddressID {
+		t.Fatalf("histories not distinct: %+v", listed)
+	}
+	endpoint := fmt.Sprintf("%s/%d", base, address.ID)
+	for _, method := range []string{http.MethodPut, http.MethodDelete} {
+		rec = ts.doRequest(method, endpoint, `{"city":"London"}`, token)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("ambiguous %s: %d %s", method, rec.Code, rec.Body.String())
+		}
+	}
+	for _, selector := range []string{"0", "invalid", fmt.Sprint(shared.ID)} {
+		rec = ts.doRequest(http.MethodDelete, endpoint+"?contact_address_id="+selector, "", token)
+		expected := http.StatusBadRequest
+		if selector == fmt.Sprint(shared.ID) {
+			expected = http.StatusNotFound
+		}
+		if rec.Code != expected {
+			t.Fatalf("selector %s: %d %s", selector, rec.Code, rec.Body.String())
+		}
+	}
+	selected := fmt.Sprintf("%s?contact_address_id=%d", endpoint, first.ID)
+	rec = ts.doRequest(http.MethodPut, selected, `{"city":"London","date_from":"2010-01-01T00:00:00Z","is_past_address":true}`, token)
+	if rec.Code != 200 {
+		t.Fatalf("update: %d %s", rec.Code, rec.Body.String())
+	}
+	var saved models.ContactAddress
+	if err := ts.db.First(&saved, second.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if saved.DateFrom != nil || saved.IsPastAddress {
+		t.Fatalf("other period changed: %+v", saved)
+	}
+	rec = ts.doRequest(http.MethodDelete, selected, "", token)
+	if rec.Code != 204 {
+		t.Fatalf("delete: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodDelete, endpoint, "", token)
+	if rec.Code != 204 {
+		t.Fatalf("legacy single history delete: %d %s", rec.Code, rec.Body.String())
+	}
+	var stillShared models.Address
+	if err := ts.db.First(&stillShared, address.ID).Error; err != nil {
+		t.Fatalf("neighbor's address was deleted: %v", err)
+	}
+	var count int64
+	if err := ts.db.Model(&models.ContactAddress{}).Where("address_id = ?", address.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("remaining histories=%d want=1", count)
+	}
+	neighborEndpoint := fmt.Sprintf("/api/vaults/%s/contacts/%s/addresses/%d", vault.ID, neighbor.ID, address.ID)
+	rec = ts.doRequest(http.MethodDelete, neighborEndpoint, "", token)
+	if rec.Code != 204 {
+		t.Fatalf("last delete: %d %s", rec.Code, rec.Body.String())
+	}
+	if err := ts.db.Model(&models.Address{}).Where("id = ?", address.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("unused address retained")
+	}
+}

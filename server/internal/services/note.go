@@ -131,7 +131,7 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 			note.BodyFormat = markdown.NormalizeFormat(note.BodyFormat)
 		}
 		note.EmotionID = req.EmotionID
-		if err := tx.Save(&note).Error; err != nil {
+		if err := updateContactRecord(tx, &note, contactID, vaultID, ErrNoteNotFound, "title", "body", "body_format", "emotion_id"); err != nil {
 			return err
 		}
 		return syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat)

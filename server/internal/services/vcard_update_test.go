@@ -184,8 +184,12 @@ func TestVCardUpdatePreservesUnprojectedBirthday(t *testing.T) {
 	if err := svc.db.Create(&contact).Error; err != nil {
 		t.Fatal(err)
 	}
+	var kind models.ContactImportantDateType
+	if err := svc.db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&kind).Error; err != nil {
+		t.Fatal(err)
+	}
 	year := 1990
-	birthday := models.ContactImportantDate{ContactID: contact.ID, Label: "Birthday", Year: &year, DatePrecision: "year"}
+	birthday := models.ContactImportantDate{ContactID: contact.ID, Label: "Birthday", ContactImportantDateTypeID: &kind.ID, Year: &year, DatePrecision: "year"}
 	if err := svc.db.Create(&birthday).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +198,7 @@ func TestVCardUpdatePreservesUnprojectedBirthday(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := svc.db.First(&birthday, birthday.ID).Error; err != nil || birthday.Year == nil || *birthday.Year != year {
+	if err := svc.db.First(&birthday, birthday.ID).Error; err != nil || birthday.Year == nil || *birthday.Year != year || birthday.ContactImportantDateTypeID == nil || *birthday.ContactImportantDateTypeID != kind.ID || birthday.DatePrecision != "year" || birthday.ContactID != contact.ID {
 		t.Fatalf("unprojected birthday deleted: %v", err)
 	}
 }

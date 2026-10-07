@@ -21,6 +21,7 @@ var ErrContactMergeReviewChanged = errors.New("contact merge requires a current 
 type contactMergeReview struct {
 	*dto.ContactMergePreview
 	relationshipChanges []contactMergeRelationshipChange
+	payerChanges        []models.Activity
 }
 
 func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.MergeContactsRequest) (*dto.ContactMergePreview, error) {
@@ -170,19 +171,34 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 		return nil, err
 	}
 
-	checked := map[string]bool{vaultID: true}
+	// A moved contact can still pay for an activity in its former vault.
+	// Authorize and lock only source references, then execute this exact plan.
+	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("paid_by_contact_id IN ?", req.SourceContactIDs).Order("id ASC").Find(&review.payerChanges).Error; err != nil {
+		return nil, err
+	}
+	affectedVaults := []string{}
 	for _, owner := range owners {
-		if checked[owner.VaultID] {
+		affectedVaults = append(affectedVaults, owner.VaultID)
+	}
+	for _, activity := range review.payerChanges {
+		affectedVaults = append(affectedVaults, activity.VaultID)
+	}
+	if len(review.payerChanges) > 0 {
+		review.Effects["payers"] = int64(len(review.payerChanges))
+	}
+	checked := map[string]bool{vaultID: true}
+	for _, owningVaultID := range affectedVaults {
+		if checked[owningVaultID] {
 			continue
 		}
-		if err := NewVaultService(tx).CheckUserVaultAccess(userID, owner.VaultID, models.PermissionEditor); err != nil {
+		if err := NewVaultService(tx).CheckUserVaultAccess(userID, owningVaultID, models.PermissionEditor); err != nil {
 			if errors.Is(err, ErrVaultForbidden) || errors.Is(err, ErrInsufficientPerm) {
 				review.Blockers = append(review.Blockers, "incoming_permission")
 			} else {
 				return nil, err
 			}
 		}
-		checked[owner.VaultID] = true
+		checked[owningVaultID] = true
 	}
 	for _, entry := range []struct{ key, table, column string }{
 		{"notes", "notes", "contact_id"}, {"contact_information", "contact_information", "contact_id"},
@@ -191,7 +207,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 		{"activities", "activity_participants", "contact_id"}, {"files", "files", "ufileable_id"},
 		{"groups", "contact_group", "contact_id"}, {"calls", "calls", "contact_id"}, {"pets", "pets", "contact_id"},
 		{"goals", "goals", "contact_id"}, {"gifts", "gifts", "contact_id"}, {"quick_facts", "quick_facts", "contact_id"},
-		{"jobs", "contact_companies", "contact_id"}, {"life_events", "contact_life_metric", "contact_id"}, {"history", "contact_feed_items", "contact_id"}, {"payers", "activities", "paid_by_contact_id"}, {"posts", "contact_post", "contact_id"}, {"labels", "contact_label", "contact_id"},
+		{"jobs", "contact_companies", "contact_id"}, {"life_events", "contact_life_metric", "contact_id"}, {"history", "contact_feed_items", "contact_id"}, {"posts", "contact_post", "contact_id"}, {"labels", "contact_label", "contact_id"},
 	} {
 		var count int64
 		if err := tx.Table(entry.table).Where(entry.column+" IN ?", req.SourceContactIDs).Count(&count).Error; err != nil {
@@ -251,7 +267,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	}
 	// Hashes are only concurrency guards, never persisted snapshots. Include all
 	// contact versions and affected reference contents, even if counts are equal.
-	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships})
+	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges})
 	if err != nil {
 		return nil, err
 	}

@@ -152,7 +152,10 @@ func (s *QuickFactService) Update(id uint, contactID, vaultID string, templateID
 	fact.ValueDate = updated.ValueDate
 	fact.ValueOption = updated.ValueOption
 	fact.FileID = nil
-	if err := s.db.Save(fact).Error; err != nil {
+	if err := updateContactRecord(s.db, fact, contactID, vaultID, ErrQuickFactNotFound,
+		"content", "value_text", "value_number", "value_date",
+		"value_option", "file_id",
+	); err != nil {
 		return nil, err
 	}
 	resp := toQuickFactResponse(fact)
@@ -252,14 +255,10 @@ func (s *QuickFactService) ReplaceFile(id uint, contactID, vaultID string, templ
 	fact.ValueDate = nil
 	fact.ValueOption = nil
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.QuickFact{}).Where("id = ?", fact.ID).Updates(map[string]interface{}{
-			"content":      fact.Content,
-			"file_id":      file.ID,
-			"value_text":   nil,
-			"value_number": nil,
-			"value_date":   nil,
-			"value_option": nil,
-		}).Error; err != nil {
+		if err := updateContactRecord(tx, fact, contactID, vaultID, ErrQuickFactNotFound,
+			"content", "file_id", "value_text", "value_number",
+			"value_date", "value_option",
+		); err != nil {
 			return err
 		}
 		return assignFileToQuickFact(tx, file.ID, fact.ID, vaultID)

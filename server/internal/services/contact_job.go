@@ -107,7 +107,7 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 
 	job.CompanyID = req.CompanyID
 	job.JobPosition = strPtrOrNil(req.JobPosition)
-	if err := s.db.Save(&job).Error; err != nil {
+	if err := updateContactRecord(s.db, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
 		return nil, err
 	}
 
@@ -206,7 +206,7 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID, userID string, req 
 		if found {
 			existingJob.CompanyID = *req.CompanyID
 			existingJob.JobPosition = strPtrOrNil(req.JobPosition)
-			if err := s.db.Save(&existingJob).Error; err != nil {
+			if err := updateContactRecord(s.db, &existingJob, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
 				return nil, err
 			}
 		} else {
@@ -224,7 +224,7 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID, userID string, req 
 	// Also update legacy fields on Contact for backward compatibility
 	contact.CompanyID = req.CompanyID
 	contact.JobPosition = strPtrOrNil(req.JobPosition)
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
@@ -260,7 +260,7 @@ func (s *ContactJobService) LegacyDelete(contactID, vaultID, userID string) (*dt
 	// Also clear legacy fields on Contact
 	contact.CompanyID = nil
 	contact.JobPosition = nil
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {

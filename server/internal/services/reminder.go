@@ -119,7 +119,11 @@ func (s *ReminderService) Update(id uint, contactID, vaultID string, req dto.Upd
 		if err := validateReminderAudienceUsers(tx, vaultID, audience, selectedUserIDs); err != nil {
 			return err
 		}
-		if err := tx.Save(&reminder).Error; err != nil {
+		if err := updateContactRecord(tx, &reminder, contactID, vaultID, ErrReminderNotFound,
+			"label", "day", "month", "year",
+			"type", "frequency_number", "audience", "calendar_type",
+			"original_day", "original_month", "original_year",
+		); err != nil {
 			return err
 		}
 		if err := replaceReminderSelectedUsers(tx, reminder.ID, selectedUserIDs); err != nil {

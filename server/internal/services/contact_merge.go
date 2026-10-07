@@ -75,6 +75,15 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 				return err
 			}
 		}
+		for _, activity := range review.payerChanges {
+			result := tx.Model(&models.Activity{}).Where("id = ? AND vault_id = ? AND paid_by_contact_id = ?", activity.ID, activity.VaultID, activity.PaidByContactID).Update("paid_by_contact_id", target.ID)
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return ErrContactMergeReviewChanged
+			}
+		}
 		for _, change := range review.relationshipChanges {
 			if change.remove {
 				if err := tx.Delete(&change.original).Error; err != nil {

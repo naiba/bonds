@@ -98,7 +98,11 @@ func (s *GiftService) Update(id uint, contactID, vaultID string, req dto.UpdateG
 	gift.ReceivedAt = req.ReceivedAt
 	gift.GivenAt = req.GivenAt
 	gift.BoughtAt = req.BoughtAt
-	if err := s.db.Save(&gift).Error; err != nil {
+	if err := updateContactRecord(s.db, &gift, contactID, vaultID, ErrGiftNotFound,
+		"type", "name", "description", "estimated_price",
+		"currency_id", "gift_occasion_id", "gift_state_id", "status_date",
+		"received_at", "given_at", "bought_at",
+	); err != nil {
 		return nil, err
 	}
 	gift.GiftOccasion = occasion
