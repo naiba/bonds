@@ -24,12 +24,16 @@ func migrateLegacyBirthdateTypes(db *gorm.DB) error {
 			ContactID string
 			TypeID    uint
 		}
+		// The legacy exporter skipped dates without both month and day. Choosing
+		// an earlier partial date would hide the birthday that clients already saw.
+		// If no date was projectable, leave all ordinary dates unclassified.
 		if err := tx.Table("contact_important_dates AS dates").
 			Select("dates.id, dates.contact_id, birthdate_types.id AS type_id").
 			Joins("JOIN contacts ON contacts.id = dates.contact_id").
 			Joins("JOIN contact_important_date_types AS birthdate_types ON birthdate_types.vault_id = contacts.vault_id AND birthdate_types.internal_type = ?", "birthdate").
 			Joins("LEFT JOIN contact_important_date_types AS current_type ON current_type.id = dates.contact_important_date_type_id").
 			Where("dates.deleted_at IS NULL AND (current_type.internal_type IS NULL) AND LOWER(dates.label) IN ?", []string{"birthday", "birthdate"}).
+			Where("dates.month IS NOT NULL AND dates.day IS NOT NULL").
 			Where(`NOT EXISTS (SELECT 1 FROM contact_important_dates AS primary_dates JOIN contact_important_date_types AS primary_type ON primary_type.id = primary_dates.contact_important_date_type_id WHERE primary_dates.contact_id = dates.contact_id AND primary_dates.deleted_at IS NULL AND primary_type.internal_type = ?)`, "birthdate").
 			Order("dates.id ASC, birthdate_types.id ASC").Scan(&candidates).Error; err != nil {
 			return err

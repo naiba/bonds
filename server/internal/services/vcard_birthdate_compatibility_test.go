@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/emersion/go-vcard"
@@ -133,7 +134,9 @@ func TestVCardLegacyBirthdayMigrationRollsBackAndRetries(t *testing.T) {
 	if err := db.Create(&contact).Error; err != nil {
 		t.Fatal(err)
 	}
-	date := models.ContactImportantDate{ContactID: contact.ID, Label: "Birthday"}
+	// Use a projectable date so the injected failure reaches the classification write.
+	month, day := 4, 6
+	date := models.ContactImportantDate{ContactID: contact.ID, Label: "Birthday", Month: &month, Day: &day, DatePrecision: "month_day"}
 	if err := db.Create(&date).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -172,5 +175,88 @@ func TestVCardLegacyBirthdayMigrationRollsBackAndRetries(t *testing.T) {
 	}
 	if err := db.First(&unchanged, date.ID).Error; err != nil || unchanged.ContactImportantDateTypeID == nil {
 		t.Fatalf("retry did not classify date: %+v %v", unchanged, err)
+	}
+}
+
+func TestVCardLegacyBirthdayMigrationSelectsProjectedDate(t *testing.T) {
+	year, month, day := 1980, 4, 6
+	for _, scenario := range []struct {
+		name                                    string
+		partialMonth, partialDay, projectedYear *int
+		hasProjectedDate                        bool
+		wantBirthday                            string
+	}{
+		{name: "year_before_full_date", projectedYear: &year, hasProjectedDate: true, wantBirthday: "1980-04-06"},
+		{name: "missing_day_before_yearless_date", partialMonth: &month, hasProjectedDate: true, wantBirthday: "--04-06"},
+		{name: "missing_month_before_full_date", partialDay: &day, projectedYear: &year, hasProjectedDate: true, wantBirthday: "1980-04-06"},
+		{name: "only_year"},
+		{name: "only_year_and_month", partialMonth: &month},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			svc, vaultID, _, _ := setupContactTest(t)
+			db := svc.db
+			if err := db.Exec("DELETE FROM data_migrations WHERE name = ?", "explicit_birthdate_types").Error; err != nil {
+				t.Fatal(err)
+			}
+			contact := models.Contact{VaultID: vaultID, FirstName: strPtrOrNil("Legacy birthday projection")}
+			if err := db.Create(&contact).Error; err != nil {
+				t.Fatal(err)
+			}
+			var birthdayType models.ContactImportantDateType
+			if err := db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&birthdayType).Error; err != nil {
+				t.Fatal(err)
+			}
+			partial := models.ContactImportantDate{ContactID: contact.ID, Label: "Birthday", Year: &year, Month: scenario.partialMonth, Day: scenario.partialDay, DatePrecision: "year"}
+			if err := db.Create(&partial).Error; err != nil {
+				t.Fatal(err)
+			}
+			// Snapshot persisted values, including PostgreSQL's timestamp precision.
+			if err := db.First(&partial, partial.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			expected := []models.ContactImportantDate{partial}
+			if scenario.hasProjectedDate {
+				projected := models.ContactImportantDate{ContactID: contact.ID, Label: "Birthdate", Year: scenario.projectedYear, Month: &month, Day: &day, DatePrecision: "month_day"}
+				if scenario.projectedYear != nil {
+					projected.DatePrecision = "full"
+				}
+				if err := db.Create(&projected).Error; err != nil {
+					t.Fatal(err)
+				}
+				if err := db.First(&projected, projected.ID).Error; err != nil {
+					t.Fatal(err)
+				}
+				projected.ContactImportantDateTypeID = &birthdayType.ID
+				expected = append(expected, projected)
+			}
+			for _, phase := range []string{"upgrade", "restart"} {
+				if err := database.AutoMigrate(db); err != nil {
+					t.Fatal(err)
+				}
+				card, err := NewVCardService(db).ExportContactToVCard(contact.ID, vaultID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := card.Value(vcard.FieldBirthday); got != scenario.wantBirthday {
+					t.Fatalf("%s BDAY = %q, want %q", phase, got, scenario.wantBirthday)
+				}
+				for _, original := range expected {
+					var current models.ContactImportantDate
+					if err := db.First(&current, original.ID).Error; err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(current, original) {
+						t.Fatalf("%s changed date %d beyond the projected birthday's type: got %+v, want %+v", phase, original.ID, current, original)
+					}
+				}
+				var markers int64
+				if err := db.Table("data_migrations").Where("name = ?", "explicit_birthdate_types").Count(&markers).Error; err != nil {
+					t.Fatal(err)
+				}
+				if markers != 1 {
+					t.Fatalf("%s completion markers = %d, want 1", phase, markers)
+				}
+			}
+		})
 	}
 }
