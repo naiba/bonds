@@ -23,7 +23,7 @@ type contactMergeReview struct {
 	relationshipChanges []contactMergeRelationshipChange
 	payerChanges        []models.Activity
 	referenceOwners     []models.Contact
-	postSections        []models.PostSection
+	posts               contactMergePostPlan
 }
 
 func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.MergeContactsRequest) (*dto.ContactMergePreview, error) {
@@ -64,11 +64,14 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	ids := append([]string{req.TargetContactID}, req.SourceContactIDs...)
 	byID := map[string]models.Contact{}
 	review := &contactMergeReview{ContactMergePreview: &dto.ContactMergePreview{Contacts: []dto.ContactMergeCandidate{}, Fields: []dto.ContactMergeField{}, Effects: map[string]int64{"removed_contacts": int64(len(req.SourceContactIDs))}, Blockers: []string{}}}
-	sections, err := lockContactMergePostSections(tx, vaultID, req.SourceContactIDs)
+	posts, err := lockContactMergePosts(tx, vaultID, req.SourceContactIDs)
 	if err != nil {
 		return nil, err
 	}
-	review.postSections = sections
+	review.posts = posts
+	if len(posts.PostIDs) > 0 {
+		review.Effects["posts"] = int64(len(posts.PostIDs))
+	}
 	for _, contact := range contacts {
 		byID[contact.ID] = contact
 	}
@@ -216,7 +219,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 		{"activities", "activity_participants", "contact_id"}, {"files", "files", "ufileable_id"},
 		{"groups", "contact_group", "contact_id"}, {"calls", "calls", "contact_id"}, {"pets", "pets", "contact_id"},
 		{"goals", "goals", "contact_id"}, {"gifts", "gifts", "contact_id"}, {"quick_facts", "quick_facts", "contact_id"},
-		{"jobs", "contact_companies", "contact_id"}, {"life_events", "contact_life_metric", "contact_id"}, {"history", "contact_feed_items", "contact_id"}, {"posts", "contact_post", "contact_id"}, {"labels", "contact_label", "contact_id"},
+		{"jobs", "contact_companies", "contact_id"}, {"life_events", "contact_life_metric", "contact_id"}, {"history", "contact_feed_items", "contact_id"}, {"labels", "contact_label", "contact_id"},
 	} {
 		var count int64
 		if err := tx.Table(entry.table).Where(entry.column+" IN ?", req.SourceContactIDs).Count(&count).Error; err != nil {
@@ -276,7 +279,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	}
 	// Hashes are only concurrency guards, never persisted snapshots. Include all
 	// contact versions and affected reference contents, even if counts are equal.
-	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges, review.postSections})
+	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges, review.posts})
 	if err != nil {
 		return nil, err
 	}

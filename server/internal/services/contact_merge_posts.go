@@ -8,17 +8,72 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// Post edits and deletion lock journals before posts. Hold the same parents
-// before reading sections: an editor can replace sections or remove mentions
-// without locking the old contact. Contact locks alone do not protect the body.
-func lockContactMergePostSections(tx *gorm.DB, vaultID string, sourceIDs []string) ([]models.PostSection, error) {
-	postIDs := tx.Model(&models.ContactPost{}).Select("post_id").Where("contact_id IN ?", sourceIDs)
-	var candidates []models.Post
-	if err := tx.Where("id IN (?)", postIDs).Find(&candidates).Error; err != nil {
+type contactMergePostPlan struct {
+	PostIDs  []uint
+	Sections []models.PostSection
+}
+
+// Legacy edits and moving a contact away and back can remove the pivot while
+// retaining an authoritative inline mention. Discover both representations;
+// scope text reads to this vault, and parse candidates with the editor grammar
+// so a bare UUID or a malformed marker never authorizes rewriting a post.
+func discoverContactMergePostIDs(tx *gorm.DB, vaultID string, sourceIDs []string) ([]uint, error) {
+	var associated []uint
+	if err := tx.Model(&models.ContactPost{}).Where("contact_id IN ?", sourceIDs).Pluck("post_id", &associated).Error; err != nil {
 		return nil, err
 	}
+	ids := make(map[uint]bool, len(associated))
+	for _, id := range associated {
+		ids[id] = true
+	}
+	sources := make(map[string]bool, len(sourceIDs))
+	conditions := make([]string, 0, len(sourceIDs))
+	values := make([]any, 0, len(sourceIDs))
+	for _, id := range sourceIDs {
+		sources[strings.ToLower(id)] = true
+		conditions = append(conditions, "LOWER(post_sections.content) LIKE ?")
+		values = append(values, "%](contact:"+strings.ToLower(id)+")%")
+	}
+	var sections []models.PostSection
+	if len(conditions) > 0 {
+		if err := tx.Model(&models.PostSection{}).Select("post_sections.post_id", "post_sections.content").
+			Joins("JOIN posts ON posts.id = post_sections.post_id").
+			Joins("JOIN journals ON journals.id = posts.journal_id").
+			Where("journals.vault_id = ?", vaultID).
+			Where("("+strings.Join(conditions, " OR ")+")", values...).Find(&sections).Error; err != nil {
+			return nil, err
+		}
+	}
+	for _, section := range sections {
+		for _, id := range contactMentionIDs(ptrToStr(section.Content)) {
+			if sources[id] {
+				ids[section.PostID] = true
+				break
+			}
+		}
+	}
+	result := make([]uint, 0, len(ids))
+	for id := range ids {
+		result = append(result, id)
+	}
+	return result, nil
+}
+
+// Post edits and deletion lock journals before posts. Hold the same parents
+// before reading sections: an editor can remove mentions without locking the
+// old contact. Rediscover after waiting so deleted/replaced bodies are not used.
+func lockContactMergePosts(tx *gorm.DB, vaultID string, sourceIDs []string) (contactMergePostPlan, error) {
+	plan := contactMergePostPlan{}
+	postIDs, err := discoverContactMergePostIDs(tx, vaultID, sourceIDs)
+	if err != nil {
+		return plan, err
+	}
+	var candidates []models.Post
+	if err := tx.Where("id IN ?", postIDs).Find(&candidates).Error; err != nil {
+		return plan, err
+	}
 	if len(candidates) == 0 {
-		return nil, nil
+		return plan, nil
 	}
 	journalIDs := make([]uint, 0, len(candidates))
 	for _, post := range candidates {
@@ -26,35 +81,42 @@ func lockContactMergePostSections(tx *gorm.DB, vaultID string, sourceIDs []strin
 	}
 	var journals []models.Journal
 	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id IN ?", journalIDs).Order("id ASC").Find(&journals).Error; err != nil {
-		return nil, err
+		return plan, err
 	}
 	lockedJournals := make(map[uint]bool, len(journals))
 	for _, journal := range journals {
-		// Journal mentions only support contacts in the journal's vault. Do not
-		// turn a legacy foreign association into authority to rewrite its text.
+		// Journal mentions only support contacts in the journal's vault. A legacy
+		// foreign association cannot authorize rewriting text outside that vault.
 		if journal.VaultID != vaultID {
-			return nil, ErrVaultForbidden
+			return plan, ErrVaultForbidden
 		}
 		lockedJournals[journal.ID] = true
 	}
-	var posts []models.Post
-	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id IN (?)", postIDs).Order("id ASC").Find(&posts).Error; err != nil {
-		return nil, err
+	postIDs, err = discoverContactMergePostIDs(tx, vaultID, sourceIDs)
+	if err != nil {
+		return plan, err
 	}
-	lockedPostIDs := make([]uint, 0, len(posts))
+	var posts []models.Post
+	if err := tx.Where("id IN ?", postIDs).Find(&posts).Error; err != nil {
+		return plan, err
+	}
 	for _, post := range posts {
 		if !lockedJournals[post.JournalID] {
-			return nil, ErrContactMergeReviewChanged
-		}
-		lockedPostIDs = append(lockedPostIDs, post.ID)
-	}
-	var sections []models.PostSection
-	if len(lockedPostIDs) > 0 {
-		if err := tx.Where("post_id IN ?", lockedPostIDs).Order("id ASC").Find(&sections).Error; err != nil {
-			return nil, err
+			return plan, ErrContactMergeReviewChanged
 		}
 	}
-	return sections, nil
+	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id IN ?", postIDs).Order("id ASC").Find(&posts).Error; err != nil {
+		return plan, err
+	}
+	for _, post := range posts {
+		plan.PostIDs = append(plan.PostIDs, post.ID)
+	}
+	if len(plan.PostIDs) > 0 {
+		if err := tx.Where("post_id IN ?", plan.PostIDs).Order("id ASC").Find(&plan.Sections).Error; err != nil {
+			return plan, err
+		}
+	}
+	return plan, nil
 }
 
 func mergeContactPostMentions(tx *gorm.DB, sections []models.PostSection, sourceIDs []string, targetID string) error {
@@ -62,6 +124,7 @@ func mergeContactPostMentions(tx *gorm.DB, sections []models.PostSection, source
 	for _, id := range sourceIDs {
 		sources[strings.ToLower(id)] = true
 	}
+	linkedPosts := make(map[uint]bool)
 	for _, section := range sections {
 		content := ptrToStr(section.Content)
 		var body strings.Builder
@@ -84,6 +147,15 @@ func mergeContactPostMentions(tx *gorm.DB, sections []models.PostSection, source
 		// together, otherwise even a title edit fails after the source is deleted.
 		if err := tx.Model(&models.PostSection{}).Where("id = ? AND post_id = ?", section.ID, section.PostID).Update("content", body.String()).Error; err != nil {
 			return err
+		}
+		if !linkedPosts[section.PostID] {
+			// Existing pivots have already moved in place. Repair only the missing
+			// association exposed by a migrated body; keep its other links unchanged.
+			association := models.ContactPost{PostID: section.PostID, ContactID: targetID}
+			if err := tx.Where("post_id = ? AND contact_id = ?", section.PostID, targetID).FirstOrCreate(&association).Error; err != nil {
+				return err
+			}
+			linkedPosts[section.PostID] = true
 		}
 	}
 	return nil

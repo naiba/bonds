@@ -94,6 +94,52 @@ for (const viewport of [
     });
     expect(postResponse.status()).toBe(201);
     const postId = (await postResponse.json()).data.id;
+    if (viewport.name === "desktop") {
+      const associationOnlyEdit = await request.put(
+        apiUrl(`${postPath}/${postId}`),
+        {
+          headers,
+          data: { title: "Garden walk before merging", contact_ids: [] },
+        },
+      );
+      expect(associationOnlyEdit.status()).toBe(200);
+      expect((await associationOnlyEdit.json()).data.contacts).toEqual([
+        expect.objectContaining({ id: contacts[2].id }),
+      ]);
+    } else {
+      // Moving away removes the vault-scoped pivot but keeps the original
+      // journal text. Returning the contact must make that text mergeable.
+      const travelVault = await request.post(apiUrl("/vaults"), {
+        headers,
+        data: { name: "Synthetic contact travel" },
+      });
+      expect(travelVault.status()).toBe(201);
+      const travelVaultId = (await travelVault.json()).data.id;
+      for (const [from, to] of [
+        [vaultId, travelVaultId],
+        [travelVaultId, vaultId],
+      ]) {
+        const move = await request.post(
+          apiUrl(`/vaults/${from}/contacts/${contacts[2].id}/move`),
+          {
+            headers,
+            data: { target_vault_id: to },
+          },
+        );
+        expect(move.status()).toBe(200);
+      }
+    }
+    const beforePostMerge = await request.get(apiUrl(`${postPath}/${postId}`), {
+      headers,
+    });
+    expect(beforePostMerge.status()).toBe(200);
+    const originalArticle = (await beforePostMerge.json()).data;
+    expect(originalArticle.sections[0].content).toBe(
+      `Walked with @[Alice Work](contact:${contacts[2].id}).`,
+    );
+    expect(originalArticle.contacts ?? []).toHaveLength(
+      viewport.name === "desktop" ? 1 : 0,
+    );
     await page.goto("/login");
     await page.getByPlaceholder("Email").fill(email);
     await page

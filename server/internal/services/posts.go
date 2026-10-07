@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/markdown"
@@ -139,7 +140,10 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 	}
 	var contactIDs []string
 	associationsProvided := req.Sections != nil || req.ContactIDs != nil
-	if associationsProvided {
+	// Omitted sections keep their stored mentions authoritative, even when a
+	// caller explicitly sends an empty contact list. Do not detach live text.
+	associationContactsNeedLocking := req.Sections == nil && (req.ContactIDs != nil || req.UpdateLastContacted)
+	if associationsProvided && !associationContactsNeedLocking {
 		var err error
 		contactIDs, err = validateAndDedupeContactIDs(postContactIDsFromSections(req.Sections, req.ContactIDs))
 		if err != nil {
@@ -147,11 +151,10 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 		}
 	}
 
-	associationContactsNeedLocking := !associationsProvided && req.UpdateLastContacted
 	var associatedContactIDs []string
 	if associationContactsNeedLocking {
 		var err error
-		associatedContactIDs, err = inVaultPostContactIDs(s.db, id, vaultID)
+		associatedContactIDs, err = storedPostContactIDs(s.db, id, vaultID, req.ContactIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -164,6 +167,18 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				lockedContactIDs = associatedContactIDs
 			}
 			if err := lockContactsBelongToVault(tx, lockedContactIDs, vaultID); err != nil {
+				// A merge can replace stored mentions while this metadata-only request
+				// waits for its parent locks. Retry from current storage, never alias IDs
+				// supplied in an old body or acquire new parents after journal locks.
+				if associationContactsNeedLocking && errors.Is(err, ErrContactNotFound) {
+					currentIDs, readErr := storedPostContactIDs(tx, id, vaultID, req.ContactIDs)
+					if readErr != nil {
+						return readErr
+					}
+					if !equalPostContactIDs(lockedContactIDs, currentIDs) {
+						return errPostContactAssociationsChanged
+					}
+				}
 				return err
 			}
 			if err := lockPostJournal(tx, journalID, vaultID); err != nil {
@@ -176,7 +191,7 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 
 			contactIDsToAdvance := contactIDs
 			if associationContactsNeedLocking {
-				verifiedContactIDs, err := inVaultPostContactIDs(tx, post.ID, vaultID)
+				verifiedContactIDs, err := storedPostContactIDs(tx, post.ID, vaultID, req.ContactIDs)
 				if err != nil {
 					return err
 				}
@@ -242,7 +257,7 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				if err := tx.Where("post_id = ?", id).Delete(&models.ContactPost{}).Error; err != nil {
 					return err
 				}
-				if err := createContactPostAssociations(tx, post.ID, contactIDs); err != nil {
+				if err := createContactPostAssociations(tx, post.ID, contactIDsToAdvance); err != nil {
 					return err
 				}
 			}
@@ -264,7 +279,7 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 		if attempt == maxPostUpdateAssociationLockAttempts-1 {
 			return nil, err
 		}
-		associatedContactIDs, err = inVaultPostContactIDs(s.db, id, vaultID)
+		associatedContactIDs, err = storedPostContactIDs(s.db, id, vaultID, req.ContactIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -284,6 +299,33 @@ func postContactIDsFromSections(sections []dto.PostSectionInput, fallback []stri
 		return markerIDs
 	}
 	return fallback
+}
+
+// storedPostContactIDs is used both before parent locking and after journal/post
+// locking. Comparing the effective IDs allows partial updates to retry safely
+// when another editor or merge changes the body while they wait.
+func storedPostContactIDs(db *gorm.DB, postID uint, vaultID string, fallback []string) ([]string, error) {
+	var sections []models.PostSection
+	if err := db.Select("content").Where("post_id = ?", postID).Find(&sections).Error; err != nil {
+		return nil, err
+	}
+	inputs := make([]dto.PostSectionInput, len(sections))
+	for i, section := range sections {
+		inputs[i].Content = ptrToStr(section.Content)
+	}
+	if fallback == nil {
+		var err error
+		fallback, err = inVaultPostContactIDs(db, postID, vaultID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	ids, err := validateAndDedupeContactIDs(postContactIDsFromSections(inputs, fallback))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func validateJournalBelongsToVault(db *gorm.DB, journalID uint, vaultID string) error {

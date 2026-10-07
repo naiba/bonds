@@ -341,11 +341,17 @@ func TestContactMergePostVaultBoundary(t *testing.T) {
 }
 
 func TestContactMergePostWaitsForConcurrentMutation(t *testing.T) {
-	for _, operation := range []string{"title_only", "remove_mention", "delete"} {
+	for _, operation := range []string{"title_only", "remove_mention", "delete", "unlinked_remove_mention", "unlinked_delete"} {
 		t.Run(operation, func(t *testing.T) {
 			f := setupContactMergePost(t)
 			if f.svc.db.Dialector.Name() != "postgres" {
 				t.Skip("PostgreSQL journal row locking")
+			}
+			if strings.HasPrefix(operation, "unlinked_") {
+				if err := f.svc.db.Where("post_id = ?", f.post.ID).Delete(&models.ContactPost{}).Error; err != nil {
+					t.Fatal(err)
+				}
+				operation = strings.TrimPrefix(operation, "unlinked_")
 			}
 			request := reviewedContactMerge(t, f.svc, f.vault, f.user, f.target, f.source)
 			locked, resume := make(chan struct{}), make(chan struct{})

@@ -71,15 +71,15 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 		if err := applyContactMergeChoices(&target, byID, review.Fields, req.FieldChoices); err != nil {
 			return err
 		}
-		if err := mergeContactPostMentions(tx, review.postSections, req.SourceContactIDs, target.ID); err != nil {
-			return err
-		}
 		for _, sourceID := range req.SourceContactIDs {
 			source := byID[sourceID]
 			fillMergedContactProfile(&target, &source)
 			if err := mergeContactAssociations(tx, source.ID, target.ID); err != nil {
 				return err
 			}
+		}
+		if err := mergeContactPostMentions(tx, review.posts.Sections, req.SourceContactIDs, target.ID); err != nil {
+			return err
 		}
 		for _, activity := range review.payerChanges {
 			result := tx.Model(&models.Activity{}).Where("id = ? AND vault_id = ? AND paid_by_contact_id = ?", activity.ID, activity.VaultID, activity.PaidByContactID).Update("paid_by_contact_id", target.ID)
