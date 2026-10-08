@@ -1,0 +1,75 @@
+{
+  "acceptance_sha": "3cd819f9644009972b980911002db703693be1bc",
+  "issue": "https://github.com/naiba/bonds/issues/291",
+  "pull_request": "https://github.com/naiba/bonds/pull/292",
+  "synthetic_data_only": true,
+  "source": "Second independent acceptance: unchanged-source complete confirmation run, 4/4 tests passed, no automatic retries or unhandled page errors.",
+  "privacy_review": "All eight images visually inspected before upload: synthetic contacts only; no credentials or real personal data. No source logs or databases included.",
+  "note_screenshot_caveat": "The contact hover card is visible in note captures; full body preservation and destination validity are asserted in browser tests.",
+  "screenshots": [
+    {
+      "file": "contact-merge-desktop-review.png",
+      "sha256": "e62100856773c0eb94d9d55a33995e943eac432f568a25989d26f5ef66d48215",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    {
+      "file": "contact-merge-desktop-effects.png",
+      "sha256": "78e434ba67b1a9850704871e2fe74c52c39d9a02d5f6df137593ebd9754010b8",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    {
+      "file": "contact-merge-desktop-result.png",
+      "sha256": "9e33bb9b1c6e4d52f866b3c01c303901d65c248b29304e77875929236ff50871",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    {
+      "file": "contact-merge-desktop-note.png",
+      "sha256": "7f1605dd0c8bb4eaecbe8320bea837da0045172e5daab62f6df289aa4e0c2aa4",
+      "dimensions": [
+        1440,
+        1000
+      ]
+    },
+    {
+      "file": "contact-merge-mobile-review.png",
+      "sha256": "a244be3673cf9138a99fdf61f49e81c682c601d6fe69ec47ae6c91b0f346e274",
+      "dimensions": [
+        390,
+        844
+      ]
+    },
+    {
+      "file": "contact-merge-mobile-effects.png",
+      "sha256": "1136e81e981fe1e398df58027f32286a61de1f07024cbfeff3297cd92d528967",
+      "dimensions": [
+        390,
+        844
+      ]
+    },
+    {
+      "file": "contact-merge-mobile-result.png",
+      "sha256": "967e80fa0a5ff9596db45cf8654dc03ed28f4bda3d3229669ab4e35bd164b58a",
+      "dimensions": [
+        390,
+        844
+      ]
+    },
+    {
+      "file": "contact-merge-mobile-note.png",
+      "sha256": "e740b407bbfb14ccb5a1b2f66f0a38c11e9cd568fae687672293aafdfe8d4d67",
+      "dimensions": [
+        390,
+        844
+      ]
+    }
+  ]
+}
