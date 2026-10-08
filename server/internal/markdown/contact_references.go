@@ -41,6 +41,20 @@ func ContactReferences(content, format string) []ContactReference {
 	for strings.Contains(content, prefix) {
 		prefix += "x"
 	}
+	configured, _ := configuredEngine()
+	original := parse.Parse("bonds-contact-reference-destinations", []byte(content), configured.ParseOptions)
+	// Raw-text uniqueness is insufficient: an unrelated address can encode the
+	// prefix and impersonate a marked code example after Lute decodes it.
+	// Check the parser's actual destination namespace before adding markers.
+	// Appending to the prefix keeps it absent from previously visited addresses.
+	ast.Walk(original.Root, func(node *ast.Node, entering bool) ast.WalkStatus {
+		if entering && node.Type == ast.NodeLinkDest {
+			for strings.Contains(node.TokensStr(), prefix) {
+				prefix += "x"
+			}
+		}
+		return ast.WalkContinue
+	})
 	var marked strings.Builder
 	offsets := make(map[string]int)
 	candidates := []ContactReference{}
@@ -81,7 +95,6 @@ func ContactReferences(content, format string) []ContactReference {
 		return refs
 	}
 	marked.WriteString(content[last:])
-	configured, _ := configuredEngine()
 	tree := parse.Parse("bonds-contact-references", []byte(marked.String()), configured.ParseOptions)
 	live := make(map[int]bool)
 	ast.Walk(tree.Root, func(node *ast.Node, entering bool) ast.WalkStatus {

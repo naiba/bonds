@@ -186,6 +186,9 @@ for (const viewport of [
     const literalText = `[Unknown](contact:550e8400-e29b-41d4-a716-446655440000) [Alicia Chen](contact:${contacts[1].id})`;
     const encodedLinks = (id: string, escapedID = false) =>
       `[Encoded colon](contact\\:${id}) [Encoded entity](contact&#58;${id}) [Encoded ID](contact:${escapedID ? id.replaceAll("-", "\\-") : id})`;
+    // These decoded addresses resemble internal parser markers but are not
+    // contact links. They must not make either code example require a contact.
+    const unrelatedDestinations = `[Unrelated](bonds&#45;contact-reference-0-contact:550e8400-e29b-41d4-a716-446655440000) [Another](bonds&#45;contact-reference-1-contact:${contacts[1].id})`;
     const notePrefix = `Literal examples: \`${literalText}\` `;
     await noteDialog
       .getByRole("textbox", { name: /write your note/i })
@@ -198,7 +201,7 @@ for (const viewport of [
     // reparses entity keystrokes mid-token and can move the typing caret.
     await noteDialog.getByRole("textbox", { name: /write your note/i })
       .press("ControlOrMeta+End");
-    await page.keyboard.insertText(` ${encodedLinks(contacts[1].id, true)}`);
+    await page.keyboard.insertText(` ${encodedLinks(contacts[1].id, true)} ${unrelatedDestinations}`);
     const noteSaved = page.waitForResponse(
       (response) =>
         response.url().endsWith(`/contacts/${contacts[1].id}/notes`) &&
@@ -210,7 +213,7 @@ for (const viewport of [
     const savedNote = (await noteResponse.json()).data;
     const noteId = savedNote.id;
     expect(savedNote.body.trim()).toBe(
-      `${notePrefix}Met [Alicia Chen](contact:${contacts[1].id}) ${encodedLinks(contacts[1].id, true)}`,
+      `${notePrefix}Met [Alicia Chen](contact:${contacts[1].id}) ${encodedLinks(contacts[1].id, true)} ${unrelatedDestinations}`,
     );
     expect(savedNote.rendered_body.match(/data-bonds-contact=/g)).toHaveLength(
       4,
