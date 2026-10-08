@@ -48,7 +48,7 @@ func (s *ContactInformationService) Create(contactID, vaultID string, req dto.Cr
 		Kind:      strPtrOrNil(req.Kind),
 		Pref:      pref,
 	}
-	if err := s.db.Create(&item).Error; err != nil {
+	if err := createContactRecord(s.db, &item, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	resp := toContactInformationResponse(&item)
@@ -72,7 +72,7 @@ func (s *ContactInformationService) Update(id uint, contactID, vaultID string, r
 	if req.Pref != nil {
 		item.Pref = *req.Pref
 	}
-	if err := s.db.Save(&item).Error; err != nil {
+	if err := updateContactRecord(s.db, &item, contactID, vaultID, ErrContactInformationNotFound, "type_id", "data", "kind", "pref"); err != nil {
 		return nil, err
 	}
 	resp := toContactInformationResponse(&item)

@@ -522,5 +522,11 @@
   "err.invalid_geocoding_settings": "地理编码服务商或配置无效",
   "err.failed_to_update_geocoding_settings": "更新地理编码设置失败",
   "err.failed_to_update_geocoding_provider": "更新地理编码服务商失败",
-  "err.failed_to_delete_geocoding_provider": "重置地理编码服务商失败"
+  "err.failed_to_delete_geocoding_provider": "重置地理编码服务商失败",
+  "err.contact_merge_selection": "请选择一个保留的联系人和 1 到 49 个不同的待合并联系人。",
+  "err.failed_to_merge_contacts": "合并联系人失败。",
+  "err.contact_merge_blocked": "请先解决合并预览中列出的限制。",
+  "err.contact_merge_review_changed": "合并预览已变化或尚未选择冲突值，请重新审核后合并。",
+  "err.address_history_ambiguous": "请选择具体的居住历史，再编辑或删除此共享地址。",
+  "err.contact_delete_changed": "删除期间联系人引用发生变化，请重试。"
 }

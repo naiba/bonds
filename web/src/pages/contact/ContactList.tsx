@@ -47,6 +47,7 @@ import type { ColumnsType } from "antd/es/table";
 import type { Breakpoint } from "antd";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
+import ContactMergeModal from "@/pages/contact/ContactMergeModal";
 import ContactAvatar from "@/components/ContactAvatar";
 import {
   invalidateCalendarQueries,
@@ -140,6 +141,11 @@ export default function ContactList() {
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const [columnsOverride, setColumnsOverride] = useState<string[] | null>(null);
   const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+  const [mergeContactIds, setMergeContactIds] = useState<string[] | null>(null);
+  const { data: currentVault } = useQuery({
+    queryKey: ["vaults", vaultId],
+    queryFn: async () => (await api.vaults.vaultsDetail(vaultId)).data,
+  });
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [bulkMoveForm] = Form.useForm<{ target_vault_id: string }>();
   const currentPage = parsePage(searchParams.get("page"));
@@ -181,7 +187,8 @@ export default function ContactList() {
   });
   const { data: companies = [] } = useQuery({
     queryKey: ["vaults", vaultId, "companies"],
-    queryFn: async (): Promise<Company[]> => (await api.companies.companiesList(String(vaultId))).data ?? [],
+    queryFn: async (): Promise<Company[]> =>
+      (await api.companies.companiesList(String(vaultId))).data ?? [],
   });
 
   const { data: vaults = [] } = useQuery<Vault[]>({
@@ -628,6 +635,15 @@ export default function ContactList() {
             </div>
           </div>
           <Space size={8} wrap>
+            {selectedContactIds.length >= 2 &&
+              (currentVault?.current_user_permission ?? 300) <= 200 && (
+                <Button
+                  disabled={selectedContactIds.length > 50}
+                  onClick={() => setMergeContactIds([...selectedContactIds])}
+                >
+                  {t("contact.merge.action")}
+                </Button>
+              )}
             {selectedContactIds.length > 0 && (
               <>
                 <Button
@@ -792,7 +808,10 @@ export default function ContactList() {
           data-testid="contact-company-filter"
           placeholder={t("contact.list.filter_company")}
           value={companyFilter}
-          options={companies.map((company) => ({ label: company.name, value: company.id }))}
+          options={companies.map((company) => ({
+            label: company.name,
+            value: company.id,
+          }))}
           onChange={(value) => {
             const next = new URLSearchParams(searchParams);
             next.delete("label");
@@ -861,6 +880,19 @@ export default function ContactList() {
         </Select>
       </div>
 
+      {mergeContactIds && (
+        <ContactMergeModal
+          key={vaultId}
+          vaultId={vaultId}
+          contactIds={mergeContactIds}
+          onClose={() => setMergeContactIds(null)}
+          onMerged={(contactId) => {
+            setMergeContactIds(null);
+            setSelectedContactIds([]);
+            navigate(`/vaults/${vaultId}/contacts/${contactId}`);
+          }}
+        />
+      )}
       <Table<Contact>
         columns={filteredColumns}
         dataSource={contacts}

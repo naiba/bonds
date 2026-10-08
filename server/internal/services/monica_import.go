@@ -113,6 +113,9 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 			continue
 		}
 
+		if contactID == "" {
+			continue
+		}
 		contactUUIDMap[mc.UUID] = contactID
 		if imported {
 			resp.ImportedContacts++
@@ -129,7 +132,7 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 		if !ok {
 			continue
 		}
-		s.importContactReferences(s.DB, &mc, contactID, contactUUIDMap, resp)
+		s.importContactReferences(s.DB, &mc, contactID, vaultID, contactUUIDMap, resp)
 		s.importContactSubResources(
 			s.DB, &mc, contactID, vaultID, accountID, userID,
 			fieldTypeByUUID, legacyActivityTypeByUUID, legacyActivityCategoryByUUID, resp,
@@ -189,8 +192,15 @@ func (s *MonicaImportService) Import(vaultID, userID string, data []byte) (*dto.
 			if t, ok := parseMonicaTimestamp(mr.UpdatedAt); ok {
 				rel.UpdatedAt = t
 			}
-			if err := s.DB.Create(&rel).Error; err == nil {
+			if err := s.DB.Transaction(func(tx *gorm.DB) error {
+				if err := lockContactsBelongToVault(tx, []string{contactIsID, ofContactID}, vaultID); err != nil {
+					return err
+				}
+				return tx.Create(&rel).Error
+			}); err == nil {
 				resp.ImportedRelationships++
+			} else {
+				resp.Errors = append(resp.Errors, "relationship: could not import contact record")
 			}
 		}
 	}
@@ -215,9 +225,18 @@ func (s *MonicaImportService) importContact(
 	genderByUUID map[string]MonicaGenderRef, resp *dto.MonicaImportResponse,
 ) (string, bool, error) {
 	var existingContact models.Contact
-	if err := tx.Where("vault_id = ? AND distant_uuid = ?", vaultID, mc.UUID).First(&existingContact).Error; err == nil {
+	// A deleted source UUID is still an import identity. Reimporting it must not
+	// recreate a merged contact or attach fresh child rows to its tombstone.
+	err := tx.Unscoped().Where("vault_id = ? AND distant_uuid = ?", vaultID, mc.UUID).First(&existingContact).Error
+	if err == nil {
 		resp.SkippedCount++
+		if existingContact.DeletedAt.Valid {
+			return "", false, nil
+		}
 		return existingContact.ID, false, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", false, err
 	}
 
 	var genderID *uint
@@ -293,7 +312,17 @@ func (s *MonicaImportService) importContact(
 	if t, ok := parseMonicaTimestamp(mc.UpdatedAt); ok {
 		contact.UpdatedAt = t
 	}
-	if err := tx.Create(&contact).Error; err != nil {
+	if err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := inner.Create(&contact).Error; err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			if err := NewFeedRecorder(inner).Record(contact.ID, userID, ActionContactCreated, "", nil, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return "", false, fmt.Errorf("create contact: %w", err)
 	}
 	// GORM zero-value bool 陷阱：Listed default:true，要设为 false 必须先 Create 再 Update
@@ -313,7 +342,7 @@ func (s *MonicaImportService) importContact(
 		IsFavorite:      mc.Properties.IsStarred,
 		LastConsultedAt: lastConsultedAt,
 	}
-	if err := tx.Create(&cvu).Error; err != nil {
+	if err := createMonicaContactRecord(tx, &cvu, contact.ID, vaultID, "contact history", resp); err != nil {
 		return "", false, fmt.Errorf("create contact_vault_user: %w", err)
 	}
 	if companyID != nil {
@@ -323,7 +352,7 @@ func (s *MonicaImportService) importContact(
 			CompanyID:   *companyID,
 			JobPosition: strPtrOrNil(mc.Properties.Job),
 		}
-		if err := tx.Create(&contactCompany).Error; err != nil {
+		if err := createMonicaContactRecord(tx, &contactCompany, contact.ID, vaultID, "company job", resp); err != nil {
 			resp.Errors = append(resp.Errors, fmt.Sprintf("company job %q: could not import company job", mc.Properties.Company))
 		}
 	}
@@ -341,7 +370,7 @@ func (s *MonicaImportService) importContact(
 			ContactID: contact.ID,
 			LabelID:   label.ID,
 		}
-		tx.Create(&cl) // 忽略错误（已存在则跳过）
+		createMonicaContactRecord(tx, &cl, contact.ID, vaultID, "contact label", resp)
 	}
 
 	if mc.Properties.Birthdate != nil {
@@ -349,10 +378,6 @@ func (s *MonicaImportService) importContact(
 	}
 	if mc.Properties.DeceasedDate != nil {
 		s.importSpecialDate(tx, contact.ID, vaultID, mc.Properties.DeceasedDate, "deceased_date", "Deceased date", resp)
-	}
-
-	if s.feedRecorder != nil {
-		s.feedRecorder.Record(contact.ID, userID, ActionContactCreated, "", nil, nil)
 	}
 
 	if s.searchEngine != nil {
@@ -363,7 +388,7 @@ func (s *MonicaImportService) importContact(
 }
 
 func (s *MonicaImportService) importContactReferences(
-	tx *gorm.DB, mc *MonicaContact, contactID string, contactUUIDMap map[string]string, resp *dto.MonicaImportResponse,
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID string, contactUUIDMap map[string]string, resp *dto.MonicaImportResponse,
 ) {
 	if mc.Properties.FirstMetThrough == "" {
 		return
@@ -373,7 +398,12 @@ func (s *MonicaImportService) importContactReferences(
 		resp.Errors = append(resp.Errors, fmt.Sprintf("first_met_through: unresolved contact %s", mc.Properties.FirstMetThrough))
 		return
 	}
-	if err := tx.Model(&models.Contact{}).Where("id = ?", contactID).Update("first_met_through_contact_id", throughContactID).Error; err != nil {
+	if err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := lockContactsBelongToVault(inner, []string{contactID, throughContactID}, vaultID); err != nil {
+			return err
+		}
+		return inner.Model(&models.Contact{}).Where("id = ?", contactID).Update("first_met_through_contact_id", throughContactID).Error
+	}); err != nil {
 		resp.Errors = append(resp.Errors, fmt.Sprintf("first_met_through %s: could not link contact", mc.Properties.FirstMetThrough))
 	}
 }
@@ -457,7 +487,7 @@ func (s *MonicaImportService) importSpecialDate(
 		IsAgeBased:                 sd.IsAgeBased,
 		IsYearUnknown:              sd.IsYearUnknown,
 	}
-	if err := tx.Create(&cid).Error; err != nil {
+	if err := createMonicaContactRecord(tx, &cid, contactID, vaultID, "important date", resp); err != nil {
 		resp.Errors = append(resp.Errors, fmt.Sprintf("importantdate %s: could not import important date", internalType))
 	}
 }
@@ -472,13 +502,13 @@ func (s *MonicaImportService) importContactSubResources(
 	resp *dto.MonicaImportResponse,
 ) {
 	s.importNotes(tx, mc, contactID, vaultID, userID, resp)
-	s.importCalls(tx, mc, contactID, userID, resp)
+	s.importCalls(tx, mc, contactID, vaultID, userID, resp)
 	s.importTasks(tx, mc, contactID, vaultID, userID, resp)
 	s.importReminders(tx, mc, contactID, vaultID, userID, resp)
 	s.importAddresses(tx, mc, contactID, vaultID, accountID, resp)
-	s.importContactFields(tx, mc, contactID, accountID, fieldTypeByUUID, resp)
-	s.importPets(tx, mc, contactID, accountID, resp)
-	s.importGifts(tx, mc, contactID, accountID, resp)
+	s.importContactFields(tx, mc, contactID, vaultID, accountID, fieldTypeByUUID, resp)
+	s.importPets(tx, mc, contactID, vaultID, accountID, resp)
+	s.importGifts(tx, mc, contactID, vaultID, accountID, resp)
 	s.recordSkippedDebts(mc, resp)
 	s.importLegacyActivities(tx, mc, contactID, vaultID, legacyActivityTypeByUUID, legacyActivityCategoryByUUID, resp)
 	s.importConversationsAsNotes(tx, mc, contactID, vaultID, userID, resp)
@@ -506,7 +536,7 @@ func (s *MonicaImportService) importNotes(
 		if t, ok := parseMonicaTimestamp(mn.UpdatedAt); ok {
 			note.UpdatedAt = t
 		}
-		if err := tx.Create(&note).Error; err == nil {
+		if err := createMonicaContactRecord(tx, &note, contactID, vaultID, "note", resp); err == nil {
 			resp.ImportedNotes++
 		}
 	}
@@ -530,7 +560,7 @@ func activityDateOnly(value time.Time) time.Time {
 }
 
 func (s *MonicaImportService) importCalls(
-	tx *gorm.DB, mc *MonicaContact, contactID, userID string,
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, userID string,
 	resp *dto.MonicaImportResponse,
 ) {
 	for _, raw := range getCollectionByType(mc.Data, "calls") {
@@ -563,7 +593,7 @@ func (s *MonicaImportService) importCalls(
 		if t, ok := parseMonicaTimestamp(mcall.UpdatedAt); ok {
 			call.UpdatedAt = t
 		}
-		if err := tx.Create(&call).Error; err == nil {
+		if err := createMonicaContactRecord(tx, &call, contactID, vaultID, "call", resp); err == nil {
 			resp.ImportedCalls++
 		}
 	}
@@ -618,11 +648,15 @@ func (s *MonicaImportService) importTasks(
 			}
 		}
 		if err := tx.Transaction(func(itx *gorm.DB) error {
+			if err := lockContactsBelongToVault(itx, []string{contactID}, vaultID); err != nil {
+				return err
+			}
 			if err := itx.Create(&task).Error; err != nil {
 				return err
 			}
 			return itx.Create(&models.TaskContact{ContactTaskID: task.ID, ContactID: contactID}).Error
 		}); err != nil {
+			resp.Errors = append(resp.Errors, "task: could not import contact record")
 			continue
 		}
 		resp.ImportedTasks++
@@ -674,10 +708,18 @@ func (s *MonicaImportService) importReminders(
 		if t, ok := parseMonicaTimestamp(mr.UpdatedAt); ok {
 			reminder.UpdatedAt = t
 		}
-		if err := tx.Create(&reminder).Error; err == nil {
-			resp.ImportedReminders++
-			if err := scheduleReminderForVaultUsers(tx, &reminder); err != nil {
-				resp.Errors = append(resp.Errors, fmt.Sprintf("reminder %s: could not schedule reminder", mr.UUID))
+		// Keep a reminder, its description and its first schedules inside the
+		// owner lock. A merge between insert and scheduling would leave a
+		// successfully imported reminder that never sends a notification.
+		if err := tx.Transaction(func(itx *gorm.DB) error {
+			if err := lockContactsBelongToVault(itx, []string{contactID}, vaultID); err != nil {
+				return err
+			}
+			if err := itx.Create(&reminder).Error; err != nil {
+				return err
+			}
+			if err := scheduleReminderForVaultUsers(itx, &reminder); err != nil {
+				return err
 			}
 			if mr.Properties.Description != "" {
 				sourceType := "monica_reminder_description"
@@ -698,10 +740,18 @@ func (s *MonicaImportService) importReminders(
 				if t, ok := parseMonicaTimestamp(mr.UpdatedAt); ok {
 					note.UpdatedAt = t
 				}
-				if err := tx.Create(&note).Error; err == nil {
-					resp.ImportedNotes++
+				if err := itx.Create(&note).Error; err != nil {
+					return err
 				}
 			}
+			return nil
+		}); err != nil {
+			resp.Errors = append(resp.Errors, fmt.Sprintf("reminder %s: could not import and schedule reminder", mr.UUID))
+			continue
+		}
+		resp.ImportedReminders++
+		if mr.Properties.Description != "" {
+			resp.ImportedNotes++
 		}
 	}
 }
@@ -734,18 +784,24 @@ func (s *MonicaImportService) importAddresses(
 		if ma.Properties.Longitude != 0 {
 			addr.Longitude = &ma.Properties.Longitude
 		}
-		if err := tx.Create(&addr).Error; err != nil {
-			continue
-		}
-		ca := models.ContactAddress{ContactID: contactID, AddressID: addr.ID}
-		if err := tx.Create(&ca).Error; err == nil {
+		if err := tx.Transaction(func(inner *gorm.DB) error {
+			if err := lockContactsBelongToVault(inner, []string{contactID}, vaultID); err != nil {
+				return err
+			}
+			if err := inner.Create(&addr).Error; err != nil {
+				return err
+			}
+			return inner.Create(&models.ContactAddress{ContactID: contactID, AddressID: addr.ID}).Error
+		}); err != nil {
+			resp.Errors = append(resp.Errors, "address: could not import contact record")
+		} else {
 			resp.ImportedAddresses++
 		}
 	}
 }
 
 func (s *MonicaImportService) importContactFields(
-	tx *gorm.DB, mc *MonicaContact, contactID, accountID string,
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, accountID string,
 	fieldTypeByUUID map[string]MonicaContactFieldTypeRef,
 	resp *dto.MonicaImportResponse,
 ) {
@@ -780,12 +836,12 @@ func (s *MonicaImportService) importContactFields(
 			TypeID:    ciType.ID,
 			Data:      mcf.Properties.Data,
 		}
-		tx.Create(&ci)
+		createMonicaContactRecord(tx, &ci, contactID, vaultID, "contact information", resp)
 	}
 }
 
 func (s *MonicaImportService) importPets(
-	tx *gorm.DB, mc *MonicaContact, contactID, accountID string,
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, accountID string,
 	resp *dto.MonicaImportResponse,
 ) {
 	for _, raw := range getCollectionByType(mc.Data, "pets") {
@@ -803,12 +859,12 @@ func (s *MonicaImportService) importPets(
 			Name:          name,
 			PetCategoryID: petCat.ID,
 		}
-		tx.Create(&pet)
+		createMonicaContactRecord(tx, &pet, contactID, vaultID, "pet", resp)
 	}
 }
 
 func (s *MonicaImportService) importGifts(
-	tx *gorm.DB, mc *MonicaContact, contactID, accountID string,
+	tx *gorm.DB, mc *MonicaContact, contactID, vaultID, accountID string,
 	resp *dto.MonicaImportResponse,
 ) {
 	for _, raw := range getCollectionByType(mc.Data, "gifts") {
@@ -857,7 +913,7 @@ func (s *MonicaImportService) importGifts(
 		if t, ok := parseMonicaTimestamp(mg.UpdatedAt); ok {
 			gift.UpdatedAt = t
 		}
-		tx.Create(&gift)
+		createMonicaContactRecord(tx, &gift, contactID, vaultID, "gift", resp)
 	}
 }
 
@@ -934,12 +990,19 @@ func (s *MonicaImportService) importLegacyActivities(
 		if t, ok := parseMonicaTimestamp(ml.UpdatedAt); ok {
 			le.UpdatedAt = t
 		}
-		if err := tx.Create(&le).Error; err != nil {
-			continue
+		if err := tx.Transaction(func(inner *gorm.DB) error {
+			if err := lockContactsBelongToVault(inner, []string{contactID}, vaultID); err != nil {
+				return err
+			}
+			if err := inner.Create(&le).Error; err != nil {
+				return err
+			}
+			return inner.Create(&models.ActivityParticipant{ActivityID: le.ID, ContactID: contactID}).Error
+		}); err != nil {
+			resp.Errors = append(resp.Errors, "activity: could not import contact record")
+		} else {
+			resp.ImportedActivities++
 		}
-		lep := models.ActivityParticipant{ContactID: contactID, ActivityID: le.ID}
-		tx.Create(&lep)
-		resp.ImportedActivities++
 	}
 }
 
@@ -1108,12 +1171,17 @@ func (s *MonicaImportService) importActivities(tx *gorm.DB, accountData []Monica
 			event.UpdatedAt = parsed
 		}
 		if err := tx.Transaction(func(inner *gorm.DB) error {
+			if err := lockContactsBelongToVault(inner, participants[activity.UUID], vaultID); err != nil {
+				return err
+			}
 			if err := inner.Create(&event).Error; err != nil {
 				return err
 			}
 			return replaceActivityParticipants(inner, event.ID, participants[activity.UUID])
 		}); err == nil {
 			resp.ImportedActivities++
+		} else {
+			resp.Errors = append(resp.Errors, "activity: could not import contact record")
 		}
 	}
 }
@@ -1185,7 +1253,7 @@ func (s *MonicaImportService) importConversationsAsNotes(
 		if t, ok := parseMonicaTimestamp(mconv.UpdatedAt); ok {
 			note.UpdatedAt = t
 		}
-		if err := tx.Create(&note).Error; err == nil {
+		if err := createMonicaContactRecord(tx, &note, contactID, vaultID, "note", resp); err == nil {
 			resp.ImportedNotes++
 		}
 	}
@@ -1374,17 +1442,10 @@ func (s *MonicaImportService) importPhotos(
 			if isAvatar || (i == 0 && (mc.Properties.Avatar == nil || mc.Properties.Avatar.AvatarPhotoUUID == "")) {
 				fileType = "avatar"
 			}
-			fileableType := "Contact"
-			s.DB.Model(&models.File{}).Where("id = ?", fileID).Updates(map[string]interface{}{
-				"ufileable_id":  contactID,
-				"fileable_type": fileableType,
-				"type":          fileType,
-			})
-
-			// Monica 指定的照片优先；旧导出没有 avatar 元数据时回退到第一张。
-			if isAvatar || (i == 0 && (mc.Properties.Avatar == nil || mc.Properties.Avatar.AvatarPhotoUUID == "")) {
-				s.DB.Model(&models.Contact{}).Where("id = ?", contactID).Update("file_id", fileID)
+			if err := s.attachImportedFile(fileID, contactID, vaultID, fileType); err != nil {
+				resp.Errors = append(resp.Errors, "photo: could not attach to contact; file remains in vault files")
 			}
+
 		}
 	}
 }
@@ -1436,11 +1497,10 @@ func (s *MonicaImportService) importDocuments(
 				continue
 			}
 
-			fileableType := "Contact"
-			s.DB.Model(&models.File{}).Where("id = ?", fileID).Updates(map[string]interface{}{
-				"ufileable_id":  contactID,
-				"fileable_type": fileableType,
-			})
+			if err := s.attachImportedFile(fileID, contactID, vaultID, "document"); err != nil {
+				resp.Errors = append(resp.Errors, "document: could not attach to contact; file remains in vault files")
+			}
+
 		}
 	}
 }
@@ -1860,4 +1920,30 @@ type MonicaDocument struct {
 		MimeType         string `json:"mime_type"`
 		DataURL          string `json:"dataUrl"`
 	} `json:"properties"`
+}
+
+// Import resolves IDs in an earlier phase, so each later write must recheck the
+// live owner. Keep failures per record and report them instead of counting hidden
+// rows as successful imports or rolling back unrelated valid imported records.
+func createMonicaContactRecord(db *gorm.DB, record any, contactID, vaultID, kind string, response *dto.MonicaImportResponse) error {
+	err := createContactRecord(db, record, contactID, vaultID)
+	if err != nil {
+		response.Errors = append(response.Errors, kind+": could not import contact record")
+	}
+	return err
+}
+
+func (s *MonicaImportService) attachImportedFile(fileID uint, contactID, vaultID, fileType string) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Model(&models.File{}).Where("id = ? AND vault_id = ?", fileID, vaultID).Updates(map[string]any{"ufileable_id": contactID, "fileable_type": "Contact", "type": fileType}).Error; err != nil {
+			return err
+		}
+		if fileType == "avatar" {
+			return tx.Model(&models.Contact{}).Where("id = ?", contactID).Update("file_id", fileID).Error
+		}
+		return nil
+	})
 }

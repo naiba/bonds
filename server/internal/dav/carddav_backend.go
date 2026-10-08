@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/naiba/bonds/internal/models"
 	"github.com/naiba/bonds/internal/services"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // CardDAVBackend implements the carddav.Backend interface.
@@ -200,7 +200,19 @@ func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, q
 	return filtered, nil
 }
 
-func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, _ *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
+func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
+	var result *carddav.AddressObject
+	err := b.db.Transaction(func(tx *gorm.DB) error {
+		backend := *b
+		backend.db = tx
+		var err error
+		result, err = backend.putAddressObject(ctx, path, card, options)
+		return err
+	})
+	return result, err
+}
+
+func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
 	// Keep PUT input aligned with the vCard 3.0 representation advertised by this address book.
 	if card.Value(vcard.FieldVersion) != "3.0" {
 		return nil, carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
@@ -240,11 +252,40 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 
 	var contact models.Contact
 	if contactID != "" {
-		err := b.db.First(&contact, "id = ?", contactID).Error
+		err := b.db.Unscoped().Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).First(&contact, "id = ?", contactID).Error
 		if err == nil {
 			// A global object ID must still belong to the DAV collection vault; otherwise a guessed ID could overwrite another vault's contact.
 			if contact.VaultID != vaultID {
 				return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+			}
+			// Deleted contact IDs remain tombstones. An offline client must
+			// not recreate a merged source at its obsolete DAV object path.
+			if contact.DeletedAt.Valid {
+				return nil, webdav.NewHTTPError(http.StatusGone, fmt.Errorf("address object was deleted"))
+			}
+			if options != nil {
+				var current models.Contact
+				if err := preloadContactForCardDAV(b.db).First(&current, "id = ?", contact.ID).Error; err != nil {
+					return nil, err
+				}
+				object, err := contactToAddressObject(&current, userID)
+				if err != nil {
+					return nil, err
+				}
+				// Honor conditional writes while holding the same row lock as a
+				// merge. A stale ETag must not overwrite newly combined fields.
+				if options.IfMatch.IsSet() {
+					match, err := options.IfMatch.MatchETag(object.ETag)
+					if err != nil || !match {
+						return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("address object changed"))
+					}
+				}
+				if options.IfNoneMatch.IsSet() {
+					match, err := options.IfNoneMatch.MatchETag(object.ETag)
+					if err != nil || match {
+						return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("address object exists"))
+					}
+				}
 			}
 			contact.FirstName = strPtrOrNil(firstName)
 			contact.LastName = strPtrOrNil(lastName)
@@ -255,7 +296,14 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 				if err := tx.Save(&contact).Error; err != nil {
 					return err
 				}
-				return replaceContactVCardFields(tx, card, contact.ID, vaultID, accountID)
+				err := services.ReplaceContactVCardFields(tx, card, contact.ID, vaultID, accountID)
+				if errors.Is(err, services.ErrVCardInvalidData) {
+					return webdav.NewHTTPError(http.StatusBadRequest, err)
+				}
+				if errors.Is(err, services.ErrVCardUnsafeReplacement) {
+					return webdav.NewHTTPError(http.StatusConflict, err)
+				}
+				return err
 			}); err != nil {
 				return nil, err
 			}
@@ -268,6 +316,10 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
+	}
+
+	if options != nil && options.IfMatch.IsSet() {
+		return nil, webdav.NewHTTPError(http.StatusPreconditionFailed, fmt.Errorf("address object does not exist"))
 	}
 
 	contact = models.Contact{
@@ -291,7 +343,7 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 		return nil, err
 	}
 
-	if err := saveContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+	if err := services.ImportContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
 		return nil, err
 	}
 
@@ -325,7 +377,29 @@ func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) e
 		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("contact cannot be deleted"))
 	}
 
-	return b.db.Delete(&contact).Error
+	// DAV deletion reaches the same introducer-clearing model hook as the
+	// REST API. Reuse its parent lock protocol rather than locking referrers
+	// inside the hook before the selected contact, opposite to merge.
+	err := b.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		contacts, err := services.LockContactDeletionOwners(tx, []string{contactID}, contact.VaultID)
+		if err != nil {
+			return err
+		}
+		if !contacts[0].CanBeDeleted {
+			return services.ErrContactCannotBeDeleted
+		}
+		return tx.Delete(&contacts[0]).Error
+	})
+	switch {
+	case errors.Is(err, services.ErrContactNotFound):
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+	case errors.Is(err, services.ErrContactCannotBeDeleted):
+		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("contact cannot be deleted"))
+	case errors.Is(err, services.ErrContactDeleteChanged):
+		return webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("contact references changed; retry deletion"))
+	default:
+		return err
+	}
 }
 
 func (b *CardDAVBackend) verifyVaultAccess(userID, vaultID string) error {
@@ -438,223 +512,6 @@ func textMatchField(value string, tm carddav.TextMatch) bool {
 		return !result
 	}
 	return result
-}
-
-// saveContactVCardFields creates TEL, EMAIL, ADR, BDAY records from a vCard.
-func saveContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	// TEL
-	if fields := card[vcard.FieldTelephone]; len(fields) > 0 {
-		var phoneType models.ContactInformationType
-		if err := db.Where("account_id = ? AND type = ?", accountID, "phone").First(&phoneType).Error; err == nil {
-			for _, f := range fields {
-				if f.Value == "" {
-					continue
-				}
-				if err := db.Create(&models.ContactInformation{
-					ContactID: contactID,
-					TypeID:    phoneType.ID,
-					Data:      f.Value,
-				}).Error; err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// EMAIL
-	if fields := card[vcard.FieldEmail]; len(fields) > 0 {
-		var emailType models.ContactInformationType
-		if err := db.Where("account_id = ? AND type = ?", accountID, "email").First(&emailType).Error; err == nil {
-			for _, f := range fields {
-				if f.Value == "" {
-					continue
-				}
-				if err := db.Create(&models.ContactInformation{
-					ContactID: contactID,
-					TypeID:    emailType.ID,
-					Data:      f.Value,
-				}).Error; err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	// ADR
-	if addrs := card.Addresses(); len(addrs) > 0 {
-		for _, addr := range addrs {
-			if addr.StreetAddress == "" && addr.Locality == "" && addr.Region == "" && addr.PostalCode == "" && addr.Country == "" {
-				continue
-			}
-			a := models.Address{
-				VaultID:    vaultID,
-				Line1:      strPtrOrNil(addr.StreetAddress),
-				City:       strPtrOrNil(addr.Locality),
-				Province:   strPtrOrNil(addr.Region),
-				PostalCode: strPtrOrNil(addr.PostalCode),
-				Country:    strPtrOrNil(addr.Country),
-			}
-			if err := db.Create(&a).Error; err != nil {
-				return err
-			}
-			if err := db.Create(&models.ContactAddress{
-				ContactID: contactID,
-				AddressID: a.ID,
-			}).Error; err != nil {
-				return err
-			}
-		}
-	}
-
-	// BDAY
-	if bday := card.Value(vcard.FieldBirthday); bday != "" {
-		year, month, day := parseBirthdayString(bday)
-		if month > 0 && day > 0 {
-			var bdayType models.ContactImportantDateType
-			if err := db.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&bdayType).Error; err == nil {
-				cid := models.ContactImportantDate{
-					ContactID:                  contactID,
-					ContactImportantDateTypeID: &bdayType.ID,
-					Label:                      "Birthdate",
-					Day:                        &day,
-					Month:                      &month,
-				}
-				if year > 0 {
-					cid.Year = &year
-				}
-				if err := db.Create(&cid).Error; err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-// replaceContactVCardFields deletes existing records and recreates from vCard.
-func replaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{}).Error; err != nil {
-		return err
-	}
-
-	// vCards do not carry coordinates, so the delete-and-recreate below would
-	// erase every pin the server has geocoded — on every sync from a phone,
-	// even one that never touched the addresses. Remember the coordinates by
-	// what the address says, and put them back on recreated rows that still
-	// say the same thing.
-	coordinates := map[string][2]*float64{}
-	var pivots []models.ContactAddress
-	if err := db.Where("contact_id = ?", contactID).Find(&pivots).Error; err != nil {
-		return err
-	}
-	if len(pivots) > 0 {
-		addressIDs := make([]uint, len(pivots))
-		for i, p := range pivots {
-			addressIDs[i] = p.AddressID
-		}
-		var previous []models.Address
-		if err := db.Where("id IN ?", addressIDs).Find(&previous).Error; err != nil {
-			return err
-		}
-		for i := range previous {
-			address := &previous[i]
-			if address.Latitude == nil || address.Longitude == nil {
-				continue
-			}
-			coordinates[addressCoordinateKey(address)] = [2]*float64{address.Latitude, address.Longitude}
-		}
-		if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{}).Error; err != nil {
-			return err
-		}
-		if err := db.Where("id IN ?", addressIDs).Delete(&models.Address{}).Error; err != nil {
-			return err
-		}
-	}
-
-	if err := db.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{}).Error; err != nil {
-		return err
-	}
-
-	if err := saveContactVCardFields(db, card, contactID, vaultID, accountID); err != nil {
-		return err
-	}
-
-	if len(coordinates) > 0 {
-		var recreatedPivots []models.ContactAddress
-		if err := db.Where("contact_id = ?", contactID).Find(&recreatedPivots).Error; err != nil {
-			return err
-		}
-		if len(recreatedPivots) == 0 {
-			return nil
-		}
-		recreatedIDs := make([]uint, len(recreatedPivots))
-		for i, p := range recreatedPivots {
-			recreatedIDs[i] = p.AddressID
-		}
-		var recreated []models.Address
-		if err := db.Where("id IN ?", recreatedIDs).Find(&recreated).Error; err != nil {
-			return err
-		}
-		for i := range recreated {
-			address := &recreated[i]
-			if address.Latitude != nil && address.Longitude != nil {
-				continue
-			}
-			pair, known := coordinates[addressCoordinateKey(address)]
-			if !known {
-				continue
-			}
-			if err := db.Model(address).
-				Select("latitude", "longitude").
-				Updates(models.Address{Latitude: pair[0], Longitude: pair[1]}).Error; err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// addressCoordinateKey identifies an address by what it says, so coordinates
-// can survive a delete-and-recreate when the recreated row still describes
-// the same place. Case and whitespace are ignored: they would not change what
-// a geocoder was asked, so they do not make it a different address.
-func addressCoordinateKey(address *models.Address) string {
-	parts := make([]string, 0, 5)
-	for _, part := range []*string{address.Line1, address.City, address.Province, address.PostalCode, address.Country} {
-		if part == nil {
-			parts = append(parts, "")
-			continue
-		}
-		parts = append(parts, strings.ToLower(strings.Join(strings.Fields(*part), "")))
-	}
-	return strings.Join(parts, "|")
-}
-
-// parseBirthdayString parses vCard BDAY formats: "19900115", "1990-01-15", "--0115" (no year)
-func parseBirthdayString(bday string) (year, month, day int) {
-	bday = strings.TrimSpace(bday)
-	if t, err := time.Parse("2006-01-02", bday); err == nil {
-		return t.Year(), int(t.Month()), t.Day()
-	}
-	if len(bday) == 8 {
-		if y, err := strconv.Atoi(bday[0:4]); err == nil {
-			if m, err := strconv.Atoi(bday[4:6]); err == nil {
-				if d, err := strconv.Atoi(bday[6:8]); err == nil {
-					return y, m, d
-				}
-			}
-		}
-	}
-	if strings.HasPrefix(bday, "--") && len(bday) >= 6 {
-		s := bday[2:]
-		if m, err := strconv.Atoi(s[0:2]); err == nil {
-			if d, err := strconv.Atoi(s[2:4]); err == nil {
-				return 0, m, d
-			}
-		}
-	}
-	return 0, 0, 0
 }
 
 // Path parsing helpers

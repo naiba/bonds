@@ -2,6 +2,7 @@ package dav
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -302,20 +303,21 @@ func (b *CalDAVBackend) putEvent(_ context.Context, path string, comp *ical.Comp
 		if existing.Contact.VaultID != vaultID {
 			return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("calendar object not found"))
 		}
-		// Update
-		existing.Label = summary
-		existing.Day = day
-		existing.Month = month
-		existing.Year = year
-		if err := b.db.Save(&existing).Error; err != nil {
-			return nil, err
+		updated, err := services.NewImportantDateService(b.db).UpdateCalendarFields(existing.ID, existing.ContactID, vaultID, summary, day, month, year)
+		if err != nil {
+			return nil, calendarWriteError(err)
 		}
+		existing = *updated
 		return &caldav.CalendarObject{
 			Path:    path,
 			ModTime: existing.UpdatedAt,
 			ETag:    fmt.Sprintf("%d", existing.UpdatedAt.Unix()),
 			Data:    buildCalendarFromImportantDate(&existing, ""),
 		}, nil
+	}
+
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
 	}
 
 	// Need a contact - find first in vault
@@ -334,8 +336,15 @@ func (b *CalDAVBackend) putEvent(_ context.Context, path string, comp *ical.Comp
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	if err := b.db.Create(&importantDate).Error; err != nil {
-		return nil, err
+	if err := b.db.Transaction(func(tx *gorm.DB) error {
+		// Lock the owner before inserting its date; merge may have deleted the
+		// discovered contact while this request was parsing the calendar.
+		if err := services.LockContactForWrite(tx, contact.ID, vaultID); err != nil {
+			return err
+		}
+		return tx.Create(&importantDate).Error
+	}); err != nil {
+		return nil, calendarWriteError(err)
 	}
 
 	return &caldav.CalendarObject{
@@ -370,8 +379,15 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		if description != "" {
 			existing.Description = &description
 		}
-		if err := b.db.Save(&existing).Error; err != nil {
-			return nil, err
+		// A task belongs to its vault, independently of its current assignees.
+		// Never restore stale vault/parent/status fields or upsert a deleted task.
+		result := b.db.Model(&existing).Where("vault_id = ?", vaultID).
+			Select("label", "description", "updated_at").Updates(&existing)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		if result.RowsAffected != 1 {
+			return nil, webdav.NewHTTPError(http.StatusNotFound, services.ErrTaskNotFound)
 		}
 		return &caldav.CalendarObject{
 			Path:    path,
@@ -381,8 +397,15 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		}, nil
 	}
 
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
 	var contact models.Contact
-	hasContact := b.db.Where("vault_id = ?", vaultID).First(&contact).Error == nil
+	contactErr := b.db.Where("vault_id = ?", vaultID).First(&contact).Error
+	if contactErr != nil && !errors.Is(contactErr, gorm.ErrRecordNotFound) {
+		return nil, contactErr
+	}
+	hasContact := contactErr == nil
 
 	task := models.ContactTask{
 		VaultID:    vaultID,
@@ -397,6 +420,13 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		task.Description = &description
 	}
 	if err := b.db.Transaction(func(tx *gorm.DB) error {
+		// Keep both the task and its assignment behind the contact lock. A
+		// rejected stale owner must not leave an accidental standalone task.
+		if hasContact {
+			if err := services.LockContactForWrite(tx, contact.ID, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := tx.Create(&task).Error; err != nil {
 			return err
 		}
@@ -405,7 +435,7 @@ func (b *CalDAVBackend) putTodo(_ context.Context, path string, comp *ical.Compo
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, calendarWriteError(err)
 	}
 
 	return &caldav.CalendarObject{
@@ -669,4 +699,11 @@ func extractVaultIDFromCalendarObjectPath(path, userID string) string {
 func replacePathSegment(path, old, replacement string) string {
 	// Replace /dav/calendars/ with /dav/addressbooks/ for path parsing reuse
 	return "/dav/" + replacement + "/" + path[len("/dav/"+old+"/"):]
+}
+
+func calendarWriteError(err error) error {
+	if errors.Is(err, services.ErrContactNotFound) || errors.Is(err, services.ErrImportantDateNotFound) || errors.Is(err, gorm.ErrRecordNotFound) {
+		return webdav.NewHTTPError(http.StatusNotFound, err)
+	}
+	return err
 }

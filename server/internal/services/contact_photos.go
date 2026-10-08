@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"math"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -58,6 +59,16 @@ func (s *VaultFileService) GetContactPhoto(fileID uint, contactID, vaultID strin
 
 func (s *VaultFileService) DeleteContactPhoto(fileID uint, contactID, vaultID string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Merge locks the owner before moving files. Take the same parent-first
+		// order before a deletion can clear its avatar reference, then recheck
+		// the file's ownership under its lock.
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			// Keep the photo endpoint's existing not-found response for stale paths.
+			if errors.Is(err, ErrContactNotFound) {
+				return ErrFileNotFound
+			}
+			return err
+		}
 		file, err := lockFileForMutation(tx, fileID, vaultID)
 		if err != nil {
 			return err

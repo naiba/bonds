@@ -76,6 +76,9 @@ func (s *LoanService) Create(contactID, vaultID string, req dto.CreateLoanReques
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Create(&loan).Error; err != nil {
 			return err
 		}
@@ -84,15 +87,19 @@ func (s *LoanService) Create(contactID, vaultID string, req dto.CreateLoanReques
 			LoanerID: contactID,
 			LoaneeID: contactID,
 		}
-		return tx.Create(&pivot).Error
+		if err := tx.Create(&pivot).Error; err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			entityType := "Loan"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionLoanCreated, "Created loan: "+req.Name, &loan.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Loan"
-		s.feedRecorder.Record(contactID, "", ActionLoanCreated, "Created loan: "+req.Name, &loan.ID, &entityType)
 	}
 
 	resp := toLoanResponse(&loan)

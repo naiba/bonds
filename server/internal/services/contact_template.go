@@ -29,7 +29,7 @@ func (s *ContactTemplateService) UpdateTemplate(contactID, vaultID, userID strin
 	}
 
 	contact.TemplateID = req.TemplateID
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "template_id"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { App as AntApp, ConfigProvider } from "antd";
@@ -13,6 +13,7 @@ import { RouteLocationProbe } from "@/test/authCompletionRouteProbe";
 import type { AuthenticationCompletion } from "@/stores/auth";
 
 const mockLogin = vi.fn();
+let queryClient: QueryClient;
 const mockWebAuthnLogin = vi.fn<
   (
     authenticate: () => Promise<{ readonly token: string; readonly user: User }>,
@@ -61,7 +62,7 @@ vi.mock("@/stores/theme", () => ({
 }));
 
 function renderLogin(initialEntry = "/login") {
-  const queryClient = new QueryClient({
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
@@ -108,6 +109,7 @@ function mockInstanceInfo(webauthnEnabled = false) {
 
 describe("Login", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.clearAllMocks();
     localStorage.clear();
     mockInstanceInfo();
@@ -118,8 +120,24 @@ describe("Login", () => {
     });
   });
 
+  afterEach(async () => {
+    // Ant Design defers clearing form errors even when navigation unmounts
+    // Login. Flush those updates before jsdom removes window, otherwise the
+    // assertions pass but CI fails with unhandled React timer exceptions.
+    cleanup();
+    queryClient.clear();
+    try {
+      await act(async () => {
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows validation errors on empty submit", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderLogin();
     await user.click(screen.getByRole("button", { name: /sign in/i }));
     expect(
@@ -152,7 +170,7 @@ describe("Login", () => {
   });
 
   it("sends the typed email through the passkey login flow", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockInstanceInfo(true);
     vi.mocked(browserSupportsWebAuthn).mockReturnValue(true);
 
@@ -206,7 +224,7 @@ describe("Login", () => {
 
   it("rejects invalid passkey options before invoking the browser API", async () => {
     // Given
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockInstanceInfo(true);
     vi.mocked(browserSupportsWebAuthn).mockReturnValue(true);
     vi.mocked(api.webauthn.webauthnLoginBeginCreate).mockResolvedValue({
@@ -232,7 +250,7 @@ describe("Login", () => {
   });
 
   it("validates email before starting passkey login", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockInstanceInfo(true);
     vi.mocked(browserSupportsWebAuthn).mockReturnValue(true);
 
@@ -246,7 +264,7 @@ describe("Login", () => {
 
   it("keeps a newer authentication subject when an older passkey login completes", async () => {
     // Given
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockInstanceInfo(true);
     vi.mocked(browserSupportsWebAuthn).mockReturnValue(true);
     const publicKey: PublicKeyCredentialRequestOptionsJSON = {
@@ -291,7 +309,7 @@ describe("Login", () => {
   it("preserves the requested authenticated navigation behavior", async () => {
     // Given
     mockLogin.mockResolvedValue({ status: "authenticated" });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderLogin("/login?redirect=%2Fvaults%2Fexpected");
     await user.type(screen.getByPlaceholderText("Email"), "user@example.com");
     await user.type(screen.getByPlaceholderText("Password"), "password");
@@ -310,7 +328,7 @@ describe("Login", () => {
   it("preserves the two-factor-required navigation behavior", async () => {
     // Given
     mockLogin.mockResolvedValue({ status: "two_factor_required" });
-    const user = userEvent.setup();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderLogin();
     await user.type(screen.getByPlaceholderText("Email"), "user@example.com");
     await user.type(screen.getByPlaceholderText("Password"), "password");

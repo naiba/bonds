@@ -87,17 +87,28 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 		EmotionID:  req.EmotionID,
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body, note.BodyFormat)
+		if err != nil {
+			return err
+		}
+		if err := validateContentMentions(req.Body, note.BodyFormat, "", "", live); err != nil {
+			return err
+		}
 		if err := tx.Create(&note).Error; err != nil {
 			return err
 		}
-		return syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat)
+		if err := syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat); err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			entityType := "Note"
+			if err := NewFeedRecorder(tx).Record(contactID, authorID, ActionNoteCreated, "Created a note", &note.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Note"
-		s.feedRecorder.Record(contactID, authorID, ActionNoteCreated, "Created a note", &note.ID, &entityType)
 	}
 
 	if s.searchService != nil {
@@ -117,10 +128,21 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 	}
 	var note models.Note
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body, req.BodyFormat)
+		if err != nil {
+			return err
+		}
 		if err := tx.Where("id = ? AND contact_id = ? AND vault_id = ?", id, contactID, vaultID).First(&note).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNoteNotFound
 			}
+			return err
+		}
+		format := req.BodyFormat
+		if format == "" {
+			format = note.BodyFormat
+		}
+		if err := validateContentMentions(req.Body, format, note.Body, note.BodyFormat, live); err != nil {
 			return err
 		}
 		note.Title = strPtrOrNil(strings.TrimSpace(req.Title))
@@ -131,17 +153,22 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 			note.BodyFormat = markdown.NormalizeFormat(note.BodyFormat)
 		}
 		note.EmotionID = req.EmotionID
-		if err := tx.Save(&note).Error; err != nil {
+		if err := updateContactRecord(tx, &note, contactID, vaultID, ErrNoteNotFound, "title", "body", "body_format", "emotion_id"); err != nil {
 			return err
 		}
-		return syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat)
+		if err := syncContentFileReferences(tx, vaultID, models.ContentOwnerNote, note.ID, note.Body, note.BodyFormat); err != nil {
+			return err
+		}
+
+		if s.feedRecorder != nil {
+			entityType := "Note"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionNoteUpdated, "Updated a note", &note.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Note"
-		s.feedRecorder.Record(contactID, "", ActionNoteUpdated, "Updated a note", &note.ID, &entityType)
 	}
 
 	if s.searchService != nil {
@@ -157,6 +184,9 @@ func (s *NoteService) Delete(id uint, contactID, vaultID string) error {
 		return err
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		var note models.Note
 		if err := tx.Where("id = ? AND contact_id = ? AND vault_id = ?", id, contactID, vaultID).First(&note).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -168,14 +198,19 @@ func (s *NoteService) Delete(id uint, contactID, vaultID string) error {
 			Delete(&models.ContentFileReference{}).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&note).Error
+		if err := tx.Delete(&note).Error; err != nil {
+			return err
+		}
+
+		if s.feedRecorder != nil {
+			entityType := "Note"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionNoteDeleted, "Deleted a note", &id, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Note"
-		s.feedRecorder.Record(contactID, "", ActionNoteDeleted, "Deleted a note", &id, &entityType)
 	}
 
 	if s.searchService != nil {

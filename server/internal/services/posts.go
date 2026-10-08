@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/markdown"
@@ -139,31 +140,48 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 	}
 	var contactIDs []string
 	associationsProvided := req.Sections != nil || req.ContactIDs != nil
-	if associationsProvided {
-		var err error
-		contactIDs, err = validateAndDedupeContactIDs(postContactIDsFromSections(req.Sections, req.ContactIDs))
-		if err != nil {
-			return nil, err
-		}
-	}
+	// Omitted sections keep their stored mentions authoritative, even when a
+	// caller explicitly sends an empty contact list. Do not detach live text.
+	associationContactsNeedLocking := req.Sections == nil && (req.ContactIDs != nil || req.UpdateLastContacted)
 
-	associationContactsNeedLocking := !associationsProvided && req.UpdateLastContacted
 	var associatedContactIDs []string
 	if associationContactsNeedLocking {
 		var err error
-		associatedContactIDs, err = inVaultPostContactIDs(s.db, id, vaultID)
+		associatedContactIDs, err = storedPostContactIDs(s.db, id, vaultID, req.ContactIDs)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	for attempt := 0; attempt < maxPostUpdateAssociationLockAttempts; attempt++ {
-		err := s.db.Transaction(func(tx *gorm.DB) error {
+		sections, err := postSectionsWithStoredFormats(s.db, id, req.Sections)
+		if err != nil {
+			return nil, err
+		}
+		if associationsProvided && !associationContactsNeedLocking {
+			contactIDs, err = validateAndDedupeContactIDs(postContactIDsFromSections(sections, req.ContactIDs))
+			if err != nil {
+				return nil, err
+			}
+		}
+		err = s.db.Transaction(func(tx *gorm.DB) error {
 			lockedContactIDs := contactIDs
 			if associationContactsNeedLocking {
 				lockedContactIDs = associatedContactIDs
 			}
 			if err := lockContactsBelongToVault(tx, lockedContactIDs, vaultID); err != nil {
+				// A merge can replace stored mentions while this metadata-only request
+				// waits for its parent locks. Retry from current storage, never alias IDs
+				// supplied in an old body or acquire new parents after journal locks.
+				if associationContactsNeedLocking && errors.Is(err, ErrContactNotFound) {
+					currentIDs, readErr := storedPostContactIDs(tx, id, vaultID, req.ContactIDs)
+					if readErr != nil {
+						return readErr
+					}
+					if !equalPostContactIDs(lockedContactIDs, currentIDs) {
+						return errPostContactAssociationsChanged
+					}
+				}
 				return err
 			}
 			if err := lockPostJournal(tx, journalID, vaultID); err != nil {
@@ -174,9 +192,19 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				return err
 			}
 
+			verifiedSections, err := postSectionsWithStoredFormats(tx, id, req.Sections)
+			if err != nil {
+				return err
+			}
+			for i := range sections {
+				if sections[i].ContentFormat != verifiedSections[i].ContentFormat {
+					return errPostContactAssociationsChanged
+				}
+			}
+
 			contactIDsToAdvance := contactIDs
 			if associationContactsNeedLocking {
-				verifiedContactIDs, err := inVaultPostContactIDs(tx, post.ID, vaultID)
+				verifiedContactIDs, err := storedPostContactIDs(tx, post.ID, vaultID, req.ContactIDs)
 				if err != nil {
 					return err
 				}
@@ -203,10 +231,8 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				if err := tx.Where("post_id = ?", id).Find(&existingSections).Error; err != nil {
 					return err
 				}
-				existingFormats := make(map[int]string, len(existingSections))
 				existingSectionIDs := make([]uint, len(existingSections))
 				for index, section := range existingSections {
-					existingFormats[section.Position] = markdown.NormalizeFormat(section.ContentFormat)
 					existingSectionIDs[index] = section.ID
 				}
 				if len(existingSectionIDs) > 0 {
@@ -218,11 +244,8 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				if err := tx.Where("post_id = ?", id).Delete(&models.PostSection{}).Error; err != nil {
 					return err
 				}
-				for _, sec := range req.Sections {
+				for _, sec := range sections {
 					contentFormat := sec.ContentFormat
-					if contentFormat == "" {
-						contentFormat = existingFormats[sec.Position]
-					}
 					section := models.PostSection{
 						PostID:        post.ID,
 						Position:      sec.Position,
@@ -242,7 +265,7 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 				if err := tx.Where("post_id = ?", id).Delete(&models.ContactPost{}).Error; err != nil {
 					return err
 				}
-				if err := createContactPostAssociations(tx, post.ID, contactIDs); err != nil {
+				if err := createContactPostAssociations(tx, post.ID, contactIDsToAdvance); err != nil {
 					return err
 				}
 			}
@@ -264,12 +287,41 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 		if attempt == maxPostUpdateAssociationLockAttempts-1 {
 			return nil, err
 		}
-		associatedContactIDs, err = inVaultPostContactIDs(s.db, id, vaultID)
+		associatedContactIDs, err = storedPostContactIDs(s.db, id, vaultID, req.ContactIDs)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return nil, errPostContactAssociationsChanged
+}
+
+// Omitted section formats retain their stored interpretation, including during
+// association discovery. Recheck under the journal lock before saving a retry.
+func postSectionsWithStoredFormats(db *gorm.DB, postID uint, sections []dto.PostSectionInput) ([]dto.PostSectionInput, error) {
+	resolved := append([]dto.PostSectionInput(nil), sections...)
+	needsStored := false
+	for _, section := range resolved {
+		if section.ContentFormat == "" {
+			needsStored = true
+		}
+	}
+	formats := map[int]string{}
+	if needsStored {
+		var stored []models.PostSection
+		if err := db.Select("position", "content_format").Where("post_id = ?", postID).Find(&stored).Error; err != nil {
+			return nil, err
+		}
+		for _, section := range stored {
+			formats[section.Position] = section.ContentFormat
+		}
+	}
+	for i := range resolved {
+		if resolved[i].ContentFormat == "" {
+			resolved[i].ContentFormat = formats[resolved[i].Position]
+		}
+		resolved[i].ContentFormat = markdown.NormalizeFormat(resolved[i].ContentFormat)
+	}
+	return resolved, nil
 }
 
 // postContactIDsFromSections makes stable inline markers authoritative. The
@@ -278,12 +330,41 @@ func (s *PostService) Update(id uint, journalID uint, vaultID string, req dto.Up
 func postContactIDsFromSections(sections []dto.PostSectionInput, fallback []string) []string {
 	var markerIDs []string
 	for _, section := range sections {
-		markerIDs = append(markerIDs, contactMentionIDs(section.Content)...)
+		markerIDs = append(markerIDs, contactMentionIDs(section.Content, section.ContentFormat)...)
 	}
 	if len(markerIDs) > 0 {
 		return markerIDs
 	}
 	return fallback
+}
+
+// storedPostContactIDs is used both before parent locking and after journal/post
+// locking. Comparing the effective IDs allows partial updates to retry safely
+// when another editor or merge changes the body while they wait.
+func storedPostContactIDs(db *gorm.DB, postID uint, vaultID string, fallback []string) ([]string, error) {
+	// With neither sections nor contact_ids submitted, this is only advancing
+	// existing associations. Historical prose may mention a moved/deleted contact;
+	// do not revalidate that untouched text or write outside the current vault.
+	// Use the same scoped lookup on every lock/retry pass. An explicit list,
+	// including [], still requires validating the stored authoritative mentions.
+	if fallback == nil {
+		return inVaultPostContactIDs(db, postID, vaultID)
+	}
+	var sections []models.PostSection
+	if err := db.Select("content", "content_format").Where("post_id = ?", postID).Find(&sections).Error; err != nil {
+		return nil, err
+	}
+	inputs := make([]dto.PostSectionInput, len(sections))
+	for i, section := range sections {
+		inputs[i].Content = ptrToStr(section.Content)
+		inputs[i].ContentFormat = section.ContentFormat
+	}
+	ids, err := validateAndDedupeContactIDs(postContactIDsFromSections(inputs, fallback))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 func validateJournalBelongsToVault(db *gorm.DB, journalID uint, vaultID string) error {

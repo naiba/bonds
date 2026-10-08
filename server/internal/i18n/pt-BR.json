@@ -454,5 +454,11 @@
   "err.invalid_geocoding_settings": "Provedor ou configuração de geocodificação inválidos",
   "err.failed_to_update_geocoding_settings": "Falha ao atualizar as configurações de geocodificação",
   "err.failed_to_update_geocoding_provider": "Falha ao atualizar o provedor de geocodificação",
-  "err.failed_to_delete_geocoding_provider": "Falha ao redefinir o provedor de geocodificação"
+  "err.failed_to_delete_geocoding_provider": "Falha ao redefinir o provedor de geocodificação",
+  "err.contact_merge_selection": "Selecione um contato para manter e de 1 a 49 contatos diferentes para mesclar.",
+  "err.failed_to_merge_contacts": "Não foi possível mesclar os contatos.",
+  "err.contact_merge_blocked": "Resolve the restrictions shown in the merge review before merging.",
+  "err.contact_merge_review_changed": "The merge review has changed or a conflict choice is missing. Review again before merging.",
+  "err.address_history_ambiguous": "Selecione um período de residência para editar ou excluir este endereço compartilhado.",
+  "err.contact_delete_changed": "As referências do contato mudaram durante a exclusão. Tente novamente."
 }

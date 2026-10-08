@@ -555,6 +555,9 @@ func cleanMovedContactsFromActivities(tx *gorm.DB, contactIDs []string, currentV
 	if len(affectedActivityIDs) == 0 {
 		return nil
 	}
+	if err := lockActivitiesBeforeParticipantRemoval(tx, affectedActivityIDs); err != nil {
+		return err
+	}
 	if err := tx.Where("contact_id IN ?", contactIDs).Delete(&models.ActivityParticipant{}).Error; err != nil {
 		return err
 	}

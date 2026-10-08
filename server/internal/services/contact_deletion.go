@@ -97,22 +97,63 @@ func (s *ContactService) deleteContacts(contactIDs []string, vaultID string) (in
 }
 
 func loadDeletableContacts(tx *gorm.DB, contactIDs []string, vaultID string) ([]models.Contact, error) {
-	lockedContactIDs := append([]string(nil), contactIDs...)
-	sort.Strings(lockedContactIDs)
-
-	var contacts []models.Contact
-	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
-		Where("id IN ? AND vault_id = ?", lockedContactIDs, vaultID).
-		Order("id ASC").
-		Find(&contacts).Error; err != nil {
+	contacts, err := LockContactDeletionOwners(tx, contactIDs, vaultID)
+	if err != nil {
 		return nil, err
-	}
-	if len(contacts) != len(lockedContactIDs) {
-		return nil, ErrContactNotFound
 	}
 	for index := range contacts {
 		if !contacts[index].CanBeDeleted {
 			return nil, ErrContactCannotBeDeleted
+		}
+	}
+	return contacts, nil
+}
+
+// LockContactDeletionOwners fixes the live selection and its incoming introducer
+// owners in global ID order. Call inside the deletion transaction before child
+// writes. HTTP and DAV callers keep their existing authorization and cleanup
+// semantics; neither may let the model hook acquire an unreviewed late parent.
+func LockContactDeletionOwners(tx *gorm.DB, contactIDs []string, vaultID string) ([]models.Contact, error) {
+	lockedContactIDs := append([]string(nil), contactIDs...)
+	sort.Strings(lockedContactIDs)
+
+	// The model's delete hook clears incoming introducer references. Discover
+	// those parents first and lock the whole set in merge's global ID order;
+	// locking just the selection before its referrers can deadlock with merge.
+	var referrerIDs []string
+	if err := tx.Model(&models.Contact{}).Where("first_met_through_contact_id IN ?", lockedContactIDs).Pluck("id", &referrerIDs).Error; err != nil {
+		return nil, err
+	}
+	ownerIDs := append(append([]string(nil), lockedContactIDs...), referrerIDs...)
+	var owners []models.Contact
+	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		Where("id IN ?", ownerIDs).Order("id ASC").Find(&owners).Error; err != nil {
+		return nil, err
+	}
+	selected := make(map[string]bool, len(lockedContactIDs))
+	for _, id := range lockedContactIDs {
+		selected[id] = true
+	}
+	locked := make(map[string]bool, len(owners))
+	contacts := []models.Contact{}
+	for _, owner := range owners {
+		locked[owner.ID] = true
+		if selected[owner.ID] && owner.VaultID == vaultID {
+			contacts = append(contacts, owner)
+		}
+	}
+	if len(contacts) != len(lockedContactIDs) {
+		return nil, ErrContactNotFound
+	}
+	// A referrer can commit between discovery and taking the source lock.
+	// Reject without writes instead of taking a newly discovered lower lock.
+	var currentReferrers []string
+	if err := tx.Model(&models.Contact{}).Where("first_met_through_contact_id IN ?", lockedContactIDs).Pluck("id", &currentReferrers).Error; err != nil {
+		return nil, err
+	}
+	for _, id := range currentReferrers {
+		if !locked[id] {
+			return nil, ErrContactDeleteChanged
 		}
 	}
 	return contacts, nil

@@ -122,6 +122,10 @@ func TestPutAddressObjectRollsBackFailedFieldReplacement(t *testing.T) {
 		}
 	}()
 
+	// Unchanged addresses are now preserved in place; change the address to
+	// exercise the actual replacement failure and transaction rollback.
+	card[vcard.FieldAddress] = nil
+	card.AddAddress(&vcard.Address{StreetAddress: "11 Downing Street", Locality: "London", Country: "United Kingdom"})
 	card.SetValue(vcard.FieldFormattedName, "Changed Person")
 	card.SetName(&vcard.Name{GivenName: "Changed", FamilyName: "Person"})
 	path := "/dav/addressbooks/" + userID + "/" + vaultID + "/" + contact.ID + ".vcf"

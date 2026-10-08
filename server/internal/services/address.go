@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -15,6 +14,7 @@ import (
 )
 
 var ErrAddressNotFound = errors.New("address not found")
+var ErrAddressHistoryAmbiguous = errors.New("select a contact address history")
 
 type AddressService struct {
 	db           *gorm.DB
@@ -84,7 +84,7 @@ func (s *AddressService) List(contactID, vaultID string) ([]dto.AddressResponse,
 		return nil, err
 	}
 	var pivots []models.ContactAddress
-	if err := s.db.Where("contact_id = ?", contactID).Find(&pivots).Error; err != nil {
+	if err := s.db.Where("contact_id = ?", contactID).Order("id ASC").Find(&pivots).Error; err != nil {
 		return nil, err
 	}
 	if len(pivots) == 0 {
@@ -92,10 +92,8 @@ func (s *AddressService) List(contactID, vaultID string) ([]dto.AddressResponse,
 	}
 
 	addressIDs := make([]uint, len(pivots))
-	pivotByAddr := make(map[uint]models.ContactAddress)
 	for i, p := range pivots {
 		addressIDs[i] = p.AddressID
-		pivotByAddr[p.AddressID] = p
 	}
 
 	var addresses []models.Address
@@ -103,11 +101,18 @@ func (s *AddressService) List(contactID, vaultID string) ([]dto.AddressResponse,
 		return nil, err
 	}
 
-	result := make([]dto.AddressResponse, len(addresses))
-	for i, a := range addresses {
-		p := pivotByAddr[a.ID]
-		result[i] = toAddressResponse(&a, p.IsPastAddress, p.DateFrom, p.DateTo)
+	// The identity of a residence period is its pivot, not the shared address.
+	byID := make(map[uint]models.Address, len(addresses))
+	for _, address := range addresses {
+		byID[address.ID] = address
 	}
+	result := make([]dto.AddressResponse, 0, len(pivots))
+	for _, pivot := range pivots {
+		if address, ok := byID[pivot.AddressID]; ok {
+			result = append(result, toAddressResponse(&address, &pivot))
+		}
+	}
+
 	return result, nil
 }
 
@@ -132,11 +137,15 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 	// IsPastAddress to true so the two fields can't disagree silently.
 	isPast := req.IsPastAddress || req.DateTo != nil
 
+	var pivot models.ContactAddress
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Create(&address).Error; err != nil {
 			return err
 		}
-		pivot := models.ContactAddress{
+		pivot = models.ContactAddress{
 			ContactID:     contactID,
 			AddressID:     address.ID,
 			IsPastAddress: isPast,
@@ -149,7 +158,16 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 			return err
 		}
 		if !isPast {
-			return tx.Model(&pivot).Update("is_past_address", false).Error
+			if err := tx.Model(&pivot).Update("is_past_address", false).Error; err != nil {
+				return err
+			}
+		}
+
+		if s.feedRecorder != nil {
+			entityType := "Address"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionAddressAdded, "Added an address", &address.ID, &entityType); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -164,24 +182,20 @@ func (s *AddressService) Create(contactID, vaultID string, req dto.CreateAddress
 		s.tryGeocode(&address, s.geocodingSnapshot())
 	}
 
-	if s.feedRecorder != nil {
-		entityType := "Address"
-		s.feedRecorder.Record(contactID, "", ActionAddressAdded, "Added an address", &address.ID, &entityType)
-	}
-
-	resp := toAddressResponse(&address, isPast, req.DateFrom, req.DateTo)
+	resp := toAddressResponse(&address, &pivot)
 	return &resp, nil
 }
 
 func (s *AddressService) Update(id uint, contactID, vaultID string, req dto.UpdateAddressRequest) (*dto.AddressResponse, error) {
+	return s.UpdateHistory(id, 0, contactID, vaultID, req)
+}
+
+func (s *AddressService) UpdateHistory(id, historyID uint, contactID, vaultID string, req dto.UpdateAddressRequest) (*dto.AddressResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
-	var pivot models.ContactAddress
-	if err := s.db.Where("address_id = ? AND contact_id = ?", id, contactID).First(&pivot).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrAddressNotFound
-		}
+	pivot, err := findContactAddress(s.db, id, historyID, contactID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -239,14 +253,14 @@ func (s *AddressService) Update(id uint, contactID, vaultID string, req dto.Upda
 	}
 
 	isPast := req.IsPastAddress || req.DateTo != nil
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(&address).Error; err != nil {
-			return err
-		}
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		pivot.IsPastAddress = isPast
 		pivot.DateFrom = req.DateFrom
 		pivot.DateTo = req.DateTo
-		return tx.Save(&pivot).Error
+		if err := updateContactRecord(tx, pivot, contactID, vaultID, ErrAddressNotFound, "is_past_address", "date_from", "date_to"); err != nil {
+			return err
+		}
+		return tx.Model(&address).Select("line1", "line2", "city", "province", "postal_code", "country", "address_type_id", "latitude", "longitude", "updated_at").Updates(&address).Error
 	})
 	if err != nil {
 		return nil, err
@@ -261,24 +275,54 @@ func (s *AddressService) Update(id uint, contactID, vaultID string, req dto.Upda
 		s.tryGeocode(&address, runtime)
 	}
 
-	resp := toAddressResponse(&address, isPast, req.DateFrom, req.DateTo)
+	resp := toAddressResponse(&address, pivot)
 	return &resp, nil
 }
 
 func (s *AddressService) Delete(id uint, contactID, vaultID string) error {
+	return s.DeleteHistory(id, 0, contactID, vaultID)
+}
+
+func (s *AddressService) DeleteHistory(id, historyID uint, contactID, vaultID string) error {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return err
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		result := tx.Where("address_id = ? AND contact_id = ?", id, contactID).Delete(&models.ContactAddress{})
+		pivot, err := findContactAddress(tx, id, historyID, contactID)
+		if err != nil {
+			return err
+		}
+		result := tx.Where("id = ? AND contact_id = ?", pivot.ID, contactID).Delete(&models.ContactAddress{})
 		if result.Error != nil {
 			return result.Error
 		}
-		if result.RowsAffected == 0 {
+		if result.RowsAffected != 1 {
 			return ErrAddressNotFound
 		}
-		return tx.Where("id = ?", id).Delete(&models.Address{}).Error
+		// Detach only this residence period. Other contacts and periods still use
+		// the address; removing the shared row would silently erase their data.
+		return tx.Where("id = ? AND NOT EXISTS (?)", id, tx.Model(&models.ContactAddress{}).Select("1").Where("address_id = ?", id)).Delete(&models.Address{}).Error
 	})
+}
+
+func findContactAddress(db *gorm.DB, addressID, historyID uint, contactID string) (*models.ContactAddress, error) {
+	query := db.Where("address_id = ? AND contact_id = ?", addressID, contactID)
+	if historyID != 0 {
+		query = query.Where("id = ?", historyID)
+	}
+	var rows []models.ContactAddress
+	if err := query.Order("id ASC").Limit(2).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, ErrAddressNotFound
+	}
+	// Legacy callers keep using the address ID for an unambiguous history.
+	// Never pick an arbitrary period or delete them all when a selector is missing.
+	if len(rows) > 1 {
+		return nil, ErrAddressHistoryAmbiguous
+	}
+	return &rows[0], nil
 }
 
 // Geocoding precision settings.
@@ -409,24 +453,25 @@ func redactGeocodeError(err error) error {
 	return err
 }
 
-func toAddressResponse(a *models.Address, isPastAddress bool, dateFrom, dateTo *time.Time) dto.AddressResponse {
+func toAddressResponse(a *models.Address, pivot *models.ContactAddress) dto.AddressResponse {
 	return dto.AddressResponse{
-		ID:            a.ID,
-		VaultID:       a.VaultID,
-		Line1:         ptrToStr(a.Line1),
-		Line2:         ptrToStr(a.Line2),
-		City:          ptrToStr(a.City),
-		Province:      ptrToStr(a.Province),
-		PostalCode:    ptrToStr(a.PostalCode),
-		Country:       ptrToStr(a.Country),
-		AddressTypeID: a.AddressTypeID,
-		Latitude:      a.Latitude,
-		Longitude:     a.Longitude,
-		IsPastAddress: isPastAddress,
-		DateFrom:      dateFrom,
-		DateTo:        dateTo,
-		CreatedAt:     a.CreatedAt,
-		UpdatedAt:     a.UpdatedAt,
+		ID:               a.ID,
+		ContactAddressID: pivot.ID,
+		VaultID:          a.VaultID,
+		Line1:            ptrToStr(a.Line1),
+		Line2:            ptrToStr(a.Line2),
+		City:             ptrToStr(a.City),
+		Province:         ptrToStr(a.Province),
+		PostalCode:       ptrToStr(a.PostalCode),
+		Country:          ptrToStr(a.Country),
+		AddressTypeID:    a.AddressTypeID,
+		Latitude:         a.Latitude,
+		Longitude:        a.Longitude,
+		IsPastAddress:    pivot.IsPastAddress,
+		DateFrom:         pivot.DateFrom,
+		DateTo:           pivot.DateTo,
+		CreatedAt:        a.CreatedAt,
+		UpdatedAt:        a.UpdatedAt,
 	}
 }
 

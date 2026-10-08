@@ -4,11 +4,13 @@ import (
 	"container/heap"
 	"errors"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -89,6 +91,9 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 
 	var relationship models.Relationship
 	transactionErr := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockRelationshipContacts(tx, contactID, vaultID, relatedContact); err != nil {
+			return err
+		}
 		if relatedContact.ID == "" {
 			createdContact, err := createExternalRelationshipContact(tx, vaultID, externalContactName)
 			if err != nil {
@@ -123,19 +128,23 @@ func (s *RelationshipService) Create(contactID, vaultID, userID string, req dto.
 			}
 			if s.feedRecorder != nil {
 				entityType := "Relationship"
-				s.feedRecorder.Record(relatedContactID, "", ActionRelationshipAdded, "Added a relationship", &reverse.ID, &entityType)
+				// A separate connection would wait on our own contact FK lock.
+				if err := NewFeedRecorder(tx).Record(relatedContactID, "", ActionRelationshipAdded, "Added a relationship", &reverse.ID, &entityType); err != nil {
+					return err
+				}
 			}
 		}
 
+		if s.feedRecorder != nil {
+			entityType := "Relationship"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionRelationshipAdded, "Added a relationship", &relationship.ID, &entityType); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if transactionErr != nil {
 		return nil, transactionErr
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "Relationship"
-		s.feedRecorder.Record(contactID, "", ActionRelationshipAdded, "Added a relationship", &relationship.ID, &entityType)
 	}
 
 	if err := s.db.Preload("RelationshipType").Preload("RelatedContact").Preload("RelatedContact.Vault").First(&relationship, relationship.ID).Error; err != nil {
@@ -156,7 +165,8 @@ func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
 		return nil, err
 	}
-	if _, err := validateAccessibleRelatedContact(s.db, userID, req.RelatedContactID); err != nil {
+	relatedContact, err := validateAccessibleRelatedContact(s.db, userID, req.RelatedContactID)
+	if err != nil {
 		return nil, ErrContactNotFound
 	}
 	var relationship models.Relationship
@@ -166,9 +176,15 @@ func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto
 		}
 		return nil, err
 	}
+	originalRelatedID := relationship.RelatedContactID
 	relationship.RelationshipTypeID = req.RelationshipTypeID
 	relationship.RelatedContactID = req.RelatedContactID
-	if err := s.db.Save(&relationship).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockRelationshipContacts(tx, contactID, vaultID, relatedContact); err != nil {
+			return err
+		}
+		return updateContactRecord(tx.Where("related_contact_id = ?", originalRelatedID), &relationship, contactID, vaultID, ErrRelationshipNotFound, "relationship_type_id", "related_contact_id")
+	}); err != nil {
 		return nil, err
 	}
 	if err := s.db.Preload("RelationshipType").Preload("RelatedContact").Preload("RelatedContact.Vault").First(&relationship, relationship.ID).Error; err != nil {
@@ -186,31 +202,46 @@ func (s *RelationshipService) Update(id uint, contactID, vaultID string, req dto
 }
 
 func (s *RelationshipService) Delete(id uint, contactID, vaultID string) error {
-	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
-		return err
-	}
-
-	var relationship models.Relationship
-	if err := s.db.Where("id = ? AND contact_id = ?", id, contactID).First(&relationship).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRelationshipNotFound
-		}
-		return err
-	}
-
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Delete(&relationship).Error; err != nil {
+		// Fix the requested owner before reading the pair, as merge/move may
+		// otherwise redirect it between validation and deletion.
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		var relationship models.Relationship
+		if err := tx.Where("id = ? AND contact_id = ?", id, contactID).First(&relationship).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrRelationshipNotFound
+			}
 			return err
 		}
 
-		reverseTypeID, found := findReverseTypeID(tx, relationship.RelationshipTypeID)
-		if found {
-			// Tolerant delete — ignore if reverse doesn't exist
-			tx.Where("contact_id = ? AND related_contact_id = ? AND relationship_type_id = ?",
-				relationship.RelatedContactID, relationship.ContactID, reverseTypeID).
-				Delete(&models.Relationship{})
+		query := tx.Where("id = ?", id)
+		if reverseTypeID, found := findReverseTypeID(tx, relationship.RelationshipTypeID); found {
+			query = query.Or("contact_id = ? AND related_contact_id = ? AND relationship_type_id = ?",
+				relationship.RelatedContactID, contactID, reverseTypeID)
 		}
-
+		// Deleting the selected direction first may lock the larger ID before
+		// its reverse, opposing merge and deletion from the other direction.
+		// Lock the complete pair in the same global order before either DELETE.
+		var pair []models.Relationship
+		if err := query.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Order("id ASC").Find(&pair).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&relationship).Error; err != nil {
+			return err
+		}
+		reverseIDs := []uint{}
+		for _, reverse := range pair {
+			if reverse.ID != id {
+				reverseIDs = append(reverseIDs, reverse.ID)
+			}
+		}
+		// Preserve cross-vault reverse cleanup without requiring permission to
+		// edit that vault; a cleanup failure must roll back both directions.
+		if len(reverseIDs) > 0 {
+			return tx.Where("id IN ?", reverseIDs).Delete(&models.Relationship{}).Error
+		}
 		return nil
 	})
 }
@@ -514,4 +545,20 @@ func (s *RelationshipService) ListContactsAcrossVaults(userID string) ([]dto.Cro
 		})
 	}
 	return result, nil
+}
+
+// Both ends can be merged, including the viewer-only end of a one-way
+// relationship. Locking its identity does not grant permission to edit its data.
+func lockRelationshipContacts(tx *gorm.DB, contactID, vaultID string, relatedContact *models.Contact) error {
+	owners := []models.Contact{{ID: contactID, VaultID: vaultID}}
+	if relatedContact.ID != "" {
+		owners = append(owners, *relatedContact)
+	}
+	sort.Slice(owners, func(i, j int) bool { return owners[i].ID < owners[j].ID })
+	for _, owner := range owners {
+		if err := lockContactsBelongToVault(tx, []string{owner.ID}, owner.VaultID); err != nil {
+			return err
+		}
+	}
+	return nil
 }

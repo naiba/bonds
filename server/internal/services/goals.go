@@ -42,7 +42,7 @@ func (s *GoalService) Create(contactID, vaultID string, req dto.CreateGoalReques
 		ContactID: contactID,
 		Name:      req.Name,
 	}
-	if err := s.db.Create(&goal).Error; err != nil {
+	if err := createContactRecord(s.db, &goal, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	resp := toGoalResponse(&goal)
@@ -81,7 +81,7 @@ func (s *GoalService) Update(id uint, contactID, vaultID string, req dto.UpdateG
 	if req.Active != nil {
 		goal.Active = *req.Active
 	}
-	if err := s.db.Save(&goal).Error; err != nil {
+	if err := updateContactRecord(s.db, &goal, contactID, vaultID, ErrGoalNotFound, "name", "active"); err != nil {
 		return nil, err
 	}
 	resp := toGoalResponse(&goal)

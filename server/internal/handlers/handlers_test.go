@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -7713,5 +7714,433 @@ func TestAdmin_GetSettings_RedactsSecrets(t *testing.T) {
 				t.Errorf("expected redaction sentinel for smtp.password, got %q", item.Value)
 			}
 		}
+	}
+}
+
+func TestContactMergeAuthorizationValidationAndResponse(t *testing.T) {
+	ts := setupTestServer(t)
+	token, auth := ts.registerTestUser(t, "merge-handler@example.test")
+	vault := ts.createTestVault(t, token, "Merge Vault")
+	target := ts.createTestContact(t, token, vault.ID, "Alice")
+	source := ts.createTestContact(t, token, vault.ID, "Alicia")
+	otherVault := ts.createTestVault(t, token, "Separate Vault")
+	other := ts.createTestContact(t, token, otherVault.ID, "Other")
+	route := fmt.Sprintf("/api/vaults/%s/contacts/merge", vault.ID)
+	body := fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, source.ID)
+	for _, test := range []struct {
+		name, token, body string
+		status            int
+	}{
+		{"anonymous", "", body, http.StatusUnauthorized},
+		{"self", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, target.ID), http.StatusBadRequest},
+		{"empty", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[]}`, target.ID), http.StatusBadRequest},
+		{"other vault", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, other.ID), http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			rec := ts.doRequest(http.MethodPost, route, test.body, test.token)
+			if rec.Code != test.status {
+				t.Fatalf("want %d got %d: %s", test.status, rec.Code, rec.Body.String())
+			}
+			if parseResponse(t, rec).Success {
+				t.Fatal("failure response marked successful")
+			}
+		})
+	}
+	if err := ts.db.Model(&models.UserVault{}).Where("user_id = ? AND vault_id = ?", auth.User.ID, vault.ID).Update("permission", models.PermissionViewer).Error; err != nil {
+		t.Fatal(err)
+	}
+	rec := ts.doRequest(http.MethodPost, route, body, token)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("viewer merge got %d: %s", rec.Code, rec.Body.String())
+	}
+	var count int64
+	if err := ts.db.Model(&models.Contact{}).Where("vault_id = ?", vault.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatal("rejected requests changed contacts")
+	}
+	if err := ts.db.Model(&models.UserVault{}).Where("user_id = ? AND vault_id = ?", auth.User.ID, vault.ID).Update("permission", models.PermissionEditor).Error; err != nil {
+		t.Fatal(err)
+	}
+	previewResponse := ts.doRequest(http.MethodPost, route+"/preview", body, token)
+	if previewResponse.Code != http.StatusOK {
+		t.Fatalf("preview: %s", previewResponse.Body.String())
+	}
+	var preview dto.ContactMergePreview
+	if err := json.Unmarshal(parseResponse(t, previewResponse).Data, &preview); err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Blockers) != 0 || preview.ReviewToken == "" {
+		t.Fatalf("invalid review: %+v", preview)
+	}
+	requestBody, err := json.Marshal(dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}, ReviewToken: preview.ReviewToken, FieldChoices: map[string]string{"first_name": target.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body = string(requestBody)
+	rec = ts.doRequest(http.MethodPost, route, body, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("editor merge got %d: %s", rec.Code, rec.Body.String())
+	}
+	response := parseResponse(t, rec)
+	var merged dto.ContactResponse
+	if err := json.Unmarshal(response.Data, &merged); err != nil {
+		t.Fatal(err)
+	}
+	if !response.Success || merged.ID != target.ID || merged.FirstName != "Alice" {
+		t.Fatalf("wrong merge response: %+v", merged)
+	}
+	for _, test := range []struct {
+		id     string
+		status int
+	}{{target.ID, http.StatusOK}, {source.ID, http.StatusNotFound}} {
+		rec := ts.doRequest(http.MethodGet, fmt.Sprintf("/api/vaults/%s/contacts/%s", vault.ID, test.id), "", token)
+		if rec.Code != test.status {
+			t.Fatalf("contact %s: want %d got %d", test.id, test.status, rec.Code)
+		}
+	}
+}
+
+func TestAddressHistorySelectorPreservesSharedResidences(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "residence-history@example.test")
+	vault := ts.createTestVault(t, token, "Residence histories")
+	contact := ts.createTestContact(t, token, vault.ID, "Alice")
+	neighbor := ts.createTestContact(t, token, vault.ID, "Bob")
+	address := models.Address{VaultID: vault.ID, City: func() *string { v := "London"; return &v }()}
+	if err := ts.db.Create(&address).Error; err != nil {
+		t.Fatal(err)
+	}
+	first := models.ContactAddress{ContactID: contact.ID, AddressID: address.ID, IsPastAddress: true}
+	second := models.ContactAddress{ContactID: contact.ID, AddressID: address.ID}
+	shared := models.ContactAddress{ContactID: neighbor.ID, AddressID: address.ID}
+	for _, p := range []*models.ContactAddress{&first, &second, &shared} {
+		if err := ts.db.Create(p).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	base := fmt.Sprintf("/api/vaults/%s/contacts/%s/addresses", vault.ID, contact.ID)
+	rec := ts.doRequest(http.MethodGet, base, "", token)
+	if rec.Code != 200 {
+		t.Fatalf("list: %d %s", rec.Code, rec.Body.String())
+	}
+	var listed []dto.AddressResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &listed); err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 2 || listed[0].ID != address.ID || listed[1].ID != address.ID || listed[0].ContactAddressID == listed[1].ContactAddressID {
+		t.Fatalf("histories not distinct: %+v", listed)
+	}
+	endpoint := fmt.Sprintf("%s/%d", base, address.ID)
+	for _, method := range []string{http.MethodPut, http.MethodDelete} {
+		rec = ts.doRequest(method, endpoint, `{"city":"London"}`, token)
+		if rec.Code != http.StatusConflict {
+			t.Fatalf("ambiguous %s: %d %s", method, rec.Code, rec.Body.String())
+		}
+	}
+	for _, selector := range []string{"0", "invalid", fmt.Sprint(shared.ID)} {
+		rec = ts.doRequest(http.MethodDelete, endpoint+"?contact_address_id="+selector, "", token)
+		expected := http.StatusBadRequest
+		if selector == fmt.Sprint(shared.ID) {
+			expected = http.StatusNotFound
+		}
+		if rec.Code != expected {
+			t.Fatalf("selector %s: %d %s", selector, rec.Code, rec.Body.String())
+		}
+	}
+	selected := fmt.Sprintf("%s?contact_address_id=%d", endpoint, first.ID)
+	rec = ts.doRequest(http.MethodPut, selected, `{"city":"London","date_from":"2010-01-01T00:00:00Z","is_past_address":true}`, token)
+	if rec.Code != 200 {
+		t.Fatalf("update: %d %s", rec.Code, rec.Body.String())
+	}
+	var updated dto.AddressResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &updated); err != nil {
+		t.Fatal(err)
+	}
+	wantDate := time.Date(2010, time.January, 1, 0, 0, 0, 0, time.UTC)
+	if updated.ContactAddressID != first.ID || updated.DateFrom == nil || !updated.DateFrom.Equal(wantDate) || !updated.IsPastAddress {
+		t.Fatalf("selected period response was not updated: %+v", updated)
+	}
+	var selectedHistory models.ContactAddress
+	if err := ts.db.First(&selectedHistory, first.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if selectedHistory.ContactID != contact.ID || selectedHistory.AddressID != address.ID || selectedHistory.DateFrom == nil || !selectedHistory.DateFrom.Equal(wantDate) || !selectedHistory.IsPastAddress {
+		t.Fatalf("selected period was not persisted: %+v", selectedHistory)
+	}
+	var saved models.ContactAddress
+	if err := ts.db.First(&saved, second.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if saved.DateFrom != nil || saved.IsPastAddress {
+		t.Fatalf("other period changed: %+v", saved)
+	}
+	rec = ts.doRequest(http.MethodDelete, selected, "", token)
+	if rec.Code != 204 {
+		t.Fatalf("delete: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodDelete, endpoint, "", token)
+	if rec.Code != 204 {
+		t.Fatalf("legacy single history delete: %d %s", rec.Code, rec.Body.String())
+	}
+	var stillShared models.Address
+	if err := ts.db.First(&stillShared, address.ID).Error; err != nil {
+		t.Fatalf("neighbor's address was deleted: %v", err)
+	}
+	var count int64
+	if err := ts.db.Model(&models.ContactAddress{}).Where("address_id = ?", address.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("remaining histories=%d want=1", count)
+	}
+	neighborEndpoint := fmt.Sprintf("/api/vaults/%s/contacts/%s/addresses/%d", vault.ID, neighbor.ID, address.ID)
+	rec = ts.doRequest(http.MethodDelete, neighborEndpoint, "", token)
+	if rec.Code != 204 {
+		t.Fatalf("last delete: %d %s", rec.Code, rec.Body.String())
+	}
+	if err := ts.db.Model(&models.Address{}).Where("id = ?", address.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("unused address retained")
+	}
+}
+
+func TestAvatarRoutesPreserveConcurrentMerge(t *testing.T) {
+	for _, method := range []string{http.MethodPut, http.MethodDelete} {
+		for _, editSource := range []bool{true, false} {
+			name := "survivor"
+			if editSource {
+				name = "source"
+			}
+			t.Run(method+"/"+name, func(t *testing.T) {
+				ts := setupTestServerWithStorage(t)
+				token, auth := ts.registerTestUser(t, "avatar-merge@example.test")
+				vault := ts.createTestVault(t, token, "Avatar Merge")
+				target := ts.createTestContact(t, token, vault.ID, "Survivor")
+				source := ts.createTestContact(t, token, vault.ID, "Duplicate")
+				if err := ts.db.Model(&models.Contact{}).Where("id = ?", source.ID).Update("nickname", "Adopted nickname").Error; err != nil {
+					t.Fatal(err)
+				}
+				requestedID := target.ID
+				if editSource {
+					requestedID = source.ID
+				}
+				loaded, resume := make(chan struct{}), make(chan struct{})
+				var paused atomic.Bool
+				hook := "avatar:pause_route_contact_read"
+				if err := ts.db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
+					if contact, ok := tx.Statement.Dest.(*models.Contact); ok && contact.ID == requestedID && tx.Error == nil && paused.CompareAndSwap(false, true) {
+						close(loaded)
+						select {
+						case <-resume:
+						case <-time.After(10 * time.Second):
+							tx.AddError(fmt.Errorf("avatar test scheduling timeout"))
+						}
+					}
+				}); err != nil {
+					t.Fatal(err)
+				}
+				defer ts.db.Callback().Query().Remove(hook)
+				var body bytes.Buffer
+				writer := multipart.NewWriter(&body)
+				headers := make(textproto.MIMEHeader)
+				headers.Set("Content-Disposition", `form-data; name="file"; filename="synthetic.png"`)
+				headers.Set("Content-Type", "image/png")
+				part, err := writer.CreatePart(headers)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := part.Write([]byte("synthetic-avatar")); err != nil {
+					t.Fatal(err)
+				}
+				if err := writer.Close(); err != nil {
+					t.Fatal(err)
+				}
+				request := httptest.NewRequest(method, "/api/vaults/"+vault.ID+"/contacts/"+requestedID+"/avatar", &body)
+				request.Header.Set("Authorization", "Bearer "+token)
+				request.Header.Set("Content-Type", writer.FormDataContentType())
+				result := make(chan *httptest.ResponseRecorder, 1)
+				go func() { record := httptest.NewRecorder(); ts.e.ServeHTTP(record, request); result <- record }()
+				select {
+				case <-loaded:
+				case <-time.After(10 * time.Second):
+					close(resume)
+					t.Fatal("avatar route did not read contact")
+				}
+				svc := services.NewContactService(ts.db)
+				mergeRequest := dto.MergeContactsRequest{TargetContactID: target.ID, SourceContactIDs: []string{source.ID}, FieldChoices: map[string]string{"first_name": target.ID}}
+				preview, err := svc.PreviewContactMerge(vault.ID, auth.User.ID, mergeRequest)
+				if err != nil {
+					close(resume)
+					t.Fatal(err)
+				}
+				mergeRequest.ReviewToken = preview.ReviewToken
+				_, mergeErr := svc.MergeContacts(vault.ID, auth.User.ID, mergeRequest)
+				close(resume)
+				if mergeErr != nil {
+					t.Fatal(mergeErr)
+				}
+				var response *httptest.ResponseRecorder
+				select {
+				case response = <-result:
+				case <-time.After(10 * time.Second):
+					t.Fatal("avatar request did not finish")
+				}
+				expected := http.StatusNoContent
+				if method == http.MethodPut {
+					expected = http.StatusOK
+				}
+				if editSource {
+					expected = http.StatusNotFound
+				}
+				if response.Code != expected {
+					t.Fatalf("expected %d got %d: %s", expected, response.Code, response.Body.String())
+				}
+				var tombstone, survivor models.Contact
+				if err := ts.db.Unscoped().First(&tombstone, "id = ?", source.ID).Error; err != nil {
+					t.Fatal(err)
+				}
+				if !tombstone.DeletedAt.Valid {
+					t.Fatal("avatar route resurrected merged source")
+				}
+				if err := ts.db.First(&survivor, "id = ?", target.ID).Error; err != nil {
+					t.Fatal(err)
+				}
+				if survivor.Nickname == nil || *survivor.Nickname != "Adopted nickname" {
+					t.Fatal("avatar route overwrote merged profile")
+				}
+				var files []models.File
+				if err := ts.db.Where("vault_id = ?", vault.ID).Find(&files).Error; err != nil {
+					t.Fatal(err)
+				}
+				expectedFiles := 0
+				if method == http.MethodPut && !editSource {
+					expectedFiles = 1
+				}
+				if len(files) != expectedFiles {
+					t.Fatalf("file rows=%d expected=%d", len(files), expectedFiles)
+				}
+				entries, err := os.ReadDir(ts.cfg.Storage.UploadDir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(entries) != expectedFiles {
+					t.Fatalf("upload cleanup left %d files expected %d", len(entries), expectedFiles)
+				}
+				if expectedFiles == 1 && (survivor.FileID == nil || *survivor.FileID != files[0].ID || files[0].UfileableID == nil || *files[0].UfileableID != target.ID) {
+					t.Fatal("avatar was not assigned to survivor")
+				}
+				stalePhoto := ts.doRequest(http.MethodDelete, "/api/vaults/"+vault.ID+"/contacts/"+source.ID+"/photos/999999", "", token)
+				if stalePhoto.Code != http.StatusNotFound {
+					t.Fatalf("stale photo route returned %d", stalePhoto.Code)
+				}
+			})
+		}
+	}
+}
+
+func TestContactDeletionRoutesRejectNewIntroducerReferences(t *testing.T) {
+	for _, bulk := range []bool{false, true} {
+		name := "single"
+		if bulk {
+			name = "bulk"
+		}
+		t.Run(name, func(t *testing.T) {
+			ts := setupTestServer(t)
+			if ts.db.Dialector.Name() != "postgres" {
+				t.Skip("PostgreSQL reference creation between discovery and parent locks")
+			}
+			token, auth := ts.registerTestUser(t, "delete-references@example.test")
+			vault := ts.createTestVault(t, token, "Deletion references")
+			source := ts.createTestContact(t, token, vault.ID, "Introducer")
+			discovered, resume := make(chan struct{}), make(chan struct{})
+			var paused atomic.Bool
+			hook := "deletion:pause_reference_discovery"
+			if err := ts.db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
+				if _, ok := tx.Statement.Dest.(*[]string); !ok {
+					return
+				}
+				if tx.Statement.Table == "contacts" && strings.Contains(tx.Statement.SQL.String(), "first_met_through_contact_id") && tx.Error == nil && paused.CompareAndSwap(false, true) {
+					close(discovered)
+					select {
+					case <-resume:
+					case <-time.After(10 * time.Second):
+						tx.AddError(fmt.Errorf("reference discovery timeout"))
+					}
+				}
+			}); err != nil {
+				t.Fatal(err)
+			}
+			defer ts.db.Callback().Query().Remove(hook)
+			path := "/api/vaults/" + vault.ID + "/contacts/" + source.ID
+			body := ""
+			if bulk {
+				path = "/api/vaults/" + vault.ID + "/contacts"
+				body = fmt.Sprintf(`{"contact_ids":[%q]}`, source.ID)
+			}
+			finished := make(chan *httptest.ResponseRecorder, 1)
+			go func() { finished <- ts.doRequest(http.MethodDelete, path, body, token) }()
+			select {
+			case <-discovered:
+			case <-time.After(10 * time.Second):
+				close(resume)
+				t.Fatal("deletion did not discover references")
+			}
+			late, err := services.NewContactService(ts.db).CreateContact(vault.ID, auth.User.ID, dto.CreateContactRequest{FirstName: "New referrer", FirstMetThroughContactID: &source.ID})
+			close(resume)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var result *httptest.ResponseRecorder
+			select {
+			case result = <-finished:
+			case <-time.After(10 * time.Second):
+				t.Fatal("deletion did not finish")
+			}
+			if result.Code != http.StatusConflict {
+				t.Fatalf("expected conflict got %d: %s", result.Code, result.Body.String())
+			}
+			response := parseResponse(t, result)
+			if response.Success || response.Error == nil || response.Error.Code != "CONFLICT" || response.Error.Message != "Contact references changed during deletion. Please try again." {
+				t.Fatalf("unexpected conflict response: %+v", response)
+			}
+			var stored models.Contact
+			if err := ts.db.First(&stored, "id = ?", late.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.FirstMetThroughContactID == nil || *stored.FirstMetThroughContactID != source.ID {
+				t.Fatal("rejected deletion cleared new reference")
+			}
+			var count int64
+			if err := ts.db.Model(&models.Contact{}).Where("id = ?", source.ID).Count(&count).Error; err != nil {
+				t.Fatal(err)
+			}
+			if count != 1 {
+				t.Fatal("rejected deletion removed source")
+			}
+			retry := ts.doRequest(http.MethodDelete, path, body, token)
+			expected := http.StatusNoContent
+			if bulk {
+				expected = http.StatusOK
+			}
+			if retry.Code != expected {
+				t.Fatalf("retry failed: %d %s", retry.Code, retry.Body.String())
+			}
+			if err := ts.db.First(&stored, "id = ?", late.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			if stored.FirstMetThroughContactID != nil {
+				t.Fatal("retry did not clear reference")
+			}
+			if err := ts.db.Model(&models.Contact{}).Where("id = ?", source.ID).Count(&count).Error; err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatal("retry left source active")
+			}
+		})
 	}
 }

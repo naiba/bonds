@@ -245,7 +245,7 @@ describe("JournalDetail", () => {
             position: 0,
           },
         ],
-        contact_ids: [CONTACT_ID],
+        contact_ids: [],
         update_last_contacted: false,
       });
     });

@@ -46,3 +46,16 @@ func TestExtractFileIDs(t *testing.T) {
 		t.Fatalf("ExtractFileIDs = %v, want [12 13]", got)
 	}
 }
+
+func TestRenderContactLinksFromBothEditors(t *testing.T) {
+	const id = "550e8400-e29b-41d4-a716-446655440000"
+	for _, format := range []string{FormatPlain, FormatMarkdown} {
+		for _, prefix := range []string{"", "@"} {
+			body := "Met " + prefix + "[Alice](contact:" + id + ")"
+			got := Render(body, format)
+			if !strings.Contains(got, `data-bonds-contact="`+id+`"`) || !strings.Contains(got, `>Alice</span>`) || strings.Contains(got, "@") {
+				t.Errorf("format=%s body=%q rendered=%s", format, body, got)
+			}
+		}
+	}
+}

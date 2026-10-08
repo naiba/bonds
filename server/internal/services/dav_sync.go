@@ -261,8 +261,12 @@ func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID st
 		})
 		if syncErr == nil {
 			s.processIncrementalSync(ctx, client, syncResp, sub, addressBookPath, vaultID, userID, accountID, result)
-			if err := s.clientService.UpdateSyncStatus(sub.ID, &syncResp.SyncToken); err != nil {
-				log.Printf("[dav-sync] failed to update sync status: %v", err)
+			// Failed replacements must remain pending; advancing the checkpoint
+			// would acknowledge remote data that the local transaction rejected.
+			if result.Errors == 0 {
+				if err := s.clientService.UpdateSyncStatus(sub.ID, &syncResp.SyncToken); err != nil {
+					log.Printf("[dav-sync] failed to update sync status: %v", err)
+				}
 			}
 			return result, nil
 		}
@@ -372,8 +376,10 @@ func (s *DavSyncService) performFullSync(
 			}
 		}
 
-		if err := s.clientService.UpdateSyncStatus(sub.ID, &syncResp.SyncToken); err != nil {
-			log.Printf("[dav-sync] failed to update sync status: %v", err)
+		if result.Errors == 0 {
+			if err := s.clientService.UpdateSyncStatus(sub.ID, &syncResp.SyncToken); err != nil {
+				log.Printf("[dav-sync] failed to update sync status: %v", err)
+			}
 		}
 		return
 	}
@@ -399,8 +405,10 @@ func (s *DavSyncService) performFullSync(
 		s.upsertFromObject(obj, sub.ID, vaultID, userID, accountID, sub.LastSynchronizedAt, result)
 	}
 
-	if err := s.clientService.UpdateSyncStatus(sub.ID, nil); err != nil {
-		log.Printf("[dav-sync] failed to update sync status: %v", err)
+	if result.Errors == 0 {
+		if err := s.clientService.UpdateSyncStatus(sub.ID, nil); err != nil {
+			log.Printf("[dav-sync] failed to update sync status: %v", err)
+		}
 	}
 }
 
@@ -543,7 +551,16 @@ func (s *DavSyncService) processDeletedPaths(
 			continue
 		}
 
-		if err := s.db.Delete(&contact).Error; err != nil {
+		// Remote deletion also invokes the introducer cleanup hook. Keep the
+		// same ordered parent locks as local deletion without adding REST-only
+		// cleanup or changing pull-only unlink semantics.
+		if err := s.db.Transaction(func(tx *gorm.DB) error {
+			owners, err := LockContactDeletionOwners(tx, []string{contactID}, vaultID)
+			if err != nil {
+				return err
+			}
+			return tx.Delete(&owners[0]).Error
+		}); err != nil {
 			errMsg := fmt.Sprintf("delete failed: %v", err)
 			s.logSyncAction(subID, &contactID, ptrToStr(contact.DistantURI), "", "error", errMsg)
 			result.Errors++

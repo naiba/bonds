@@ -47,7 +47,7 @@ func (s *PetService) Create(contactID, vaultID string, req dto.CreatePetRequest)
 		PetCategoryID: req.PetCategoryID,
 		Name:          strPtrOrNil(req.Name),
 	}
-	if err := s.db.Create(&pet).Error; err != nil {
+	if err := createContactRecord(s.db, &pet, contactID, vaultID); err != nil {
 		return nil, err
 	}
 	pet.PetCategory = *petCategory
@@ -72,7 +72,7 @@ func (s *PetService) Update(id uint, contactID, vaultID string, req dto.UpdatePe
 	}
 	pet.PetCategoryID = req.PetCategoryID
 	pet.Name = strPtrOrNil(req.Name)
-	if err := s.db.Save(&pet).Error; err != nil {
+	if err := updateContactRecord(s.db, &pet, contactID, vaultID, ErrPetNotFound, "pet_category_id", "name"); err != nil {
 		return nil, err
 	}
 	pet.PetCategory = *petCategory

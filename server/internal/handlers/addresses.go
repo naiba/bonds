@@ -81,8 +81,22 @@ func (h *AddressHandler) Create(c *echo.Context) error {
 	return response.Created(c, address)
 }
 
+func addressHistoryID(c *echo.Context) (uint, error) {
+	value := c.QueryParam("contact_address_id")
+	if value == "" {
+		return 0, nil
+	}
+	id, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || id == 0 {
+		return 0, errors.New("invalid contact address history ID")
+	}
+	return uint(id), nil
+}
+
 // Update godoc
 //
+//	@Param contact_address_id query integer false "Residence history ID; required when an address has multiple histories"
+//	@Failure 409 {object} response.APIResponse
 //	@Summary		Update an address
 //	@Description	Update an existing address for a contact
 //	@Tags			addresses
@@ -112,10 +126,17 @@ func (h *AddressHandler) Update(c *echo.Context) error {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
 
-	address, err := h.addressService.Update(uint(id), contactID, vaultID, req)
+	historyID, err := addressHistoryID(c)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_address_id", nil)
+	}
+	address, err := h.addressService.UpdateHistory(uint(id), historyID, contactID, vaultID, req)
 	if err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrAddressHistoryAmbiguous) {
+			return response.Conflict(c, "err.address_history_ambiguous")
 		}
 		if errors.Is(err, services.ErrAddressNotFound) {
 			return response.NotFound(c, "err.address_not_found")
@@ -127,6 +148,8 @@ func (h *AddressHandler) Update(c *echo.Context) error {
 
 // Delete godoc
 //
+//	@Param contact_address_id query integer false "Residence history ID; required when an address has multiple histories"
+//	@Failure 409 {object} response.APIResponse
 //	@Summary		Delete an address
 //	@Description	Delete an address from a contact
 //	@Tags			addresses
@@ -149,9 +172,16 @@ func (h *AddressHandler) Delete(c *echo.Context) error {
 		return response.BadRequest(c, "err.invalid_address_id", nil)
 	}
 
-	if err := h.addressService.Delete(uint(id), contactID, vaultID); err != nil {
+	historyID, err := addressHistoryID(c)
+	if err != nil {
+		return response.BadRequest(c, "err.invalid_address_id", nil)
+	}
+	if err := h.addressService.DeleteHistory(uint(id), historyID, contactID, vaultID); err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrAddressHistoryAmbiguous) {
+			return response.Conflict(c, "err.address_history_ambiguous")
 		}
 		if errors.Is(err, services.ErrAddressNotFound) {
 			return response.NotFound(c, "err.address_not_found")

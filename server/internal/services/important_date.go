@@ -44,6 +44,9 @@ func (s *ImportantDateService) List(contactID, vaultID string) ([]dto.ImportantD
 func (s *ImportantDateService) Create(contactID, vaultID string, req dto.CreateImportantDateRequest) (*dto.ImportantDateResponse, error) {
 	var result *dto.ImportantDateResponse
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		var err error
 		result, err = NewImportantDateService(tx).create(contactID, vaultID, req)
 		return err
@@ -117,6 +120,12 @@ func (s *ImportantDateService) create(contactID, vaultID string, req dto.CreateI
 func (s *ImportantDateService) Update(id uint, contactID, vaultID string, req dto.UpdateImportantDateRequest) (*dto.ImportantDateResponse, error) {
 	var result *dto.ImportantDateResponse
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Reminder creation takes a contact FK lock. Acquire the parent before
+		// the date row, matching merge order instead of forming a lock cycle.
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+
 		var err error
 		result, err = NewImportantDateService(tx).update(id, contactID, vaultID, req)
 		return err
@@ -176,7 +185,11 @@ func (s *ImportantDateService) update(id uint, contactID, vaultID string, req dt
 	if err := validateImportantDateCalendarDay(&date); err != nil {
 		return nil, err
 	}
-	if err := s.db.Save(&date).Error; err != nil {
+	if err := updateContactRecord(s.db, &date, contactID, vaultID, ErrImportantDateNotFound,
+		"label", "date_precision", "is_year_unknown", "day",
+		"month", "year", "contact_important_date_type_id", "calendar_type",
+		"original_day", "original_month", "original_year",
+	); err != nil {
 		return nil, err
 	}
 
@@ -219,6 +232,11 @@ func (s *ImportantDateService) update(id uint, contactID, vaultID string, req dt
 
 func (s *ImportantDateService) Delete(id uint, contactID, vaultID string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Deleting reminders before their date must not race a merge that moves
+		// the date before its reminders; both operations lock the parent first.
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		return NewImportantDateService(tx).delete(id, contactID, vaultID)
 	})
 }
@@ -289,7 +307,7 @@ func (s *ImportantDateService) ensureReminder(contactID string, date *models.Con
 		existing.OriginalDay = date.OriginalDay
 		existing.OriginalMonth = date.OriginalMonth
 		existing.OriginalYear = date.OriginalYear
-		if err := s.db.Save(&existing).Error; err != nil {
+		if err := s.db.Model(&existing).Select("label", "day", "month", "year", "calendar_type", "original_day", "original_month", "original_year", "updated_at").Updates(&existing).Error; err != nil {
 			return err
 		}
 		return reschedulePendingReminder(s.db, &existing)
@@ -368,4 +386,34 @@ func validateImportantDateCalendarDay(date *models.ContactImportantDate) error {
 		return ErrImportantDateInvalidPrecision
 	}
 	return nil
+}
+
+// UpdateCalendarFields applies the fields writable through a calendar projection.
+// Re-read under the parent lock: saving a preloaded date after a merge would
+// restore its old ContactID and detach it from its migrated reminders.
+func (s *ImportantDateService) UpdateCalendarFields(id uint, contactID, vaultID, label string, day, month, year *int) (*models.ContactImportantDate, error) {
+	var date models.ContactImportantDate
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Where("id = ? AND contact_id = ?", id, contactID).First(&date).Error; err != nil {
+			return err
+		}
+		date.Label, date.Day, date.Month, date.Year = label, day, month, year
+		if err := updateContactRecord(tx, &date, contactID, vaultID, ErrImportantDateNotFound, "label", "day", "month", "year"); err != nil {
+			return err
+		}
+		if date.RemindMe {
+			if importantDateCanScheduleReminder(&date) {
+				return NewImportantDateService(tx).ensureReminder(contactID, &date)
+			}
+			if err := tx.Model(&date).Update("remind_me", false).Error; err != nil {
+				return err
+			}
+			return NewImportantDateService(tx).removeReminder(contactID, date.ID)
+		}
+		return nil
+	})
+	return &date, err
 }

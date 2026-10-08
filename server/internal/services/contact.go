@@ -17,6 +17,7 @@ var (
 	ErrContactNotFound        = errors.New("contact not found")
 	ErrContactNameRequired    = errors.New("contact first name or nickname required")
 	ErrContactDeleteEmpty     = errors.New("contact delete list is empty")
+	ErrContactDeleteChanged   = errors.New("contact references changed during deletion")
 	ErrContactCannotBeDeleted = errors.New("contact cannot be deleted")
 )
 
@@ -186,6 +187,11 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if contact.FirstMetThroughContactID != nil {
+			if err := lockContactsBelongToVault(tx, []string{*contact.FirstMetThroughContactID}, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := tx.Create(&contact).Error; err != nil {
 			return err
 		}
@@ -209,6 +215,13 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 				return err
 			}
 		}
+
+		if s.feedRecorder != nil {
+			desc := "Created contact " + req.FirstName
+			if err := NewFeedRecorder(tx).Record(contact.ID, userID, ActionContactCreated, desc, nil, nil); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -221,11 +234,6 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	formatter, err := newContactNameFormatter(s.db, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		desc := "Created contact " + req.FirstName
-		s.feedRecorder.Record(contact.ID, userID, ActionContactCreated, desc, nil, nil)
 	}
 
 	if s.searchService != nil {
@@ -255,11 +263,9 @@ func (s *ContactService) GetContact(contactID, userID, vaultID string) (*dto.Con
 		return nil, err
 	}
 
-	var cvu models.ContactVaultUser
-	isFav := false
-	if err := s.db.Where("contact_id = ? AND user_id = ?", contactID, userID).First(&cvu).Error; err == nil {
-		isFav = cvu.IsFavorite
-		s.db.Model(&cvu).Update("number_of_views", cvu.NumberOfViews+1)
+	isFav, err := recordContactView(s.db, contactID, userID, vaultID)
+	if err != nil {
+		return nil, err
 	}
 
 	formatter, err := newContactNameFormatter(s.db, userID)
@@ -330,10 +336,34 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	}
 
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Save(&contact).Error; err != nil {
+		owners := []string{contactID}
+		if contact.FirstMetThroughContactID != nil {
+			owners = append(owners, *contact.FirstMetThroughContactID)
+		}
+		if err := lockContactsBelongToVault(tx, owners, vaultID); err != nil {
 			return err
 		}
-		return applyContactImportantDateChanges(tx, contactID, vaultID, req.ImportantDateChanges)
+		if err := updateContactProfile(tx, &contact, vaultID,
+			"first_name", "last_name", "middle_name", "nickname",
+			"maiden_name", "prefix", "suffix", "gender_id",
+			"pronoun_id", "template_id", "last_talked_to", "first_met_through_contact_id",
+			"stay_in_touch_frequency_days", "stay_in_touch_trigger_date", "last_updated_at", "first_met_at",
+			"first_met_date_precision", "first_met_year", "first_met_month", "first_met_day",
+			"listed", "needs_verification",
+		); err != nil {
+			return err
+		}
+		if err := applyContactImportantDateChanges(tx, contactID, vaultID, req.ImportantDateChanges); err != nil {
+			return err
+		}
+
+		if s.feedRecorder != nil {
+			desc := "Updated contact " + req.FirstName
+			if err := NewFeedRecorder(tx).Record(contact.ID, "", ActionContactUpdated, desc, nil, nil); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -343,11 +373,6 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	formatter, err := newContactNameFormatter(s.db, userID)
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		desc := "Updated contact " + req.FirstName
-		s.feedRecorder.Record(contact.ID, "", ActionContactUpdated, desc, nil, nil)
 	}
 
 	if s.searchService != nil {
@@ -381,7 +406,7 @@ func (s *ContactService) ToggleArchive(contactID, vaultID, userID string) (*dto.
 	}
 
 	contact.Listed = !contact.Listed
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "listed"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
@@ -400,6 +425,22 @@ func (s *ContactService) ToggleArchive(contactID, vaultID, userID string) (*dto.
 }
 
 func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto.ContactResponse, error) {
+	var result *dto.ContactResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Use the same contact-first lock order as merging, including first favorites.
+		if err := lockContactHistoryOwner(tx, contactID, vaultID); err != nil {
+			return err
+		}
+		service := *s
+		service.db = tx
+		var err error
+		result, err = service.toggleFavorite(contactID, userID, vaultID)
+		return err
+	})
+	return result, err
+}
+
+func (s *ContactService) toggleFavorite(contactID, userID, vaultID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -424,7 +465,7 @@ func (s *ContactService) ToggleFavorite(contactID, userID, vaultID string) (*dto
 		return nil, err
 	} else {
 		cvu.IsFavorite = !cvu.IsFavorite
-		if err := s.db.Save(&cvu).Error; err != nil {
+		if err := updateContactRecord(s.db, &cvu, contactID, vaultID, ErrContactNotFound, "is_favorite"); err != nil {
 			return nil, err
 		}
 	}
@@ -506,7 +547,7 @@ func (s *ContactService) MarkCaughtUp(contactID, vaultID, userID string) (*dto.C
 	contact.LastTalkedTo = &now
 	contact.StayInTouchTriggerDate = calculateStayInTouchTriggerDate(contact.LastTalkedTo, contact.StayInTouchFrequencyDays)
 	contact.LastUpdatedAt = &now
-	if err := s.db.Save(&contact).Error; err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "last_talked_to", "stay_in_touch_trigger_date", "last_updated_at"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {

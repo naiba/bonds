@@ -396,11 +396,18 @@ test.describe("Contact Modules - Pets", () => {
     await expect(petModal).toBeVisible({ timeout: 5000 });
 
     await petModal.getByPlaceholder(/name/i).fill("Buddy");
-    await petModal.locator(".ant-select:visible").click();
-    await page
-      .locator(".ant-select-dropdown:visible .ant-select-item-option")
-      .filter({ hasText: "Dog" })
-      .click();
+    // The portaled option can move outside the viewport while the modal
+    // settles. Use the searchable control and verify the committed selection.
+    const category = petModal.getByRole("combobox");
+    await category.fill("Dog");
+    await expect(
+      page
+        .locator(".ant-select-dropdown:visible")
+        .getByTitle("Dog", { exact: true }),
+    ).toBeVisible();
+    await category.press("Enter");
+    await expect(category).toHaveAttribute("aria-expanded", "false");
+    await expect(petModal.getByTitle("Dog", { exact: true })).toHaveText("Dog");
 
     const responsePromise = page.waitForResponse(
       (resp) =>
@@ -408,7 +415,11 @@ test.describe("Contact Modules - Pets", () => {
     );
     await petModal.getByRole("button", { name: /save/i }).click();
     const resp = await responsePromise;
-    expect(resp.status()).toBeLessThan(400);
+    expect(resp.status()).toBe(201);
+    expect(await resp.json()).toMatchObject({
+      success: true,
+      data: { name: "Buddy", pet_category_name: "Dog" },
+    });
 
     await expect(petsCard.getByText("Buddy")).toBeVisible({ timeout: 10000 });
     await expect(petsCard.getByText("Dog")).toBeVisible({ timeout: 10000 });

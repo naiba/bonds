@@ -148,7 +148,7 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 				return err
 			}
 
-			if err := importVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
+			if err := ImportContactVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
 				return err
 			}
 			if err := tx.Preload("FirstMetThrough", "vault_id = ?", vaultID).First(&contact, "id = ?", contact.ID).Error; err != nil {
@@ -175,8 +175,9 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 	}, nil
 }
 
-// importVCardFields parses TEL, EMAIL, ADR, BDAY from a vCard and stores them.
-func importVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
+// ImportContactVCardFields parses the shared TEL, EMAIL, ADR and BDAY projection.
+// Callers must use their contact transaction so invalid fields cannot partially commit.
+func ImportContactVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
 	// TEL → ContactInformation
 	if fields := card[vcard.FieldTelephone]; len(fields) > 0 {
 		var phoneType models.ContactInformationType
@@ -185,13 +186,20 @@ func importVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, account
 				if f.Value == "" {
 					continue
 				}
+				kind, preferred := vcardInformationMetadata(f, "phone")
 				ci := models.ContactInformation{
+					Kind: strPtrOrNil(kind), Pref: preferred,
 					ContactID: contactID,
 					TypeID:    phoneType.ID,
 					Data:      f.Value,
 				}
 				if err := tx.Create(&ci).Error; err != nil {
 					return err
+				}
+				if !preferred {
+					if err := tx.Model(&ci).Update("pref", false).Error; err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -205,13 +213,20 @@ func importVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, account
 				if f.Value == "" {
 					continue
 				}
+				kind, preferred := vcardInformationMetadata(f, "email")
 				ci := models.ContactInformation{
+					Kind: strPtrOrNil(kind), Pref: preferred,
 					ContactID: contactID,
 					TypeID:    emailType.ID,
 					Data:      f.Value,
 				}
 				if err := tx.Create(&ci).Error; err != nil {
 					return err
+				}
+				if !preferred {
+					if err := tx.Model(&ci).Update("pref", false).Error; err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -273,26 +288,18 @@ func importVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, account
 // parseBirthdayString parses vCard BDAY formats: "19900115", "1990-01-15", "--0115" (no year)
 func parseBirthdayString(bday string) (year, month, day int) {
 	bday = strings.TrimSpace(bday)
-	// Try "YYYY-MM-DD"
-	if t, err := time.Parse("2006-01-02", bday); err == nil {
-		return t.Year(), int(t.Month()), t.Day()
-	}
-	// Try "YYYYMMDD"
-	if len(bday) == 8 {
-		if y, err := strconv.Atoi(bday[0:4]); err == nil {
-			if m, err := strconv.Atoi(bday[4:6]); err == nil {
-				if d, err := strconv.Atoi(bday[6:8]); err == nil {
-					return y, m, d
-				}
-			}
+	for _, layout := range []string{"2006-01-02", "20060102"} {
+		if date, err := time.Parse(layout, bday); err == nil {
+			return date.Year(), int(date.Month()), date.Day()
 		}
 	}
-	// Try "--MMDD" (no year)
-	if strings.HasPrefix(bday, "--") && len(bday) >= 6 {
-		s := bday[2:]
-		if m, err := strconv.Atoi(s[0:2]); err == nil {
-			if d, err := strconv.Atoi(s[2:4]); err == nil {
-				return 0, m, d
+	if strings.HasPrefix(bday, "--") {
+		value := strings.ReplaceAll(bday[2:], "-", "")
+		if len(value) == 4 {
+			month, monthErr := strconv.Atoi(value[:2])
+			day, dayErr := strconv.Atoi(value[2:])
+			if monthErr == nil && dayErr == nil && isValidReminderMonthDay(month, day) {
+				return 0, month, day
 			}
 		}
 	}
@@ -520,13 +527,25 @@ func contactPhotoVCardValue(file *models.File) (string, string) {
 }
 
 func contactBirthdayVCardValue(dates []models.ContactImportantDate) string {
-	for _, date := range dates {
-		if !isBirthdateImportantDate(&date) || date.Month == nil || date.Day == nil {
-			continue
-		}
-		return formatImportantDateVCardValue(&date)
+	if birthday := contactBirthdayImportantDate(dates); birthday != nil && birthday.Month != nil && birthday.Day != nil {
+		return formatImportantDateVCardValue(birthday)
 	}
 	return ""
+}
+
+func contactBirthdayImportantDate(dates []models.ContactImportantDate) *models.ContactImportantDate {
+	// Only the explicit singleton type is a birthday. Label fallback would
+	// re-promote an ordinary merged date after deletion and a repeated DAV PUT
+	// would then delete that date and its reminders. Legacy labels are classified
+	// once by the database migration, preserving their former BDAY projection.
+	for i := range dates {
+		date := &dates[i]
+		if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil && *date.ContactImportantDateType.InternalType == "birthdate" {
+			return date
+		}
+	}
+
+	return nil
 }
 
 func contactAnniversaryVCardValue(dates []models.ContactImportantDate) string {
@@ -544,13 +563,6 @@ func formatImportantDateVCardValue(date *models.ContactImportantDate) string {
 		return fmt.Sprintf("%04d-%02d-%02d", *date.Year, *date.Month, *date.Day)
 	}
 	return fmt.Sprintf("--%02d-%02d", *date.Month, *date.Day)
-}
-
-func isBirthdateImportantDate(date *models.ContactImportantDate) bool {
-	if date.ContactImportantDateType != nil && date.ContactImportantDateType.InternalType != nil {
-		return *date.ContactImportantDateType.InternalType == "birthdate"
-	}
-	return strings.EqualFold(date.Label, "Birthdate") || strings.EqualFold(date.Label, "Birthday")
 }
 
 func isAnniversaryImportantDate(date *models.ContactImportantDate) bool {
@@ -631,8 +643,6 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		nameComponents := extractFullNameFromCard(card)
 		nickname := card.Value(vcard.FieldNickname)
 		title := card.Value(vcard.FieldTitle)
-		now := time.Now()
-
 		existing.FirstName = strPtrOrNil(nameComponents.firstName)
 		existing.LastName = strPtrOrNil(nameComponents.lastName)
 		existing.MiddleName = strPtrOrNil(nameComponents.middleName)
@@ -641,12 +651,15 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		existing.Nickname = strPtrOrNil(nickname)
 		existing.JobPosition = strPtrOrNil(title)
 		existing.DistantEtag = strPtrOrNil(distantEtag)
-		existing.LastUpdatedAt = &now
+		// LastUpdatedAt detects local edits, not accepted remote revisions. A
+		// partially failed batch retains lastSyncAt, so advancing this marker on
+		// a successful pull would falsely discard later remote changes on retry.
+		// Save still advances UpdatedAt for the changed contact representation.
 		if err := tx.Save(&existing).Error; err != nil {
 			return "", "", err
 		}
 
-		if err := replaceVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
+		if err := ReplaceContactVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
 			return "", "", err
 		}
 		return existing.ID, "updated", nil
@@ -655,23 +668,20 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 	nameComponents := extractFullNameFromCard(card)
 	nickname := card.Value(vcard.FieldNickname)
 	title := card.Value(vcard.FieldTitle)
-	now := time.Now()
-
 	uid := card.Value("UID")
 
 	contact := models.Contact{
-		VaultID:       vaultID,
-		FirstName:     strPtrOrNil(nameComponents.firstName),
-		LastName:      strPtrOrNil(nameComponents.lastName),
-		MiddleName:    strPtrOrNil(nameComponents.middleName),
-		Prefix:        strPtrOrNil(nameComponents.prefix),
-		Suffix:        strPtrOrNil(nameComponents.suffix),
-		Nickname:      strPtrOrNil(nickname),
-		JobPosition:   strPtrOrNil(title),
-		DistantUUID:   strPtrOrNil(uid),
-		DistantURI:    strPtrOrNil(distantURI),
-		DistantEtag:   strPtrOrNil(distantEtag),
-		LastUpdatedAt: &now,
+		VaultID:     vaultID,
+		FirstName:   strPtrOrNil(nameComponents.firstName),
+		LastName:    strPtrOrNil(nameComponents.lastName),
+		MiddleName:  strPtrOrNil(nameComponents.middleName),
+		Prefix:      strPtrOrNil(nameComponents.prefix),
+		Suffix:      strPtrOrNil(nameComponents.suffix),
+		Nickname:    strPtrOrNil(nickname),
+		JobPosition: strPtrOrNil(title),
+		DistantUUID: strPtrOrNil(uid),
+		DistantURI:  strPtrOrNil(distantURI),
+		DistantEtag: strPtrOrNil(distantEtag),
 	}
 	if err := tx.Create(&contact).Error; err != nil {
 		return "", "", err
@@ -686,28 +696,9 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		return "", "", err
 	}
 
-	if err := importVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
+	if err := ImportContactVCardFields(tx, card, contact.ID, vaultID, accountID); err != nil {
 		return "", "", err
 	}
 
 	return contact.ID, "created", nil
-}
-
-func replaceVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	tx.Where("contact_id = ?", contactID).Delete(&models.ContactInformation{})
-
-	var pivots []models.ContactAddress
-	tx.Where("contact_id = ?", contactID).Find(&pivots)
-	if len(pivots) > 0 {
-		addressIDs := make([]uint, len(pivots))
-		for i, p := range pivots {
-			addressIDs[i] = p.AddressID
-		}
-		tx.Where("contact_id = ?", contactID).Delete(&models.ContactAddress{})
-		tx.Where("id IN ?", addressIDs).Delete(&models.Address{})
-	}
-
-	tx.Where("contact_id = ?", contactID).Delete(&models.ContactImportantDate{})
-
-	return importVCardFields(tx, card, contactID, vaultID, accountID)
 }

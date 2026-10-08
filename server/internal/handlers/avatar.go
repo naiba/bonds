@@ -112,14 +112,12 @@ func (h *AvatarHandler) UpdateAvatar(c *echo.Context) error {
 	defer src.Close()
 
 	authorID := middleware.GetUserID(c)
-	file, err := h.vaultFileService.Upload(vaultID, contactID, authorID, "avatar", fileHeader.Filename, mimeType, fileHeader.Size, src)
+	file, err := h.vaultFileService.UploadContactAvatar(contactID, vaultID, authorID, fileHeader.Filename, mimeType, fileHeader.Size, src)
 	if err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_upload_file")
-	}
-
-	contact.FileID = &file.ID
-	if err := h.db.Save(&contact).Error; err != nil {
-		return response.InternalError(c, "err.failed_to_update_avatar")
 	}
 
 	return response.OK(c, file)
@@ -142,13 +140,12 @@ func (h *AvatarHandler) DeleteAvatar(c *echo.Context) error {
 	contactID := c.Param("contact_id")
 	vaultID := c.Param("vault_id")
 
-	var contact models.Contact
-	if err := h.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
-		return response.NotFound(c, "err.contact_not_found")
-	}
-
-	contact.FileID = nil
-	if err := h.db.Save(&contact).Error; err != nil {
+	// Use the same guarded profile write as other avatar entry points; Save
+	// would upsert a source soft-deleted after the initial contact read.
+	if _, err := services.NewContactAvatarService(h.db).DeleteAvatar(contactID, vaultID, middleware.GetUserID(c)); err != nil {
+		if errors.Is(err, services.ErrContactNotFound) {
+			return response.NotFound(c, "err.contact_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_delete_avatar")
 	}
 

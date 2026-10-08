@@ -1,7 +1,8 @@
 import type { JournalContactReference } from "@/components/journal/contactMentionTypes";
 
+// Vditor consumes @ during completion; legacy content keeps it. Both are live links.
 const CONTACT_MENTION_PATTERN =
-  /@\[((?:\\[\\\]]|[^\]\r\n])+)\]\(contact:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\)/g;
+  /@?\[((?:\\[\\\]]|[^\]\r\n])+)\]\(contact:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\)/g;
 
 type SerializedContactMention = {
   readonly marker: string;
@@ -66,13 +67,12 @@ export function contactIdsFromMentions(content: string): string[] {
   );
 }
 
-export function appendMissingContactMentions(
+export function prependMissingContactMentions(
   content: string,
   contacts: readonly JournalContactReference[],
+  existingContactIds = contactIdsFromMentions(content),
 ): string {
-  const present = new Set(
-    contactIdsFromMentions(content).map((id) => id.toLowerCase()),
-  );
+  const present = new Set(existingContactIds.map((id) => id.toLowerCase()));
   const missing = contacts.filter(
     (contact) => !present.has(contact.id.toLowerCase()),
   );
@@ -80,5 +80,7 @@ export function appendMissingContactMentions(
   const suffix = missing
     .map((contact) => serializeContactMention(contact).marker)
     .join(" ");
-  return content.length === 0 ? suffix : `${content} ${suffix}`;
+  // Put restored associations before the body: appending can hide the marker
+  // inside an indented or unclosed fenced code block.
+  return content.length === 0 ? suffix : `${suffix}\n\n${content}`;
 }

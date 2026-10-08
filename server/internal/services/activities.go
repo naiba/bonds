@@ -3,7 +3,6 @@ package services
 import (
 	"errors"
 	"math"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -21,8 +20,6 @@ var ErrActivityNotFound = errors.New("activity not found")
 var ErrInvalidActivityTime = errors.New("invalid activity time")
 var ErrInvalidActivityInput = errors.New("invalid activity input")
 var ErrInvalidContentFormat = errors.New("invalid content format")
-
-var contactMentionPattern = regexp.MustCompile(`@\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:([0-9a-fA-F-]{36})\)`)
 
 type ActivityService struct {
 	db           *gorm.DB
@@ -110,6 +107,13 @@ func (s *ActivityService) CreateForUser(vaultID, userID string, req dto.Activity
 		event.SubjectUserName = &subjectName
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		live, err := lockContentContacts(tx, vaultID, contactIDs, req.Description, event.DescriptionFormat)
+		if err != nil {
+			return err
+		}
+		if err := validateContentMentions(req.Description, event.DescriptionFormat, "", "", live); err != nil {
+			return err
+		}
 		if err := tx.Create(&event).Error; err != nil {
 			return err
 		}
@@ -119,14 +123,20 @@ func (s *ActivityService) CreateForUser(vaultID, userID string, req dto.Activity
 		if err := replaceActivityParticipants(tx, event.ID, contactIDs); err != nil {
 			return err
 		}
-		return updateInteractionLastTalkedTo(tx, event.ActivityTypeID, event.StartDate, contactIDs)
+		if err := updateInteractionLastTalkedTo(tx, event.ActivityTypeID, event.StartDate, contactIDs); err != nil {
+			return err
+		}
+		if s.feedRecorder != nil && req.PrimaryContactID != "" {
+			entityType := "Activity"
+			if err := NewFeedRecorder(tx).Record(req.PrimaryContactID, "", ActionActivityCreated, "Created an activity", &event.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return nil, err
 	}
-	if s.feedRecorder != nil && req.PrimaryContactID != "" {
-		entityType := "Activity"
-		s.feedRecorder.Record(req.PrimaryContactID, "", ActionActivityCreated, "Created an activity", &event.ID, &entityType)
-	}
+
 	return s.get(vaultID, event.ID, userID)
 }
 
@@ -146,6 +156,10 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 	for i := range current.Participants {
 		currentParticipantIDs[i] = current.Participants[i].ID
 	}
+	formatOmitted := req.DescriptionFormat == ""
+	if formatOmitted {
+		req.DescriptionFormat = current.DescriptionFormat
+	}
 	replacement, contactIDs, err := s.eventFromRequest(vaultID, req, currentParticipantIDs, current.SubjectUserID != nil)
 	if err != nil {
 		return nil, err
@@ -160,6 +174,37 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 		return nil, ErrInvalidActivityTime
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		lockFormat := replacement.DescriptionFormat
+		if formatOmitted {
+			lockFormat = ""
+		}
+		live, err := lockContentContacts(tx, vaultID, contactIDs, req.Description, lockFormat)
+		if err != nil {
+			return err
+		}
+		var stored models.Activity
+		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", id, vaultID).First(&stored).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrActivityNotFound
+			}
+			return err
+		}
+		if formatOmitted {
+			replacement.DescriptionFormat = markdown.NormalizeFormat(stored.DescriptionFormat)
+			if req.ParticipantIDs == nil && len(currentParticipantIDs) == 0 {
+				contactIDs = mergeContactIDs([]string{req.PrimaryContactID}, contactMentionIDs(req.Description, replacement.DescriptionFormat))
+			}
+		}
+		// A format change may turn literal text into participant fallback IDs.
+		// Historical mention exemptions never authorize foreign participants.
+		for _, contactID := range contactIDs {
+			if !live[contactID] {
+				return ErrContactNotFound
+			}
+		}
+		if err := validateContentMentions(req.Description, replacement.DescriptionFormat, ptrToStr(stored.Description), stored.DescriptionFormat, live); err != nil {
+			return err
+		}
 		if err := tx.Save(&replacement).Error; err != nil {
 			return err
 		}
@@ -177,14 +222,17 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 }
 
 func (s *ActivityService) Delete(vaultID string, id uint) error {
-	var event models.Activity
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&event).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrActivityNotFound
-		}
-		return err
-	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockActivitiesBeforeParticipantRemoval(tx, []uint{id}); err != nil {
+			return err
+		}
+		var event models.Activity
+		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&event).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrActivityNotFound
+			}
+			return err
+		}
 		if err := tx.Model(&models.Activity{}).Where("parent_id = ?", id).Update("parent_id", nil).Error; err != nil {
 			return err
 		}
@@ -250,7 +298,7 @@ func (s *ActivityService) eventFromRequest(vaultID string, req dto.ActivityUpser
 		contactIDs = mergeContactIDs([]string{req.PrimaryContactID}, existingParticipantIDs)
 	} else {
 		// Creation fallback for clients generated before participant_ids existed.
-		contactIDs = mergeContactIDs([]string{req.PrimaryContactID}, contactMentionIDs(req.Description))
+		contactIDs = mergeContactIDs([]string{req.PrimaryContactID}, contactMentionIDs(req.Description, req.DescriptionFormat))
 	}
 	if len(contactIDs) == 0 && !allowEmptyParticipants {
 		return models.Activity{}, nil, ErrContactNotFound
@@ -312,12 +360,10 @@ func normalizedEndStatus(value string) string {
 	}
 }
 
-func contactMentionIDs(content string) []string {
+func contactMentionIDs(content, format string) []string {
 	ids := make([]string, 0)
-	for _, match := range contactMentionPattern.FindAllStringSubmatch(content, -1) {
-		if len(match) == 2 {
-			ids = append(ids, strings.ToLower(match[1]))
-		}
+	for _, ref := range markdown.ContactReferences(content, format) {
+		ids = append(ids, strings.ToLower(ref.ID))
 	}
 	return dedupeContactIDs(ids)
 }
@@ -351,7 +397,7 @@ func (s *ActivityService) toActivityResponse(le *models.Activity, currentUserID 
 			SystemKind: ptrToStr(le.ActivityType.SystemKind), Icon: ptrToStr(le.ActivityType.Icon), Color: ptrToStr(le.ActivityType.Color),
 			CountsAsInteraction: le.ActivityType.CountsAsInteraction, CreatedAt: le.ActivityType.CreatedAt, UpdatedAt: le.ActivityType.UpdatedAt}
 	}
-	mentionIDs := contactMentionIDs(ptrToStr(le.Description))
+	mentionIDs := contactMentionIDs(ptrToStr(le.Description), le.DescriptionFormat)
 	if len(mentionIDs) > 0 {
 		var mentioned []models.Contact
 		if err := s.db.Where("vault_id = ? AND id IN ?", le.VaultID, mentionIDs).Find(&mentioned).Error; err != nil {
@@ -462,4 +508,17 @@ func contactRefs(contacts []models.Contact) []dto.TaskContactRef {
 		return refs[i].Name < refs[j].Name
 	})
 	return refs
+}
+
+// Merge locks legacy payer activities before moving their participant rows.
+// Deletion and vault moves must use the same activity-before-pivot order.
+// Include child activities in ID order before clearing their parent links.
+func lockActivitiesBeforeParticipantRemoval(tx *gorm.DB, activityIDs []uint) error {
+	if len(activityIDs) == 0 {
+		return nil
+	}
+	var activities []models.Activity
+	return tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		Select("id").Where("id IN ? OR parent_id IN ?", activityIDs, activityIDs).
+		Order("id ASC").Find(&activities).Error
 }

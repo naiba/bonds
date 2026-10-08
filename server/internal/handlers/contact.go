@@ -331,6 +331,7 @@ func (h *ContactHandler) MarkCaughtUp(c *echo.Context) error {
 //	@Success		204			"No Content"
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		404			{object}	response.APIResponse
+//	@Failure		409			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
 //	@Router			/vaults/{vault_id}/contacts/{id} [delete]
 func (h *ContactHandler) Delete(c *echo.Context) error {
@@ -339,6 +340,9 @@ func (h *ContactHandler) Delete(c *echo.Context) error {
 	if err := h.contactService.DeleteContact(contactID, vaultID); err != nil {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
+		}
+		if errors.Is(err, services.ErrContactDeleteChanged) {
+			return response.Conflict(c, "err.contact_delete_changed")
 		}
 		if errors.Is(err, services.ErrContactCannotBeDeleted) {
 			return response.Conflict(c, "err.contact_cannot_be_deleted")
@@ -387,6 +391,8 @@ func (h *ContactHandler) DeleteMany(c *echo.Context) error {
 			return response.ValidationError(c, map[string]string{"contact_ids": "contact_ids is invalid"})
 		case errors.Is(err, services.ErrContactNotFound):
 			return response.NotFound(c, "err.contact_not_found")
+		case errors.Is(err, services.ErrContactDeleteChanged):
+			return response.Conflict(c, "err.contact_delete_changed")
 		case errors.Is(err, services.ErrContactCannotBeDeleted):
 			return response.Conflict(c, "err.contact_cannot_be_deleted")
 		default:

@@ -104,7 +104,12 @@ func (s *GroupService) AddContactToGroup(contactID, vaultID string, req dto.AddC
 		ContactID:       contactID,
 		GroupTypeRoleID: req.GroupTypeRoleID,
 	}
-	return s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&cg).Error
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&cg).Error
+	})
 }
 
 func (s *GroupService) RemoveContactFromGroup(contactID, vaultID string, groupID uint) error {

@@ -110,6 +110,7 @@ func AllModels() []interface{} {
 		&OAuthProvider{},
 		&GeocodingProviderConfig{},
 		&SystemSetting{},
+		&DataMigration{},
 		&PersonalAccessToken{},
 	}
 }

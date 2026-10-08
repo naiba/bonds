@@ -46,12 +46,15 @@ describe("Markdown compatibility helpers", () => {
     );
   });
 
-  it("preserves contact markers while escaping the surrounding plain text", () => {
-    const marker = `@[Alice](contact:${CONTACT_ID})`;
-    expect(plainTextToMarkdown(`# Met ${marker} *today*`)).toBe(
-      `\\# Met ${marker} \\*today\\*`,
-    );
-  });
+  it.each(["", "@"])(
+    "preserves %s contact markers while escaping surrounding plain text",
+    (prefix) => {
+      const marker = `${prefix}[Alice](contact:${CONTACT_ID})`;
+      expect(plainTextToMarkdown(`# Met ${marker} *today*`)).toBe(
+        `\\# Met ${marker} \\*today\\*`,
+      );
+    },
+  );
 
   it("escapes legacy plain text before producing fallback HTML", () => {
     expect(plainTextToSafeHTML(`<script>alert("x")</script>\nnext`)).toBe(
@@ -59,13 +62,18 @@ describe("Markdown compatibility helpers", () => {
     );
   });
 
-  it("keeps contact mentions interactive in legacy fallback HTML", () => {
-    expect(
-      plainTextToSafeHTML(`Met @[Alice](contact:${CONTACT_ID}) today`),
-    ).toBe(
-      `<p>Met <span data-bonds-contact="${CONTACT_ID}" data-bonds-name="Alice">Alice</span> today</p>`,
-    );
-  });
+  it.each(["", "@"])(
+    "keeps %s contact mentions interactive in legacy fallback HTML",
+    (prefix) => {
+      expect(
+        plainTextToSafeHTML(
+          `Met ${prefix}[Alice](contact:${CONTACT_ID}) today`,
+        ),
+      ).toBe(
+        `<p>Met <span data-bonds-contact="${CONTACT_ID}" data-bonds-name="Alice">Alice</span> today</p>`,
+      );
+    },
+  );
 });
 
 describe("MarkdownContent", () => {

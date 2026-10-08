@@ -86,18 +86,25 @@ func (s *TaskService) Create(contactID, vaultID, authorID string, req dto.Create
 	}
 	applyTaskCalendarFields(&task, req.CalendarType, req.OriginalDay, req.OriginalMonth, req.OriginalYear)
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, extras, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Create(&task).Error; err != nil {
 			return err
 		}
-		return replaceTaskAssigneesLocked(tx, task.ID, extras)
+		if err := replaceTaskAssigneesLocked(tx, task.ID, extras); err != nil {
+			return err
+		}
+		if s.feedRecorder != nil {
+			entityType := "ContactTask"
+			if err := NewFeedRecorder(tx).Record(contactID, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	if s.feedRecorder != nil {
-		entityType := "ContactTask"
-		s.feedRecorder.Record(contactID, authorID, ActionTaskCreated, "Created task: "+req.Label, &task.ID, &entityType)
 	}
 
 	resps, err := buildTaskResponses(s.db, []models.ContactTask{task}, authorID)
@@ -141,15 +148,18 @@ func (s *TaskService) Update(id uint, contactID, vaultID string, req dto.UpdateT
 	}
 
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		next := []string{contactID}
+		if req.ContactIDs != nil {
+			next = append(next, (*req.ContactIDs)...)
+		}
+		if err := lockContactsBelongToVault(tx, next, vaultID); err != nil {
+			return err
+		}
 		if err := tx.Save(&task).Error; err != nil {
 			return err
 		}
 		if req.ContactIDs == nil {
 			return nil
-		}
-		next := append([]string{contactID}, (*req.ContactIDs)...)
-		if err := validateContactsBelongToVault(tx, next, vaultID); err != nil {
-			return err
 		}
 		return replaceTaskAssigneesLocked(tx, task.ID, next)
 	})
@@ -189,13 +199,23 @@ func (s *TaskService) ToggleCompleted(id uint, contactID, vaultID, userID string
 			task.Status = models.TaskStatusTodo
 		}
 	}
-	if err := s.db.Save(&task).Error; err != nil {
-		return nil, err
-	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Save(&task).Error; err != nil {
+			return err
+		}
 
-	if s.feedRecorder != nil && task.Completed {
-		entityType := "ContactTask"
-		s.feedRecorder.Record(contactID, "", ActionTaskCompleted, "Completed task: "+task.Label, &task.ID, &entityType)
+		if s.feedRecorder != nil && task.Completed {
+			entityType := "ContactTask"
+			if err := NewFeedRecorder(tx).Record(contactID, "", ActionTaskCompleted, "Completed task: "+task.Label, &task.ID, &entityType); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	resps, err := buildTaskResponses(s.db, []models.ContactTask{task}, userID)
