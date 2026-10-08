@@ -22,7 +22,7 @@ var ErrInvalidActivityTime = errors.New("invalid activity time")
 var ErrInvalidActivityInput = errors.New("invalid activity input")
 var ErrInvalidContentFormat = errors.New("invalid content format")
 
-var contactMentionPattern = regexp.MustCompile(`@\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:([0-9a-fA-F-]{36})\)`)
+var contactMentionPattern = regexp.MustCompile(markdown.ContactMentionPattern)
 
 type ActivityService struct {
 	db           *gorm.DB

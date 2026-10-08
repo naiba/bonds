@@ -118,7 +118,8 @@ func TestContactMergeBodyDiscoveryPreservesScopeAndGrammar(t *testing.T) {
 		journal uint
 		body    string
 	}{
-		{f.journal, "UUID " + f.source + " and malformed [Name](contact:" + f.source + ")"},
+		// A bare [Name](contact:ID) is valid Vditor output; use an actually incomplete label.
+		{f.journal, "UUID " + f.source + " and malformed Name](contact:" + f.source + ")"},
 		{journal.ID, f.body},
 	} {
 		post := models.Post{JournalID: entry.journal, WrittenAt: time.Now()}

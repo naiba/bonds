@@ -16,11 +16,15 @@ import (
 const (
 	FormatPlain    = "plain"
 	FormatMarkdown = "markdown"
+
+	// Vditor consumes the @ completion trigger, while the legacy editor keeps it.
+	// Rendering, reference validation and merge redirection must accept both saved forms.
+	ContactMentionPattern = `@?\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:([0-9a-fA-F-]{36})\)`
 )
 
 var (
 	contactDestinationPattern = regexp.MustCompile(`^contact:([0-9a-fA-F-]{36})$`)
-	contactMentionPattern     = regexp.MustCompile(`@\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:[0-9a-fA-F-]{36}\)`)
+	contactMentionPattern     = regexp.MustCompile(ContactMentionPattern)
 	fileDestinationPattern    = regexp.MustCompile(`^bonds-file:([1-9][0-9]*)$`)
 	engineOnce                sync.Once
 	engine                    *lute.Lute

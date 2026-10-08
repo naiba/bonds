@@ -153,3 +153,33 @@ describe("journal contact mention serialization", () => {
     expect(contactIdsFromMentions(normalized)).toEqual([CONTACT_ID]);
   });
 });
+
+// Vditor consumes the @ trigger; old saved links must remain discoverable too.
+it("recognizes Vditor links and legacy mentions without adding duplicate associations", () => {
+  const contact = { id: CONTACT_ID, name: "Research ] Team" };
+  const { optionValue, marker } = serializeContactMention(contact);
+  const body = `Met ${optionValue} and ${marker}.`;
+  expect(parseContactMentions(body)).toEqual([
+    {
+      marker: optionValue,
+      displayName: contact.name,
+      contactId: CONTACT_ID,
+      index: 4,
+    },
+    {
+      marker,
+      displayName: contact.name,
+      contactId: CONTACT_ID,
+      index: 4 + optionValue.length + 5,
+    },
+  ]);
+  expect(contactIdsFromMentions(body)).toEqual([CONTACT_ID]);
+  expect(appendMissingContactMentions(`Met ${optionValue}`, [contact])).toBe(
+    `Met ${optionValue}`,
+  );
+  expect(
+    parseContactMentions(
+      `[ordinary](https://example.test/${CONTACT_ID}) [bad](contact:missing)`,
+    ),
+  ).toEqual([]);
+});

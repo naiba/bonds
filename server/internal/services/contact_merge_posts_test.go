@@ -91,8 +91,8 @@ func TestContactMergePostMentionsPreserveContent(t *testing.T) {
 			// Names, raw UUIDs, URLs, HTML and escaped delimiters are prose, not ID slots.
 			prefix := "# Walk\nRaw " + source.ID + " [reference](https://example.test/" + source.ID + ") <span>" + source.ID + "</span>\n"
 			markerName := `A\]lice\\ ` + source.ID
-			body := prefix + "@[" + markerName + "](contact:" + strings.ToUpper(source.ID) + ") and @[Again](contact:" + source.ID + ")\n@[Duplicate](contact:" + duplicate.ID + ") @[Retained](contact:" + target.ID + ") @[Other](contact:" + other.ID + ")" + fmt.Sprintf("\n![Attachment](bonds-file:%d)", file.ID)
-			want := prefix + "@[" + markerName + "](contact:" + target.ID + ") and @[Again](contact:" + target.ID + ")\n@[Duplicate](contact:" + target.ID + ") @[Retained](contact:" + target.ID + ") @[Other](contact:" + other.ID + ")" + fmt.Sprintf("\n![Attachment](bonds-file:%d)", file.ID)
+			body := prefix + "@[" + markerName + "](contact:" + strings.ToUpper(source.ID) + ") and [Again](contact:" + source.ID + ")\n@[Duplicate](contact:" + duplicate.ID + ") @[Retained](contact:" + target.ID + ") @[Other](contact:" + other.ID + ")" + fmt.Sprintf("\n![Attachment](bonds-file:%d)", file.ID)
+			want := prefix + "@[" + markerName + "](contact:" + target.ID + ") and [Again](contact:" + target.ID + ")\n@[Duplicate](contact:" + target.ID + ") @[Retained](contact:" + target.ID + ") @[Other](contact:" + other.ID + ")" + fmt.Sprintf("\n![Attachment](bonds-file:%d)", file.ID)
 			posts := NewPostService(svc.db)
 			post, err := posts.Create(journal.ID, vault, dto.CreatePostRequest{Title: "Walk", WrittenAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), Sections: []dto.PostSectionInput{
 				{Position: 1, Label: "Story", Content: body, ContentFormat: format},
@@ -184,7 +184,7 @@ func setupContactMergePost(t *testing.T) contactMergePostFixture {
 		t.Fatal(err)
 	}
 	posts := NewPostService(svc.db)
-	body := "Walked with @[Mentioned friend](contact:" + source.ID + ")"
+	body := "Walked with [Mentioned friend](contact:" + source.ID + ")"
 	post, err := posts.Create(journal.ID, vault, dto.CreatePostRequest{Title: "Walk", WrittenAt: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), Sections: []dto.PostSectionInput{{Position: 1, Label: "Story", Content: body, ContentFormat: "markdown"}}})
 	if err != nil {
 		t.Fatal(err)

@@ -1,7 +1,8 @@
 import type { JournalContactReference } from "@/components/journal/contactMentionTypes";
 
+// Vditor consumes @ during completion; legacy content keeps it. Both are live links.
 const CONTACT_MENTION_PATTERN =
-  /@\[((?:\\[\\\]]|[^\]\r\n])+)\]\(contact:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\)/g;
+  /@?\[((?:\\[\\\]]|[^\]\r\n])+)\]\(contact:([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\)/g;
 
 type SerializedContactMention = {
   readonly marker: string;

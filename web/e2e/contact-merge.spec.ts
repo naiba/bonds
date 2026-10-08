@@ -53,19 +53,6 @@ for (const viewport of [
       expect(response.status()).toBe(201);
       contacts.push((await response.json()).data);
     }
-    const noteResponse = await request.post(
-      apiUrl(`/vaults/${vaultId}/contacts/${contacts[1].id}/notes`),
-      {
-        headers,
-        data: {
-          title: "Shared project",
-          body: `Met @[Alicia Chen](contact:${contacts[1].id}) at the synthetic gardening club.`,
-          body_format: "markdown",
-        },
-      },
-    );
-    expect(noteResponse.status()).toBe(201);
-    const noteId = (await noteResponse.json()).data.id;
     const categoriesResponse = await request.get(
       apiUrl(`/vaults/${vaultId}/settings/activityCategories`),
       { headers },
@@ -175,6 +162,48 @@ for (const viewport of [
       .fill("Password123!");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/vaults$/);
+    // Exercise the real Vditor completion: it consumes @ and saves a bare
+    // Markdown link, unlike the legacy mention editor. API fixtures missed this.
+    await page.goto(`/vaults/${vaultId}/contacts/${contacts[1].id}`);
+    if (viewport.name === "mobile") {
+      await page.getByRole("combobox", { name: "Jump to section" }).click();
+      await page
+        .locator(".ant-select-dropdown")
+        .getByText("Notes and records", { exact: true })
+        .click();
+    } else {
+      await page
+        .getByRole("navigation", { name: "Contact sections" })
+        .getByRole("button", { name: "Notes and records", exact: true })
+        .click();
+    }
+    const notesCard = page.locator(".ant-card").filter({ hasText: /^Notes/ });
+    await notesCard.getByRole("button", { name: /add/i }).click();
+    const noteDialog = page.getByRole("dialog");
+    await noteDialog.getByPlaceholder(/title/i).fill("Shared project");
+    await noteDialog
+      .getByRole("textbox", { name: /write your note/i })
+      .pressSequentially("Met @Alicia", { delay: 50 });
+    await page
+      .locator(".vditor-hint")
+      .getByRole("button", { name: "Alicia Chen", exact: true })
+      .click();
+    const noteSaved = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/contacts/${contacts[1].id}/notes`) &&
+        response.request().method() === "POST",
+    );
+    await noteDialog.getByRole("button", { name: "Save", exact: true }).click();
+    const noteResponse = await noteSaved;
+    expect(noteResponse.status()).toBe(201);
+    const savedNote = (await noteResponse.json()).data;
+    const noteId = savedNote.id;
+    expect(savedNote.body.trim()).toBe(
+      `Met [Alicia Chen](contact:${contacts[1].id})`,
+    );
+    await expect(
+      notesCard.getByRole("link", { name: "Alicia Chen", exact: true }),
+    ).toHaveAttribute("href", `/vaults/${vaultId}/contacts/${contacts[1].id}`);
     await page.goto(`/vaults/${vaultId}/contacts`);
     const table = page.getByRole("table");
     await expect(table.getByText("Alice Chen", { exact: true })).toBeVisible();
@@ -354,7 +383,7 @@ for (const viewport of [
       expect.arrayContaining([
         expect.objectContaining({
           id: noteId,
-          body: `Met @[Alicia Chen](contact:${retainedId}) at the synthetic gardening club.`,
+          body: savedNote.body.replaceAll(contacts[1].id, retainedId),
         }),
       ]),
     );

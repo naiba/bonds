@@ -95,7 +95,7 @@ func setupContactMergeContent(t *testing.T) contactMergeContentFixture {
 			t.Fatal(err)
 		}
 	}
-	body := "Remember @[Duplicate](contact:" + contacts[1].ID + ")"
+	body := "Remember [Duplicate](contact:" + contacts[1].ID + ")"
 	note, err := NewNoteService(svc.db).Create(contacts[2].ID, vault, user, dto.CreateNoteRequest{Title: "Observer's note", Body: body, BodyFormat: "markdown"})
 	if err != nil {
 		t.Fatal(err)
@@ -127,8 +127,8 @@ func TestContactMergeContentPreservesScopeAndBytes(t *testing.T) {
 			}
 			prefix := "Raw " + f.source + " [link](https://example.test/" + f.source + ") <span>" + f.source + "</span>\n"
 			name := `A\]lice\\ ` + f.source
-			body := prefix + "@[" + name + "](contact:" + strings.ToUpper(f.source) + ")\n@[Again](contact:" + f.source + ") @[Observer](contact:" + f.owner + ")" + fmt.Sprintf(" ![Photo](bonds-file:%d)", file.ID)
-			want := prefix + "@[" + name + "](contact:" + f.target + ")\n@[Again](contact:" + f.target + ") @[Observer](contact:" + f.owner + ")" + fmt.Sprintf(" ![Photo](bonds-file:%d)", file.ID)
+			body := prefix + "@[" + name + "](contact:" + strings.ToUpper(f.source) + ")\n[Again](contact:" + f.source + ") @[Observer](contact:" + f.owner + ")" + fmt.Sprintf(" ![Photo](bonds-file:%d)", file.ID)
+			want := prefix + "@[" + name + "](contact:" + f.target + ")\n[Again](contact:" + f.target + ") @[Observer](contact:" + f.owner + ")" + fmt.Sprintf(" ![Photo](bonds-file:%d)", file.ID)
 			if _, err := NewNoteService(f.svc.db).Update(f.note.ID, f.owner, f.vault, dto.UpdateNoteRequest{Title: "Observer's note", Body: body, BodyFormat: format}); err != nil {
 				t.Fatal(err)
 			}
