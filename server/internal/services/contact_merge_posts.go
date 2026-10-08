@@ -32,11 +32,11 @@ func discoverContactMergePostIDs(tx *gorm.DB, vaultID string, sourceIDs []string
 	for _, id := range sourceIDs {
 		sources[strings.ToLower(id)] = true
 		conditions = append(conditions, "LOWER(post_sections.content) LIKE ?")
-		values = append(values, "%](contact:"+strings.ToLower(id)+")%")
+		values = append(values, "%contact:"+strings.ToLower(id)+"%")
 	}
 	var sections []models.PostSection
 	if len(conditions) > 0 {
-		if err := tx.Model(&models.PostSection{}).Select("post_sections.post_id", "post_sections.content").
+		if err := tx.Model(&models.PostSection{}).Select("post_sections.post_id", "post_sections.content", "post_sections.content_format").
 			Joins("JOIN posts ON posts.id = post_sections.post_id").
 			Joins("JOIN journals ON journals.id = posts.journal_id").
 			Where("journals.vault_id = ?", vaultID).
@@ -45,7 +45,7 @@ func discoverContactMergePostIDs(tx *gorm.DB, vaultID string, sourceIDs []string
 		}
 	}
 	for _, section := range sections {
-		for _, id := range contactMentionIDs(ptrToStr(section.Content)) {
+		for _, id := range contactMentionIDs(ptrToStr(section.Content), section.ContentFormat) {
 			if sources[id] {
 				ids[section.PostID] = true
 				break
@@ -127,7 +127,7 @@ func mergeContactPostMentions(tx *gorm.DB, sections []models.PostSection, source
 	linkedPosts := make(map[uint]bool)
 	for _, section := range sections {
 		content := ptrToStr(section.Content)
-		body := redirectContactMentions(content, sources, targetID)
+		body := redirectContactMentions(content, section.ContentFormat, sources, targetID)
 		if body == content {
 			continue
 		}

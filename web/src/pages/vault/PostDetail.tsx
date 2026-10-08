@@ -48,10 +48,7 @@ import { useDateFormat, formatDate } from "@/utils/dateFormat";
 import MarkdownEditor from "@/components/markdown/MarkdownEditor";
 import MarkdownContent from "@/components/markdown/MarkdownContent";
 import PostContactTags from "@/components/journal/PostContactTags";
-import {
-  appendMissingContactMentions,
-  contactIdsFromMentions,
-} from "@/components/journal/contactMentionSerialization";
+import { prependMissingContactMentions } from "@/components/journal/contactMentionSerialization";
 import { formatContactName, useNameOrder } from "@/utils/nameFormat";
 import {
   plainTextToMarkdown,
@@ -302,16 +299,33 @@ export default function PostDetail() {
           ? [{ id: contact.id, name: formatContactName(nameOrder, contact) }]
           : [],
     );
+    // The server-rendered links distinguish Markdown references from code and
+    // escaped examples. Do not infer Markdown associations with a text regexp.
+    const inlineContactIds = (post.sections ?? []).flatMap(
+      (section: PostSection) => {
+        const document = new DOMParser().parseFromString(
+          section.rendered_content ?? "",
+          "text/html",
+        );
+        return Array.from(
+          document.querySelectorAll("[data-bonds-contact]"),
+        ).flatMap((node) => {
+          const id = node.getAttribute("data-bonds-contact");
+          return id ? [id] : [];
+        });
+      },
+    );
     setSections(
       (post.sections ?? []).map((s: PostSection, index: number) => ({
         label: s.label,
         body:
           index === 0
-            ? appendMissingContactMentions(
+            ? prependMissingContactMentions(
                 s.content_format === "markdown"
                   ? (s.content ?? "")
                   : plainTextToMarkdown(s.content ?? ""),
                 associatedContacts,
+                inlineContactIds,
               )
             : s.content_format === "markdown"
               ? (s.content ?? "")
@@ -361,11 +375,8 @@ export default function PostDetail() {
           content_format: "markdown",
           position,
         })),
-        contact_ids: Array.from(
-          new Set(
-            sections.flatMap((section) => contactIdsFromMentions(section.body)),
-          ),
-        ),
+        // Sections are authoritative; the backend parses their actual format.
+        contact_ids: [],
         update_last_contacted: updateLastContacted,
       },
     });

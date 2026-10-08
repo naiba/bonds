@@ -10,6 +10,7 @@ import (
 	"github.com/88250/lute"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/parse"
+	"github.com/88250/lute/render"
 	"github.com/microcosm-cc/bluemonday"
 )
 
@@ -19,16 +20,17 @@ const (
 
 	// Vditor consumes the @ completion trigger, while the legacy editor keeps it.
 	// Rendering, reference validation and merge redirection must accept both saved forms.
-	ContactMentionPattern = `@?\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:([0-9a-fA-F-]{36})\)`
+	contactMarkerPattern = `@?\[(?:\\[\\\]]|[^\]\r\n])+\]\(contact:([0-9a-fA-F-]{36})\)`
 )
 
 var (
-	contactDestinationPattern = regexp.MustCompile(`^contact:([0-9a-fA-F-]{36})$`)
-	contactMentionPattern     = regexp.MustCompile(ContactMentionPattern)
-	fileDestinationPattern    = regexp.MustCompile(`^bonds-file:([1-9][0-9]*)$`)
-	engineOnce                sync.Once
-	engine                    *lute.Lute
-	policy                    *bluemonday.Policy
+	contactDestinationInTextPattern = regexp.MustCompile(`(?:\]\(\s*<?|\]:\s*<?|<)(contact:([0-9a-fA-F-]{36}))`)
+	contactDestinationPattern       = regexp.MustCompile(`^contact:([0-9a-fA-F-]{36})$`)
+	contactMentionPattern           = regexp.MustCompile(contactMarkerPattern)
+	fileDestinationPattern          = regexp.MustCompile(`^bonds-file:([1-9][0-9]*)$`)
+	engineOnce                      sync.Once
+	engine                          *lute.Lute
+	policy                          *bluemonday.Policy
 )
 
 func NormalizeFormat(format string) string {
@@ -79,12 +81,22 @@ func Render(content, format string) string {
 	if NormalizeFormat(format) == FormatPlain {
 		return sanitizer.Sanitize(renderPlain(content))
 	}
-	// The leading @ is part of Bonds' mention marker, not the link label.
-	// Remove it only for rendering; the stored Markdown remains canonical.
-	prepared := contactMentionPattern.ReplaceAllStringFunc(content, func(marker string) string {
-		return strings.TrimPrefix(marker, "@")
+	// Strip the legacy trigger only from parsed links, never code or escaped text.
+	tree := parse.Parse("bonds", []byte(content), configuredLute.ParseOptions)
+	ast.Walk(tree.Root, func(node *ast.Node, entering bool) ast.WalkStatus {
+		if entering && node.Type == ast.NodeLink {
+			_, destination := linkParts(node)
+			if contactDestinationPattern.MatchString(destination) && node.Previous != nil && node.Previous.Type == ast.NodeText {
+				node.Previous.Tokens = []byte(strings.TrimSuffix(node.Previous.TokensStr(), "@"))
+			}
+		}
+		return ast.WalkContinue
 	})
-	return sanitizer.Sanitize(configuredLute.MarkdownStr("bonds", prepared))
+	renderer := render.NewHtmlRenderer(tree, configuredLute.RenderOptions, configuredLute.ParseOptions)
+	for nodeType, rendererFunc := range configuredLute.Md2HTMLRendererFuncs {
+		renderer.ExtRendererFuncs[nodeType] = rendererFunc
+	}
+	return sanitizer.Sanitize(string(renderer.Render()))
 }
 
 func renderPlain(content string) string {

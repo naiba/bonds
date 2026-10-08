@@ -18,7 +18,7 @@ func contactMergeMentionCandidates(column string, sourceIDs []string) (string, [
 	values := make([]any, 0, len(sourceIDs))
 	for _, id := range sourceIDs {
 		conditions = append(conditions, "LOWER("+column+") LIKE ?")
-		values = append(values, "%](contact:"+strings.ToLower(id)+")%")
+		values = append(values, "%contact:"+strings.ToLower(id)+"%")
 	}
 	return "(" + strings.Join(conditions, " OR ") + ")", values
 }
@@ -31,8 +31,8 @@ func contactMergeSourceSet(sourceIDs []string) map[string]bool {
 	return sources
 }
 
-func containsMergeSourceMention(content string, sources map[string]bool) bool {
-	for _, id := range contactMentionIDs(content) {
+func containsMergeSourceMention(content, format string, sources map[string]bool) bool {
+	for _, id := range contactMentionIDs(content, format) {
 		if sources[id] {
 			return true
 		}
@@ -54,7 +54,7 @@ func discoverContactMergeNotes(tx *gorm.DB, vaultID string, sourceIDs []string) 
 	sources := contactMergeSourceSet(sourceIDs)
 	notes := []models.Note{}
 	for _, note := range candidates {
-		if containsMergeSourceMention(note.Body, sources) {
+		if containsMergeSourceMention(note.Body, note.BodyFormat, sources) {
 			notes = append(notes, note)
 		}
 	}
@@ -84,7 +84,7 @@ func lockContactMergeContent(tx *gorm.DB, vaultID string, sourceIDs []string) (c
 		if sources[ptrToStr(activity.PaidByContactID)] {
 			payers = append(payers, activity)
 		}
-		if activity.VaultID == vaultID && containsMergeSourceMention(ptrToStr(activity.Description), sources) {
+		if activity.VaultID == vaultID && containsMergeSourceMention(ptrToStr(activity.Description), activity.DescriptionFormat, sources) {
 			plan.Activities = append(plan.Activities, activity)
 		}
 	}
@@ -98,13 +98,13 @@ func mergeContactContent(tx *gorm.DB, plan contactMergeContentPlan, sourceIDs []
 	sources := contactMergeSourceSet(sourceIDs)
 	for _, note := range plan.Notes {
 		if err := tx.Model(&models.Note{}).Where("id = ? AND vault_id = ?", note.ID, note.VaultID).
-			Update("body", redirectContactMentions(note.Body, sources, targetID)).Error; err != nil {
+			Update("body", redirectContactMentions(note.Body, note.BodyFormat, sources, targetID)).Error; err != nil {
 			return err
 		}
 	}
 	for _, activity := range plan.Activities {
 		if err := tx.Model(&models.Activity{}).Where("id = ? AND vault_id = ?", activity.ID, activity.VaultID).
-			Update("description", redirectContactMentions(ptrToStr(activity.Description), sources, targetID)).Error; err != nil {
+			Update("description", redirectContactMentions(ptrToStr(activity.Description), activity.DescriptionFormat, sources, targetID)).Error; err != nil {
 			return err
 		}
 	}

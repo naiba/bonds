@@ -6,7 +6,7 @@ import { App as AntApp, ConfigProvider } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ContactMentionEditor from "@/components/journal/ContactMentionEditor";
 import {
-  appendMissingContactMentions,
+  prependMissingContactMentions,
   contactIdsFromMentions,
   parseContactMentions,
   serializeContactMention,
@@ -146,10 +146,14 @@ describe("journal contact mention serialization", () => {
 
   it("normalizes legacy associations into stable inline markers without duplicates", () => {
     const alice = { id: CONTACT_ID, name: "Alice" };
-    const normalized = appendMissingContactMentions("Dinner together", [alice]);
+    const normalized = prependMissingContactMentions("Dinner together", [
+      alice,
+    ]);
 
-    expect(normalized).toBe(`Dinner together @[Alice](contact:${CONTACT_ID})`);
-    expect(appendMissingContactMentions(normalized, [alice])).toBe(normalized);
+    expect(normalized).toBe(
+      `@[Alice](contact:${CONTACT_ID})\n\nDinner together`,
+    );
+    expect(prependMissingContactMentions(normalized, [alice])).toBe(normalized);
     expect(contactIdsFromMentions(normalized)).toEqual([CONTACT_ID]);
   });
 });
@@ -174,7 +178,7 @@ it("recognizes Vditor links and legacy mentions without adding duplicate associa
     },
   ]);
   expect(contactIdsFromMentions(body)).toEqual([CONTACT_ID]);
-  expect(appendMissingContactMentions(`Met ${optionValue}`, [contact])).toBe(
+  expect(prependMissingContactMentions(`Met ${optionValue}`, [contact])).toBe(
     `Met ${optionValue}`,
   );
   expect(
@@ -183,3 +187,13 @@ it("recognizes Vditor links and legacy mentions without adding duplicate associa
     ),
   ).toEqual([]);
 });
+
+it.each(["    sample", "```text\nunclosed example"])(
+  "restores associations outside literal blocks: %s",
+  (body) => {
+    const contact = { id: CONTACT_ID, name: "Alice" };
+    expect(prependMissingContactMentions(body, [contact], [])).toBe(
+      `@[Alice](contact:${CONTACT_ID})\n\n${body}`,
+    );
+  },
+);

@@ -181,6 +181,8 @@ function mockLoadedPostQueries(
   },
   nameOrder = "%first_name% %last_name%",
   content = `Hello @[Old Name](contact:${CONTACT_ID})`,
+  contentFormat = "plain",
+  renderedContent?: string,
 ) {
   mockUseQuery.mockImplementation(
     (opts: {
@@ -212,10 +214,12 @@ function mockLoadedPostQueries(
                 id: 2,
                 label: "Body",
                 content,
-                content_format: "plain",
-                rendered_content: content.includes(`contact:${CONTACT_ID}`)
-                  ? `<p><span data-bonds-contact="${CONTACT_ID}" data-bonds-name="Old Name">Old Name</span></p>`
-                  : `<p>${content}</p>`,
+                content_format: contentFormat,
+                rendered_content:
+                  renderedContent ??
+                  (content.includes(`contact:${CONTACT_ID}`)
+                    ? `<p><span data-bonds-contact="${CONTACT_ID}" data-bonds-name="Old Name">Old Name</span></p>`
+                    : `<p>${content}</p>`),
                 position: 0,
               },
             ],
@@ -328,7 +332,7 @@ describe("PostDetail", () => {
     await user.click(screen.getByRole("button", { name: /edit/i }));
     const body = screen.getByRole("textbox", { name: "Body" });
     expect(body).toHaveValue(
-      `A legacy post @[Renamed Person](contact:${CONTACT_ID})`,
+      `@[Renamed Person](contact:${CONTACT_ID})\n\nA legacy post`,
     );
     const updateLastContacted = screen.getByRole("checkbox", {
       name: /update last contacted/i,
@@ -343,15 +347,48 @@ describe("PostDetail", () => {
         sections: [
           {
             label: "Body",
-            content: `A legacy post @[Renamed Person](contact:${CONTACT_ID})`,
+            content: `@[Renamed Person](contact:${CONTACT_ID})\n\nA legacy post`,
             content_format: "markdown",
             position: 0,
           },
         ],
-        contact_ids: [CONTACT_ID],
+        contact_ids: [],
         update_last_contacted: false,
       });
     });
+  });
+
+  it("preserves a legacy association when Markdown contains only its literal example", async () => {
+    const literal = `\`[Example](contact:${CONTACT_ID})\``;
+    mockLoadedPostQueries(
+      undefined,
+      undefined,
+      literal,
+      "markdown",
+      `<p><code>[Example](contact:${CONTACT_ID})</code></p>`,
+    );
+    renderPostDetail();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /edit/i }));
+    const expected = `@[Renamed Person](contact:${CONTACT_ID})\n\n${literal}`;
+    expect(screen.getByRole("textbox", { name: "Body" })).toHaveValue(expected);
+    await user.click(screen.getByRole("button", { name: /save/i }));
+    await waitFor(() =>
+      expect(mockUpdatePost).toHaveBeenCalledWith(
+        "v1",
+        1,
+        1,
+        expect.objectContaining({
+          contact_ids: [],
+          sections: [
+            expect.objectContaining({
+              content: expected,
+              content_format: "markdown",
+            }),
+          ],
+        }),
+      ),
+    );
   });
 
   it("keeps a newer edit draft open when an older update completes", async () => {
@@ -387,7 +424,7 @@ describe("PostDetail", () => {
           position: 0,
         },
       ],
-      contact_ids: [CONTACT_ID],
+      contact_ids: [],
       update_last_contacted: false,
     });
 

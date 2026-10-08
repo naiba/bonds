@@ -87,11 +87,11 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 		EmotionID:  req.EmotionID,
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body)
+		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body, note.BodyFormat)
 		if err != nil {
 			return err
 		}
-		if err := validateContentMentions(req.Body, "", live); err != nil {
+		if err := validateContentMentions(req.Body, note.BodyFormat, "", "", live); err != nil {
 			return err
 		}
 		if err := tx.Create(&note).Error; err != nil {
@@ -128,7 +128,7 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 	}
 	var note models.Note
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body)
+		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body, req.BodyFormat)
 		if err != nil {
 			return err
 		}
@@ -138,7 +138,11 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 			}
 			return err
 		}
-		if err := validateContentMentions(req.Body, note.Body, live); err != nil {
+		format := req.BodyFormat
+		if format == "" {
+			format = note.BodyFormat
+		}
+		if err := validateContentMentions(req.Body, format, note.Body, note.BodyFormat, live); err != nil {
 			return err
 		}
 		note.Title = strPtrOrNil(strings.TrimSpace(req.Title))

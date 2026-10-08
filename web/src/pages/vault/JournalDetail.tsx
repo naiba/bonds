@@ -49,7 +49,6 @@ import { buildCalendarAwareValue } from "@/components/calendarAwareDateValue";
 import type { CalendarAwareDateValue } from "@/components/calendarAwareDateValue";
 import MarkdownEditor from "@/components/markdown/MarkdownEditor";
 import PostContactTags from "@/components/journal/PostContactTags";
-import { contactIdsFromMentions } from "@/components/journal/contactMentionSerialization";
 
 const { Title, Text } = Typography;
 
@@ -842,7 +841,8 @@ export default function JournalDetail() {
                     position: 0,
                   },
                 ],
-                contact_ids: contactIdsFromMentions(postBody),
+                // The backend derives links from Markdown, excluding code examples.
+                contact_ids: [],
                 update_last_contacted: updateLastContacted,
               },
             })

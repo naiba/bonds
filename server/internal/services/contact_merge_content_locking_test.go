@@ -236,3 +236,79 @@ func TestContentWriterRejectsConcurrentMergedMention(t *testing.T) {
 		})
 	}
 }
+
+func TestActivityOmittedFormatCannotRestoreForeignParticipants(t *testing.T) {
+	f := setupContactMergeContent(t)
+	if f.svc.db.Dialector.Name() != "postgres" {
+		t.Skip("PostgreSQL concurrent format update")
+	}
+	foreign, err := NewVaultService(f.svc.db).CreateVault(f.account, f.user, dto.CreateVaultRequest{Name: "Other space"}, "en")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.db.Model(&models.Contact{}).Where("id = ?", f.source).Update("vault_id", foreign.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	locked, resume := make(chan struct{}), make(chan struct{})
+	var paused atomic.Bool
+	hook := "activity_format:pause_initial_read"
+	if err := f.svc.db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
+		if tx.Error != nil || tx.Statement.Context.Value(contentMutationContextKey{}) != true {
+			return
+		}
+		if _, ok := tx.Statement.Dest.(*models.Activity); !ok {
+			return
+		}
+		if _, ok := tx.Statement.Clauses["FOR"]; ok {
+			return
+		}
+		if paused.CompareAndSwap(false, true) {
+			close(locked)
+			select {
+			case <-resume:
+			case <-time.After(15 * time.Second):
+				tx.AddError(errors.New("format barrier timed out"))
+			}
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer f.svc.db.Callback().Query().Remove(hook)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completed := make(chan error, 1)
+	go func() {
+		req := f.activityRequest("`" + f.body + "`")
+		req.DescriptionFormat = ""
+		req.ParticipantIDs = nil
+		_, err := NewActivityService(f.svc.db.WithContext(context.WithValue(ctx, contentMutationContextKey{}, true))).UpdateForUser(f.vault, f.user, f.activity.ID, req)
+		completed <- err
+	}()
+	awaitMergeBoundarySignal(t, locked)
+	// Preserve a historical foreign link, while explicitly retaining no participants.
+	changed := f.activityRequest(f.body)
+	changed.DescriptionFormat = "plain"
+	_, changeErr := NewActivityService(f.svc.db).UpdateForUser(f.vault, f.user, f.activity.ID, changed)
+	close(resume)
+	writeErr := awaitMergeBoundaryError(t, completed)
+	if changeErr != nil {
+		t.Fatal(changeErr)
+	}
+	if !errors.Is(writeErr, ErrContactNotFound) {
+		t.Errorf("stale format writer accepted foreign participant: %v", writeErr)
+	}
+	var count int64
+	if err := f.svc.db.Model(&models.ActivityParticipant{}).Where("activity_id = ?", f.activity.ID).Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("cross-vault participant persisted: %d", count)
+	}
+	stored, err := NewActivityService(f.svc.db).Get(f.vault, f.user, f.activity.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stored.Description != f.body || stored.DescriptionFormat != "plain" {
+		t.Fatal("rejected write changed stored activity")
+	}
+}

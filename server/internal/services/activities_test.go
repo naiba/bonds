@@ -123,7 +123,7 @@ func TestActivityMarkdownRendersAndTracksUploadedFiles(t *testing.T) {
 
 func TestContactMentionIDsDedupe(t *testing.T) {
 	id := "550e8400-e29b-41d4-a716-446655440000"
-	ids := contactMentionIDs("hi @[A](contact:" + id + ") and @[Again](contact:" + id + ")")
+	ids := contactMentionIDs("hi @[A](contact:"+id+") and @[Again](contact:"+id+")", "plain")
 	if len(ids) != 1 || ids[0] != id {
 		t.Fatalf("ids=%v", ids)
 	}

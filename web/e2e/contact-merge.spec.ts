@@ -181,9 +181,13 @@ for (const viewport of [
     await notesCard.getByRole("button", { name: /add/i }).click();
     const noteDialog = page.getByRole("dialog");
     await noteDialog.getByPlaceholder(/title/i).fill("Shared project");
+    // Save code examples and a real completion together. Unknown and source
+    // UUIDs inside code must neither block saving nor change during the merge.
+    const literalText = `[Unknown](contact:550e8400-e29b-41d4-a716-446655440000) [Alicia Chen](contact:${contacts[1].id})`;
+    const notePrefix = `Literal examples: \`${literalText}\` `;
     await noteDialog
       .getByRole("textbox", { name: /write your note/i })
-      .pressSequentially("Met @Alicia", { delay: 50 });
+      .pressSequentially(`${notePrefix}Met @Alicia`, { delay: 10 });
     await page
       .locator(".vditor-hint")
       .getByRole("button", { name: "Alicia Chen", exact: true })
@@ -199,11 +203,15 @@ for (const viewport of [
     const savedNote = (await noteResponse.json()).data;
     const noteId = savedNote.id;
     expect(savedNote.body.trim()).toBe(
-      `Met [Alicia Chen](contact:${contacts[1].id})`,
+      `${notePrefix}Met [Alicia Chen](contact:${contacts[1].id})`,
+    );
+    expect(savedNote.rendered_body.match(/data-bonds-contact=/g)).toHaveLength(
+      1,
     );
     await expect(
       notesCard.getByRole("link", { name: "Alicia Chen", exact: true }),
     ).toHaveAttribute("href", `/vaults/${vaultId}/contacts/${contacts[1].id}`);
+    await expect(notesCard.locator("code")).toHaveText(literalText);
     await page.goto(`/vaults/${vaultId}/contacts`);
     const table = page.getByRole("table");
     await expect(table.getByText("Alice Chen", { exact: true })).toBeVisible();
@@ -383,7 +391,10 @@ for (const viewport of [
       expect.arrayContaining([
         expect.objectContaining({
           id: noteId,
-          body: savedNote.body.replaceAll(contacts[1].id, retainedId),
+          body: savedNote.body.replace(
+            `Met [Alicia Chen](contact:${contacts[1].id})`,
+            `Met [Alicia Chen](contact:${retainedId})`,
+          ),
         }),
       ]),
     );
@@ -393,6 +404,9 @@ for (const viewport of [
       ),
     ).toHaveLength(0);
     expect(noteData).toHaveLength(1);
+    expect(
+      noteData[0].rendered_body.match(/data-bonds-contact=/g),
+    ).toHaveLength(1);
     for (const contact of contacts.filter(
       (contact) => contact.id !== retainedId,
     )) {
