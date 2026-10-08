@@ -110,7 +110,11 @@ func (s *ActivityService) CreateForUser(vaultID, userID string, req dto.Activity
 		event.SubjectUserName = &subjectName
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+		live, err := lockContentContacts(tx, vaultID, contactIDs, req.Description)
+		if err != nil {
+			return err
+		}
+		if err := validateContentMentions(req.Description, "", live); err != nil {
 			return err
 		}
 		if err := tx.Create(&event).Error; err != nil {
@@ -169,7 +173,18 @@ func (s *ActivityService) UpdateForUser(vaultID, userID string, id uint, req dto
 		return nil, ErrInvalidActivityTime
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+		live, err := lockContentContacts(tx, vaultID, contactIDs, req.Description)
+		if err != nil {
+			return err
+		}
+		var stored models.Activity
+		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", id, vaultID).First(&stored).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrActivityNotFound
+			}
+			return err
+		}
+		if err := validateContentMentions(req.Description, ptrToStr(stored.Description), live); err != nil {
 			return err
 		}
 		if err := tx.Save(&replacement).Error; err != nil {

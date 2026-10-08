@@ -25,6 +25,13 @@ func lockContactMergeOwners(tx *gorm.DB, vaultID string, req dto.MergeContactsRe
 		return nil, nil, err
 	}
 	ownerIDs = append(ownerIDs, introducerOwners...)
+	notes, err := discoverContactMergeNotes(tx, vaultID, req.SourceContactIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, note := range notes {
+		ownerIDs = append(ownerIDs, note.ContactID)
+	}
 	var owners []models.Contact
 	if err := tx.Unscoped().Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id IN ?", ownerIDs).Order("id ASC").Find(&owners).Error; err != nil {
 		return nil, nil, err

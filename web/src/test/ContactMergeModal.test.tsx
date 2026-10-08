@@ -49,7 +49,13 @@ const preview = {
       options: [{ contact_id: "alicia", value: "Vegetarian" }],
     },
   ],
-  effects: { removed_contacts: 1, notes: 3, redirected_relationships: 2 },
+  effects: {
+    removed_contacts: 1,
+    notes: 3,
+    note_mentions: 2,
+    activity_mentions: 1,
+    redirected_relationships: 2,
+  },
   blockers: [] as string[],
 };
 function renderMerge() {
@@ -114,6 +120,14 @@ describe("Contact merge review", () => {
     expect(
       screen.getByText(
         /DAV accepts ordinary edits and retains unchanged details/,
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText("Redirect contact mentions in 2 note(s)."),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "Redirect contact mentions in 1 activity description(s).",
       ),
     ).toBeVisible();
     const confirm = screen.getByRole("button", { name: "Confirm merge" });

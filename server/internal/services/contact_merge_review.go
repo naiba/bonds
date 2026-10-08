@@ -24,6 +24,7 @@ type contactMergeReview struct {
 	payerChanges        []models.Activity
 	referenceOwners     []models.Contact
 	posts               contactMergePostPlan
+	content             contactMergeContentPlan
 }
 
 func (s *ContactService) PreviewContactMerge(vaultID, userID string, req dto.MergeContactsRequest) (*dto.ContactMergePreview, error) {
@@ -185,8 +186,16 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 
 	// A moved contact can still pay for an activity in its former vault.
 	// Authorize and lock only source references, then execute this exact plan.
-	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("paid_by_contact_id IN ?", req.SourceContactIDs).Order("id ASC").Find(&review.payerChanges).Error; err != nil {
+	content, payers, err := lockContactMergeContent(tx, vaultID, req.SourceContactIDs)
+	if err != nil {
 		return nil, err
+	}
+	review.content, review.payerChanges = content, payers
+	if len(content.Notes) > 0 {
+		review.Effects["note_mentions"] = int64(len(content.Notes))
+	}
+	if len(content.Activities) > 0 {
+		review.Effects["activity_mentions"] = int64(len(content.Activities))
 	}
 	affectedVaults := []string{}
 	for _, owner := range owners {
@@ -279,7 +288,7 @@ func buildContactMergePreview(tx *gorm.DB, vaultID, userID string, req dto.Merge
 	}
 	// Hashes are only concurrency guards, never persisted snapshots. Include all
 	// contact versions and affected reference contents, even if counts are equal.
-	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges, review.posts})
+	payload, err := json.Marshal([]any{review, contacts, owners, groups, relationships, review.payerChanges, review.posts, review.content})
 	if err != nil {
 		return nil, err
 	}

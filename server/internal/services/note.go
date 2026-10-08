@@ -87,7 +87,11 @@ func (s *NoteService) Create(contactID, vaultID, authorID string, req dto.Create
 		EmotionID:  req.EmotionID,
 	}
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body)
+		if err != nil {
+			return err
+		}
+		if err := validateContentMentions(req.Body, "", live); err != nil {
 			return err
 		}
 		if err := tx.Create(&note).Error; err != nil {
@@ -124,13 +128,17 @@ func (s *NoteService) Update(id uint, contactID, vaultID string, req dto.UpdateN
 	}
 	var note models.Note
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+		live, err := lockContentContacts(tx, vaultID, []string{contactID}, req.Body)
+		if err != nil {
 			return err
 		}
 		if err := tx.Where("id = ? AND contact_id = ? AND vault_id = ?", id, contactID, vaultID).First(&note).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrNoteNotFound
 			}
+			return err
+		}
+		if err := validateContentMentions(req.Body, note.Body, live); err != nil {
 			return err
 		}
 		note.Title = strPtrOrNil(strings.TrimSpace(req.Title))

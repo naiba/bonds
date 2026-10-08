@@ -35,6 +35,7 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 	}
 	var target models.Contact
 	var result dto.ContactResponse
+	var updatedNoteIDs []uint
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := NewVaultService(tx).CheckUserVaultAccess(userID, vaultID, models.PermissionEditor); err != nil {
 			return err
@@ -59,6 +60,12 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 				return ErrContactMergeReviewChanged
 			}
 		}
+		for _, note := range review.content.Notes {
+			if !lockedOwners[note.ContactID] {
+				return ErrContactMergeReviewChanged
+			}
+			updatedNoteIDs = append(updatedNoteIDs, note.ID)
+		}
 		if len(review.Blockers) != 0 {
 			return ErrContactMergeBlocked
 		}
@@ -79,6 +86,9 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 			}
 		}
 		if err := mergeContactPostMentions(tx, review.posts.Sections, req.SourceContactIDs, target.ID); err != nil {
+			return err
+		}
+		if err := mergeContactContent(tx, review.content, req.SourceContactIDs, target.ID); err != nil {
 			return err
 		}
 		for _, activity := range review.payerChanges {
@@ -157,7 +167,7 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 			log.Printf("[contact-merge] search contact: %v", err)
 		}
 		var notes []models.Note
-		if err := s.db.Where("contact_id = ?", target.ID).Find(&notes).Error; err != nil {
+		if err := s.db.Where("contact_id = ? OR id IN ?", target.ID, updatedNoteIDs).Find(&notes).Error; err != nil {
 			log.Printf("[contact-merge] load search notes: %v", err)
 		} else {
 			for i := range notes {

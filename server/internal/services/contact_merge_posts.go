@@ -127,25 +127,13 @@ func mergeContactPostMentions(tx *gorm.DB, sections []models.PostSection, source
 	linkedPosts := make(map[uint]bool)
 	for _, section := range sections {
 		content := ptrToStr(section.Content)
-		var body strings.Builder
-		start := 0
-		// Change only the ID capture of the existing mention grammar. Keeping
-		// display names and every other byte preserves prose, escapes, formatting
-		// and file references; a global UUID replacement would corrupt plain text.
-		for _, match := range contactMentionPattern.FindAllStringSubmatchIndex(content, -1) {
-			if sources[strings.ToLower(content[match[2]:match[3]])] {
-				body.WriteString(content[start:match[2]])
-				body.WriteString(targetID)
-				start = match[3]
-			}
-		}
-		if start == 0 {
+		body := redirectContactMentions(content, sources, targetID)
+		if body == content {
 			continue
 		}
-		body.WriteString(content[start:])
 		// The association and its authoritative inline reference must commit
 		// together, otherwise even a title edit fails after the source is deleted.
-		if err := tx.Model(&models.PostSection{}).Where("id = ? AND post_id = ?", section.ID, section.PostID).Update("content", body.String()).Error; err != nil {
+		if err := tx.Model(&models.PostSection{}).Where("id = ? AND post_id = ?", section.ID, section.PostID).Update("content", body).Error; err != nil {
 			return err
 		}
 		if !linkedPosts[section.PostID] {

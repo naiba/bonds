@@ -59,12 +59,40 @@ for (const viewport of [
         headers,
         data: {
           title: "Shared project",
-          body: "Met at the synthetic gardening club.",
+          body: `Met @[Alicia Chen](contact:${contacts[1].id}) at the synthetic gardening club.`,
+          body_format: "markdown",
         },
       },
     );
     expect(noteResponse.status()).toBe(201);
     const noteId = (await noteResponse.json()).data.id;
+    const categoriesResponse = await request.get(
+      apiUrl(`/vaults/${vaultId}/settings/activityCategories`),
+      { headers },
+    );
+    expect(categoriesResponse.status()).toBe(200);
+    const categories: { types?: { id: number }[] }[] = (
+      await categoriesResponse.json()
+    ).data;
+    const activityTypeId = categories.flatMap(
+      (category) => category.types ?? [],
+    )[0]?.id;
+    expect(activityTypeId).toBeDefined();
+    const activityResponse = await request.post(
+      apiUrl(`/vaults/${vaultId}/activities`),
+      {
+        headers,
+        data: {
+          title: "Synthetic gardening memory",
+          activity_type_id: activityTypeId,
+          primary_contact_id: contacts[1].id,
+          description: `Walked with @[Alicia Chen](contact:${contacts[1].id}).`,
+          description_format: "markdown",
+        },
+      },
+    );
+    expect(activityResponse.status()).toBe(201);
+    const activityId = (await activityResponse.json()).data.id;
     const journalResponse = await request.post(
       apiUrl(`/vaults/${vaultId}/journals`),
       {
@@ -326,7 +354,7 @@ for (const viewport of [
       expect.arrayContaining([
         expect.objectContaining({
           id: noteId,
-          body: "Met at the synthetic gardening club.",
+          body: `Met @[Alicia Chen](contact:${retainedId}) at the synthetic gardening club.`,
         }),
       ]),
     );
@@ -345,6 +373,77 @@ for (const viewport of [
       );
       expect(removed.status()).toBe(404);
     }
+    // Both migrated ownership and rendered content links must resolve to the survivor.
+    if (viewport.name === "mobile") {
+      await page.getByRole("combobox", { name: "Jump to section" }).click();
+      // Ant Select virtualizes its accessibility options; choose the visible item.
+      await page
+        .locator(".ant-select-dropdown")
+        .getByText("Notes and records", { exact: true })
+        .click();
+    } else {
+      await page
+        .getByRole("navigation", { name: "Contact sections" })
+        .getByRole("button", { name: "Notes and records", exact: true })
+        .click();
+    }
+    const noteLink = page
+      .getByRole("link", { name: "Alicia Chen", exact: true })
+      .first();
+    await expect(noteLink).toBeVisible();
+    await noteLink.scrollIntoViewIfNeeded();
+    await expect(noteLink).toBeInViewport();
+    await expect(noteLink).toHaveAttribute(
+      "href",
+      `/vaults/${vaultId}/contacts/${retainedId}`,
+    );
+    if (evidenceDirectory)
+      await page.screenshot({
+        path: join(
+          evidenceDirectory,
+          `contact-merge-${viewport.name}-note.png`,
+        ),
+        animations: "disabled",
+      });
+    await noteLink.click();
+    await expect(page).toHaveURL(new RegExp(`/contacts/${retainedId}$`));
+    const migratedActivityResponse = await request.get(
+      apiUrl(`/vaults/${vaultId}/activities/${activityId}`),
+      { headers },
+    );
+    expect(migratedActivityResponse.status()).toBe(200);
+    const migratedActivity = (await migratedActivityResponse.json()).data;
+    expect(migratedActivity.description).toBe(
+      `Walked with @[Alicia Chen](contact:${retainedId}).`,
+    );
+    expect(migratedActivity.participants).toEqual([
+      expect.objectContaining({ id: retainedId }),
+    ]);
+    expect(migratedActivity.mentioned_contacts).toEqual([
+      expect.objectContaining({ id: retainedId }),
+    ]);
+    await page.goto(`/vaults/${vaultId}/activities/${activityId}`);
+    const activityLink = page
+      .locator("p")
+      .filter({ hasText: "Walked with" })
+      .getByRole("link");
+    await expect(activityLink).toHaveAttribute(
+      "href",
+      `/vaults/${vaultId}/contacts/${retainedId}`,
+    );
+    if (evidenceDirectory)
+      await page.screenshot({
+        path: join(
+          evidenceDirectory,
+          `contact-merge-${viewport.name}-activity.png`,
+        ),
+        animations: "disabled",
+      });
+    await activityLink.click();
+    await expect(page).toHaveURL(new RegExp(`/contacts/${retainedId}$`));
+    await expect(
+      page.getByText("Alice Chen", { exact: true }).first(),
+    ).toBeVisible();
     await page.goto(`/vaults/${vaultId}/contacts`);
     await expect(table.getByText("Alice Chen", { exact: true })).toBeVisible();
     await expect(table.getByRole("row")).toHaveCount(2);

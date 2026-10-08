@@ -657,6 +657,8 @@
       "effects": {
         "removed_contacts": "Remove {{count}} source contact(s).",
         "notes": "Move {{count}} note(s).",
+        "note_mentions": "Redirecionar menções a contactos em {{count}} nota(s).",
+        "activity_mentions": "Redirecionar menções a contactos em {{count}} descrição(ões) de atividade.",
         "contact_information": "Move {{count}} contact information record(s).",
         "addresses": "Move {{count}} address link(s).",
         "reminders": "Move {{count}} reminder(s), keeping their schedules.",

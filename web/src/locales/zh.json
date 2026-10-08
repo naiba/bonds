@@ -657,6 +657,8 @@
       "effects": {
         "removed_contacts": "删除 {{count}} 个来源联系人。",
         "notes": "迁移 {{count}} 条笔记。",
+        "note_mentions": "重定向 {{count}} 篇笔记中的联系人提及。",
+        "activity_mentions": "重定向 {{count}} 条活动描述中的联系人提及。",
         "contact_information": "迁移 {{count}} 条联系信息。",
         "addresses": "迁移 {{count}} 个地址关联。",
         "reminders": "迁移 {{count}} 个提醒，保留调度时间。",
