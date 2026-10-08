@@ -13,16 +13,6 @@ type contactMergeContentPlan struct {
 	Activities []models.Activity
 }
 
-func contactMergeMentionCandidates(column string, sourceIDs []string) (string, []any) {
-	conditions := make([]string, 0, len(sourceIDs))
-	values := make([]any, 0, len(sourceIDs))
-	for _, id := range sourceIDs {
-		conditions = append(conditions, "LOWER("+column+") LIKE ?")
-		values = append(values, "%contact:"+strings.ToLower(id)+"%")
-	}
-	return "(" + strings.Join(conditions, " OR ") + ")", values
-}
-
 func contactMergeSourceSet(sourceIDs []string) map[string]bool {
 	sources := make(map[string]bool, len(sourceIDs))
 	for _, id := range sourceIDs {
@@ -40,15 +30,16 @@ func containsMergeSourceMention(content, format string, sources map[string]bool)
 	return false
 }
 
+// Markdown can encode every character of a destination. SQL substring filters
+// cannot safely preselect references; parse vault-scoped bodies with the renderer.
 // Notes have both a vault and a contact owner. Do not use a textual match to
 // authorize changing another vault's history (including legacy mismatched rows).
 func discoverContactMergeNotes(tx *gorm.DB, vaultID string, sourceIDs []string) ([]models.Note, error) {
-	condition, values := contactMergeMentionCandidates("notes.body", sourceIDs)
 	var candidates []models.Note
 	if err := tx.Model(&models.Note{}).Select("notes.*").
 		Joins("JOIN contacts ON contacts.id = notes.contact_id").
 		Where("notes.vault_id = ? AND contacts.vault_id = ? AND contacts.deleted_at IS NULL", vaultID, vaultID).
-		Where(condition, values...).Order("notes.id ASC").Find(&candidates).Error; err != nil {
+		Order("notes.id ASC").Find(&candidates).Error; err != nil {
 		return nil, err
 	}
 	sources := contactMergeSourceSet(sourceIDs)
@@ -70,11 +61,10 @@ func lockContactMergeContent(tx *gorm.DB, vaultID string, sourceIDs []string) (c
 	plan.Notes = notes // Their parent contacts are locked before the merge review.
 	// Lock all affected activity rows in the same order, before participant rows.
 	// A description may mention a source even when participant_ids is explicitly empty.
-	condition, values := contactMergeMentionCandidates("description", sourceIDs)
 	participants := tx.Model(&models.ActivityParticipant{}).Select("activity_id").Where("contact_id IN ?", sourceIDs)
 	var activities []models.Activity
 	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
-		Where("paid_by_contact_id IN ? OR id IN (?) OR (vault_id = ? AND "+condition+")", append([]any{sourceIDs, participants, vaultID}, values...)...).
+		Where("paid_by_contact_id IN ? OR id IN (?) OR vault_id = ?", sourceIDs, participants, vaultID).
 		Order("id ASC").Find(&activities).Error; err != nil {
 		return plan, nil, err
 	}

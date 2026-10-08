@@ -184,6 +184,8 @@ for (const viewport of [
     // Save code examples and a real completion together. Unknown and source
     // UUIDs inside code must neither block saving nor change during the merge.
     const literalText = `[Unknown](contact:550e8400-e29b-41d4-a716-446655440000) [Alicia Chen](contact:${contacts[1].id})`;
+    const encodedLinks = (id: string, escapedID = false) =>
+      `[Encoded colon](contact\\:${id}) [Encoded entity](contact&#58;${id}) [Encoded ID](contact:${escapedID ? id.replaceAll("-", "\\-") : id})`;
     const notePrefix = `Literal examples: \`${literalText}\` `;
     await noteDialog
       .getByRole("textbox", { name: /write your note/i })
@@ -192,6 +194,11 @@ for (const viewport of [
       .locator(".vditor-hint")
       .getByRole("button", { name: "Alicia Chen", exact: true })
       .click();
+    // Insert the encoded Markdown as a single pasted text input. Vditor IR
+    // reparses entity keystrokes mid-token and can move the typing caret.
+    await noteDialog.getByRole("textbox", { name: /write your note/i })
+      .press("ControlOrMeta+End");
+    await page.keyboard.insertText(` ${encodedLinks(contacts[1].id, true)}`);
     const noteSaved = page.waitForResponse(
       (response) =>
         response.url().endsWith(`/contacts/${contacts[1].id}/notes`) &&
@@ -203,10 +210,10 @@ for (const viewport of [
     const savedNote = (await noteResponse.json()).data;
     const noteId = savedNote.id;
     expect(savedNote.body.trim()).toBe(
-      `${notePrefix}Met [Alicia Chen](contact:${contacts[1].id})`,
+      `${notePrefix}Met [Alicia Chen](contact:${contacts[1].id}) ${encodedLinks(contacts[1].id, true)}`,
     );
     expect(savedNote.rendered_body.match(/data-bonds-contact=/g)).toHaveLength(
-      1,
+      4,
     );
     await expect(
       notesCard.getByRole("link", { name: "Alicia Chen", exact: true }),
@@ -391,7 +398,9 @@ for (const viewport of [
       expect.arrayContaining([
         expect.objectContaining({
           id: noteId,
-          body: savedNote.body.replace(
+          body: savedNote.body
+            .replace(encodedLinks(contacts[1].id, true), encodedLinks(retainedId, retainedId === contacts[1].id))
+            .replace(
             `Met [Alicia Chen](contact:${contacts[1].id})`,
             `Met [Alicia Chen](contact:${retainedId})`,
           ),
@@ -406,7 +415,7 @@ for (const viewport of [
     expect(noteData).toHaveLength(1);
     expect(
       noteData[0].rendered_body.match(/data-bonds-contact=/g),
-    ).toHaveLength(1);
+    ).toHaveLength(4);
     for (const contact of contacts.filter(
       (contact) => contact.id !== retainedId,
     )) {
@@ -429,6 +438,18 @@ for (const viewport of [
         .getByRole("navigation", { name: "Contact sections" })
         .getByRole("button", { name: "Notes and records", exact: true })
         .click();
+    }
+    for (const name of ["Encoded colon", "Encoded entity", "Encoded ID"]) {
+      const encodedLink = page.getByRole("link", { name, exact: true });
+      await expect(encodedLink).toHaveAttribute(
+        "href", `/vaults/${vaultId}/contacts/${retainedId}`,
+      );
+      await encodedLink.click();
+      await expect(page).toHaveURL(`/vaults/${vaultId}/contacts/${retainedId}`);
+      const resolved = await request.get(
+        apiUrl(`/vaults/${vaultId}/contacts/${retainedId}`), { headers },
+      );
+      expect(resolved.status()).toBe(200);
     }
     const noteLink = page
       .getByRole("link", { name: "Alicia Chen", exact: true })

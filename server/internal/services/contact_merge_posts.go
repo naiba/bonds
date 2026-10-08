@@ -26,23 +26,15 @@ func discoverContactMergePostIDs(tx *gorm.DB, vaultID string, sourceIDs []string
 	for _, id := range associated {
 		ids[id] = true
 	}
-	sources := make(map[string]bool, len(sourceIDs))
-	conditions := make([]string, 0, len(sourceIDs))
-	values := make([]any, 0, len(sourceIDs))
-	for _, id := range sourceIDs {
-		sources[strings.ToLower(id)] = true
-		conditions = append(conditions, "LOWER(post_sections.content) LIKE ?")
-		values = append(values, "%contact:"+strings.ToLower(id)+"%")
-	}
+	sources := contactMergeSourceSet(sourceIDs)
 	var sections []models.PostSection
-	if len(conditions) > 0 {
-		if err := tx.Model(&models.PostSection{}).Select("post_sections.post_id", "post_sections.content", "post_sections.content_format").
-			Joins("JOIN posts ON posts.id = post_sections.post_id").
-			Joins("JOIN journals ON journals.id = posts.journal_id").
-			Where("journals.vault_id = ?", vaultID).
-			Where("("+strings.Join(conditions, " OR ")+")", values...).Find(&sections).Error; err != nil {
-			return nil, err
-		}
+	// Do not prefilter by literal UUID: Markdown destinations may encode any of
+	// its characters. Keep the vault boundary and let the shared parser decide.
+	if err := tx.Model(&models.PostSection{}).Select("post_sections.post_id", "post_sections.content", "post_sections.content_format").
+		Joins("JOIN posts ON posts.id = post_sections.post_id").
+		Joins("JOIN journals ON journals.id = posts.journal_id").
+		Where("journals.vault_id = ?", vaultID).Find(&sections).Error; err != nil {
+		return nil, err
 	}
 	for _, section := range sections {
 		for _, id := range contactMentionIDs(ptrToStr(section.Content), section.ContentFormat) {

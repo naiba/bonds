@@ -24,13 +24,12 @@ const (
 )
 
 var (
-	contactDestinationInTextPattern = regexp.MustCompile(`(?:\]\(\s*<?|\]:\s*<?|<)(contact:([0-9a-fA-F-]{36}))`)
-	contactDestinationPattern       = regexp.MustCompile(`^contact:([0-9a-fA-F-]{36})$`)
-	contactMentionPattern           = regexp.MustCompile(contactMarkerPattern)
-	fileDestinationPattern          = regexp.MustCompile(`^bonds-file:([1-9][0-9]*)$`)
-	engineOnce                      sync.Once
-	engine                          *lute.Lute
-	policy                          *bluemonday.Policy
+	contactDestinationPattern = regexp.MustCompile(`^contact:([0-9a-fA-F-]{36})$`)
+	contactMentionPattern     = regexp.MustCompile(contactMarkerPattern)
+	fileDestinationPattern    = regexp.MustCompile(`^bonds-file:([1-9][0-9]*)$`)
+	engineOnce                sync.Once
+	engine                    *lute.Lute
+	policy                    *bluemonday.Policy
 )
 
 func NormalizeFormat(format string) string {

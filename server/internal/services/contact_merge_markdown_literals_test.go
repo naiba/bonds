@@ -10,12 +10,16 @@ import (
 )
 
 func TestContactMergePreservesMarkdownLiteralExamples(t *testing.T) {
-	for _, kind := range []string{"inline_code", "fenced_code", "escaped_link", "image_label"} {
+	for _, kind := range []string{"inline_code", "fenced_code", "escaped_link", "image_label", "nested_link", "footnote"} {
 		t.Run(kind, func(t *testing.T) {
 			f := setupContactMergeContent(t)
 			literal := "[Duplicate](contact:" + f.source + ")"
 			var body string
 			switch kind {
+			case "nested_link":
+				body = "[outer <contact:" + f.source + ">](https://example.test)"
+			case "footnote":
+				body = "Text[^friend]\n\n[^friend]: " + literal
 			case "inline_code":
 				body = "Example: `" + literal + "`"
 			case "fenced_code":

@@ -53,3 +53,51 @@ func TestContactReferencesFollowMarkdownRendering(t *testing.T) {
 		t.Fatalf("plain markers changed: %+v", refs)
 	}
 }
+
+func TestEncodedContactReferencesFollowRendering(t *testing.T) {
+	const id = "550e8400-e29b-41d4-a716-446655440000"
+	for _, destination := range []string{
+		"contact:" + id, `contact\:` + id, "contact&#58;" + id,
+		"contact&colon;" + id, "&#99;ontact:" + id,
+		"contact:" + strings.ReplaceAll(id, "-", `\-`),
+		"contact:&#53;" + id[1:], "contact:" + strings.ReplaceAll(id, "-", "&#x2d;"),
+		"contact&#92;:" + id,
+	} {
+		for name, body := range map[string]string{
+			"inline":                "[Alice](" + destination + ")",
+			"nested_autolink_label": "[outer <" + destination + ">](https://example.test)",
+			"footnote":              "Text[^friend]\n\n[^friend]: [Alice](" + destination + ")",
+			"heart_label":           "[<3](" + destination + ")",
+			"heart_reference_label": "[<3][friend]\n\n[friend]: " + destination,
+			"preceding_less_than":   "<text>[Alice](" + destination + ")",
+			"legacy":                "@[Alice](" + destination + ")",
+			"angle":                 "[Alice](<" + destination + ">)",
+			"reference":             "[Alice][friend]\n\n[friend]: " + destination,
+			"autolink":              "<" + destination + ">",
+			"code":                  "`[Alice](" + destination + ")`",
+			"escaped":               `\[Alice](` + destination + ")",
+			"fence":                 "```\n[Alice](" + destination + ")\n```",
+			"image":                 "![Alice](" + destination + ")",
+			"image_label":           "![sample [Alice](" + destination + ")](https://example.test/photo.png)",
+			"unused":                "[friend]: " + destination,
+		} {
+			t.Run(destination+"/"+name, func(t *testing.T) {
+				refs := ContactReferences(body, FormatMarkdown)
+				rendered := Render(body, FormatMarkdown)
+				count := strings.Count(rendered, `data-bonds-contact="`+id+`"`)
+				if len(refs) != count {
+					t.Fatalf("refs=%+v rendered=%s", refs, rendered)
+				}
+				for _, ref := range refs {
+					if ref.ID != id {
+						t.Fatalf("decoded ID=%q", ref.ID)
+					}
+					changed := body[:ref.Start] + "660e8400-e29b-41d4-a716-446655440000" + body[ref.End:]
+					if !strings.Contains(Render(changed, FormatMarkdown), `data-bonds-contact="660e8400-e29b-41d4-a716-446655440000"`) {
+						t.Fatalf("wrong source offsets %+v: %s", ref, changed)
+					}
+				}
+			})
+		}
+	}
+}
