@@ -40,16 +40,7 @@ func (b *CardDAVBackend) addContactPhoto(card vcard.Card, contact *models.Contac
 	if err != nil || !filepath.IsLocal(relativePath) {
 		return nil
 	}
-	root, err := os.OpenRoot(rootPath)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("open CardDAV photo storage: %w", err)
-	}
-	defer root.Close()
-	// Root.Open also confines symlinks, including legacy imported file paths.
-	file, err := root.Open(relativePath)
+	file, err := openCardDAVPhoto(rootPath, relativePath)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}

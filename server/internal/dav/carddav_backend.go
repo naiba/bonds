@@ -1,7 +1,6 @@
 package dav
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -172,6 +171,12 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, re
 		if err != nil {
 			return nil, err
 		}
+		// PROPFIND asks for metadata with an empty request. Hash the complete
+		// representation first, then release PHOTO before accumulating objects:
+		// a getetag sync must not retain every avatar in the address book.
+		if request != nil && !request.AllProp && len(request.Props) == 0 {
+			delete(object.Card, vcard.FieldPhoto)
+		}
 		objects = append(objects, *object)
 	}
 	return objects, nil
@@ -181,7 +186,14 @@ func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, q
 	// For simplicity, list all and filter
 	request := &carddav.AddressDataRequest{AllProp: true}
 	if query != nil {
-		request = &query.DataRequest
+		dataRequest := query.DataRequest
+		// In REPORT, <address-data/> means the full card. The DAV library
+		// represents it with the same empty request as metadata-only PROPFIND.
+		// Keep the complete card here, including PHOTO for query filters.
+		if len(dataRequest.Props) == 0 {
+			dataRequest.AllProp = true
+		}
+		request = &dataRequest
 	}
 	objects, err := b.ListAddressObjects(ctx, path, request)
 	if err != nil {
@@ -440,16 +452,15 @@ func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string
 		// go-webdav sends error text to clients; keep local storage paths private.
 		return nil, webdav.NewHTTPError(http.StatusInternalServerError, errors.New("contact photo unavailable"))
 	}
-	var encoded bytes.Buffer
-	if err := vcard.NewEncoder(&encoded).Encode(card); err != nil {
+	hash := sha256.New()
+	if err := vcard.NewEncoder(hash).Encode(card); err != nil {
 		return nil, fmt.Errorf("encode CardDAV v3 card: %w", err)
 	}
 	// Content-derived ETags keep DAV caches coherent when related fields change.
-	hash := sha256.Sum256(encoded.Bytes())
 	return &carddav.AddressObject{
 		Path:    "/dav/addressbooks/" + userID + "/" + c.VaultID + "/" + c.ID + ".vcf",
 		ModTime: c.UpdatedAt,
-		ETag:    "v3-" + hex.EncodeToString(hash[:]),
+		ETag:    "v3-" + hex.EncodeToString(hash.Sum(nil)),
 		Card:    card,
 	}, nil
 }

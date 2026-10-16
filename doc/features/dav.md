@@ -51,6 +51,8 @@ Uploaded PNG, JPEG, GIF, and WebP avatars are embedded in the vCard, so clients 
 
 Upload, select, or remove avatars in Bonds. CardDAV photo writes are not imported; editing other contact fields from a DAV client preserves the selected avatar. Changes to the returned photo also change the contact ETag.
 
+On Linux, confined photo reads use `openat2` (Linux 5.6+) and do not require permission to list the upload directory. If that syscall is unavailable or blocked, or on other operating systems, the standard-library fallback requires a readable upload directory. In all cases, local photo paths and symlinks must stay within the upload directory.
+
 ### CalDAV
 
 | Bonds Entity | iCal Type | Notes |
