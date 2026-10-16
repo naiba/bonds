@@ -2,7 +2,9 @@ package dav
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"github.com/naiba/bonds/internal/services"
 	"github.com/naiba/bonds/internal/testutil"
 	"github.com/naiba/bonds/pkg/avatar"
+	"golang.org/x/sys/unix"
 )
 
 func TestCardDAVSearchableUploadDirectory(t *testing.T) {
@@ -85,6 +88,28 @@ func TestCardDAVSearchableUploadDirectory(t *testing.T) {
 	}
 	t.Log("non-root upload and direct UUID file read both succeeded with upload directory mode 0300")
 	href := fmt.Sprintf("/dav/addressbooks/%s/%s/%s.vcf", userID, vaultID, contact.ID)
+	// Probe the syscall independently of the production helper: an ordinary
+	// photo regression must not be mistaken for an unavailable openat2. Its
+	// documented safe fallback needs directory read permission, unlike O_PATH.
+	if !cardDAVPhotoOpenat2Available(t, root, uploaded.UUID) {
+		file, err := openCardDAVPhoto(root, uploaded.UUID)
+		if file != nil {
+			file.Close()
+		}
+		if !errors.Is(err, os.ErrPermission) {
+			t.Fatalf("search-only root must be denied by the fallback: %v", err)
+		}
+		if _, err := backend.GetAddressObject(ctx, href, nil); err == nil {
+			t.Fatal("DAV read unexpectedly bypassed fallback directory permissions")
+		}
+		if err := os.Chmod(root, 0700); err != nil {
+			t.Fatal(err)
+		}
+		t.Log("openat2 unavailable: confirmed permission denial; testing confined fallback with readable storage")
+	} else {
+		t.Log("openat2 available: testing confined reads with search-only storage")
+	}
+
 	object, err := backend.GetAddressObject(ctx, href, nil)
 	if err != nil {
 		t.Errorf("CardDAV GET regressed for otherwise-readable selected photo: %v", err)
@@ -122,4 +147,71 @@ func TestCardDAVSearchableUploadDirectory(t *testing.T) {
 		t.Fatal("name edit did not persist")
 	}
 	assertCardDAVPhoto(t, readback.Card, picture, "PNG")
+
+	// Exercise both confinement implementations, including readable-directory
+	// fallback, rather than skipping assertions when openat2 is unavailable.
+	if err := os.Mkdir(filepath.Join(root, "portraits"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "portraits", "selected.png"), picture, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("portraits/selected.png", filepath.Join(root, "selected-link")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"portraits/selected.png", "selected-link"} {
+		file, err := openCardDAVPhoto(root, name)
+		if err != nil {
+			t.Fatalf("confined read %s: %v", name, err)
+		}
+		data, readErr := io.ReadAll(file)
+		closeErr := file.Close()
+		if readErr != nil || closeErr != nil || !bytes.Equal(data, picture) {
+			t.Fatalf("confined image bytes differ: read=%v close=%v", readErr, closeErr)
+		}
+	}
+	outside := filepath.Join(t.TempDir(), "private.png")
+	if err := os.WriteFile(outside, picture, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "outside-link")); err != nil {
+		t.Fatal(err)
+	}
+	relativeOutside, err := filepath.Rel(root, outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"outside-link", relativeOutside, outside} {
+		file, err := openCardDAVPhoto(root, name)
+		if file != nil {
+			file.Close()
+		}
+		if err == nil {
+			t.Fatalf("photo read escaped storage via %s", name)
+		}
+	}
+	t.Log("verified photo reads, persisted name edit, internal symlink, and rejection of external symlink/relative/absolute paths")
+}
+
+func cardDAVPhotoOpenat2Available(t *testing.T, root, name string) bool {
+	t.Helper()
+	directory, err := unix.Open(root, unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unix.Close(directory)
+	file, err := unix.Openat2(directory, name, &unix.OpenHow{
+		Flags:   unix.O_RDONLY | unix.O_CLOEXEC,
+		Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_MAGICLINKS,
+	})
+	if errors.Is(err, unix.ENOSYS) || errors.Is(err, unix.EPERM) {
+		return false
+	}
+	if err != nil {
+		t.Fatalf("unexpected openat2 probe error: %v", err)
+	}
+	if err := unix.Close(file); err != nil {
+		t.Fatal(err)
+	}
+	return true
 }
