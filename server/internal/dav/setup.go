@@ -16,8 +16,8 @@ import (
 const utf8Charset = "utf-8"
 
 // SetupDAVRoutes registers CardDAV and CalDAV routes on the Echo instance.
-func SetupDAVRoutes(e *echo.Echo, db *gorm.DB) {
-	cardBackend := NewCardDAVBackend(db)
+func SetupDAVRoutes(e *echo.Echo, db *gorm.DB, uploadDir string) {
+	cardBackend := NewCardDAVBackend(db, uploadDir)
 	calBackend := NewCalDAVBackend(db)
 
 	cardHandler := &carddav.Handler{Backend: cardBackend, Prefix: "/dav"}

@@ -162,7 +162,7 @@ func main() {
 
 	handlers.RegisterRoutes(e, db, cfg, Version, reloadBackup)
 
-	dav.SetupDAVRoutes(e, db)
+	dav.SetupDAVRoutes(e, db, cfg.Storage.UploadDir)
 
 	if frontend.HasDistFiles() {
 		frontend.RegisterSPARoutes(e)

@@ -22,12 +22,13 @@ import (
 
 // CardDAVBackend implements the carddav.Backend interface.
 type CardDAVBackend struct {
-	db *gorm.DB
+	db        *gorm.DB
+	uploadDir string
 }
 
 // NewCardDAVBackend creates a new CardDAV backend.
-func NewCardDAVBackend(db *gorm.DB) *CardDAVBackend {
-	return &CardDAVBackend{db: db}
+func NewCardDAVBackend(db *gorm.DB, uploadDir string) *CardDAVBackend {
+	return &CardDAVBackend{db: db, uploadDir: uploadDir}
 }
 
 func (b *CardDAVBackend) CurrentUserPrincipal(ctx context.Context) (string, error) {
@@ -136,7 +137,7 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 		return nil, err
 	}
 
-	return contactToAddressObject(&contact, userID)
+	return b.contactToAddressObject(&contact, userID)
 }
 
 func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
@@ -167,7 +168,7 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, re
 
 	objects := make([]carddav.AddressObject, 0, len(contacts))
 	for i := range contacts {
-		object, err := contactToAddressObject(&contacts[i], userID)
+		object, err := b.contactToAddressObject(&contacts[i], userID)
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +269,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 				if err := preloadContactForCardDAV(b.db).First(&current, "id = ?", contact.ID).Error; err != nil {
 					return nil, err
 				}
-				object, err := contactToAddressObject(&current, userID)
+				object, err := b.contactToAddressObject(&current, userID)
 				if err != nil {
 					return nil, err
 				}
@@ -311,7 +312,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 				return nil, err
 			}
-			return contactToAddressObject(&contact, userID)
+			return b.contactToAddressObject(&contact, userID)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
@@ -350,7 +351,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
-	return contactToAddressObject(&contact, userID)
+	return b.contactToAddressObject(&contact, userID)
 }
 
 func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) error {
@@ -428,8 +429,17 @@ func validateCardDAVAddressDataRequest(request *carddav.AddressDataRequest) erro
 }
 
 // contactToAddressObject converts a Contact model to a CardDAV AddressObject.
-func contactToAddressObject(c *models.Contact, userID string) (*carddav.AddressObject, error) {
-	card := services.BuildContactCardDAVV3(c)
+func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string) (*carddav.AddressObject, error) {
+	// A stale or invalid avatar reference must never expose another vault's file.
+	projection := *c
+	if projection.File != nil && projection.File.VaultID != c.VaultID {
+		projection.File = nil
+	}
+	card := services.BuildContactCardDAVV3(&projection)
+	if err := b.addContactPhoto(card, &projection); err != nil {
+		// go-webdav sends error text to clients; keep local storage paths private.
+		return nil, webdav.NewHTTPError(http.StatusInternalServerError, errors.New("contact photo unavailable"))
+	}
 	var encoded bytes.Buffer
 	if err := vcard.NewEncoder(&encoded).Encode(card); err != nil {
 		return nil, fmt.Errorf("encode CardDAV v3 card: %w", err)
