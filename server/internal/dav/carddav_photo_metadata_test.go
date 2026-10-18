@@ -151,6 +151,29 @@ func TestCardDAVPhotoQueryPreservesDefaultDataAndFilters(t *testing.T) {
 			assertCardDAVPhoto(t, objects[0].Card, picture, "PNG")
 		}
 	}
+	// Filtering must see the same PHOTO bytes as GET, even when the caller
+	// requests only FN. A nonmatching PHOTO must not leak into the result.
+	for _, negate := range []bool{false, true} {
+		objects, err := backend.QueryAddressObjects(ctx, book, &carddav.AddressBookQuery{
+			DataRequest: carddav.AddressDataRequest{Props: []string{vcard.FieldFormattedName}},
+			PropFilters: []carddav.PropFilter{{Name: vcard.FieldPhoto, TextMatches: []carddav.TextMatch{{
+				Text: full.Card.Value(vcard.FieldPhoto), MatchType: carddav.MatchEquals, NegateCondition: negate,
+			}}}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if negate {
+			if len(objects) != 0 {
+				t.Fatal("negated PHOTO match returned a contact")
+			}
+		} else {
+			if len(objects) != 1 || objects[0].Path != href || objects[0].ETag != full.ETag {
+				t.Fatal("PHOTO value filter changed matching contact or ETag")
+			}
+			assertCardDAVPhoto(t, objects[0].Card, picture, "PNG")
+		}
+	}
 	missing, err := backend.QueryAddressObjects(ctx, book, &carddav.AddressBookQuery{PropFilters: []carddav.PropFilter{{Name: vcard.FieldPhoto, IsNotDefined: true}}})
 	if err != nil {
 		t.Fatal(err)

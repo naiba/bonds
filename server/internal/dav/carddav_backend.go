@@ -140,6 +140,10 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 }
 
 func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
+	return b.collectAddressObjects(ctx, path, request, nil)
+}
+
+func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
 	if err := validateCardDAVAddressDataRequest(request); err != nil {
 		return nil, err
 	}
@@ -171,6 +175,12 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, re
 		if err != nil {
 			return nil, err
 		}
+		// Filter each complete card before retaining it. Listing the whole book
+		// first would keep every unmatched base64 PHOTO alive even for a query
+		// returning no contacts. PHOTO filters and ETags still need the full card.
+		if query != nil && !matchesQuery(object.Card, query) {
+			continue
+		}
 		// PROPFIND asks for metadata with an empty request. Hash the complete
 		// representation first, then release PHOTO before accumulating objects:
 		// a getetag sync must not retain every avatar in the address book.
@@ -183,7 +193,6 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, re
 }
 
 func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
-	// For simplicity, list all and filter
 	request := &carddav.AddressDataRequest{AllProp: true}
 	if query != nil {
 		dataRequest := query.DataRequest
@@ -195,22 +204,7 @@ func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, q
 		}
 		request = &dataRequest
 	}
-	objects, err := b.ListAddressObjects(ctx, path, request)
-	if err != nil {
-		return nil, err
-	}
-
-	if query == nil || len(query.PropFilters) == 0 {
-		return objects, nil
-	}
-
-	var filtered []carddav.AddressObject
-	for _, obj := range objects {
-		if matchesQuery(obj.Card, query) {
-			filtered = append(filtered, obj)
-		}
-	}
-	return filtered, nil
+	return b.collectAddressObjects(ctx, path, request, query)
 }
 
 func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
