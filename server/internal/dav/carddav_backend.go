@@ -181,7 +181,7 @@ func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string,
 		if query != nil && !matchesQuery(object.Card, query) {
 			continue
 		}
-		// PROPFIND asks for metadata with an empty request. Hash the complete
+		// Metadata-only PROPFIND and REPORT use an empty request. Hash the complete
 		// representation first, then release PHOTO before accumulating objects:
 		// a getetag sync must not retain every avatar in the address book.
 		if request != nil && !request.AllProp && len(request.Props) == 0 {
@@ -196,13 +196,15 @@ func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, q
 	request := &carddav.AddressDataRequest{AllProp: true}
 	if query != nil {
 		dataRequest := query.DataRequest
-		// In REPORT, <address-data/> means the full card. The DAV library
-		// represents it with the same empty request as metadata-only PROPFIND.
-		// Keep the complete card here, including PHOTO for query filters.
+		// An empty address-data element and direct backend callers request
+		// the full card. The HTTP adapter preserves an absent element separately.
 		if len(dataRequest.Props) == 0 {
 			dataRequest.AllProp = true
 		}
 		request = &dataRequest
+	}
+	if requested, known := ctx.Value(cardDAVQueryDataRequestedKey{}).(bool); known && !requested {
+		request = &carddav.AddressDataRequest{}
 	}
 	return b.collectAddressObjects(ctx, path, request, query)
 }

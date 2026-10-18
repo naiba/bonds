@@ -229,3 +229,153 @@ func TestCardDAVPhotoQueryPreservesDefaultDataAndFilters(t *testing.T) {
 		previousETag = full.ETag
 	}
 }
+
+type cardDAVQueryPhotoObserver struct {
+	*CardDAVBackend
+	calls      int
+	photoBytes int
+	contacts   int
+}
+
+func (b *cardDAVQueryPhotoObserver) QueryAddressObjects(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
+	objects, err := b.CardDAVBackend.QueryAddressObjects(ctx, path, query)
+	b.calls++
+	b.contacts = len(objects)
+	for _, object := range objects {
+		b.photoBytes += len(object.Card.Value(vcard.FieldPhoto))
+	}
+	return objects, err
+}
+
+func TestCardDAVMetadataOnlyREPORTReleasesPhotos(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+	picture := image.NewNRGBA(image.Rect(0, 0, 512, 512))
+	for i := range picture.Pix {
+		picture.Pix[i] = byte(i*31 + i/17)
+	}
+	var encoded bytes.Buffer
+	encoder := png.Encoder{CompressionLevel: png.NoCompression}
+	if err := encoder.Encode(&encoded, picture); err != nil {
+		t.Fatal(err)
+	}
+	const count = 3
+	book := fmt.Sprintf("/dav/addressbooks/%s/%s/", userID, vaultID)
+	etags := map[string]string{}
+	for i := 0; i < count; i++ {
+		contact := createTestContact(t, db, vaultID, userID, fmt.Sprintf("Metadata %d", i), "Photo")
+		if _, err := services.NewVaultFileService(db, backend.uploadDir).UploadContactAvatar(contact.ID, vaultID, userID, "portrait.png", "image/png", int64(encoded.Len()), bytes.NewReader(encoded.Bytes())); err != nil {
+			t.Fatal(err)
+		}
+		href := book + contact.ID + ".vcf"
+		full, err := backend.GetAddressObject(ctx, href, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertCardDAVPhoto(t, full.Card, encoded.Bytes(), "PNG")
+		etags[href] = `"` + full.ETag + `"`
+	}
+	observed := &cardDAVQueryPhotoObserver{CardDAVBackend: backend}
+	handler := newCardDAVHandler(observed)
+	// This valid REPORT requests only getetag, with PHOTO used only as a filter.
+	// It deliberately has no address-data element, unlike <address-data/>.
+	body := `<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav"><D:prop><D:getetag/></D:prop><C:filter><C:prop-filter name="PHOTO"/></C:filter></C:addressbook-query>`
+	req := httptest.NewRequest("REPORT", book, strings.NewReader(body)).WithContext(ctx)
+	req.Header.Set("Depth", "1")
+	req.Header.Set("Content-Type", "application/xml")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusMultiStatus {
+		t.Fatalf("REPORT status %d: %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "address-data") || strings.Contains(rec.Body.String(), "PHOTO;") {
+		t.Fatal("metadata REPORT returned address-data")
+	}
+	var report cardDAVMultigetReport
+	if err := xml.Unmarshal(rec.Body.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Responses) != count || observed.calls != 1 || observed.contacts != count {
+		t.Fatalf("invalid coverage: responses=%d calls=%d contacts=%d", len(report.Responses), observed.calls, observed.contacts)
+	}
+	seen := map[string]bool{}
+	for _, response := range report.Responses {
+		want, ok := etags[response.Href]
+		if !ok || seen[response.Href] || response.Propstat.Status != "HTTP/1.1 200 OK" || response.Propstat.Prop.ETag != want || response.Propstat.Prop.AddressData != "" {
+			t.Fatalf("bad metadata response: %#v", response)
+		}
+		seen[response.Href] = true
+	}
+	t.Logf("actual metadata-only REPORT: HTTP=%d contacts=%d response_bytes=%d source_photo_bytes=%d retained_PHOTO_bytes=%d", rec.Code, count, rec.Body.Len(), encoded.Len(), observed.photoBytes)
+	if observed.photoBytes != 0 {
+		t.Errorf("metadata-only REPORT unnecessarily retains %d PHOTO bytes after filtering and ETag calculation", observed.photoBytes)
+	}
+}
+
+func TestCardDAVREPORTAddressDataPresence(t *testing.T) {
+	backend, db, ctx, vaultID, userID := setupCardDAVTest(t)
+	contact := createTestContact(t, db, vaultID, userID, "Selected", "Portrait")
+	createTestContact(t, db, vaultID, userID, "Without", "Portrait")
+	picture := avatar.GenerateInitials("Report photo", 32)
+	if _, err := services.NewVaultFileService(db, backend.uploadDir).UploadContactAvatar(contact.ID, vaultID, userID, "portrait.png", "image/png", int64(len(picture)), bytes.NewReader(picture)); err != nil {
+		t.Fatal(err)
+	}
+	book := fmt.Sprintf("/dav/addressbooks/%s/%s/", userID, vaultID)
+	href := book + contact.ID + ".vcf"
+	full, err := backend.GetAddressObject(ctx, href, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name       string
+		properties string
+		wantData   bool
+		wantPhoto  bool
+	}{
+		{name: "metadata", properties: `<D:getetag/>`},
+		{name: "empty address data", properties: `<D:getetag/><C:address-data/>`, wantData: true, wantPhoto: true},
+		{name: "all card properties", properties: `<D:getetag/><C:address-data><C:allprop/></C:address-data>`, wantData: true, wantPhoto: true},
+		{name: "explicit vcard version", properties: `<D:getetag/><C:address-data content-type="text/vcard" version="3.0"/>`, wantData: true, wantPhoto: true},
+		{name: "selected name", properties: `<D:getetag/><C:address-data><C:prop name="FN"/></C:address-data>`, wantData: true},
+		{name: "selected photo", properties: `<D:getetag/><C:address-data><C:prop name="PHOTO"/></C:address-data>`, wantData: true, wantPhoto: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			observed := &cardDAVQueryPhotoObserver{CardDAVBackend: backend}
+			handler := newCardDAVHandler(observed)
+			body := `<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav"><D:prop>` + tc.properties + `</D:prop><C:filter><C:prop-filter name="PHOTO"/></C:filter></C:addressbook-query>`
+			req := httptest.NewRequest("REPORT", book, strings.NewReader(body)).WithContext(ctx)
+			req.Header.Set("Depth", "1")
+			req.Header.Set("Content-Type", "application/xml")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			if rec.Code != http.StatusMultiStatus {
+				t.Fatalf("REPORT status %d: %s", rec.Code, rec.Body.String())
+			}
+			var report cardDAVMultigetReport
+			if err := xml.Unmarshal(rec.Body.Bytes(), &report); err != nil {
+				t.Fatal(err)
+			}
+			if len(report.Responses) != 1 || observed.calls != 1 || observed.contacts != 1 {
+				t.Fatalf("PHOTO filter: responses=%d calls=%d contacts=%d", len(report.Responses), observed.calls, observed.contacts)
+			}
+			response := report.Responses[0]
+			if response.Href != href || response.Propstat.Status != "HTTP/1.1 200 OK" || response.Propstat.Prop.ETag != `"`+full.ETag+`"` {
+				t.Fatalf("incorrect REPORT metadata: %#v", response)
+			}
+			if !tc.wantData {
+				if response.Propstat.Prop.AddressData != "" || observed.photoBytes != 0 {
+					t.Fatalf("metadata query retained %d PHOTO bytes or returned address-data", observed.photoBytes)
+				}
+				return
+			}
+			card, err := vcard.NewDecoder(strings.NewReader(response.Propstat.Prop.AddressData)).Decode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.wantPhoto {
+				assertCardDAVPhoto(t, card, picture, "PNG")
+			} else if card.Value(vcard.FieldFormattedName) != full.Card.Value(vcard.FieldFormattedName) {
+				t.Fatal("selected name request omitted the requested name")
+			}
+		})
+	}
+}

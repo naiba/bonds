@@ -20,7 +20,7 @@ func SetupDAVRoutes(e *echo.Echo, db *gorm.DB, uploadDir string) {
 	cardBackend := NewCardDAVBackend(db, uploadDir)
 	calBackend := NewCalDAVBackend(db)
 
-	cardHandler := &carddav.Handler{Backend: cardBackend, Prefix: "/dav"}
+	cardHandler := newCardDAVHandler(cardBackend)
 	calHandler := &caldav.Handler{Backend: calBackend, Prefix: "/dav"}
 
 	authMw := BasicAuthMiddleware(db)
