@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -136,7 +137,12 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 		return nil, err
 	}
 
-	return b.contactToAddressObject(&contact, userID)
+	object, err := b.contactToAddressObject(&contact, userID)
+	if err != nil {
+		return nil, err
+	}
+	omitUnrequestedCardDAVPhoto(object, cardDAVReportDataRequest(ctx, request))
+	return object, nil
 }
 
 func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
@@ -181,32 +187,43 @@ func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string,
 		if query != nil && !matchesQuery(object.Card, query) {
 			continue
 		}
-		// Metadata-only PROPFIND and REPORT use an empty request. Hash the complete
-		// representation first, then release PHOTO before accumulating objects:
-		// a getetag sync must not retain every avatar in the address book.
-		if request != nil && !request.AllProp && len(request.Props) == 0 {
-			delete(object.Card, vcard.FieldPhoto)
-		}
+		omitUnrequestedCardDAVPhoto(object, request)
 		objects = append(objects, *object)
 	}
 	return objects, nil
 }
 
 func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
-	request := &carddav.AddressDataRequest{AllProp: true}
+	var request *carddav.AddressDataRequest
 	if query != nil {
-		dataRequest := query.DataRequest
-		// An empty address-data element and direct backend callers request
-		// the full card. The HTTP adapter preserves an absent element separately.
-		if len(dataRequest.Props) == 0 {
-			dataRequest.AllProp = true
-		}
-		request = &dataRequest
+		request = &query.DataRequest
 	}
-	if requested, known := ctx.Value(cardDAVQueryDataRequestedKey{}).(bool); known && !requested {
-		request = &carddav.AddressDataRequest{}
+	return b.collectAddressObjects(ctx, path, cardDAVReportDataRequest(ctx, request), query)
+}
+
+func cardDAVReportDataRequest(ctx context.Context, request *carddav.AddressDataRequest) *carddav.AddressDataRequest {
+	if requested, known := ctx.Value(cardDAVReportDataRequestedKey{}).(bool); known && !requested {
+		return &carddav.AddressDataRequest{}
 	}
-	return b.collectAddressObjects(ctx, path, request, query)
+	// Empty address-data and direct GET/query callers request complete cards.
+	// PROPFIND/list requests retain their separate empty-means-metadata meaning.
+	if request != nil && len(request.Props) == 0 {
+		full := *request
+		full.AllProp = true
+		return &full
+	}
+	return request
+}
+
+func omitUnrequestedCardDAVPhoto(object *carddav.AddressObject, request *carddav.AddressDataRequest) {
+	// Filtering and ETags need the complete representation first. Only then
+	// can metadata and explicit selections without PHOTO release the payload,
+	// consistently for query, multiget and list results.
+	if request != nil && !request.AllProp && !slices.ContainsFunc(request.Props, func(name string) bool {
+		return strings.EqualFold(name, vcard.FieldPhoto)
+	}) {
+		delete(object.Card, vcard.FieldPhoto)
+	}
 }
 
 func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {

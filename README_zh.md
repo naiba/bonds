@@ -32,6 +32,7 @@ Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由�
 - **提醒系统**：一次性和周期性（每周、每月、每年），支持邮件和兼容 Shoutrrr 的通知渠道。
 - **全文搜索**：基于 Bleve 的中英文混合搜索，覆盖联系人和笔记。
 - **CardDAV / CalDAV**：与 Apple 通讯录、Thunderbird 等 DAV 客户端同步联系人和日历。支持个人访问令牌认证。
+  CardDAV REPORT 请求体上限为 16 MiB，超限返回 HTTP 413；较大的 multiget 请求请分批发送。响应大小不受此上限限制。
 - **DAV 同步订阅**：支持直接从外部 CardDAV 数据源同步联系人至 Vault。
 - **个人访问令牌**：生成安全的 API 与同步令牌，保障接口调用与第三方集成的安全。
 - **AI Agent 接入（MCP）**：内置 `/mcp` 端点，MCP 客户端可以发现能力、搜索 Vault 数据、读取资源，并在同一套认证和权限下执行已有 `/api` 操作。详见 [AI Agent 接入](https://naiba.github.io/bonds/zh/features/ai-agents)。

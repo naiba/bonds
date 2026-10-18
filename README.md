@@ -32,6 +32,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **Reminders**: One-time and recurring (weekly, monthly, yearly), with email and Shoutrrr-compatible notifications.
 - **Full-text Search**: Bleve-powered CJK-aware search across contacts and notes.
 - **CardDAV / CalDAV**: Sync contacts and calendars with Apple, Thunderbird, and other DAV clients. Supports Personal Access Tokens.
+  CardDAV REPORT request bodies are limited to 16 MiB (HTTP 413 above the limit); split larger multiget requests into batches. This does not limit the response size.
 - **DAV Sync Subscriptions**: Subscribe to and sync from external CardDAV address books directly into a vault.
 - **Personal Access Tokens**: Generate secure API and sync tokens to access endpoints safely.
 - **AI Agent Access (MCP)**: Built-in `/mcp` endpoint for MCP clients. Agents can discover capabilities, search vault data, fetch resources, and execute existing `/api` operations with the same auth and permissions. See [AI Agent Access](https://naiba.github.io/bonds/features/ai-agents).
