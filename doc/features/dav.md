@@ -47,7 +47,7 @@ The CardDAV server uses UTF-8 vCard 3.0 for broad compatibility with Apple Conta
 | Addresses | `ADR` |
 | Selected contact avatar | `PHOTO` |
 
-Uploaded PNG, JPEG, GIF, and WebP avatars are embedded in the vCard, so clients do not need a separate authenticated download. Only the selected avatar is included; other gallery photos and generated initials are omitted. Missing local images are omitted without blocking contact synchronization. Existing remote photo URLs remain URI properties and are not fetched by the server.
+Uploaded PNG, JPEG, GIF, and WebP avatars are embedded in the vCard, so clients do not need a separate authenticated download. Only the selected avatar is included; other gallery photos and generated initials are omitted. Local images up to 10 MiB are embedded. Missing files, unsupported content types, and files larger than 10 MiB are omitted without blocking contact synchronization; the selected avatar and stored file are unchanged. Existing remote photo URLs remain URI properties and are not fetched by the server.
 
 Upload, select, or remove avatars in Bonds. CardDAV photo writes are not imported; editing other contact fields from a DAV client preserves the selected avatar. Changes to the returned photo also change the contact ETag.
 
