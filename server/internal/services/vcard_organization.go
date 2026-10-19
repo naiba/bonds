@@ -41,7 +41,8 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 			}
 		}
 	} else {
-		contact.JobPosition = strPtrOrNil(card.Value(vcard.FieldTitle))
+		// Standalone titles use the same blank-value semantics as the projection.
+		contact.JobPosition = strPtrOrNil(strings.TrimSpace(card.Value(vcard.FieldTitle)))
 	}
 	return updateContactProfile(tx, contact, vaultID, "company_id", "job_position")
 }

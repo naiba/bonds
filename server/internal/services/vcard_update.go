@@ -22,6 +22,16 @@ func ReplaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 	if err := preloadContactVCardRelations(db).First(&current, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
 		return err
 	}
+	// A full replacement can remove a standalone title without deleting a job.
+	// Keep this out of incremental imports (including birthday-only imports),
+	// and preserve real employment records when their ORG/TITLE is omitted.
+	if len(card[vcard.FieldOrganization]) == 0 && len(card[vcard.FieldTitle]) == 0 &&
+		current.CompanyID == nil && len(current.ContactCompanies) == 0 && current.JobPosition != nil {
+		current.JobPosition = nil
+		if err := updateContactProfile(db, &current, vaultID, "job_position"); err != nil {
+			return err
+		}
+	}
 	if err := reconcileVCardOrganization(db, card, contactID, vaultID); err != nil {
 		return err
 	}
