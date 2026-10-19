@@ -22,6 +22,9 @@ func ReplaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 	if err := preloadContactVCardRelations(db).First(&current, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
 		return err
 	}
+	if err := reconcileVCardOrganization(db, card, contactID, vaultID); err != nil {
+		return err
+	}
 	if err := reconcileVCardBirthday(db, card, &current); err != nil {
 		return err
 	}
