@@ -414,6 +414,12 @@ func (s *ContactJobService) withLocalEmploymentChange(contactID, vaultID string,
 		if err != nil {
 			return err
 		}
+		// Create/AddEmployee must not hide an independent pre-Jobs employer.
+		// Share the same parent-locked conversion as merge and vCard writes; a
+		// rejected local edit rolls back the conversion and the selection together.
+		if err := materializeLegacyEmployment(tx, contact); err != nil {
+			return err
+		}
 		projected := ContactVCardEmployments(contact)
 		if len(projected) > 0 && projected[0].JobID != 0 {
 			if err := tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ?", contactID, vaultID).Update("preferred_job_id", projected[0].JobID).Error; err != nil {

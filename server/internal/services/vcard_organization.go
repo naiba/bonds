@@ -14,6 +14,31 @@ import (
 // Derive both compatibility fields from one coordinated job. card.Value(TITLE)
 // may belong to a secondary ORG when the selected company has no title.
 func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID string) error {
+	organizations := effectiveVCardOrganizations(card)
+	if len(organizations) != len(card[vcard.FieldOrganization]) {
+		// Empty ORG (including department-only components) is not a company.
+		// Still reject an explicit clear of existing employment before normalizing
+		// it, rather than silently discarding Jobs or changing their identity.
+		if len(organizations) == 0 {
+			if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+				return err
+			}
+			contact, err := loadContactEmployment(tx, contactID, vaultID)
+			if err != nil {
+				return err
+			}
+			if contact.CompanyID != nil || len(contact.ContactCompanies) > 0 {
+				return ErrVCardUnsafeReplacement
+			}
+		}
+		normalized := make(vcard.Card, len(card))
+		for key, fields := range card {
+			normalized[key] = fields
+		}
+		normalized[vcard.FieldOrganization] = organizations
+		card = normalized
+	}
+
 	if len(card[vcard.FieldOrganization]) == 0 && len(card[vcard.FieldTitle]) == 0 {
 		return nil
 	}
@@ -316,4 +341,17 @@ func vcardOrganizationTitle(card vcard.Card, group string) (*vcard.Field, error)
 		return card[vcard.FieldTitle][0], nil
 	}
 	return nil, nil
+}
+
+// effectiveVCardOrganizations interprets the same structured company component
+// for full replacements and incremental imports. The caller's card is immutable.
+func effectiveVCardOrganizations(card vcard.Card) []*vcard.Field {
+	var organizations []*vcard.Field
+	for _, field := range card[vcard.FieldOrganization] {
+		components := field.Organization()
+		if len(components) > 0 && strings.TrimSpace(components[0]) != "" {
+			organizations = append(organizations, field)
+		}
+	}
+	return organizations
 }

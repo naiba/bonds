@@ -27,6 +27,18 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 		}
 		result = append(result, VCardEmployment{Company: strings.TrimSpace(job.Company.Name), Title: strings.TrimSpace(ptrToStr(job.JobPosition)), JobID: job.ID, CompanyID: job.CompanyID})
 	}
+	// Older records can already contain both a legacy employer and unrelated
+	// Jobs. Preserve that employer on reads too, before any write materializes it.
+	if len(contact.ContactCompanies) == 0 || hasStandaloneEmployment(contact) || hasUnrepresentedLegacyCompany(contact) {
+		employment := VCardEmployment{Title: strings.TrimSpace(ptrToStr(contact.JobPosition))}
+		if contact.Company != nil && (contact.Company.VaultID == "" || contact.Company.VaultID == contact.VaultID) {
+			employment.Company = strings.TrimSpace(contact.Company.Name)
+			employment.CompanyID = contact.Company.ID
+		}
+		if employment.Company != "" || employment.Title != "" {
+			result = append(result, employment)
+		}
+	}
 	// Company and title are mutable and several jobs can share both. Persisted
 	// job identity prevents a secondary edit from retargeting the next DAV PUT.
 	sort.SliceStable(result, func(i, j int) bool {
@@ -38,16 +50,7 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 		}
 		return result[i].JobID < result[j].JobID
 	})
-	if len(contact.ContactCompanies) == 0 || hasStandaloneEmployment(contact) {
-		employment := VCardEmployment{Title: strings.TrimSpace(ptrToStr(contact.JobPosition))}
-		if contact.Company != nil && (contact.Company.VaultID == "" || contact.Company.VaultID == contact.VaultID) {
-			employment.Company = strings.TrimSpace(contact.Company.Name)
-			employment.CompanyID = contact.Company.ID
-		}
-		if employment.Company != "" || employment.Title != "" {
-			result = append([]VCardEmployment{employment}, result...)
-		}
-	}
+
 	return result
 }
 
@@ -65,19 +68,29 @@ func loadContactEmployment(db *gorm.DB, contactID, vaultID string) (*models.Cont
 	return &contact, err
 }
 
-// materializeLegacyEmployment preserves an independent old employer before
-// combining it with normal Jobs. Once Jobs exist the export/edit projection
-// uses them, so a legacy-only selection needs a real job identity first.
-// Existing mirrors are not copied. Call with employment relations loaded and
-// the parent contact locked, inside the transaction that combines the records.
-func materializeLegacyEmployment(tx *gorm.DB, contact *models.Contact) error {
+// hasUnrepresentedLegacyCompany identifies a real old relationship, not a
+// compatibility mirror of an existing Job. Names and titles are mutable, so
+// company identity alone determines whether Jobs already express it.
+func hasUnrepresentedLegacyCompany(contact *models.Contact) bool {
 	if contact.CompanyID == nil || contact.Company == nil || contact.Company.VaultID != contact.VaultID {
-		return nil
+		return false
 	}
 	for _, job := range contact.ContactCompanies {
 		if job.CompanyID == *contact.CompanyID {
-			return nil
+			return false
 		}
+	}
+	return true
+}
+
+// materializeLegacyEmployment preserves an independent old employer before
+// editing or combining Jobs. The read projection keeps old mixed records
+// visible; mutation also needs a real job identity so later edits stay targeted.
+// Existing mirrors are not copied. Call with employment relations loaded and
+// the parent contact locked, inside the transaction that combines the records.
+func materializeLegacyEmployment(tx *gorm.DB, contact *models.Contact) error {
+	if !hasUnrepresentedLegacyCompany(contact) {
+		return nil
 	}
 	job := models.ContactCompany{ContactID: contact.ID, CompanyID: contact.Company.ID, JobPosition: contact.JobPosition}
 	if err := createContactRecord(tx, &job, contact.ID, contact.VaultID); err != nil {
