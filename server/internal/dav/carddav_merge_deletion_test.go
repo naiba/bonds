@@ -61,7 +61,7 @@ func TestCardDAVDeletionUsesMergeContactLockOrder(t *testing.T) {
 	defer db.Callback().Update().Remove(hook)
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	backend = NewCardDAVBackend(db.WithContext(ctx))
+	backend = NewCardDAVBackend(db.WithContext(ctx), t.TempDir())
 	deleted := make(chan error, 1)
 	go func() {
 		deleted <- backend.DeleteAddressObject(ctx, fmt.Sprintf("/dav/addressbooks/%s/%s/%s.vcf", user, vault, source.ID))

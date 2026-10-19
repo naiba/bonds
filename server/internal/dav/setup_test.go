@@ -181,7 +181,7 @@ func setupDAVHTTPTestWithDB(t *testing.T) (*echo.Echo, *gorm.DB) {
 	db := testutil.SetupTestDB(t)
 	e := echo.New()
 	e.Use(appMiddleware.CORS())
-	SetupDAVRoutes(e, db)
+	SetupDAVRoutes(e, db, t.TempDir())
 	return e, db
 }
 

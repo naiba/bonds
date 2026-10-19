@@ -45,6 +45,13 @@ The CardDAV server uses UTF-8 vCard 3.0 for broad compatibility with Apple Conta
 | Phone numbers | `TEL` |
 | Email addresses | `EMAIL` |
 | Addresses | `ADR` |
+| Selected contact avatar | `PHOTO` |
+
+Uploaded PNG, JPEG, GIF, and WebP avatars are embedded in the vCard, so clients do not need a separate authenticated download. Only the selected avatar is included; other gallery photos and generated initials are omitted. Local images up to 10 MiB are embedded. Missing files, unsupported content types, and files larger than 10 MiB are omitted without blocking contact synchronization; the selected avatar and stored file are unchanged. Existing remote photo URLs remain URI properties and are not fetched by the server.
+
+Upload, select, or remove avatars in Bonds. CardDAV photo writes are not imported; editing other contact fields from a DAV client preserves the selected avatar. Changes to the returned photo also change the contact ETag.
+
+On Linux, confined photo reads use `openat2` (Linux 5.6+) and do not require permission to list the upload directory. If that syscall is unavailable or blocked, or on other operating systems, the standard-library fallback requires a readable upload directory. In all cases, local photo paths and symlinks must stay within the upload directory.
 
 ### CalDAV
 

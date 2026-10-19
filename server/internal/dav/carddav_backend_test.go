@@ -38,7 +38,7 @@ func setupCardDAVTest(t *testing.T) (*CardDAVBackend, *gorm.DB, context.Context,
 		t.Fatalf("CreateVault failed: %v", err)
 	}
 
-	backend := NewCardDAVBackend(db)
+	backend := NewCardDAVBackend(db, t.TempDir())
 	ctx := WithUserID(context.Background(), resp.User.ID)
 	ctx = WithAccountID(ctx, resp.User.AccountID)
 

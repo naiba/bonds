@@ -1,13 +1,13 @@
 package dav
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -22,12 +22,13 @@ import (
 
 // CardDAVBackend implements the carddav.Backend interface.
 type CardDAVBackend struct {
-	db *gorm.DB
+	db        *gorm.DB
+	uploadDir string
 }
 
 // NewCardDAVBackend creates a new CardDAV backend.
-func NewCardDAVBackend(db *gorm.DB) *CardDAVBackend {
-	return &CardDAVBackend{db: db}
+func NewCardDAVBackend(db *gorm.DB, uploadDir string) *CardDAVBackend {
+	return &CardDAVBackend{db: db, uploadDir: uploadDir}
 }
 
 func (b *CardDAVBackend) CurrentUserPrincipal(ctx context.Context) (string, error) {
@@ -136,10 +137,19 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 		return nil, err
 	}
 
-	return contactToAddressObject(&contact, userID)
+	object, err := b.contactToAddressObject(&contact, userID)
+	if err != nil {
+		return nil, err
+	}
+	omitUnrequestedCardDAVPhoto(object, cardDAVReportDataRequest(ctx, request))
+	return object, nil
 }
 
 func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest) ([]carddav.AddressObject, error) {
+	return b.collectAddressObjects(ctx, path, request, nil)
+}
+
+func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string, request *carddav.AddressDataRequest, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
 	if err := validateCardDAVAddressDataRequest(request); err != nil {
 		return nil, err
 	}
@@ -167,37 +177,53 @@ func (b *CardDAVBackend) ListAddressObjects(ctx context.Context, path string, re
 
 	objects := make([]carddav.AddressObject, 0, len(contacts))
 	for i := range contacts {
-		object, err := contactToAddressObject(&contacts[i], userID)
+		object, err := b.contactToAddressObject(&contacts[i], userID)
 		if err != nil {
 			return nil, err
 		}
+		// Filter each complete card before retaining it. Listing the whole book
+		// first would keep every unmatched base64 PHOTO alive even for a query
+		// returning no contacts. PHOTO filters and ETags still need the full card.
+		if query != nil && !matchesQuery(object.Card, query) {
+			continue
+		}
+		omitUnrequestedCardDAVPhoto(object, request)
 		objects = append(objects, *object)
 	}
 	return objects, nil
 }
 
 func (b *CardDAVBackend) QueryAddressObjects(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
-	// For simplicity, list all and filter
-	request := &carddav.AddressDataRequest{AllProp: true}
+	var request *carddav.AddressDataRequest
 	if query != nil {
 		request = &query.DataRequest
 	}
-	objects, err := b.ListAddressObjects(ctx, path, request)
-	if err != nil {
-		return nil, err
-	}
+	return b.collectAddressObjects(ctx, path, cardDAVReportDataRequest(ctx, request), query)
+}
 
-	if query == nil || len(query.PropFilters) == 0 {
-		return objects, nil
+func cardDAVReportDataRequest(ctx context.Context, request *carddav.AddressDataRequest) *carddav.AddressDataRequest {
+	if requested, known := ctx.Value(cardDAVReportDataRequestedKey{}).(bool); known && !requested {
+		return &carddav.AddressDataRequest{}
 	}
+	// Empty address-data and direct GET/query callers request complete cards.
+	// PROPFIND/list requests retain their separate empty-means-metadata meaning.
+	if request != nil && len(request.Props) == 0 {
+		full := *request
+		full.AllProp = true
+		return &full
+	}
+	return request
+}
 
-	var filtered []carddav.AddressObject
-	for _, obj := range objects {
-		if matchesQuery(obj.Card, query) {
-			filtered = append(filtered, obj)
-		}
+func omitUnrequestedCardDAVPhoto(object *carddav.AddressObject, request *carddav.AddressDataRequest) {
+	// Filtering and ETags need the complete representation first. Only then
+	// can metadata and explicit selections without PHOTO release the payload,
+	// consistently for query, multiget and list results.
+	if request != nil && !request.AllProp && !slices.ContainsFunc(request.Props, func(name string) bool {
+		return strings.EqualFold(name, vcard.FieldPhoto)
+	}) {
+		delete(object.Card, vcard.FieldPhoto)
 	}
-	return filtered, nil
 }
 
 func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
@@ -268,7 +294,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 				if err := preloadContactForCardDAV(b.db).First(&current, "id = ?", contact.ID).Error; err != nil {
 					return nil, err
 				}
-				object, err := contactToAddressObject(&current, userID)
+				object, err := b.contactToAddressObject(&current, userID)
 				if err != nil {
 					return nil, err
 				}
@@ -311,7 +337,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 				return nil, err
 			}
-			return contactToAddressObject(&contact, userID)
+			return b.contactToAddressObject(&contact, userID)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
@@ -350,7 +376,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
 	}
-	return contactToAddressObject(&contact, userID)
+	return b.contactToAddressObject(&contact, userID)
 }
 
 func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) error {
@@ -428,18 +454,26 @@ func validateCardDAVAddressDataRequest(request *carddav.AddressDataRequest) erro
 }
 
 // contactToAddressObject converts a Contact model to a CardDAV AddressObject.
-func contactToAddressObject(c *models.Contact, userID string) (*carddav.AddressObject, error) {
-	card := services.BuildContactCardDAVV3(c)
-	var encoded bytes.Buffer
-	if err := vcard.NewEncoder(&encoded).Encode(card); err != nil {
+func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string) (*carddav.AddressObject, error) {
+	// A stale or invalid avatar reference must never expose another vault's file.
+	projection := *c
+	if projection.File != nil && projection.File.VaultID != c.VaultID {
+		projection.File = nil
+	}
+	card := services.BuildContactCardDAVV3(&projection)
+	if err := b.addContactPhoto(card, &projection); err != nil {
+		// go-webdav sends error text to clients; keep local storage paths private.
+		return nil, webdav.NewHTTPError(http.StatusInternalServerError, errors.New("contact photo unavailable"))
+	}
+	hash := sha256.New()
+	if err := vcard.NewEncoder(hash).Encode(card); err != nil {
 		return nil, fmt.Errorf("encode CardDAV v3 card: %w", err)
 	}
 	// Content-derived ETags keep DAV caches coherent when related fields change.
-	hash := sha256.Sum256(encoded.Bytes())
 	return &carddav.AddressObject{
 		Path:    "/dav/addressbooks/" + userID + "/" + c.VaultID + "/" + c.ID + ".vcf",
 		ModTime: c.UpdatedAt,
-		ETag:    "v3-" + hex.EncodeToString(hash[:]),
+		ETag:    "v3-" + hex.EncodeToString(hash.Sum(nil)),
 		Card:    card,
 	}, nil
 }
