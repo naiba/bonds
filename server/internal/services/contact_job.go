@@ -118,6 +118,10 @@ func (s *ContactJobService) update(contactID, vaultID string, jobID uint, req dt
 		return nil, err
 	}
 
+	selected, err := s.isSelectedJob(contactID, vaultID, jobID)
+	if err != nil {
+		return nil, err
+	}
 	oldCompanyID := job.CompanyID
 	job.CompanyID = req.CompanyID
 	job.JobPosition = strPtrOrNil(req.JobPosition)
@@ -125,9 +129,12 @@ func (s *ContactJobService) update(contactID, vaultID string, jobID uint, req dt
 		return nil, err
 	}
 
-	// Keep the existing primary selection compatible with legacy readers.
-	if err := s.db.Model(&models.Contact{}).Where("id = ? AND vault_id = ? AND company_id = ?", contactID, vaultID, oldCompanyID).Updates(map[string]any{"company_id": job.CompanyID, "job_position": job.JobPosition}).Error; err != nil {
-		return nil, err
+	// Several jobs can share a company. Only editing the selected job may
+	// change its legacy selection; a secondary role must not replace it.
+	if selected {
+		if err := s.db.Model(&models.Contact{}).Where("id = ? AND vault_id = ? AND company_id = ?", contactID, vaultID, oldCompanyID).Updates(map[string]any{"company_id": job.CompanyID, "job_position": job.JobPosition}).Error; err != nil {
+			return nil, err
+		}
 	}
 	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
 		return nil, err
@@ -150,10 +157,18 @@ func (s *ContactJobService) Delete(contactID, vaultID string, jobID uint) error 
 			}
 			return err
 		}
+		selected, err := NewContactJobService(tx).isSelectedJob(contactID, vaultID, jobID)
+		if err != nil {
+			return err
+		}
 		if err := tx.Delete(&job).Error; err != nil {
 			return err
 		}
-		return clearLegacyJobSelection(tx, contactID, vaultID, job.CompanyID)
+		// Deleting another role at this company must preserve the selection too.
+		if selected {
+			return clearLegacyJobSelection(tx, contactID, vaultID, job.CompanyID)
+		}
+		return nil
 	})
 }
 
@@ -341,4 +356,15 @@ func toContactJobResponse(j *models.ContactCompany) dto.ContactJobResponse {
 		CreatedAt:   j.CreatedAt,
 		UpdatedAt:   j.UpdatedAt,
 	}
+}
+
+// isSelectedJob uses the pre-mutation export order, not company ID alone.
+// Call inside the contact transaction while holding the parent contact lock.
+func (s *ContactJobService) isSelectedJob(contactID, vaultID string, jobID uint) (bool, error) {
+	contact, err := loadContactEmployment(s.db, contactID, vaultID)
+	if err != nil {
+		return false, err
+	}
+	employments := ContactVCardEmployments(contact)
+	return len(employments) > 0 && employments[0].JobID == jobID, nil
 }

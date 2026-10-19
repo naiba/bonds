@@ -20,13 +20,13 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 	if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
 		return err
 	}
-	var contact models.Contact
-	if err := tx.Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).Preload("ContactCompanies.Company").First(&contact, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
+	contact, err := loadContactEmployment(tx, contactID, vaultID)
+	if err != nil {
 		return err
 	}
 	if len(organizations) == 0 {
 		// A title-only edit targets the first projected job, not a stale profile copy.
-		employment := ContactVCardEmployments(&contact)
+		employment := ContactVCardEmployments(contact)
 		if len(employment) > 0 && employment[0].JobID != 0 {
 			job := models.ContactCompany{ID: employment[0].JobID, ContactID: contactID, JobPosition: strPtrOrNil(card.Value(vcard.FieldTitle))}
 			return updateContactRecord(tx, &job, contactID, vaultID, ErrContactJobNotFound, "job_position")
@@ -41,8 +41,41 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 			continue
 		}
 		name := strings.TrimSpace(components[0])
+		title := vcardOrganizationTitle(card, field.Group)
+		// Match the same normalized projection we exported before a name lookup.
+		// Names are not identities: whitespace or another same-name company must
+		// never turn an unchanged vCard into a new company or employment record.
+		var companyID, knownCompanyID uint
+		for _, employment := range ContactVCardEmployments(contact) {
+			if employment.Company != name {
+				continue
+			}
+			if knownCompanyID == 0 {
+				knownCompanyID = employment.CompanyID
+			}
+			if used[employment.JobID] {
+				continue
+			}
+			if companyID == 0 {
+				companyID = employment.CompanyID
+			}
+			if title != nil && employment.Title == strings.TrimSpace(title.Value) {
+				companyID = employment.CompanyID
+				break
+			}
+		}
+		// Consuming a job does not consume its company: another role can reuse it.
+		if companyID == 0 {
+			companyID = knownCompanyID
+		}
 		var company models.Company
-		err := tx.Where("vault_id = ? AND name = ?", vaultID, name).Order("id ASC").First(&company).Error
+		query := tx.Where("vault_id = ?", vaultID)
+		if companyID != 0 {
+			query = query.Where("id = ?", companyID)
+		} else {
+			query = query.Where("name = ?", name).Order("id ASC")
+		}
+		err := query.First(&company).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			company = models.Company{VaultID: vaultID, Name: name}
 			if err := tx.Create(&company).Error; err != nil {
@@ -51,7 +84,6 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		} else if err != nil {
 			return err
 		}
-		title := vcardOrganizationTitle(card, field.Group)
 		var selected *models.ContactCompany
 		var candidates []*models.ContactCompany
 		for i := range contact.ContactCompanies {
@@ -60,7 +92,7 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 				continue
 			}
 			candidates = append(candidates, job)
-			if title != nil && ptrToStr(job.JobPosition) == title.Value {
+			if title != nil && strings.TrimSpace(ptrToStr(job.JobPosition)) == strings.TrimSpace(title.Value) {
 				selected = job
 				break
 			}
@@ -78,9 +110,10 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 			if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
 				return err
 			}
+			job.Company = company
 			contact.ContactCompanies = append(contact.ContactCompanies, job)
 			selected = &contact.ContactCompanies[len(contact.ContactCompanies)-1]
-		} else if title != nil && ptrToStr(selected.JobPosition) != title.Value {
+		} else if title != nil && strings.TrimSpace(ptrToStr(selected.JobPosition)) != strings.TrimSpace(title.Value) {
 			selected.JobPosition = strPtrOrNil(title.Value)
 			if err := updateContactRecord(tx, selected, contactID, vaultID, ErrContactJobNotFound, "job_position"); err != nil {
 				return err
@@ -98,7 +131,7 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		return ErrVCardUnsafeReplacement
 	}
 	contact.CompanyID = primaryCompanyID
-	return updateContactProfile(tx, &contact, vaultID, "company_id")
+	return updateContactProfile(tx, contact, vaultID, "company_id")
 }
 
 func vcardOrganizationTitle(card vcard.Card, group string) *vcard.Field {

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/naiba/bonds/internal/models"
+	"gorm.io/gorm"
 )
 
 // VCardEmployment is the common projection used by exports and presence filters.
@@ -43,4 +44,12 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 		}
 	}
 	return result
+}
+
+// loadContactEmployment loads only the relations needed for employment identity.
+func loadContactEmployment(db *gorm.DB, contactID, vaultID string) (*models.Contact, error) {
+	var contact models.Contact
+	err := db.Preload("Company").Preload("ContactCompanies").Preload("ContactCompanies.Company").
+		First(&contact, "id = ? AND vault_id = ?", contactID, vaultID).Error
+	return &contact, err
 }
