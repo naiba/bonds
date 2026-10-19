@@ -95,18 +95,16 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 	if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
 		return err
 	}
+	// Read both associated and automatic candidates under the same name lock.
+	// Loading the projection before waiting could reuse a pre-rename name.
+	if len(organizations) > 0 {
+		if err := lockCompanyResolution(tx, vaultID); err != nil {
+			return err
+		}
+	}
 	contact, err := loadContactEmployment(tx, contactID, vaultID)
 	if err != nil {
 		return err
-	}
-	// One transaction-scoped lock per Vault serializes automatic lookup/create
-	// across contacts and processes. A name uniqueness constraint would forbid
-	// legitimate explicit duplicates; per-name locks could deadlock when batch
-	// imports encounter several names in different orders. SQLite serializes writes.
-	if len(organizations) > 0 && tx.Dialector.Name() == "postgres" {
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "bonds:vcard-company:"+vaultID).Error; err != nil {
-			return err
-		}
 	}
 	if err := materializeLegacyEmployment(tx, contact); err != nil {
 		return err
@@ -276,21 +274,10 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 			if companyID == 0 {
 				// A new association has no prior identity to disambiguate equal
 				// names. Never attach it to an arbitrary company (or make a copy).
-				var companies []models.Company
-				if err := tx.Where("vault_id = ? AND name = ?", vaultID, entry.name).Limit(2).Find(&companies).Error; err != nil {
+				var err error
+				companyID, err = resolveVCardCompany(tx, vaultID, entry.name)
+				if err != nil {
 					return err
-				}
-				if len(companies) > 1 {
-					return ErrVCardUnsafeReplacement
-				}
-				if len(companies) == 0 {
-					company := models.Company{VaultID: vaultID, Name: entry.name}
-					if err := tx.Create(&company).Error; err != nil {
-						return err
-					}
-					companyID = company.ID
-				} else {
-					companyID = companies[0].ID
 				}
 			}
 			job := models.ContactCompany{ContactID: contactID, CompanyID: companyID, JobPosition: strPtrOrNil(entry.title)}
@@ -354,4 +341,41 @@ func effectiveVCardOrganizations(card vcard.Card) []*vcard.Field {
 		}
 	}
 	return organizations
+}
+
+// Match the exact Unicode whitespace normalization used by the export
+// projection. SQL TRIM differs between databases and misses Unicode whitespace;
+// normalizing only incoming ORG would create copies of existing companies.
+// Read just identity/name in bounded batches; stop at the second match rather
+// than loading every company or retaining an unbounded candidate collection.
+// The caller holds lockCompanyResolution for the entire transaction.
+func resolveVCardCompany(tx *gorm.DB, vaultID, name string) (uint, error) {
+	const batchSize = 128
+	var afterID, candidateID uint
+	for {
+		var companies []models.Company
+		if err := tx.Select("id", "name").Where("vault_id = ? AND id > ?", vaultID, afterID).Order("id").Limit(batchSize).Find(&companies).Error; err != nil {
+			return 0, err
+		}
+		for _, company := range companies {
+			if strings.TrimSpace(company.Name) == name {
+				if candidateID != 0 {
+					return 0, ErrVCardUnsafeReplacement
+				}
+				candidateID = company.ID
+			}
+		}
+		if len(companies) < batchSize {
+			break
+		}
+		afterID = companies[len(companies)-1].ID
+	}
+	if candidateID != 0 {
+		return candidateID, nil
+	}
+	company := models.Company{VaultID: vaultID, Name: name}
+	if err := tx.Create(&company).Error; err != nil {
+		return 0, err
+	}
+	return company.ID, nil
 }

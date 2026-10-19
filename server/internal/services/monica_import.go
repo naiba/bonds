@@ -409,6 +409,11 @@ func (s *MonicaImportService) importContactReferences(
 }
 
 func (s *MonicaImportService) findOrCreateCompany(tx *gorm.DB, vaultID, name string) (*models.Company, error) {
+	// Company creation must not change a vCard resolver's candidate set midway
+	// through its transaction. Preserve Monica's existing case-insensitive rule.
+	if err := lockCompanyResolution(tx, vaultID); err != nil {
+		return nil, err
+	}
 	var company models.Company
 	err := tx.Where("vault_id = ? AND LOWER(name) = LOWER(?)", vaultID, name).First(&company).Error
 	if err == nil {
