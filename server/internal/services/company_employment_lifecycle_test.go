@@ -119,3 +119,83 @@ func TestCompanyEmploymentDeletionAtomicity(t *testing.T) {
 		})
 	}
 }
+
+func TestCompanyRenameEmploymentAtomicity(t *testing.T) {
+	for _, scenario := range []string{"rename", "type only", "rollback"} {
+		t.Run(scenario, func(t *testing.T) {
+			svc, id, vault, _ := setupVCardTest(t)
+			company := models.Company{VaultID: vault, Name: "Acme"}
+			if err := svc.db.Create(&company).Error; err != nil {
+				t.Fatal(err)
+			}
+			job, err := NewContactJobService(svc.db).Create(id, vault, dto.CreateContactJobRequest{CompanyID: company.ID, JobPosition: "Engineer"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			old := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
+			if err := svc.db.Model(&models.Contact{}).Where("id = ?", id).Update("last_updated_at", old).Error; err != nil {
+				t.Fatal(err)
+			}
+			legacy := models.Contact{VaultID: vault, CompanyID: &company.ID, JobPosition: strPtrOrNil("Consultant"), LastUpdatedAt: &old}
+			unrelated := models.Contact{VaultID: vault, LastUpdatedAt: &old}
+			for _, c := range []*models.Contact{&legacy, &unrelated} {
+				if err := svc.db.Create(c).Error; err != nil {
+					t.Fatal(err)
+				}
+			}
+			injected := errors.New("synthetic marker failure")
+			if scenario == "rollback" {
+				const hook = "employment:reject_rename_marker"
+				if err := svc.db.Callback().Update().Before("gorm:update").Register(hook, func(tx *gorm.DB) {
+					if tx.Statement.Table == "contacts" {
+						tx.AddError(injected)
+					}
+				}); err != nil {
+					t.Fatal(err)
+				}
+				defer svc.db.Callback().Update().Remove(hook)
+			}
+			name := "Beta"
+			if scenario == "type only" {
+				name = "Acme"
+			}
+			_, err = NewCompanyService(svc.db).Update(company.ID, vault, dto.UpdateCompanyRequest{Name: name, Type: "Business"})
+			if scenario == "rollback" {
+				if !errors.Is(err, injected) {
+					t.Fatalf("expected marker failure: %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			var actual models.Company
+			if err := svc.db.First(&actual, company.ID).Error; err != nil {
+				t.Fatal(err)
+			}
+			wantName, wantType := name, "Business"
+			if scenario == "rollback" {
+				wantName = "Acme"
+				wantType = ""
+			}
+			if actual.Name != wantName || ptrToStr(actual.Type) != wantType {
+				t.Fatal("company update did not commit/rollback atomically")
+			}
+			for _, contactID := range []string{id, legacy.ID, unrelated.ID} {
+				var current models.Contact
+				if err := svc.db.First(&current, "id = ?", contactID).Error; err != nil {
+					t.Fatal(err)
+				}
+				changed := scenario == "rename" && contactID != unrelated.ID
+				if current.LastUpdatedAt == nil || (changed && !current.LastUpdatedAt.After(old)) || (!changed && !current.LastUpdatedAt.Equal(old)) {
+					t.Fatalf("wrong marker on %s in %s", contactID, scenario)
+				}
+			}
+			jobs, err := NewContactJobService(svc.db).List(id, vault)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(jobs) != 1 || jobs[0].ID != job.ID || jobs[0].CompanyID != company.ID || jobs[0].JobPosition != "Engineer" {
+				t.Fatal("rename changed employment identity or title")
+			}
+		})
+	}
+}

@@ -111,15 +111,35 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 
 func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
 	var company models.Company
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrCompanyNotFound
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Rename changes every employee's vCard. Lock the same parents as deletion,
+		// then read the company and commit its name together with local-wins markers.
+		contactIDs, err := lockCompanyEmploymentContacts(tx, id, vaultID)
+		if err != nil {
+			return err
 		}
-		return nil, err
-	}
-	company.Name = req.Name
-	company.Type = strPtrOrNil(req.Type)
-	if err := s.db.Save(&company).Error; err != nil {
+		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCompanyNotFound
+			}
+			return err
+		}
+		renamed := company.Name != req.Name
+		company.Name = req.Name
+		company.Type = strPtrOrNil(req.Type)
+		if err := tx.Save(&company).Error; err != nil {
+			return err
+		}
+		if renamed {
+			for _, contactID := range contactIDs {
+				if err := markLocalEmploymentChanged(tx, contactID, vaultID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 	resp := toCompanyResponse(&company)
@@ -139,13 +159,8 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 		// Company deletion is also a local employment edit. Discover both normal
 		// jobs and legacy-only owners, then use the same parent lock order as Jobs
 		// and merge. Cleanup and the local-wins marker must commit together.
-		var contactIDs []string
-		employees := tx.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", id)
-		if err := tx.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
-			Where("company_id = ? OR id IN (?)", id, employees).Pluck("id", &contactIDs).Error; err != nil {
-			return err
-		}
-		if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+		contactIDs, err := lockCompanyEmploymentContacts(tx, id, vaultID)
+		if err != nil {
 			return err
 		}
 		if err := tx.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
@@ -194,4 +209,19 @@ func toCompanyResponseWithEmployees(c *models.Company, formatter *contactNameFor
 	}
 	resp.Contacts = contacts
 	return resp, nil
+}
+
+// Company rename and deletion affect both normal jobs and legacy-only owners.
+// Keep the parent lock order shared with Jobs and contact merge operations.
+func lockCompanyEmploymentContacts(tx *gorm.DB, companyID uint, vaultID string) ([]string, error) {
+	var contactIDs []string
+	employees := tx.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
+	if err := tx.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
+		Where("company_id = ? OR id IN (?)", companyID, employees).Pluck("id", &contactIDs).Error; err != nil {
+		return nil, err
+	}
+	if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+		return nil, err
+	}
+	return contactIDs, nil
 }

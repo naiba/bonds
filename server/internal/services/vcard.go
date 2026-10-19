@@ -13,6 +13,7 @@ import (
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrVCardInvalidData = errors.New("invalid vcard data")
@@ -628,14 +629,16 @@ func extractFullNameFromCard(card vcard.Card) vcardNameComponents {
 // lastSyncAt is used for conflict detection: if the contact was locally modified after lastSyncAt, the local version wins.
 // Returns the contact ID and an action string: "created", "updated", "skipped", or "conflict_local_wins".
 func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID, existingContactID, distantURI, distantEtag string, lastSyncAt *time.Time) (contactID string, action string, err error) {
+	// Read conflict metadata under the same parent lock as local Jobs edits.
+	// Locking only during child reconciliation lets a stale Save undo a deletion.
 	var existing models.Contact
 	var findErr error
 	if existingContactID != "" {
-		findErr = tx.Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
+		findErr = tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
 	}
 	if existingContactID == "" || errors.Is(findErr, gorm.ErrRecordNotFound) {
 		if distantURI != "" {
-			findErr = tx.Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
+			findErr = tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
 		} else {
 			findErr = gorm.ErrRecordNotFound
 		}
@@ -664,17 +667,16 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		existing.Nickname = strPtrOrNil(nickname)
 		existing.JobPosition = strPtrOrNil(title)
 		existing.DistantEtag = strPtrOrNil(distantEtag)
-		// LastUpdatedAt detects local edits, not accepted remote revisions. A
-		// partially failed batch retains lastSyncAt, so advancing this marker on
-		// a successful pull would falsely discard later remote changes on retry.
-		// Save still advances UpdatedAt for the changed contact representation.
-		if err := tx.Save(&existing).Error; err != nil {
-			return "", "", err
-		}
-
+		// Reconcile against the old profile before overwriting its legacy title.
 		if err := ReplaceContactVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
 			return "", "", err
 		}
+		// Remote updates must neither overwrite local conflict metadata nor restore
+		// the old company selection changed by employment reconciliation.
+		if err := updateContactProfile(tx, &existing, vaultID, "first_name", "last_name", "middle_name", "prefix", "suffix", "nickname", "job_position", "distant_etag"); err != nil {
+			return "", "", err
+		}
+
 		return existing.ID, "updated", nil
 	}
 

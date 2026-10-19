@@ -343,9 +343,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			contact.JobPosition = strPtrOrNil(title)
 			contact.LastUpdatedAt = &now
 			if err := b.db.Transaction(func(tx *gorm.DB) error {
-				if err := tx.Save(&contact).Error; err != nil {
-					return err
-				}
+				// Preserve legacy employment before writing the new profile title.
 				err := services.ReplaceContactVCardFields(tx, card, contact.ID, vaultID, accountID)
 				if errors.Is(err, services.ErrVCardInvalidData) {
 					return webdav.NewHTTPError(http.StatusBadRequest, err)
@@ -353,7 +351,11 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 				if errors.Is(err, services.ErrVCardUnsafeReplacement) {
 					return webdav.NewHTTPError(http.StatusConflict, err)
 				}
-				return err
+				if err != nil {
+					return err
+				}
+				// Reconciliation owns company_id; never restore its old selection.
+				return tx.Model(&contact).Select("first_name", "last_name", "nickname", "job_position", "last_updated_at", "updated_at").Updates(&contact).Error
 			}); err != nil {
 				return nil, err
 			}

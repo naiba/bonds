@@ -47,7 +47,15 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 			continue
 		}
 		title := ""
-		if fieldTitle := vcardOrganizationTitle(card, field.Group); fieldTitle != nil {
+		fieldTitle, err := vcardOrganizationTitle(card, field.Group)
+		if err != nil {
+			return err
+		}
+		if fieldTitle != nil {
+			// A TITLE belongs to one ORG only, even when both lack a group.
+			if matchedTitles[fieldTitle] {
+				return ErrVCardUnsafeReplacement
+			}
 			title = strings.TrimSpace(fieldTitle.Value)
 			matchedTitles[fieldTitle] = true
 		}
@@ -63,8 +71,19 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 			}
 		}
 	}
-	if len(incoming) == 0 && len(contact.ContactCompanies) > 0 {
+	if len(incoming) == 0 && (len(contact.ContactCompanies) > 0 || contact.CompanyID != nil) {
 		return ErrVCardUnsafeReplacement
+	}
+	// Promote the one legacy relationship before changing the profile selection.
+	// Otherwise adding an ORG hides the only stored link to the former employer.
+	// Keep only domain data (company, title), not a snapshot of the contact.
+	if len(incoming) > 0 && len(contact.ContactCompanies) == 0 && contact.Company != nil && contact.Company.VaultID == vaultID {
+		job := models.ContactCompany{ContactID: contactID, CompanyID: contact.Company.ID, JobPosition: contact.JobPosition}
+		if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
+			return err
+		}
+		job.Company = *contact.Company
+		contact.ContactCompanies = append(contact.ContactCompanies, job)
 	}
 	projected := ContactVCardEmployments(contact)
 	used := map[uint]bool{}
@@ -195,16 +214,22 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 }
 
 // vCard group names are case-insensitive, just like property names.
-func vcardOrganizationTitle(card vcard.Card, group string) *vcard.Field {
+func vcardOrganizationTitle(card vcard.Card, group string) (*vcard.Field, error) {
+	var match *vcard.Field
 	for _, title := range card[vcard.FieldTitle] {
 		if strings.EqualFold(title.Group, group) {
-			return title
+			if match != nil {
+				return nil, ErrVCardUnsafeReplacement
+			}
+			match = title
 		}
 	}
-	// Some clients label only ORG. A single ORG/TITLE pair is still unambiguous;
-	// do not turn a valid title into an empty job that shadows the legacy title.
-	if len(card[vcard.FieldOrganization]) == 1 && len(card[vcard.FieldTitle]) == 1 {
-		return card[vcard.FieldTitle][0]
+	if match != nil {
+		return match, nil
 	}
-	return nil
+	// Some clients label only one side of a unique ORG/TITLE pair.
+	if len(card[vcard.FieldOrganization]) == 1 && len(card[vcard.FieldTitle]) == 1 {
+		return card[vcard.FieldTitle][0], nil
+	}
+	return nil, nil
 }
