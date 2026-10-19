@@ -209,6 +209,12 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 // same transaction so editing/deleting an imported job cannot resurrect it when
 // the final job is removed and the vCard projection falls back to old fields.
 func clearLegacyJobSelection(tx *gorm.DB, contactID, vaultID string, companyID uint) error {
+	// Clear deleted identities independently of legacy CompanyID (which can be
+	// NULL). The subquery also prevents retaining another contact's job ID.
+	remainingJobs := tx.Model(&models.ContactCompany{}).Select("id").Where("contact_id = ?", contactID)
+	if err := tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ? AND preferred_job_id NOT IN (?)", contactID, vaultID, remainingJobs).Update("preferred_job_id", nil).Error; err != nil {
+		return err
+	}
 	var remaining int64
 	if err := tx.Model(&models.ContactCompany{}).Where("contact_id = ?", contactID).Count(&remaining).Error; err != nil {
 		return err
@@ -283,6 +289,7 @@ func (s *ContactJobService) legacyUpdate(contactID, vaultID, userID string, req 
 		if found {
 			existingJob.CompanyID = *req.CompanyID
 			existingJob.JobPosition = strPtrOrNil(req.JobPosition)
+			contact.PreferredJobID = &existingJob.ID
 			if err := updateContactRecord(s.db, &existingJob, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
 				return nil, err
 			}
@@ -295,13 +302,14 @@ func (s *ContactJobService) legacyUpdate(contactID, vaultID, userID string, req 
 			if err := createContactRecord(s.db, &newJob, contactID, vaultID); err != nil {
 				return nil, err
 			}
+			contact.PreferredJobID = &newJob.ID
 		}
 	}
 
 	// Also update legacy fields on Contact for backward compatibility
 	contact.CompanyID = req.CompanyID
 	contact.JobPosition = strPtrOrNil(req.JobPosition)
-	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position"); err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position", "preferred_job_id"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
@@ -335,9 +343,10 @@ func (s *ContactJobService) legacyDelete(contactID, vaultID, userID string) (*dt
 	}
 
 	// Also clear legacy fields on Contact
+	contact.PreferredJobID = nil
 	contact.CompanyID = nil
 	contact.JobPosition = nil
-	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position"); err != nil {
+	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position", "preferred_job_id"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
@@ -389,6 +398,18 @@ func (s *ContactJobService) withLocalEmploymentChange(contactID, vaultID string,
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
 			return err
+		}
+		// Freeze the pre-edit fallback for old rows before any mutable company or
+		// title can change the ordering. Roll back this metadata with the edit.
+		contact, err := loadContactEmployment(tx, contactID, vaultID)
+		if err != nil {
+			return err
+		}
+		projected := ContactVCardEmployments(contact)
+		if len(projected) > 0 && projected[0].JobID != 0 {
+			if err := tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ?", contactID, vaultID).Update("preferred_job_id", projected[0].JobID).Error; err != nil {
+				return err
+			}
 		}
 		if err := change(tx); err != nil {
 			return err

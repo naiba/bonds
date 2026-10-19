@@ -407,7 +407,11 @@ func contactMergeProfileFields(tx *gorm.DB, c models.Contact) ([]contactMergePro
 			}
 			value = row.Name + " / " + value
 		}
-		add("job", value, func(t *models.Contact) { t.CompanyID = c.CompanyID; t.JobPosition = c.JobPosition })
+		add("job", value, func(t *models.Contact) {
+			t.CompanyID = c.CompanyID
+			t.JobPosition = c.JobPosition
+			t.PreferredJobID = c.PreferredJobID
+		})
 	}
 	if c.FirstMetAt != nil || c.FirstMetYear != nil || c.FirstMetMonth != nil || c.FirstMetDay != nil {
 		parts := []any{c.FirstMetYear, c.FirstMetMonth, c.FirstMetDay, c.FirstMetAt, c.FirstMetDatePrecision}

@@ -27,7 +27,12 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 		}
 		result = append(result, VCardEmployment{Company: strings.TrimSpace(job.Company.Name), Title: strings.TrimSpace(ptrToStr(job.JobPosition)), JobID: job.ID, CompanyID: job.CompanyID})
 	}
+	// Company and title are mutable and several jobs can share both. Persisted
+	// job identity prevents a secondary edit from retargeting the next DAV PUT.
 	sort.SliceStable(result, func(i, j int) bool {
+		if contact.PreferredJobID != nil && (result[i].JobID == *contact.PreferredJobID) != (result[j].JobID == *contact.PreferredJobID) {
+			return result[i].JobID == *contact.PreferredJobID
+		}
 		if contact.CompanyID != nil && (result[i].CompanyID == *contact.CompanyID) != (result[j].CompanyID == *contact.CompanyID) {
 			return result[i].CompanyID == *contact.CompanyID
 		}

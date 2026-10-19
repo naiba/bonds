@@ -111,6 +111,11 @@ func (h *VCardHandler) ImportVCard(c *echo.Context) error {
 
 	result, err := h.vcardService.ImportVCard(vaultID, userID, src)
 	if err != nil {
+		// Shared employment reconciliation can reject ambiguous ORG/TITLE input.
+		// This is a recoverable file error, not a database/server failure.
+		if errors.Is(err, services.ErrVCardUnsafeReplacement) {
+			return response.BadRequest(c, "err.ambiguous_vcard_employment", nil)
+		}
 		if errors.Is(err, services.ErrVCardInvalidData) {
 			return response.BadRequest(c, "err.invalid_vcard_data", nil)
 		}

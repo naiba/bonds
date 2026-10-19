@@ -8394,3 +8394,55 @@ func TestCompanyEmployeeRemovalMissingContactHTTP(t *testing.T) {
 		})
 	}
 }
+
+func TestVCardAmbiguousVCardImportReturnsClientError(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "synthetic-import@example.com")
+	vault := ts.createTestVault(t, token, "Synthetic import")
+	count := func(model any) int64 {
+		t.Helper()
+		var n int64
+		if err := ts.db.Model(model).Count(&n).Error; err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	existing := ts.createTestContact(t, token, vault.ID, "Preserved")
+	var before models.Contact
+	if err := ts.db.First(&before, "id = ?", existing.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := ts.db.Create(&models.Company{VaultID: vault.ID, Name: "Shared employer"}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	beforeContacts, beforeJobs, beforeCompanies := count(&models.Contact{}), count(&models.ContactCompany{}), count(&models.Company{})
+	valid := "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Valid first card\r\nORG:Unique company\r\nTITLE:Engineer\r\nEND:VCARD\r\n"
+	for _, fields := range []string{"ORG:Acme\r\nORG:Beta\r\nTITLE:Engineer\r\n", "ORG:Shared employer\r\nTITLE:Engineer\r\n"} {
+		data := []byte(valid + "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Synthetic Ambiguous\r\n" + fields + "END:VCARD\r\n")
+		rec := ts.doMultipartUpload(t, "/api/vaults/"+vault.ID+"/contacts/import", token, "file", "ambiguous-employment.vcf", "text/vcard", data)
+		t.Logf("import status=%d body=%s", rec.Code, rec.Body.String())
+		parsed := parseResponse(t, rec)
+		if parsed.Success || parsed.Error == nil || parsed.Error.Code != "BAD_REQUEST" || !strings.Contains(parsed.Error.Message, "employment is ambiguous") {
+			t.Fatalf("unexpected error response: %s", rec.Body.String())
+		}
+		var after models.Contact
+		if err := ts.db.First(&after, "id = ?", existing.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(before, after) {
+			t.Fatal("rejected import changed unrelated contact")
+		}
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("invalid employment input must produce a client error, got %d", rec.Code)
+		}
+		if count(&models.Contact{}) != beforeContacts || count(&models.ContactCompany{}) != beforeJobs || count(&models.Company{}) != beforeCompanies {
+			t.Error("rejected import partially committed domain state")
+		}
+	}
+	rec := ts.doMultipartUpload(t, "/api/vaults/"+vault.ID+"/contacts/import", token, "file", "unique-employment.vcf", "text/vcard", []byte(valid))
+	if rec.Code != http.StatusCreated || count(&models.Contact{}) != beforeContacts+1 || count(&models.ContactCompany{}) != beforeJobs+1 || count(&models.Company{}) != beforeCompanies+1 {
+		t.Fatalf("valid import failed after recoverable errors: %d %s", rec.Code, rec.Body.String())
+	}
+}

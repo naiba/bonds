@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/emersion/go-vcard"
@@ -35,6 +34,7 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		for _, job := range contact.ContactCompanies {
 			if job.ID == employment[0].JobID {
 				id := job.CompanyID
+				contact.PreferredJobID = &job.ID
 				contact.CompanyID = &id
 				contact.JobPosition = job.JobPosition
 				break
@@ -44,7 +44,7 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		// Standalone titles use the same blank-value semantics as the projection.
 		contact.JobPosition = strPtrOrNil(strings.TrimSpace(card.Value(vcard.FieldTitle)))
 	}
-	return updateContactProfile(tx, contact, vaultID, "company_id", "job_position")
+	return updateContactProfile(tx, contact, vaultID, "company_id", "job_position", "preferred_job_id")
 }
 
 func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, vaultID string) error {
@@ -175,7 +175,7 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 	// Reordering must retain the selected company when it is still present.
 	// Replacing its ORG, however, selects the new company while preserving the
 	// old employment, as the shared import/subscription contract requires.
-	var primaryCompanyID *uint
+	var primaryCompanyID, primaryJobID *uint
 	for _, job := range projected {
 		if job.CompanyID == 0 {
 			continue
@@ -187,6 +187,8 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 			if entry.name == job.Company {
 				id := job.CompanyID
 				primaryCompanyID = &id
+				jobID := job.JobID
+				primaryJobID = &jobID
 				break
 			}
 		}
@@ -224,33 +226,44 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 				companyID = job.CompanyID
 			}
 			if companyID == 0 {
-				var company models.Company
-				err := tx.Where("vault_id = ? AND name = ?", vaultID, entry.name).Order("id ASC").First(&company).Error
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					company = models.Company{VaultID: vaultID, Name: entry.name}
+				// A new association has no prior identity to disambiguate equal
+				// names. Never attach it to an arbitrary company (or make a copy).
+				var companies []models.Company
+				if err := tx.Where("vault_id = ? AND name = ?", vaultID, entry.name).Limit(2).Find(&companies).Error; err != nil {
+					return err
+				}
+				if len(companies) > 1 {
+					return ErrVCardUnsafeReplacement
+				}
+				if len(companies) == 0 {
+					company := models.Company{VaultID: vaultID, Name: entry.name}
 					if err := tx.Create(&company).Error; err != nil {
 						return err
 					}
-				} else if err != nil {
-					return err
+					companyID = company.ID
+				} else {
+					companyID = companies[0].ID
 				}
-				companyID = company.ID
 			}
 			job := models.ContactCompany{ContactID: contactID, CompanyID: companyID, JobPosition: strPtrOrNil(entry.title)}
 			if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
 				return err
 			}
+			entry.jobID = job.ID
 		}
 		if primaryCompanyID == nil {
 			id := companyID
 			primaryCompanyID = &id
+			jobID := entry.jobID
+			primaryJobID = &jobID
 		}
 	}
 	if len(incoming) == 0 {
 		primaryCompanyID = nil
 	}
 	contact.CompanyID = primaryCompanyID
-	return updateContactProfile(tx, contact, vaultID, "company_id")
+	contact.PreferredJobID = primaryJobID
+	return updateContactProfile(tx, contact, vaultID, "company_id", "preferred_job_id")
 }
 
 // vCard group names are case-insensitive, just like property names.

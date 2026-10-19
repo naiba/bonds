@@ -496,6 +496,11 @@ func moveFullyOwnedLoans(tx *gorm.DB, contactIDs []string, targetVaultID string)
 }
 
 func cleanSourceScopedMovePivots(tx *gorm.DB, contactIDs []string, currentVaultID string) error {
+	// Jobs are scoped to the source vault and removed below; their selection
+	// must not follow the contact into an unrelated vault.
+	if err := tx.Model(&models.Contact{}).Where("id IN ?", contactIDs).Update("preferred_job_id", nil).Error; err != nil {
+		return err
+	}
 	if err := tx.Where("contact_id IN ? AND label_id IN (?)", contactIDs, tx.Model(&models.Label{}).Select("id").Where("vault_id = ?", currentVaultID)).Delete(&models.ContactLabel{}).Error; err != nil {
 		return err
 	}

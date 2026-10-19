@@ -1,4 +1,5 @@
 {
+  "err.ambiguous_vcard_employment": "vCard 就业信息存在歧义。请明确配对公司与职位，或在 Bonds 中编辑就业信息。",
   "err.invalid_request_body": "无效的请求体",
   "err.validation_error": "提交的数据无效。",
 
