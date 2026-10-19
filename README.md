@@ -33,6 +33,7 @@ Monica is a beloved open-source personal CRM with 24k+ stars. But as a side proj
 - **Full-text Search**: Bleve-powered CJK-aware search across contacts and notes.
 - **CardDAV / CalDAV**: Sync contacts and calendars with Apple, Thunderbird, and other DAV clients. Supports Personal Access Tokens.
   CardDAV REPORT request bodies are limited to 16 MiB (HTTP 413 above the limit); split larger multiget requests into batches. This does not limit the response size.
+  Vault managers can configure CardDAV presence filters in **Vault Settings → General** (all/any of phone, email, names, nickname, company, job title or postal address). Empty filters preserve the default: all non-archived contacts. Excluded contacts remain in Bonds and relationships, disappear from devices on their next full sync, and return when filters are cleared. Stale writes to excluded contacts return 404; device creates/updates that do not match return 409 without saving. These settings apply to all vault members, not external DAV subscriptions, CalDAV or vCard exports.
 - **DAV Sync Subscriptions**: Subscribe to and sync from external CardDAV address books directly into a vault.
 - **Personal Access Tokens**: Generate secure API and sync tokens to access endpoints safely.
 - **AI Agent Access (MCP)**: Built-in `/mcp` endpoint for MCP clients. Agents can discover capabilities, search vault data, fetch resources, and execute existing `/api` operations with the same auth and permissions. See [AI Agent Access](https://naiba.github.io/bonds/features/ai-agents).

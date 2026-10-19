@@ -33,6 +33,7 @@ Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由�
 - **全文搜索**：基于 Bleve 的中英文混合搜索，覆盖联系人和笔记。
 - **CardDAV / CalDAV**：与 Apple 通讯录、Thunderbird 等 DAV 客户端同步联系人和日历。支持个人访问令牌认证。
   CardDAV REPORT 请求体上限为 16 MiB，超限返回 HTTP 413；较大的 multiget 请求请分批发送。响应大小不受此上限限制。
+  Vault 管理员可在 **Vault 设置 → 常规** 配置 CardDAV 字段存在筛选（电话、邮箱、姓名、昵称、公司、职位或邮寄地址，可满足全部或任一字段）。空筛选保持默认行为：同步所有未归档联系人。被排除的联系人仍保留在 Bonds 和关系网中，在设备下次完整同步时移除，清空筛选后恢复同步。旧客户端向已排除联系人写入返回 404；设备新建或编辑后不满足筛选返回 409 且不保存。设置对所有 Vault 成员生效，不影响外部 DAV 订阅、CalDAV 或 vCard 导出。
 - **DAV 同步订阅**：支持直接从外部 CardDAV 数据源同步联系人至 Vault。
 - **个人访问令牌**：生成安全的 API 与同步令牌，保障接口调用与第三方集成的安全。
 - **AI Agent 接入（MCP）**：内置 `/mcp` 端点，MCP 客户端可以发现能力、搜索 Vault 数据、读取资源，并在同一套认证和权限下执行已有 `/api` 操作。详见 [AI Agent 接入](https://naiba.github.io/bonds/zh/features/ai-agents)。

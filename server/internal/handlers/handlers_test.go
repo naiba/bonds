@@ -8144,3 +8144,46 @@ func TestContactDeletionRoutesRejectNewIntroducerReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestVaultSettingsCardDAVFiltersValidationAndIsolation(t *testing.T) {
+	ts, managerToken, viewerToken, vaultID, _ := setupViewerTest(t)
+	path := fmt.Sprintf("/api/vaults/%s/settings", vaultID)
+	body := `{"name":"Filtered book","carddav_filter":{"match":"any","fields":["phone","email"]}}`
+	denied := ts.doRequest(http.MethodPut, path, body, viewerToken)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("viewer changed filters: %d", denied.Code)
+	}
+	for _, invalid := range []string{`{"match":"unknown","fields":["phone"]}`, `{"match":"all","fields":["password"]}`, `{"match":"all","fields":["phone","phone"]}`} {
+		rec := ts.doRequest(http.MethodPut, path, `{"name":"Invalid","carddav_filter":`+invalid+`}`, managerToken)
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("invalid filter status %d: %s", rec.Code, rec.Body.String())
+		}
+	}
+	saved := ts.doRequest(http.MethodPut, path, body, managerToken)
+	if saved.Code != http.StatusOK {
+		t.Fatalf("save failed: %d %s", saved.Code, saved.Body.String())
+	}
+	var response struct {
+		Data struct {
+			CardDAVFilter models.CardDAVFilter `json:"carddav_filter"`
+		} `json:"data"`
+	}
+	read := ts.doRequest(http.MethodGet, path, "", managerToken)
+	if read.Code != http.StatusOK {
+		t.Fatalf("read failed: %d", read.Code)
+	}
+	if err := json.Unmarshal(read.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Data.CardDAVFilter.Match != "any" || len(response.Data.CardDAVFilter.Fields) != 2 || response.Data.CardDAVFilter.Fields[0] != "phone" || response.Data.CardDAVFilter.Fields[1] != "email" {
+		t.Fatalf("wrong saved filter: %+v", response.Data.CardDAVFilter)
+	}
+	other := ts.createTestVault(t, managerToken, "Unfiltered book")
+	var vault models.Vault
+	if err := ts.db.First(&vault, "id = ?", other.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if vault.CardDAVFilter != nil {
+		t.Fatal("filter leaked into another vault")
+	}
+}
