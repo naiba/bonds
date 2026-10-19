@@ -12,7 +12,41 @@ import (
 // reconcileVCardOrganization runs inside the caller's contact transaction.
 // ORG must populate the same jobs that normal UI writes and vCard exports use.
 // Departments are not company names; split components before interpreting text.
+// Derive both compatibility fields from one coordinated job. card.Value(TITLE)
+// may belong to a secondary ORG when the selected company has no title.
 func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID string) error {
+	if len(card[vcard.FieldOrganization]) == 0 && len(card[vcard.FieldTitle]) == 0 {
+		return nil
+	}
+	// Group labels without ORG do not identify local jobs. Never partially
+	// accept multiple title-only properties by choosing the first one.
+	if len(card[vcard.FieldOrganization]) == 0 && len(card[vcard.FieldTitle]) > 1 {
+		return ErrVCardUnsafeReplacement
+	}
+	if err := reconcileVCardEmploymentRecords(tx, card, contactID, vaultID); err != nil {
+		return err
+	}
+	contact, err := loadContactEmployment(tx, contactID, vaultID)
+	if err != nil {
+		return err
+	}
+	employment := ContactVCardEmployments(contact)
+	if len(employment) > 0 && employment[0].JobID != 0 {
+		for _, job := range contact.ContactCompanies {
+			if job.ID == employment[0].JobID {
+				id := job.CompanyID
+				contact.CompanyID = &id
+				contact.JobPosition = job.JobPosition
+				break
+			}
+		}
+	} else {
+		contact.JobPosition = strPtrOrNil(card.Value(vcard.FieldTitle))
+	}
+	return updateContactProfile(tx, contact, vaultID, "company_id", "job_position")
+}
+
+func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, vaultID string) error {
 	organizations := card[vcard.FieldOrganization]
 	if len(organizations) == 0 && len(card[vcard.FieldTitle]) == 0 {
 		return nil
@@ -23,6 +57,22 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 	contact, err := loadContactEmployment(tx, contactID, vaultID)
 	if err != nil {
 		return err
+	}
+	// Preserve an independent legacy employer even if other normal jobs exist.
+	// Only materialize the necessary relationship; existing mirrors are not copied.
+	legacyRepresented := false
+	for _, job := range contact.ContactCompanies {
+		if contact.CompanyID != nil && job.CompanyID == *contact.CompanyID {
+			legacyRepresented = true
+		}
+	}
+	if !legacyRepresented && contact.Company != nil && contact.Company.VaultID == vaultID {
+		job := models.ContactCompany{ContactID: contactID, CompanyID: contact.Company.ID, JobPosition: contact.JobPosition}
+		if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
+			return err
+		}
+		job.Company = *contact.Company
+		contact.ContactCompanies = append(contact.ContactCompanies, job)
 	}
 	if len(organizations) == 0 {
 		// A title-only edit targets the first projected job, not a stale profile copy.
@@ -73,17 +123,6 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 	}
 	if len(incoming) == 0 && (len(contact.ContactCompanies) > 0 || contact.CompanyID != nil) {
 		return ErrVCardUnsafeReplacement
-	}
-	// Promote the one legacy relationship before changing the profile selection.
-	// Otherwise adding an ORG hides the only stored link to the former employer.
-	// Keep only domain data (company, title), not a snapshot of the contact.
-	if len(incoming) > 0 && len(contact.ContactCompanies) == 0 && contact.Company != nil && contact.Company.VaultID == vaultID {
-		job := models.ContactCompany{ContactID: contactID, CompanyID: contact.Company.ID, JobPosition: contact.JobPosition}
-		if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
-			return err
-		}
-		job.Company = *contact.Company
-		contact.ContactCompanies = append(contact.ContactCompanies, job)
 	}
 	projected := ContactVCardEmployments(contact)
 	used := map[uint]bool{}

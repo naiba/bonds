@@ -33,14 +33,7 @@ func (s *ContactJobService) verifyContactInVault(contactID, vaultID string) erro
 
 // verifyCompanyInVault checks that a company exists and belongs to the given vault.
 func (s *ContactJobService) verifyCompanyInVault(companyID uint, vaultID string) error {
-	var count int64
-	if err := s.db.Model(&models.Company{}).Where("id = ? AND vault_id = ?", companyID, vaultID).Count(&count).Error; err != nil {
-		return err
-	}
-	if count == 0 {
-		return ErrCompanyNotFound
-	}
-	return nil
+	return lockCompanyForEmployment(s.db, companyID, vaultID)
 }
 
 // List returns all jobs (ContactCompany rows) for a contact.
@@ -225,6 +218,10 @@ func clearLegacyJobSelection(tx *gorm.DB, contactID, vaultID string, companyID u
 	// job must clear its fallback title regardless of that optional selection.
 	if remaining > 0 {
 		query = query.Where("company_id = ?", companyID)
+	} else {
+		// A different legacy company is an independent relationship, not a stale
+		// mirror of this job. Preserve it when removing the last normal job.
+		query = query.Where("company_id = ? OR company_id IS NULL", companyID)
 	}
 	return query.Updates(map[string]any{"company_id": nil, "job_position": nil}).Error
 }

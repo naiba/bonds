@@ -340,7 +340,6 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			contact.FirstName = strPtrOrNil(firstName)
 			contact.LastName = strPtrOrNil(lastName)
 			contact.Nickname = strPtrOrNil(nickname)
-			contact.JobPosition = strPtrOrNil(title)
 			contact.LastUpdatedAt = &now
 			if err := b.db.Transaction(func(tx *gorm.DB) error {
 				// Preserve legacy employment before writing the new profile title.
@@ -355,7 +354,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 					return err
 				}
 				// Reconciliation owns company_id; never restore its old selection.
-				return tx.Model(&contact).Select("first_name", "last_name", "nickname", "job_position", "last_updated_at", "updated_at").Updates(&contact).Error
+				return tx.Model(&contact).Select("first_name", "last_name", "nickname", "last_updated_at", "updated_at").Updates(&contact).Error
 			}); err != nil {
 				return nil, err
 			}

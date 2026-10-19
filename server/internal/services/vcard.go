@@ -658,14 +658,12 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 
 		nameComponents := extractFullNameFromCard(card)
 		nickname := card.Value(vcard.FieldNickname)
-		title := card.Value(vcard.FieldTitle)
 		existing.FirstName = strPtrOrNil(nameComponents.firstName)
 		existing.LastName = strPtrOrNil(nameComponents.lastName)
 		existing.MiddleName = strPtrOrNil(nameComponents.middleName)
 		existing.Prefix = strPtrOrNil(nameComponents.prefix)
 		existing.Suffix = strPtrOrNil(nameComponents.suffix)
 		existing.Nickname = strPtrOrNil(nickname)
-		existing.JobPosition = strPtrOrNil(title)
 		existing.DistantEtag = strPtrOrNil(distantEtag)
 		// Reconcile against the old profile before overwriting its legacy title.
 		if err := ReplaceContactVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
@@ -673,7 +671,7 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		}
 		// Remote updates must neither overwrite local conflict metadata nor restore
 		// the old company selection changed by employment reconciliation.
-		if err := updateContactProfile(tx, &existing, vaultID, "first_name", "last_name", "middle_name", "prefix", "suffix", "nickname", "job_position", "distant_etag"); err != nil {
+		if err := updateContactProfile(tx, &existing, vaultID, "first_name", "last_name", "middle_name", "prefix", "suffix", "nickname", "distant_etag"); err != nil {
 			return "", "", err
 		}
 
