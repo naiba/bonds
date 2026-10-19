@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/services"
 )
 
 func TestCardDAVStandaloneTitleRemoval(t *testing.T) {
@@ -120,5 +122,92 @@ func TestCardDAVStandaloneTitleRemoval(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// A merged standalone title remains independent of Jobs, including on an actual
+// GET/PUT round trip and when deleting it is rejected by the Vault filter.
+func TestCardDAVStandaloneTitleAlongsideJobs(t *testing.T) {
+	e, db := setupDAVHTTPTestWithDB(t)
+	user, email, password := createDAVHTTPTestUser(t, db)
+	vault, id := createDAVHTTPTestContact(t, db, user, "Synthetic", "Independent")
+	href := fmt.Sprintf("/dav/addressbooks/%s/%s/%s.vcf", user, vault, id)
+	request := func(method, body string) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest(method, href, strings.NewReader(body))
+		req.SetBasicAuth(email, password)
+		req.Header.Set("Content-Type", "text/vcard")
+		rec := httptest.NewRecorder()
+		e.ServeHTTP(rec, req)
+		return rec
+	}
+	original := "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Synthetic Independent\r\nTITLE:Independent artist\r\nEND:VCARD\r\n"
+	if rec := request(http.MethodPut, original); rec.Code != http.StatusCreated {
+		t.Fatalf("create title: %d %s", rec.Code, rec.Body.String())
+	}
+	company := models.Company{VaultID: vault, Name: "Synthetic employer"}
+	if err := db.Create(&company).Error; err != nil {
+		t.Fatal(err)
+	}
+	job, err := services.NewContactJobService(db).Create(id, vault, dto.CreateContactJobRequest{CompanyID: company.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := request(http.MethodGet, "")
+	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), "employment1.TITLE:Independent artist\r\n") || !strings.Contains(get.Body.String(), "employment2.ORG:Synthetic employer\r\n") {
+		t.Fatalf("mixed employment export: %d %s", get.Code, get.Body.String())
+	}
+	if rec := request(http.MethodPut, get.Body.String()); rec.Code != http.StatusCreated {
+		t.Fatalf("round trip: %d %s", rec.Code, rec.Body.String())
+	}
+	var before models.Contact
+	if err := db.First(&before, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if before.CompanyID != nil || before.PreferredJobID != nil || ptrToStr(before.JobPosition) != "Independent artist" {
+		t.Fatal("round trip retargeted standalone selection")
+	}
+	filter := models.Vault{ID: vault, CardDAVFilter: &models.CardDAVFilter{Match: "all", Fields: []string{"job_title"}}}
+	if err := db.Model(&filter).Select("CardDAVFilter").Updates(&filter).Error; err != nil {
+		t.Fatal(err)
+	}
+	get = request(http.MethodGet, "")
+	body := strings.Replace(get.Body.String(), "employment1.TITLE:Independent artist\r\n", "", 1)
+	if rec := request(http.MethodPut, body); rec.Code != http.StatusConflict {
+		t.Fatalf("delete filtered title: %d %s", rec.Code, rec.Body.String())
+	}
+	var after models.Contact
+	if err := db.First(&after, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("rejected mixed employment write changed contact")
+	}
+	retained := request(http.MethodGet, "")
+	if retained.Code != http.StatusOK || retained.Body.String() != get.Body.String() || retained.Header().Get("ETag") != get.Header().Get("ETag") {
+		t.Fatal("rejected write changed representation")
+	}
+	filter.CardDAVFilter = &models.CardDAVFilter{Match: "all", Fields: []string{}}
+	if err := db.Model(&filter).Select("CardDAVFilter").Updates(&filter).Error; err != nil {
+		t.Fatal(err)
+	}
+	if rec := request(http.MethodPut, body); rec.Code != http.StatusCreated {
+		t.Fatalf("unfiltered title deletion: %d %s", rec.Code, rec.Body.String())
+	}
+	if err := db.First(&after, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if after.JobPosition != nil {
+		t.Fatal("deleted standalone title remains persisted")
+	}
+	remaining, err := services.NewContactJobService(db).List(id, vault)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(remaining) != 1 || !reflect.DeepEqual(remaining[0], *job) {
+		t.Fatal("round trip or title removal changed unrelated Jobs")
+	}
+	if rec := request(http.MethodGet, ""); rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "TITLE:") || !strings.Contains(rec.Body.String(), "ORG:Synthetic employer") {
+		t.Fatal("title removal lost company or still exports standalone title")
 	}
 }

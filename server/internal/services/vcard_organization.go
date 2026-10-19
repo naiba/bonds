@@ -22,6 +22,21 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 	if len(card[vcard.FieldOrganization]) == 0 && len(card[vcard.FieldTitle]) > 1 {
 		return ErrVCardUnsafeReplacement
 	}
+	if len(card[vcard.FieldOrganization]) == 0 {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		contact, err := loadContactEmployment(tx, contactID, vaultID)
+		if err != nil {
+			return err
+		}
+		// Clearing the independent title must not select and overwrite a remaining
+		// Job merely because the cleared title no longer appears in the projection.
+		if hasStandaloneEmployment(contact) {
+			contact.JobPosition = strPtrOrNil(strings.TrimSpace(card.Value(vcard.FieldTitle)))
+			return updateContactProfile(tx, contact, vaultID, "job_position")
+		}
+	}
 	if err := reconcileVCardEmploymentRecords(tx, card, contactID, vaultID); err != nil {
 		return err
 	}
@@ -40,7 +55,7 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 				break
 			}
 		}
-	} else {
+	} else if len(card[vcard.FieldOrganization]) == 0 {
 		// Standalone titles use the same blank-value semantics as the projection.
 		contact.JobPosition = strPtrOrNil(strings.TrimSpace(card.Value(vcard.FieldTitle)))
 	}
@@ -58,6 +73,15 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 	contact, err := loadContactEmployment(tx, contactID, vaultID)
 	if err != nil {
 		return err
+	}
+	// One transaction-scoped lock per Vault serializes automatic lookup/create
+	// across contacts and processes. A name uniqueness constraint would forbid
+	// legitimate explicit duplicates; per-name locks could deadlock when batch
+	// imports encounter several names in different orders. SQLite serializes writes.
+	if len(organizations) > 0 && tx.Dialector.Name() == "postgres" {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "bonds:vcard-company:"+vaultID).Error; err != nil {
+			return err
+		}
 	}
 	if err := materializeLegacyEmployment(tx, contact); err != nil {
 		return err
@@ -100,13 +124,25 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 		// Missing TITLE is an empty title, not permission to keep an old title.
 		incoming = append(incoming, incomingEmployment{name: strings.TrimSpace(components[0]), title: title})
 	}
-	// A group label is optional metadata. When several organizations make an
-	// unpaired title ambiguous, reject rather than silently dropping that title.
+	// A distinct group can identify one company-less TITLE alongside Jobs.
+	// Ungrouped or multiple unmatched titles remain ambiguous; never guess which
+	// company they belong to. Export emits the same distinct groups on round trips.
+	var standaloneTitle *string
 	if len(incoming) > 0 {
 		for _, title := range card[vcard.FieldTitle] {
-			if !matchedTitles[title] && strings.TrimSpace(title.Value) != "" {
+			if matchedTitles[title] || strings.TrimSpace(title.Value) == "" {
+				continue
+			}
+			if title.Group == "" || standaloneTitle != nil {
 				return ErrVCardUnsafeReplacement
 			}
+			for _, org := range organizations {
+				if strings.EqualFold(org.Group, title.Group) {
+					return ErrVCardUnsafeReplacement
+				}
+			}
+			value := strings.TrimSpace(title.Value)
+			standaloneTitle = &value
 		}
 	}
 	if len(incoming) == 0 && (len(contact.ContactCompanies) > 0 || contact.CompanyID != nil) {
@@ -250,6 +286,11 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 	}
 	contact.CompanyID = primaryCompanyID
 	contact.PreferredJobID = primaryJobID
+	if standaloneTitle != nil {
+		contact.CompanyID, contact.PreferredJobID = nil, nil
+		contact.JobPosition = standaloneTitle
+		return updateContactProfile(tx, contact, vaultID, "company_id", "preferred_job_id", "job_position")
+	}
 	return updateContactProfile(tx, contact, vaultID, "company_id", "preferred_job_id")
 }
 
@@ -268,7 +309,10 @@ func vcardOrganizationTitle(card vcard.Card, group string) (*vcard.Field, error)
 		return match, nil
 	}
 	// Some clients label only one side of a unique ORG/TITLE pair.
-	if len(card[vcard.FieldOrganization]) == 1 && len(card[vcard.FieldTitle]) == 1 {
+	// Distinct explicit groups identify an independent TITLE, even when there
+	// is just one employer without a title. Do not pair those on a round trip.
+	if len(card[vcard.FieldOrganization]) == 1 && len(card[vcard.FieldTitle]) == 1 &&
+		(group == "" || card[vcard.FieldTitle][0].Group == "") {
 		return card[vcard.FieldTitle][0], nil
 	}
 	return nil, nil

@@ -340,9 +340,10 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 	if contact.Nickname != nil && *contact.Nickname != "" {
 		card.SetValue(vcard.FieldNickname, *contact.Nickname)
 	}
-	for i, employment := range ContactVCardEmployments(contact) {
+	employments := ContactVCardEmployments(contact)
+	for i, employment := range employments {
 		group := ""
-		if len(contact.ContactCompanies) > 1 {
+		if len(employments) > 1 {
 			group = fmt.Sprintf("employment%d", i+1)
 		}
 		if employment.Company != "" {

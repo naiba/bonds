@@ -26,7 +26,7 @@ func ReplaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 	// Keep this out of incremental imports (including birthday-only imports),
 	// and preserve real employment records when their ORG/TITLE is omitted.
 	if len(card[vcard.FieldOrganization]) == 0 && len(card[vcard.FieldTitle]) == 0 &&
-		current.CompanyID == nil && len(current.ContactCompanies) == 0 && current.JobPosition != nil {
+		hasStandaloneEmployment(&current) {
 		current.JobPosition = nil
 		if err := updateContactProfile(db, &current, vaultID, "job_position"); err != nil {
 			return err

@@ -209,6 +209,15 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 // same transaction so editing/deleting an imported job cannot resurrect it when
 // the final job is removed and the vCard projection falls back to old fields.
 func clearLegacyJobSelection(tx *gorm.DB, contactID, vaultID string, companyID uint) error {
+	// Inspect the original selection before clearing deleted Job IDs: a standalone
+	// title is independent of every company, including the last company removed.
+	var contact models.Contact
+	if err := tx.First(&contact, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
+		return err
+	}
+	if hasStandaloneEmployment(&contact) {
+		return nil
+	}
 	// Clear deleted identities independently of legacy CompanyID (which can be
 	// NULL). The subquery also prevents retaining another contact's job ID.
 	remainingJobs := tx.Model(&models.ContactCompany{}).Select("id").Where("contact_id = ?", contactID)

@@ -16,9 +16,9 @@ type VCardEmployment struct {
 	CompanyID uint
 }
 
-// ContactVCardEmployments prefers the normal jobs model. Legacy fields are a
-// fallback for old contacts and standalone imported titles, never a second copy
-// that can override an edited job. Keep all jobs visible, in deterministic order.
+// ContactVCardEmployments prefers identified Jobs, while a title with neither
+// a company nor a selected Job is an independent employment. In particular,
+// merging Jobs into that contact must not hide the reviewed standalone title.
 func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 	result := make([]VCardEmployment, 0, len(contact.ContactCompanies))
 	for _, job := range contact.ContactCompanies {
@@ -38,17 +38,23 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 		}
 		return result[i].JobID < result[j].JobID
 	})
-	if len(contact.ContactCompanies) == 0 {
+	if len(contact.ContactCompanies) == 0 || hasStandaloneEmployment(contact) {
 		employment := VCardEmployment{Title: strings.TrimSpace(ptrToStr(contact.JobPosition))}
 		if contact.Company != nil && (contact.Company.VaultID == "" || contact.Company.VaultID == contact.VaultID) {
 			employment.Company = strings.TrimSpace(contact.Company.Name)
 			employment.CompanyID = contact.Company.ID
 		}
 		if employment.Company != "" || employment.Title != "" {
-			result = append(result, employment)
+			result = append([]VCardEmployment{employment}, result...)
 		}
 	}
 	return result
+}
+
+// hasStandaloneEmployment distinguishes an independent title from a normal
+// Job's compatibility mirror. No synthetic company or duplicate job is needed.
+func hasStandaloneEmployment(contact *models.Contact) bool {
+	return contact.CompanyID == nil && contact.PreferredJobID == nil && strings.TrimSpace(ptrToStr(contact.JobPosition)) != ""
 }
 
 // loadContactEmployment loads only the relations needed for employment identity.
