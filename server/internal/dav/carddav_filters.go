@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/naiba/bonds/internal/models"
+	"github.com/naiba/bonds/internal/services"
 )
 
 // Filter before encoding photos: presence rules need only already-loaded contact
@@ -39,10 +40,12 @@ func cardDAVFieldPresent(contact *models.Contact, field string) bool {
 		return nonblank(contact.LastName)
 	case "nickname":
 		return nonblank(contact.Nickname)
-	case "job_title":
-		return nonblank(contact.JobPosition)
-	case "organization":
-		return contact.Company != nil && strings.TrimSpace(contact.Company.Name) != ""
+	case "job_title", "organization":
+		for _, employment := range services.ContactVCardEmployments(contact) {
+			if (field == "job_title" && employment.Title != "") || (field == "organization" && employment.Company != "") {
+				return true
+			}
+		}
 	case "phone", "email":
 		for _, info := range contact.ContactInformations {
 			if ptrToStr(info.ContactInformationType.Type) == field && strings.TrimSpace(info.Data) != "" {

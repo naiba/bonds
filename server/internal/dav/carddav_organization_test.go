@@ -156,18 +156,87 @@ func TestCardDAVOrganizationWritesRespectFilterAndVault(t *testing.T) {
 		t.Fatalf("explicit clear must obey filter: %d", cleared.Code)
 	}
 	setFilter()
+	// Jobs are now the canonical projection. Clearing only a legacy pointer
+	// cannot erase these jobs; an ambiguous destructive edit remains a conflict.
 	cleared = perform(http.MethodPut, location, "ORG:\r\n", "Person")
-	if cleared.Code != http.StatusCreated {
-		t.Fatalf("unfiltered explicit clear: %d %s", cleared.Code, cleared.Body.String())
+	if cleared.Code != http.StatusConflict {
+		t.Fatalf("empty ORG must not erase existing jobs: %d", cleared.Code)
 	}
 	persisted = models.Contact{}
 	if err := db.First(&persisted, "id = ?", contact.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if persisted.CompanyID != nil {
-		t.Fatal("explicit ORG clear did not clear primary company")
+	if persisted.CompanyID == nil {
+		t.Fatal("rejected clear changed primary company")
 	}
 	if err := db.First(&preservedJob, job.ID).Error; err != nil {
 		t.Fatal("clear deleted employment", err)
+	}
+}
+
+func TestCardDAVStructuredOrganizationCompanyNames(t *testing.T) {
+	e, db := setupDAVHTTPTestWithDB(t)
+	userID, email, password := createDAVHTTPTestUser(t, db)
+	vaultID, _ := createDAVHTTPTestContact(t, db, userID, "Existing", "Person")
+	company := models.Company{VaultID: vaultID, Name: "Acme"}
+	if err := db.Create(&company).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := services.NewVaultSettingsService(db).Update(vaultID, dto.UpdateVaultSettingsRequest{Name: "Organization names", CardDAVFilter: &models.CardDAVFilter{Match: "all", Fields: []string{"organization"}}}); err != nil {
+		t.Fatal(err)
+	}
+	book := fmt.Sprintf("/dav/addressbooks/%s/%s/", userID, vaultID)
+	for _, tc := range []struct{ path, wire, want string }{
+		{"department", "Acme;Sales", "Acme"}, {"empty-department", "Acme;", "Acme"},
+		{"empty-organization", ";Sales", ""}, {"empty-components", ";", ""},
+		{"literal-semicolon", `Acme\;Partners;Sales`, "Acme;Partners"},
+		{"literal-backslash", `Acme\\;Sales`, `Acme\`},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			body := "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Synthetic\r\nORG:" + tc.wire + "\r\nEND:VCARD\r\n"
+			req := httptest.NewRequest(http.MethodPut, book+tc.path+".vcf", strings.NewReader(body))
+			req.SetBasicAuth(email, password)
+			req.Header.Set("Content-Type", "text/vcard")
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			if tc.want == "" {
+				if rec.Code != 409 {
+					t.Fatalf("empty organization: %d", rec.Code)
+				}
+				return
+			}
+			if rec.Code != 201 {
+				t.Fatalf("create: %d %s", rec.Code, rec.Body.String())
+			}
+			req = httptest.NewRequest(http.MethodGet, rec.Header().Get("Location"), nil)
+			req.SetBasicAuth(email, password)
+			rec = httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			if rec.Code != 200 {
+				t.Fatalf("readback: %d", rec.Code)
+			}
+			card, err := vcard.NewDecoder(strings.NewReader(rec.Body.String())).Decode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			parts := card.Get(vcard.FieldOrganization).Organization()
+			if len(parts) != 1 || parts[0] != tc.want {
+				t.Fatalf("wrong ORG components: %q", parts)
+			}
+		})
+	}
+	var companies []models.Company
+	if err := db.Where("vault_id = ?", vaultID).Order("id ASC").Find(&companies).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(companies) != 3 || companies[0].ID != company.ID || companies[0].Name != "Acme" || companies[1].Name != "Acme;Partners" || companies[2].Name != `Acme\` {
+		t.Fatalf("incorrect company identities: count %d", len(companies))
+	}
+	var contacts int64
+	if err := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&contacts).Error; err != nil {
+		t.Fatal(err)
+	}
+	if contacts != 5 {
+		t.Fatalf("empty ORG left contacts behind: %d", contacts)
 	}
 }

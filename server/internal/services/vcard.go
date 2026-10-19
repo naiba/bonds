@@ -86,6 +86,8 @@ func preloadContactVCardRelations(db *gorm.DB) *gorm.DB {
 		Preload("Addresses").
 		Preload("ImportantDates.ContactImportantDateType").
 		Preload("Company").
+		Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Preload("ContactCompanies.Company").
 		Preload("File")
 }
 
@@ -337,11 +339,19 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 	if contact.Nickname != nil && *contact.Nickname != "" {
 		card.SetValue(vcard.FieldNickname, *contact.Nickname)
 	}
-	if contact.JobPosition != nil && *contact.JobPosition != "" {
-		card.SetValue(vcard.FieldTitle, *contact.JobPosition)
-	}
-	if contact.Company != nil && strings.TrimSpace(contact.Company.Name) != "" {
-		card.SetValue(vcard.FieldOrganization, strings.TrimSpace(contact.Company.Name))
+	for i, employment := range ContactVCardEmployments(contact) {
+		group := ""
+		if len(contact.ContactCompanies) > 1 {
+			group = fmt.Sprintf("employment%d", i+1)
+		}
+		if employment.Company != "" {
+			field := vcard.NewOrganization([]string{employment.Company})
+			field.Group = group
+			card.Add(vcard.FieldOrganization, field)
+		}
+		if employment.Title != "" {
+			card.Add(vcard.FieldTitle, &vcard.Field{Value: employment.Title, Group: group})
+		}
 	}
 	if contact.Description != nil && *contact.Description != "" {
 		card.SetValue(vcard.FieldNote, *contact.Description)

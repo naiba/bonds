@@ -25,6 +25,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/naiba/bonds/internal/config"
+	"github.com/naiba/bonds/internal/dav"
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/handlers"
 	"github.com/naiba/bonds/internal/middleware"
@@ -8186,4 +8187,87 @@ func TestVaultSettingsCardDAVFiltersValidationAndIsolation(t *testing.T) {
 	if vault.CardDAVFilter != nil {
 		t.Fatal("filter leaked into another vault")
 	}
+}
+
+func TestContactJobsDriveCardDAVProjectionAndFilters(t *testing.T) {
+	ts := setupTestServer(t)
+	dav.SetupDAVRoutes(ts.e, ts.db, t.TempDir())
+	email := "dav-employment@example.com"
+	token, auth := ts.registerTestUser(t, email)
+	vault := ts.createTestVault(t, token, "Employment filters")
+	contact := ts.createTestContact(t, token, vault.ID, "Synthetic")
+	apiPath := fmt.Sprintf("/api/vaults/%s", vault.ID)
+	rec := ts.doRequest(http.MethodPost, apiPath+"/companies", `{"name":"Acme"}`, token)
+	if rec.Code != 201 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	var company struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &company); err != nil {
+		t.Fatal(err)
+	}
+	jobsPath := apiPath + "/contacts/" + contact.ID + "/jobs"
+	rec = ts.doRequest(http.MethodPost, jobsPath, fmt.Sprintf(`{"company_id":%d,"job_position":"Engineer"}`, company.ID), token)
+	if rec.Code != 201 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	var job struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &job); err != nil {
+		t.Fatal(err)
+	}
+	readDAV := func(want int, title string) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/dav/addressbooks/%s/%s/%s.vcf", auth.User.ID, vault.ID, contact.ID), nil)
+		req.SetBasicAuth(email, "password123")
+		response := httptest.NewRecorder()
+		ts.e.ServeHTTP(response, req)
+		if response.Code != want {
+			t.Fatalf("DAV status %d, want %d: %s", response.Code, want, response.Body.String())
+		}
+		if want == 200 && (!strings.Contains(response.Body.String(), "ORG:Acme") || !strings.Contains(response.Body.String(), "TITLE:"+title)) {
+			t.Fatalf("employment missing from card: %s", response.Body.String())
+		}
+	}
+	for _, field := range []string{"organization", "job_title"} {
+		rec = ts.doRequest(http.MethodPut, apiPath+"/settings", fmt.Sprintf(`{"name":"Employment filters","carddav_filter":{"match":"all","fields":[%q]}}`, field), token)
+		if rec.Code != 200 {
+			t.Fatal(rec.Code, rec.Body.String())
+		}
+		readDAV(200, "Engineer")
+	}
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d", jobsPath, job.ID), fmt.Sprintf(`{"company_id":%d,"job_position":"Architect"}`, company.ID), token)
+	if rec.Code != 200 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	readDAV(200, "Architect")
+
+	// A later job with a title must still be projected when the first job has none.
+	rec = ts.doRequest(http.MethodPost, jobsPath, fmt.Sprintf(`{"company_id":%d,"job_position":"Consultant"}`, company.ID), token)
+	if rec.Code != 201 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	var secondJob struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &secondJob); err != nil {
+		t.Fatal(err)
+	}
+	rec = ts.doRequest(http.MethodPut, fmt.Sprintf("%s/%d", jobsPath, job.ID), fmt.Sprintf(`{"company_id":%d,"job_position":""}`, company.ID), token)
+	if rec.Code != 200 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	readDAV(200, "Consultant")
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("%s/%d", jobsPath, secondJob.ID), "", token)
+	if rec.Code != 204 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	readDAV(404, "")
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("%s/%d", jobsPath, job.ID), "", token)
+	if rec.Code != 204 {
+		t.Fatal(rec.Code, rec.Body.String())
+	}
+	readDAV(404, "")
 }

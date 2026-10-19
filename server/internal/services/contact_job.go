@@ -89,6 +89,19 @@ func (s *ContactJobService) Create(contactID, vaultID string, req dto.CreateCont
 
 // Update modifies an existing job entry by its ID.
 func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dto.UpdateContactJobRequest) (*dto.ContactJobResponse, error) {
+	var result *dto.ContactJobResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		var err error
+		result, err = NewContactJobService(tx).update(contactID, vaultID, jobID, req)
+		return err
+	})
+	return result, err
+}
+
+func (s *ContactJobService) update(contactID, vaultID string, jobID uint, req dto.UpdateContactJobRequest) (*dto.ContactJobResponse, error) {
 	if err := s.verifyContactInVault(contactID, vaultID); err != nil {
 		return nil, err
 	}
@@ -105,12 +118,17 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 		return nil, err
 	}
 
+	oldCompanyID := job.CompanyID
 	job.CompanyID = req.CompanyID
 	job.JobPosition = strPtrOrNil(req.JobPosition)
 	if err := updateContactRecord(s.db, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
 		return nil, err
 	}
 
+	// Keep the existing primary selection compatible with legacy readers.
+	if err := s.db.Model(&models.Contact{}).Where("id = ? AND vault_id = ? AND company_id = ?", contactID, vaultID, oldCompanyID).Updates(map[string]any{"company_id": job.CompanyID, "job_position": job.JobPosition}).Error; err != nil {
+		return nil, err
+	}
 	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
 		return nil, err
 	}
@@ -121,18 +139,22 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 
 // Delete removes a specific job entry by its ID.
 func (s *ContactJobService) Delete(contactID, vaultID string, jobID uint) error {
-	if err := s.verifyContactInVault(contactID, vaultID); err != nil {
-		return err
-	}
-
-	result := s.db.Where("id = ? AND contact_id = ?", jobID, contactID).Delete(&models.ContactCompany{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrContactJobNotFound
-	}
-	return nil
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		var job models.ContactCompany
+		if err := tx.Where("id = ? AND contact_id = ?", jobID, contactID).First(&job).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrContactJobNotFound
+			}
+			return err
+		}
+		if err := tx.Delete(&job).Error; err != nil {
+			return err
+		}
+		return clearLegacyJobSelection(tx, contactID, vaultID, job.CompanyID)
+	})
 }
 
 // AddEmployee creates a ContactCompany entry from the company side (VaultCompanies page).
@@ -165,19 +187,30 @@ func (s *ContactJobService) AddEmployee(companyID uint, vaultID string, req dto.
 
 // RemoveEmployee removes a ContactCompany entry by company and contact ID.
 func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID string) error {
-	// Verify company belongs to vault
 	if err := s.verifyCompanyInVault(companyID, vaultID); err != nil {
 		return err
 	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		result := tx.Where("company_id = ? AND contact_id = ?", companyID, contactID).Delete(&models.ContactCompany{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrContactJobNotFound
+		}
+		return clearLegacyJobSelection(tx, contactID, vaultID, companyID)
+	})
+}
 
-	result := s.db.Where("company_id = ? AND contact_id = ?", companyID, contactID).Delete(&models.ContactCompany{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrContactJobNotFound
-	}
-	return nil
+// Normal jobs are authoritative. Clear their obsolete legacy selection in the
+// same transaction so editing/deleting an imported job cannot resurrect it when
+// the final job is removed and the vCard projection falls back to old fields.
+func clearLegacyJobSelection(tx *gorm.DB, contactID, vaultID string, companyID uint) error {
+	return tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ? AND company_id = ?", contactID, vaultID, companyID).
+		Updates(map[string]any{"company_id": nil, "job_position": nil}).Error
 }
 
 // LegacyUpdate creates or updates the first job for backward compatibility with the old PUT /jobInformation endpoint.
