@@ -13,6 +13,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -8270,4 +8271,126 @@ func TestContactJobsDriveCardDAVProjectionAndFilters(t *testing.T) {
 		t.Fatal(rec.Code, rec.Body.String())
 	}
 	readDAV(404, "")
+}
+
+func TestCompanyEmployeeRemovalMissingContactHTTP(t *testing.T) {
+	for _, scenario := range []string{"nonexistent", "deleted", "other_vault", "live_unassigned"} {
+		t.Run(scenario, func(t *testing.T) {
+			ts := setupTestServer(t)
+			token, _ := ts.registerTestUser(t, "employee-removal@example.com")
+			vault := ts.createTestVault(t, token, "Employee removal")
+			createCompany := func(vaultID string) uint {
+				t.Helper()
+				rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vaultID+"/companies", `{"name":"Retained company"}`, token)
+				if rec.Code != http.StatusCreated {
+					t.Fatalf("create company=%d: %s", rec.Code, rec.Body.String())
+				}
+				var company struct {
+					ID uint `json:"id"`
+				}
+				if err := json.Unmarshal(parseResponse(t, rec).Data, &company); err != nil {
+					t.Fatal(err)
+				}
+				if company.ID == 0 {
+					t.Fatal("company ID missing")
+				}
+				return company.ID
+			}
+			companyID := createCompany(vault.ID)
+			employee := ts.createTestContact(t, token, vault.ID, "Retained employee")
+			employeePath := func(vaultID string, companyID uint) string {
+				return fmt.Sprintf("/api/vaults/%s/companies/%d/employees", vaultID, companyID)
+			}
+			addEmployee := func(vaultID string, companyID uint, contactID string) {
+				t.Helper()
+				rec := ts.doRequest(http.MethodPost, employeePath(vaultID, companyID), fmt.Sprintf(`{"contact_id":%q,"job_position":"Engineer"}`, contactID), token)
+				if rec.Code != http.StatusCreated {
+					t.Fatalf("add employee=%d: %s", rec.Code, rec.Body.String())
+				}
+			}
+			addEmployee(vault.ID, companyID, employee.ID)
+			contactID := uuid.NewString()
+			if scenario != "nonexistent" {
+				targetVault := vault.ID
+				if scenario == "other_vault" {
+					targetVault = ts.createTestVault(t, token, "Other vault").ID
+				}
+				target := ts.createTestContact(t, token, targetVault, "Removal target")
+				contactID = target.ID
+				if scenario == "other_vault" {
+					addEmployee(targetVault, createCompany(targetVault), target.ID)
+				}
+				if scenario == "deleted" {
+					rec := ts.doRequest(http.MethodDelete, "/api/vaults/"+vault.ID+"/contacts/"+contactID, "", token)
+					if rec.Code != http.StatusNoContent {
+						t.Fatalf("delete contact=%d: %s", rec.Code, rec.Body.String())
+					}
+				}
+			}
+			type employmentState struct {
+				Jobs      []models.ContactCompany
+				Companies []models.Company
+				Contacts  []models.Contact
+			}
+			snapshot := func() employmentState {
+				t.Helper()
+				var state employmentState
+				if err := ts.db.Order("id").Find(&state.Jobs).Error; err != nil {
+					t.Fatal(err)
+				}
+				if err := ts.db.Order("id").Find(&state.Companies).Error; err != nil {
+					t.Fatal(err)
+				}
+				if err := ts.db.Unscoped().Order("id").Find(&state.Contacts).Error; err != nil {
+					t.Fatal(err)
+				}
+				return state
+			}
+			before := snapshot()
+			if len(before.Jobs) == 0 {
+				t.Fatal("missing unrelated employment fixture")
+			}
+			path := employeePath(vault.ID, companyID)
+			rec := ts.doRequest(http.MethodDelete, path+"/"+contactID, "", token)
+			if !reflect.DeepEqual(before, snapshot()) {
+				t.Fatal("rejected removal changed stored companies, employment or contacts")
+			}
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("missing employee=%d, want 404: %s", rec.Code, rec.Body.String())
+			}
+			response := parseResponse(t, rec)
+			if response.Success || response.Error == nil || response.Error.Code != "NOT_FOUND" {
+				t.Fatalf("invalid missing-resource response: %s", rec.Body.String())
+			}
+
+			// A rejected lookup must not prevent a subsequent legitimate removal or
+			// mutate another vault's employment while changing this contact's marker.
+			rec = ts.doRequest(http.MethodDelete, path+"/"+employee.ID, "", token)
+			if rec.Code != http.StatusNoContent || rec.Body.Len() != 0 {
+				t.Fatalf("valid removal=%d: %s", rec.Code, rec.Body.String())
+			}
+			after := snapshot()
+			expectedJobs := make([]models.ContactCompany, 0, len(before.Jobs)-1)
+			for _, job := range before.Jobs {
+				if job.CompanyID != companyID || job.ContactID != employee.ID {
+					expectedJobs = append(expectedJobs, job)
+				}
+			}
+			if len(after.Jobs) != len(before.Jobs)-1 || !reflect.DeepEqual(after.Jobs, expectedJobs) {
+				t.Fatal("valid removal did not remove only the requested employment")
+			}
+			if !reflect.DeepEqual(before.Companies, after.Companies) || len(before.Contacts) != len(after.Contacts) {
+				t.Fatal("valid removal removed a company or contact")
+			}
+			for i, contact := range before.Contacts {
+				if contact.ID != employee.ID && !reflect.DeepEqual(contact, after.Contacts[i]) {
+					t.Fatal("valid removal changed an unrelated contact")
+				}
+			}
+			rec = ts.doRequest(http.MethodGet, "/api/vaults/"+vault.ID+"/contacts/"+employee.ID, "", token)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("removed employee contact no longer readable: %d", rec.Code)
+			}
+		})
+	}
 }
