@@ -128,25 +128,39 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 
 // Delete removes a company and cleans up related ContactCompany rows and legacy Contact.CompanyID references.
 func (s *CompanyService) Delete(id uint, vaultID string) error {
-	var company models.Company
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrCompanyNotFound
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var company models.Company
+		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCompanyNotFound
+			}
+			return err
 		}
-		return err
-	}
-	// Delete related ContactCompany join table rows
-	if err := s.db.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
-		return err
-	}
-	// Also null out legacy CompanyID on contacts for backward compatibility
-	if err := s.db.Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
-		return err
-	}
-	if err := s.db.Delete(&company).Error; err != nil {
-		return err
-	}
-	return nil
+		// Company deletion is also a local employment edit. Discover both normal
+		// jobs and legacy-only owners, then use the same parent lock order as Jobs
+		// and merge. Cleanup and the local-wins marker must commit together.
+		var contactIDs []string
+		employees := tx.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", id)
+		if err := tx.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
+			Where("company_id = ? OR id IN (?)", id, employees).Pluck("id", &contactIDs).Error; err != nil {
+			return err
+		}
+		if err := lockContactsBelongToVault(tx, contactIDs, vaultID); err != nil {
+			return err
+		}
+		if err := tx.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
+			return err
+		}
+		for _, contactID := range contactIDs {
+			if err := clearLegacyJobSelection(tx, contactID, vaultID, id); err != nil {
+				return err
+			}
+			if err := markLocalEmploymentChanged(tx, contactID, vaultID); err != nil {
+				return err
+			}
+		}
+		return tx.Delete(&company).Error
+	})
 }
 
 func toCompanyResponse(c *models.Company) dto.CompanyResponse {

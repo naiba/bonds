@@ -216,8 +216,17 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 // same transaction so editing/deleting an imported job cannot resurrect it when
 // the final job is removed and the vCard projection falls back to old fields.
 func clearLegacyJobSelection(tx *gorm.DB, contactID, vaultID string, companyID uint) error {
-	return tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ? AND company_id = ?", contactID, vaultID, companyID).
-		Updates(map[string]any{"company_id": nil, "job_position": nil}).Error
+	var remaining int64
+	if err := tx.Model(&models.ContactCompany{}).Where("contact_id = ?", contactID).Count(&remaining).Error; err != nil {
+		return err
+	}
+	query := tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ?", contactID, vaultID)
+	// A title-only DAV edit may leave CompanyID nil. Removing the final normal
+	// job must clear its fallback title regardless of that optional selection.
+	if remaining > 0 {
+		query = query.Where("company_id = ?", companyID)
+	}
+	return query.Updates(map[string]any{"company_id": nil, "job_position": nil}).Error
 }
 
 // LegacyUpdate creates or updates the first job for backward compatibility with the old PUT /jobInformation endpoint.
@@ -244,13 +253,31 @@ func (s *ContactJobService) legacyUpdate(contactID, vaultID, userID string, req 
 		return nil, err
 	}
 
-	// Find existing first job or create new one
+	// Use the same selected employment as exports. The legacy endpoint is a
+	// single-job editor; a missing company performs a title-only edit, not an
+	// ignored profile write hidden by the authoritative normal Jobs records.
+	loaded, err := loadContactEmployment(s.db, contactID, vaultID)
+	if err != nil {
+		return nil, err
+	}
 	var existingJob models.ContactCompany
-	found := true
-	if err := s.db.Where("contact_id = ?", contactID).Order("id ASC").First(&existingJob).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			found = false
-		} else {
+	found := false
+	projected := ContactVCardEmployments(loaded)
+	if len(projected) > 0 && projected[0].JobID != 0 {
+		for _, job := range loaded.ContactCompanies {
+			if job.ID == projected[0].JobID {
+				existingJob = job
+				found = true
+				break
+			}
+		}
+	}
+	if req.CompanyID == nil && found {
+		id := existingJob.CompanyID
+		req.CompanyID = &id
+	}
+	if req.CompanyID != nil {
+		if err := s.verifyCompanyInVault(*req.CompanyID, vaultID); err != nil {
 			return nil, err
 		}
 	}
@@ -369,9 +396,7 @@ func (s *ContactJobService) withLocalEmploymentChange(contactID, vaultID string,
 		if err := change(tx); err != nil {
 			return err
 		}
-		now := time.Now()
-		contact := models.Contact{ID: contactID, LastUpdatedAt: &now}
-		return updateContactProfile(tx, &contact, vaultID, "last_updated_at")
+		return markLocalEmploymentChanged(tx, contactID, vaultID)
 	})
 }
 
@@ -403,4 +428,12 @@ func (s *ContactJobService) LegacyDelete(contactID, vaultID, userID string) (*dt
 		return err
 	})
 	return result, err
+}
+
+// Company-side deletion and contact-side edits share the same local-wins marker.
+// Call only for local mutations, inside their parent-locked transaction.
+func markLocalEmploymentChanged(tx *gorm.DB, contactID, vaultID string) error {
+	now := time.Now()
+	contact := models.Contact{ID: contactID, LastUpdatedAt: &now}
+	return updateContactProfile(tx, &contact, vaultID, "last_updated_at")
 }

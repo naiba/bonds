@@ -40,6 +40,7 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		jobID       uint
 	}
 	var incoming []incomingEmployment
+	matchedTitles := map[*vcard.Field]bool{}
 	for _, field := range organizations {
 		components := field.Organization()
 		if len(components) == 0 || strings.TrimSpace(components[0]) == "" {
@@ -48,9 +49,19 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		title := ""
 		if fieldTitle := vcardOrganizationTitle(card, field.Group); fieldTitle != nil {
 			title = strings.TrimSpace(fieldTitle.Value)
+			matchedTitles[fieldTitle] = true
 		}
 		// Missing TITLE is an empty title, not permission to keep an old title.
 		incoming = append(incoming, incomingEmployment{name: strings.TrimSpace(components[0]), title: title})
+	}
+	// A group label is optional metadata. When several organizations make an
+	// unpaired title ambiguous, reject rather than silently dropping that title.
+	if len(incoming) > 0 {
+		for _, title := range card[vcard.FieldTitle] {
+			if !matchedTitles[title] && strings.TrimSpace(title.Value) != "" {
+				return ErrVCardUnsafeReplacement
+			}
+		}
 	}
 	if len(incoming) == 0 && len(contact.ContactCompanies) > 0 {
 		return ErrVCardUnsafeReplacement
@@ -189,6 +200,11 @@ func vcardOrganizationTitle(card vcard.Card, group string) *vcard.Field {
 		if strings.EqualFold(title.Group, group) {
 			return title
 		}
+	}
+	// Some clients label only ORG. A single ORG/TITLE pair is still unambiguous;
+	// do not turn a valid title into an empty job that shadows the legacy title.
+	if len(card[vcard.FieldOrganization]) == 1 && len(card[vcard.FieldTitle]) == 1 {
+		return card[vcard.FieldTitle][0]
 	}
 	return nil
 }

@@ -224,27 +224,45 @@ func TestContactCreationOverlappingMerge(t *testing.T) {
 				if mergeFirst {
 					validated, resume := make(chan struct{}), make(chan struct{})
 					var paused atomic.Bool
-					hook := "merge:pause_creation_after_validation"
-					if err := db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
-						row, ok := tx.Statement.Dest.(*models.Contact)
-						matches := ok && row.ID == source.ID
-						if count, counting := tx.Statement.Dest.(*int64); counting && (kind == "activity" || kind == "vault_task" || kind == "company_employee") && tx.Statement.Table == "contacts" && *count > 0 {
-							matches = true
+					hook := "merge:pause_creation_for_merge_first"
+					if kind != "company_employee" {
+						if err := db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
+							row, ok := tx.Statement.Dest.(*models.Contact)
+							matches := ok && row.ID == source.ID
+							if count, counting := tx.Statement.Dest.(*int64); counting && (kind == "activity" || kind == "vault_task") && tx.Statement.Table == "contacts" && *count > 0 {
+								matches = true
+							}
+							if matches && tx.Error == nil && paused.CompareAndSwap(false, true) {
+								close(validated)
+								select {
+								case <-resume:
+								case <-time.After(10 * time.Second):
+									tx.AddError(errors.New("test scheduling timeout"))
+								}
+							}
+						}); err != nil {
+							t.Fatal(err)
 						}
-						if matches && tx.Error == nil && paused.CompareAndSwap(false, true) {
+						defer db.Callback().Query().Remove(hook)
+					}
+					done := make(chan error, 1)
+					go func() {
+						if kind == "company_employee" {
+							// AddEmployee enters a transaction before any validation.
+							// SQLite's single connection is already held even before
+							// its first query. Schedule the stale request before entry
+							// so merge-first is possible; the real service must still
+							// reject the deleted owner, with all row assertions below.
 							close(validated)
 							select {
 							case <-resume:
 							case <-time.After(10 * time.Second):
-								tx.AddError(errors.New("test scheduling timeout"))
+								done <- errors.New("test scheduling timeout")
+								return
 							}
 						}
-					}); err != nil {
-						t.Fatal(err)
-					}
-					defer db.Callback().Query().Remove(hook)
-					done := make(chan error, 1)
-					go func() { done <- create() }()
+						done <- create()
+					}()
 					select {
 					case <-validated:
 					case <-time.After(10 * time.Second):

@@ -397,6 +397,11 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	}
 
 	if err := services.ImportContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+		// Ambiguous employment can also occur on create. Preserve the same
+		// conflict/rollback contract as updates, rather than reporting a 500.
+		if errors.Is(err, services.ErrVCardUnsafeReplacement) {
+			return nil, webdav.NewHTTPError(http.StatusConflict, err)
+		}
 		return nil, err
 	}
 
