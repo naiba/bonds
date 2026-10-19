@@ -33,110 +33,160 @@ func reconcileVCardOrganization(tx *gorm.DB, card vcard.Card, contactID, vaultID
 		}
 		return nil
 	}
-	var primaryCompanyID *uint
-	used := map[uint]bool{}
+	// Resolve the entire input before writing. A greedy per-field match lets an
+	// inserted/edited first role consume an unchanged later role's identity.
+	type incomingEmployment struct {
+		name, title string
+		jobID       uint
+	}
+	var incoming []incomingEmployment
 	for _, field := range organizations {
 		components := field.Organization()
 		if len(components) == 0 || strings.TrimSpace(components[0]) == "" {
 			continue
 		}
-		name := strings.TrimSpace(components[0])
-		title := vcardOrganizationTitle(card, field.Group)
-		// Match the same normalized projection we exported before a name lookup.
-		// Names are not identities: whitespace or another same-name company must
-		// never turn an unchanged vCard into a new company or employment record.
-		var companyID, knownCompanyID uint
-		for _, employment := range ContactVCardEmployments(contact) {
-			if employment.Company != name {
-				continue
+		title := ""
+		if fieldTitle := vcardOrganizationTitle(card, field.Group); fieldTitle != nil {
+			title = strings.TrimSpace(fieldTitle.Value)
+		}
+		// Missing TITLE is an empty title, not permission to keep an old title.
+		incoming = append(incoming, incomingEmployment{name: strings.TrimSpace(components[0]), title: title})
+	}
+	if len(incoming) == 0 && len(contact.ContactCompanies) > 0 {
+		return ErrVCardUnsafeReplacement
+	}
+	projected := ContactVCardEmployments(contact)
+	used := map[uint]bool{}
+	for i := range incoming {
+		for _, job := range projected {
+			if job.JobID != 0 && !used[job.JobID] && job.Company == incoming[i].name && job.Title == incoming[i].title {
+				incoming[i].jobID = job.JobID
+				used[job.JobID] = true
+				break
 			}
-			if knownCompanyID == 0 {
-				knownCompanyID = employment.CompanyID
+		}
+	}
+	// Exact matches (including empty titles) are reserved first. Within a company
+	// only one remaining input and one remaining job identify an edit. Multiple
+	// candidates have no stable wire identity: reject rather than guess by order.
+	for i := range incoming {
+		if incoming[i].jobID != 0 {
+			continue
+		}
+		var remaining []VCardEmployment
+		for _, job := range projected {
+			if job.JobID != 0 && !used[job.JobID] && job.Company == incoming[i].name {
+				remaining = append(remaining, job)
 			}
-			if used[employment.JobID] {
-				continue
+		}
+		if len(remaining) == 0 {
+			continue
+		}
+		unmatched := 0
+		for _, entry := range incoming {
+			if entry.jobID == 0 && entry.name == incoming[i].name {
+				unmatched++
+			}
+		}
+		if len(remaining) != 1 || unmatched != 1 {
+			return ErrVCardUnsafeReplacement
+		}
+		// If an identical old role was reserved above, the wire cannot tell which
+		// of those IDs was edited. Reserving one arbitrarily must not manufacture
+		// a unique residual identity for the other.
+		for _, job := range projected {
+			if used[job.JobID] && job.Company == remaining[0].Company && job.Title == remaining[0].Title {
+				return ErrVCardUnsafeReplacement
+			}
+		}
+		incoming[i].jobID = remaining[0].JobID
+		used[remaining[0].JobID] = true
+	}
+	// Reordering must retain the selected company when it is still present.
+	// Replacing its ORG, however, selects the new company while preserving the
+	// old employment, as the shared import/subscription contract requires.
+	var primaryCompanyID *uint
+	for _, job := range projected {
+		if job.CompanyID == 0 {
+			continue
+		}
+		if contact.CompanyID != nil && job.CompanyID != *contact.CompanyID {
+			continue
+		}
+		for _, entry := range incoming {
+			if entry.name == job.Company {
+				id := job.CompanyID
+				primaryCompanyID = &id
+				break
+			}
+		}
+		if primaryCompanyID != nil {
+			break
+		}
+	}
+	for _, entry := range incoming {
+		var companyID uint
+		if entry.jobID != 0 {
+			for _, job := range projected {
+				if job.JobID != entry.jobID {
+					continue
+				}
+				companyID = job.CompanyID
+				if job.Title != entry.title {
+					updated := models.ContactCompany{ID: job.JobID, ContactID: contactID, JobPosition: strPtrOrNil(entry.title)}
+					if err := updateContactRecord(tx, &updated, contactID, vaultID, ErrContactJobNotFound, "job_position"); err != nil {
+						return err
+					}
+				}
+				break
+			}
+		} else {
+			// Company names are not identities. Reuse the associated company even
+			// when its stored name has whitespace; never choose between two local
+			// same-name company identities for an unidentifiable new role.
+			for _, job := range projected {
+				if job.Company != entry.name {
+					continue
+				}
+				if companyID != 0 && companyID != job.CompanyID {
+					return ErrVCardUnsafeReplacement
+				}
+				companyID = job.CompanyID
 			}
 			if companyID == 0 {
-				companyID = employment.CompanyID
+				var company models.Company
+				err := tx.Where("vault_id = ? AND name = ?", vaultID, entry.name).Order("id ASC").First(&company).Error
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					company = models.Company{VaultID: vaultID, Name: entry.name}
+					if err := tx.Create(&company).Error; err != nil {
+						return err
+					}
+				} else if err != nil {
+					return err
+				}
+				companyID = company.ID
 			}
-			if title != nil && employment.Title == strings.TrimSpace(title.Value) {
-				companyID = employment.CompanyID
-				break
-			}
-		}
-		// Consuming a job does not consume its company: another role can reuse it.
-		if companyID == 0 {
-			companyID = knownCompanyID
-		}
-		var company models.Company
-		query := tx.Where("vault_id = ?", vaultID)
-		if companyID != 0 {
-			query = query.Where("id = ?", companyID)
-		} else {
-			query = query.Where("name = ?", name).Order("id ASC")
-		}
-		err := query.First(&company).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			company = models.Company{VaultID: vaultID, Name: name}
-			if err := tx.Create(&company).Error; err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		}
-		var selected *models.ContactCompany
-		var candidates []*models.ContactCompany
-		for i := range contact.ContactCompanies {
-			job := &contact.ContactCompanies[i]
-			if job.CompanyID != company.ID || used[job.ID] {
-				continue
-			}
-			candidates = append(candidates, job)
-			if title != nil && strings.TrimSpace(ptrToStr(job.JobPosition)) == strings.TrimSpace(title.Value) {
-				selected = job
-				break
-			}
-		}
-		// Several jobs at one company have no unique wire identifier. Preserve them
-		// unless an exact title identifies one; a new title becomes a separate job.
-		if selected == nil && (len(candidates) == 1 || (title == nil && len(candidates) > 0)) {
-			selected = candidates[0]
-		}
-		if selected == nil {
-			job := models.ContactCompany{ContactID: contactID, CompanyID: company.ID}
-			if title != nil {
-				job.JobPosition = strPtrOrNil(title.Value)
-			}
+			job := models.ContactCompany{ContactID: contactID, CompanyID: companyID, JobPosition: strPtrOrNil(entry.title)}
 			if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
 				return err
 			}
-			job.Company = company
-			contact.ContactCompanies = append(contact.ContactCompanies, job)
-			selected = &contact.ContactCompanies[len(contact.ContactCompanies)-1]
-		} else if title != nil && strings.TrimSpace(ptrToStr(selected.JobPosition)) != strings.TrimSpace(title.Value) {
-			selected.JobPosition = strPtrOrNil(title.Value)
-			if err := updateContactRecord(tx, selected, contactID, vaultID, ErrContactJobNotFound, "job_position"); err != nil {
-				return err
-			}
 		}
-		used[selected.ID] = true
 		if primaryCompanyID == nil {
-			id := company.ID
+			id := companyID
 			primaryCompanyID = &id
 		}
 	}
-	if primaryCompanyID == nil && len(contact.ContactCompanies) > 0 {
-		// An empty ORG cannot identify which existing employment to remove. Do not
-		// claim it cleared the company while jobs still export it, or erase local jobs.
-		return ErrVCardUnsafeReplacement
+	if len(incoming) == 0 {
+		primaryCompanyID = nil
 	}
 	contact.CompanyID = primaryCompanyID
 	return updateContactProfile(tx, contact, vaultID, "company_id")
 }
 
+// vCard group names are case-insensitive, just like property names.
 func vcardOrganizationTitle(card vcard.Card, group string) *vcard.Field {
 	for _, title := range card[vcard.FieldTitle] {
-		if title.Group == group {
+		if strings.EqualFold(title.Group, group) {
 			return title
 		}
 	}

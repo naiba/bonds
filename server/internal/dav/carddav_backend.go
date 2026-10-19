@@ -274,7 +274,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 		return nil, webdav.NewHTTPError(http.StatusBadRequest, fmt.Errorf("invalid path"))
 	}
 
-	if err := b.verifyVaultAccess(userID, vaultID); err != nil {
+	if err := b.verifyVaultWriteAccess(userID, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -427,7 +427,7 @@ func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) e
 		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 	}
 
-	if err := b.verifyVaultAccess(userID, contact.VaultID); err != nil {
+	if err := b.verifyVaultWriteAccess(userID, contact.VaultID); err != nil {
 		return err
 	}
 
@@ -480,6 +480,16 @@ func (b *CardDAVBackend) verifyVaultAccess(userID, vaultID string) error {
 	var uv models.UserVault
 	if err := b.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil {
 		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("access denied"))
+	}
+	return nil
+}
+
+// DAV membership permits reads, not writes. Apply the same Editor boundary as
+// REST before contact, company, employment or deletion side effects can occur.
+func (b *CardDAVBackend) verifyVaultWriteAccess(userID, vaultID string) error {
+	var uv models.UserVault
+	if err := b.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil || uv.Permission > models.PermissionEditor {
+		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("write access denied"))
 	}
 	return nil
 }
