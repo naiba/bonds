@@ -59,21 +59,8 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 	if err != nil {
 		return err
 	}
-	// Preserve an independent legacy employer even if other normal jobs exist.
-	// Only materialize the necessary relationship; existing mirrors are not copied.
-	legacyRepresented := false
-	for _, job := range contact.ContactCompanies {
-		if contact.CompanyID != nil && job.CompanyID == *contact.CompanyID {
-			legacyRepresented = true
-		}
-	}
-	if !legacyRepresented && contact.Company != nil && contact.Company.VaultID == vaultID {
-		job := models.ContactCompany{ContactID: contactID, CompanyID: contact.Company.ID, JobPosition: contact.JobPosition}
-		if err := createContactRecord(tx, &job, contactID, vaultID); err != nil {
-			return err
-		}
-		job.Company = *contact.Company
-		contact.ContactCompanies = append(contact.ContactCompanies, job)
+	if err := materializeLegacyEmployment(tx, contact); err != nil {
+		return err
 	}
 	if len(organizations) == 0 {
 		// A title-only edit targets the first projected job, not a stale profile copy.

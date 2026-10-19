@@ -58,3 +58,26 @@ func loadContactEmployment(db *gorm.DB, contactID, vaultID string) (*models.Cont
 		First(&contact, "id = ? AND vault_id = ?", contactID, vaultID).Error
 	return &contact, err
 }
+
+// materializeLegacyEmployment preserves an independent old employer before
+// combining it with normal Jobs. Once Jobs exist the export/edit projection
+// uses them, so a legacy-only selection needs a real job identity first.
+// Existing mirrors are not copied. Call with employment relations loaded and
+// the parent contact locked, inside the transaction that combines the records.
+func materializeLegacyEmployment(tx *gorm.DB, contact *models.Contact) error {
+	if contact.CompanyID == nil || contact.Company == nil || contact.Company.VaultID != contact.VaultID {
+		return nil
+	}
+	for _, job := range contact.ContactCompanies {
+		if job.CompanyID == *contact.CompanyID {
+			return nil
+		}
+	}
+	job := models.ContactCompany{ContactID: contact.ID, CompanyID: contact.Company.ID, JobPosition: contact.JobPosition}
+	if err := createContactRecord(tx, &job, contact.ID, contact.VaultID); err != nil {
+		return err
+	}
+	job.Company = *contact.Company
+	contact.ContactCompanies = append(contact.ContactCompanies, job)
+	return nil
+}
