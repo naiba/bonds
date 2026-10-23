@@ -8268,3 +8268,52 @@ func TestJobSubscriptionPush_Handler(t *testing.T) {
 	}
 	expect("", "")
 }
+
+func TestLegacyJobRejectsDeletedCompanyWithoutChangingJob(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "legacy-company-boundary@example.com")
+	vault := ts.createTestVault(t, token, "Legacy company boundary")
+	contact := ts.createTestContact(t, token, vault.ID, "Preserved name")
+	createCompany := func(name string) uint {
+		rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies", fmt.Sprintf(`{"name":%q}`, name), token)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("create company: %d %s", rec.Code, rec.Body.String())
+		}
+		var company dto.CompanyResponse
+		if err := json.Unmarshal(parseResponse(t, rec).Data, &company); err != nil {
+			t.Fatal(err)
+		}
+		return company.ID
+	}
+	original, target := createCompany("Preserved company"), createCompany("Deleted target")
+	path := fmt.Sprintf("/api/vaults/%s/contacts/%s/jobInformation", vault.ID, contact.ID)
+	rec := ts.doRequest(http.MethodPut, path, fmt.Sprintf(`{"company_id":%d,"job_position":"Preserved role"}`, original), token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("assign original job: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("/api/vaults/%s/companies/%d", vault.ID, target), "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete target company: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = ts.doRequest(http.MethodPut, path, fmt.Sprintf(`{"company_id":%d,"job_position":"Rejected role"}`, target), token)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("deleted company must return 404: %d %s", rec.Code, rec.Body.String())
+	}
+	if parseResponse(t, rec).Success {
+		t.Fatal("rejected company returned success")
+	}
+	var stored models.Contact
+	if err := ts.db.First(&stored, "id = ?", contact.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.CompanyID == nil || *stored.CompanyID != original || stored.JobPosition == nil || *stored.JobPosition != "Preserved role" || stored.FirstName == nil || *stored.FirstName != "Preserved name" {
+		t.Fatal("rejected update changed contact fields")
+	}
+	var jobs []models.ContactCompany
+	if err := ts.db.Where("contact_id = ?", contact.ID).Find(&jobs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 1 || jobs[0].CompanyID != original || jobs[0].JobPosition == nil || *jobs[0].JobPosition != "Preserved role" {
+		t.Fatalf("rejected update changed jobs: %+v", jobs)
+	}
+}
