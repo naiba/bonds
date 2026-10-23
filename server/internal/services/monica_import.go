@@ -313,6 +313,13 @@ func (s *MonicaImportService) importContact(
 		contact.UpdatedAt = t
 	}
 	if err := tx.Transaction(func(inner *gorm.DB) error {
+		// Imported legacy company references participate in the same deletion
+		// boundary as interactive jobs; an earlier lookup is not a write lock.
+		if companyID != nil {
+			if err := lockCompanyForJobWrite(inner, *companyID, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := inner.Create(&contact).Error; err != nil {
 			return err
 		}
@@ -352,7 +359,7 @@ func (s *MonicaImportService) importContact(
 			CompanyID:   *companyID,
 			JobPosition: strPtrOrNil(mc.Properties.Job),
 		}
-		if err := createMonicaContactRecord(tx, &contactCompany, contact.ID, vaultID, "company job", resp); err != nil {
+		if err := createContactJobRecord(tx, &contactCompany, contact.ID, vaultID); err != nil {
 			resp.Errors = append(resp.Errors, fmt.Sprintf("company job %q: could not import company job", mc.Properties.Company))
 		}
 	}

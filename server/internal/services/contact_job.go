@@ -87,7 +87,7 @@ func (s *ContactJobService) Create(contactID, vaultID string, req dto.CreateCont
 		CompanyID:   req.CompanyID,
 		JobPosition: strPtrOrNil(req.JobPosition),
 	}
-	if err := createContactRecord(s.db, &job, contactID, vaultID); err != nil {
+	if err := createContactJobRecord(s.db, &job, contactID, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -122,7 +122,15 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 
 	job.CompanyID = req.CompanyID
 	job.JobPosition = strPtrOrNil(req.JobPosition)
-	if err := updateContactRecord(s.db, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockCompanyForJobWrite(tx, req.CompanyID, vaultID); err != nil {
+			return err
+		}
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		return updateContactRecord(tx, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position")
+	}); err != nil {
 		return nil, err
 	}
 	s.pushContactChange(contactID, vaultID)
@@ -168,7 +176,7 @@ func (s *ContactJobService) AddEmployee(companyID uint, vaultID string, req dto.
 		CompanyID:   companyID,
 		JobPosition: strPtrOrNil(req.JobPosition),
 	}
-	if err := createContactRecord(s.db, &job, req.ContactID, vaultID); err != nil {
+	if err := createContactJobRecord(s.db, &job, req.ContactID, vaultID); err != nil {
 		return nil, err
 	}
 	s.pushContactChange(req.ContactID, vaultID)
@@ -207,6 +215,11 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID, userID string, req 
 	}
 	var result *dto.ContactResponse
 	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if req.CompanyID != nil {
+			if err := lockCompanyForJobWrite(tx, *req.CompanyID, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
 			return err
 		}

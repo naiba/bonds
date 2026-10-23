@@ -6,6 +6,7 @@ import (
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrCompanyNotFound = errors.New("company not found")
@@ -116,11 +117,15 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 
 // companyContactIDs includes both job history and legacy-only contacts. Selecting
 // from contacts deduplicates employees with multiple jobs at the same company.
-func companyContactIDs(db *gorm.DB, companyID uint, vaultID string) ([]string, error) {
+func companyContactIDs(db *gorm.DB, companyID uint, vaultID string, lockContacts bool) ([]string, error) {
 	var ids []string
 	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
-	err := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
-		Where("company_id = ? OR id IN (?)", companyID, jobs).Pluck("id", &ids).Error
+	query := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
+		Where("company_id = ? OR id IN (?)", companyID, jobs).Order("id ASC")
+	if lockContacts {
+		query = query.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+	}
+	err := query.Pluck("id", &ids).Error
 	return ids, err
 }
 
@@ -137,16 +142,18 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 	var company models.Company
 	var contactIDs []string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
 			}
 			return err
 		}
+		// Hold the company lock through recipient discovery and commit so a new
+		// association cannot push the old name after being missed by this batch.
 		// Only the name appears in vCards; changing company type needs no push.
 		if s.davPushService != nil && company.Name != req.Name {
 			var err error
-			contactIDs, err = companyContactIDs(tx, id, vaultID)
+			contactIDs, err = companyContactIDs(tx, id, vaultID, false)
 			if err != nil {
 				return err
 			}
@@ -170,18 +177,19 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 	// subscribers can observe a partially deleted organization.
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var company models.Company
-		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
 			}
 			return err
 		}
-		if s.davPushService != nil {
-			var err error
-			contactIDs, err = companyContactIDs(tx, id, vaultID)
-			if err != nil {
-				return err
-			}
+		// Lock company -> contacts (in ID order) -> jobs, matching association
+		// writers and contact cleanup. Collecting recipients without the company
+		// lock can miss an employee that pushes before this deletion commits.
+		var err error
+		contactIDs, err = companyContactIDs(tx, id, vaultID, true)
+		if err != nil {
+			return err
 		}
 		if err := tx.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
 			return err
