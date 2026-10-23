@@ -51,7 +51,7 @@ func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, 
 func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 	var contacts []models.Contact
 	// Archived contacts are intentionally omitted from a full Vault export.
-	if err := preloadContactVCardRelations(s.db).Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
+	if err := PreloadContactVCardRelations(s.db).Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 
@@ -70,7 +70,7 @@ func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 
 func (s *VCardService) loadContactForVCard(contactID, vaultID string) (*models.Contact, error) {
 	var contact models.Contact
-	if err := preloadContactVCardRelations(s.db).
+	if err := PreloadContactVCardRelations(s.db).
 		Where("id = ? AND vault_id = ?", contactID, vaultID).
 		First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -81,11 +81,21 @@ func (s *VCardService) loadContactForVCard(contactID, vaultID string) (*models.C
 	return &contact, nil
 }
 
-func preloadContactVCardRelations(db *gorm.DB) *gorm.DB {
+// PreloadContactVCardRelations keeps file exports, subscription pushes and CardDAV
+// reads on the same projection. Load only one job per contact even in bulk exports.
+func PreloadContactVCardRelations(db *gorm.DB) *gorm.DB {
 	return db.Preload("ContactInformations.ContactInformationType").
 		Preload("Addresses").
 		Preload("ImportantDates.ContactImportantDateType").
 		Preload("Company").
+		Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB {
+			return db.Where(`contact_companies.id = (
+				SELECT latest.id FROM contact_companies AS latest
+				WHERE latest.contact_id = contact_companies.contact_id
+				ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
+			)`)
+		}).
+		Preload("ContactCompanies.Company").
 		Preload("File")
 }
 
@@ -334,11 +344,12 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 	if contact.Nickname != nil && *contact.Nickname != "" {
 		card.SetValue(vcard.FieldNickname, *contact.Nickname)
 	}
-	if contact.JobPosition != nil && *contact.JobPosition != "" {
-		card.SetValue(vcard.FieldTitle, *contact.JobPosition)
+	organization, title := contactVCardJob(contact)
+	if title != "" {
+		card.SetValue(vcard.FieldTitle, title)
 	}
-	if contact.Company != nil && strings.TrimSpace(contact.Company.Name) != "" {
-		card.SetValue(vcard.FieldOrganization, strings.TrimSpace(contact.Company.Name))
+	if organization != "" {
+		card.SetValue(vcard.FieldOrganization, organization)
 	}
 	if contact.Description != nil && *contact.Description != "" {
 		card.SetValue(vcard.FieldNote, *contact.Description)
@@ -642,14 +653,12 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 
 		nameComponents := extractFullNameFromCard(card)
 		nickname := card.Value(vcard.FieldNickname)
-		title := card.Value(vcard.FieldTitle)
 		existing.FirstName = strPtrOrNil(nameComponents.firstName)
 		existing.LastName = strPtrOrNil(nameComponents.lastName)
 		existing.MiddleName = strPtrOrNil(nameComponents.middleName)
 		existing.Prefix = strPtrOrNil(nameComponents.prefix)
 		existing.Suffix = strPtrOrNil(nameComponents.suffix)
 		existing.Nickname = strPtrOrNil(nickname)
-		existing.JobPosition = strPtrOrNil(title)
 		existing.DistantEtag = strPtrOrNil(distantEtag)
 		// LastUpdatedAt detects local edits, not accepted remote revisions. A
 		// partially failed batch retains lastSyncAt, so advancing this marker on

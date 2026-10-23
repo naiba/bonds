@@ -19,8 +19,17 @@ var ErrVCardUnsafeReplacement = errors.New("vCard update would discard local dat
 // Both subscription pulls and CardDAV PUT must run this in their transaction.
 func ReplaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
 	var current models.Contact
-	if err := preloadContactVCardRelations(db).First(&current, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
+	if err := PreloadContactVCardRelations(db).First(&current, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
 		return err
+	}
+	// TITLE projects the newest local job when one exists. Copying that value
+	// into the legacy field on a round trip would resurrect it after all jobs
+	// are deleted. Keep local job history and its legacy fallback independent.
+	if len(current.ContactCompanies) == 0 {
+		if err := db.Model(&models.Contact{}).Where("id = ? AND vault_id = ?", contactID, vaultID).
+			UpdateColumn("job_position", strPtrOrNil(card.Value(vcard.FieldTitle))).Error; err != nil {
+			return err
+		}
 	}
 	if err := reconcileVCardBirthday(db, card, &current); err != nil {
 		return err

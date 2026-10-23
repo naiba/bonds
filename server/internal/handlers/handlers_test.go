@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/emersion/go-vcard"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
@@ -6942,6 +6943,25 @@ func TestContactJob_CRUD_Handler(t *testing.T) {
 	token, _ := ts.registerTestUser(t, "job-crud@example.com")
 	vault := ts.createTestVault(t, token, "Job CRUD Vault")
 	contact := ts.createTestContact(t, token, vault.ID, "JobCRUD")
+	assertExportedJob := func(companyName, position string) {
+		t.Helper()
+		for _, path := range []string{
+			fmt.Sprintf("/api/vaults/%s/contacts/%s/vcard", vault.ID, contact.ID),
+			fmt.Sprintf("/api/vaults/%s/contacts/export", vault.ID),
+		} {
+			exported := ts.doRequest(http.MethodGet, path, "", token)
+			if exported.Code != http.StatusOK {
+				t.Fatalf("export: %d %s", exported.Code, exported.Body.String())
+			}
+			card, err := vcard.NewDecoder(strings.NewReader(exported.Body.String())).Decode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if card.Value(vcard.FieldUID) != contact.ID || card.Value(vcard.FieldOrganization) != companyName || card.Value(vcard.FieldTitle) != position {
+				t.Fatalf("exported wrong contact/job: %v", card)
+			}
+		}
+	}
 
 	// Create a company
 	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies",
@@ -7001,6 +7021,7 @@ func TestContactJob_CRUD_Handler(t *testing.T) {
 	if job.CompanyName != "Job Corp" {
 		t.Errorf("expected company name 'Job Corp', got '%s'", job.CompanyName)
 	}
+	assertExportedJob("Job Corp", "Engineer")
 
 	// Update the job
 	rec = ts.doRequest(http.MethodPut,
@@ -7059,6 +7080,7 @@ func TestContactJob_CRUD_Handler(t *testing.T) {
 	if len(afterDelete) != 0 {
 		t.Fatalf("expected 0 jobs after delete, got %d", len(afterDelete))
 	}
+	assertExportedJob("", "")
 }
 
 // ==================== Company Employee Endpoints ====================

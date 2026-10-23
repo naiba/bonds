@@ -316,7 +316,6 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			contact.FirstName = strPtrOrNil(firstName)
 			contact.LastName = strPtrOrNil(lastName)
 			contact.Nickname = strPtrOrNil(nickname)
-			contact.JobPosition = strPtrOrNil(title)
 			contact.LastUpdatedAt = &now
 			if err := b.db.Transaction(func(tx *gorm.DB) error {
 				if err := tx.Save(&contact).Error; err != nil {
@@ -479,11 +478,7 @@ func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string
 }
 
 func preloadContactForCardDAV(db *gorm.DB) *gorm.DB {
-	return db.Preload("ContactInformations.ContactInformationType").
-		Preload("Addresses").
-		Preload("ImportantDates.ContactImportantDateType").
-		Preload("Company").
-		Preload("File")
+	return services.PreloadContactVCardRelations(db)
 }
 
 // extractNameFromCard extracts first name and last name from a vCard.
