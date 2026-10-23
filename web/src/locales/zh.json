@@ -1768,7 +1768,26 @@
       "errors": "错误"
     },
     "activity_category_updated": "活动类别已更新",
-    "activity_type_updated": "活动类型已更新"
+    "activity_type_updated": "活动类型已更新",
+    "carddav": {
+      "title": "CardDAV 同步筛选",
+      "description": "选择此 Vault 的 CardDAV 通讯录向所有成员展示哪些未归档联系人。未选择字段时同步所有未归档联系人。所选字段须包含非空白内容。",
+      "match": "所选字段的匹配方式",
+      "all": "满足全部字段",
+      "any": "满足任一字段",
+      "fields": "联系人具有",
+      "sync_effect": "被排除的联系人会在设备下次完整同步时移除，但仍保留在 Bonds 和关系网中。清空筛选即可重新同步。设备中新建或编辑的联系人仍须满足筛选。外部 DAV 订阅、CalDAV 和 vCard 导出不受影响。",
+      "field": {
+        "phone": "电话号码",
+        "email": "电子邮箱",
+        "first_name": "名",
+        "last_name": "姓",
+        "nickname": "昵称",
+        "organization": "公司",
+        "job_title": "职位",
+        "address": "邮寄地址"
+      }
+    }
   },
   "backups": {
     "title": "备份管理",

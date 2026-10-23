@@ -203,13 +203,17 @@ function renderVaultSettings(vaultId = "1") {
   };
 }
 
-function mockLoadedVaultSettings(): void {
+function mockLoadedVaultSettings(carddavFilter?: {
+  match: string;
+  fields: string[];
+}): void {
   mockUseQuery.mockImplementation((opts: { queryKey: unknown[] }) => {
     if (Array.isArray(opts.queryKey) && opts.queryKey[0] === "vault") {
       return {
         data: {
           name: "My Vault",
           description: "desc",
+          carddav_filter: carddavFilter,
           default_template_id: 1,
           show_group_tab: true,
           show_tasks_tab: true,
@@ -891,9 +895,38 @@ describe("VaultSettings", () => {
     expect(apiMocks.settingsUpdate).toHaveBeenCalledWith("1", {
       name: "My Vault",
       description: "desc",
+      carddav_filter: { match: "all", fields: [] },
     });
     expect(queryClientMock.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["vault", "1"],
+    });
+  });
+
+  it("loads saved CardDAV filters and sends selected conditions", async () => {
+    mockLoadedVaultSettings({ match: "any", fields: ["phone"] });
+    const saved = createPendingInvalidation();
+    apiMocks.settingsUpdate.mockResolvedValue({ data: undefined });
+    queryClientMock.invalidateQueries.mockImplementation(() => {
+      saved.resolve();
+      return Promise.resolve();
+    });
+    const user = userEvent.setup();
+    const { container } = renderVaultSettings();
+    expect(screen.getByText("Any field")).toBeVisible();
+    expect(screen.getByText("Phone number")).toBeVisible();
+    await user.click(screen.getByLabelText("Contact has"));
+    await user.click(screen.getByText("Last name"));
+    const save = container.querySelector('button[type="submit"]');
+    if (!(save instanceof HTMLButtonElement))
+      throw new Error("missing settings submit");
+    await act(async () => {
+      fireEvent.click(save);
+      await saved.promise;
+    });
+    expect(apiMocks.settingsUpdate).toHaveBeenCalledWith("1", {
+      name: "My Vault",
+      description: "desc",
+      carddav_filter: { match: "any", fields: ["phone", "last_name"] },
     });
   });
 

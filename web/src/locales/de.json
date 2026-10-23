@@ -1768,7 +1768,26 @@
       "errors": "Fehler"
     },
     "activity_category_updated": "Aktivitätskategorie aktualisiert",
-    "activity_type_updated": "Aktivitätstyp aktualisiert"
+    "activity_type_updated": "Aktivitätstyp aktualisiert",
+    "carddav": {
+      "title": "CardDAV-Synchronisierungsfilter",
+      "description": "Wählen Sie, welche nicht archivierten Kontakte dieses Tresors für alle Mitglieder im CardDAV-Adressbuch erscheinen. Ohne ausgewählte Felder werden alle nicht archivierten Kontakte synchronisiert. Felder müssen einen Wert enthalten, der nicht nur aus Leerzeichen besteht.",
+      "match": "Ausgewählte Felder abgleichen",
+      "all": "Alle Felder",
+      "any": "Beliebiges Feld",
+      "fields": "Kontakt hat",
+      "sync_effect": "Ausgeschlossene Kontakte verschwinden bei der nächsten vollständigen Synchronisierung von Geräten, bleiben aber in Bonds und seinen Beziehungen erhalten. Entfernen Sie die Filter, um sie wieder einzubeziehen. Auf Geräten erstellte oder bearbeitete Kontakte müssen den Filtern entsprechen. Externe DAV-Abonnements, CalDAV und vCard-Exporte bleiben unverändert.",
+      "field": {
+        "phone": "Telefonnummer",
+        "email": "E-Mail-Adresse",
+        "first_name": "Vorname",
+        "last_name": "Nachname",
+        "nickname": "Spitzname",
+        "organization": "Firma",
+        "job_title": "Berufsbezeichnung",
+        "address": "Postanschrift"
+      }
+    }
   },
   "backups": {
     "title": "Backups",

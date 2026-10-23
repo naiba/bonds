@@ -1768,7 +1768,26 @@
       "errors": "Erros"
     },
     "activity_category_updated": "Categoria de atividade atualizada",
-    "activity_type_updated": "Tipo de atividade atualizado"
+    "activity_type_updated": "Tipo de atividade atualizado",
+    "carddav": {
+      "title": "Filtros de sincronização CardDAV",
+      "description": "Escolha quais os contactos não arquivados que aparecem no catálogo CardDAV deste cofre para todos os membros. Sem campos selecionados, todos os contactos não arquivados são sincronizados. O campo deve conter um valor que não seja apenas espaços.",
+      "match": "Correspondência dos campos selecionados",
+      "all": "Todos os campos",
+      "any": "Qualquer campo",
+      "fields": "O contacto tem",
+      "sync_effect": "Os contactos excluídos desaparecem dos dispositivos na próxima sincronização completa, mas permanecem no Bonds e nas relações. Limpe os filtros para os incluir novamente. Contactos criados ou editados num dispositivo devem cumprir os filtros. Subscrições DAV externas, CalDAV e exportações vCard não são afetadas.",
+      "field": {
+        "phone": "Número de telefone",
+        "email": "E-mail",
+        "first_name": "Nome próprio",
+        "last_name": "Apelido",
+        "nickname": "Alcunha",
+        "organization": "Empresa",
+        "job_title": "Cargo",
+        "address": "Morada postal"
+      }
+    }
   },
   "backups": {
     "title": "Cópias de Segurança",

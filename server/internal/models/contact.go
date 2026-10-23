@@ -12,11 +12,14 @@ import (
 var ErrContactTemplateOutsideVault = errors.New("contact template must belong to the contact vault")
 
 type Contact struct {
-	ID                       string         `json:"id" gorm:"primaryKey;type:text"`
-	VaultID                  string         `json:"vault_id" gorm:"type:text;not null;index:idx_contact_vault"`
-	GenderID                 *uint          `json:"gender_id" gorm:"index"`
-	PronounID                *uint          `json:"pronoun_id" gorm:"index"`
-	TemplateID               *uint          `json:"template_id" gorm:"index"`
+	ID         string `json:"id" gorm:"primaryKey;type:text"`
+	VaultID    string `json:"vault_id" gorm:"type:text;not null;index:idx_contact_vault"`
+	GenderID   *uint  `json:"gender_id" gorm:"index"`
+	PronounID  *uint  `json:"pronoun_id" gorm:"index"`
+	TemplateID *uint  `json:"template_id" gorm:"index"`
+	// PreferredJobID is internal selection metadata, not a second employment record.
+	// Resolve it only among this contact's jobs; legacy rows may leave it NULL.
+	PreferredJobID           *uint          `json:"-"`
 	CompanyID                *uint          `json:"company_id" gorm:"index"`
 	FileID                   *uint          `json:"file_id" gorm:"index"`
 	ReligionID               *uint          `json:"religion_id" gorm:"index"`

@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -9,6 +10,7 @@ import (
 )
 
 var (
+	ErrInvalidCardDAVFilter = errors.New("CardDAV filter requires match all or any and at most eight unique supported fields")
 	ErrVaultUserNotFound    = errors.New("vault user not found")
 	ErrUserEmailNotFound    = errors.New("user with this email not found")
 	ErrUserAlreadyInVault   = errors.New("user already in vault")
@@ -43,12 +45,31 @@ func (s *VaultSettingsService) Get(vaultID string) (*dto.VaultSettingsResponse, 
 }
 
 func (s *VaultSettingsService) Update(vaultID string, req dto.UpdateVaultSettingsRequest) (*dto.VaultSettingsResponse, error) {
+	if req.CardDAVFilter != nil {
+		filter := req.CardDAVFilter
+		if (filter.Match != "all" && filter.Match != "any") || len(filter.Fields) > 8 {
+			return nil, ErrInvalidCardDAVFilter
+		}
+		allowed := []string{"phone", "email", "first_name", "last_name", "nickname", "organization", "job_title", "address"}
+		for i, field := range filter.Fields {
+			if !slices.Contains(allowed, field) || slices.Contains(filter.Fields[:i], field) {
+				return nil, ErrInvalidCardDAVFilter
+			}
+		}
+	}
+
 	var vault models.Vault
 	if err := s.db.First(&vault, "id = ?", vaultID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrVaultNotFound
 		}
 		return nil, err
+	}
+	if req.CardDAVFilter != nil {
+		vault.CardDAVFilter = req.CardDAVFilter
+		if len(req.CardDAVFilter.Fields) == 0 {
+			vault.CardDAVFilter = nil
+		}
 	}
 	vault.Name = req.Name
 	desc := req.Description
@@ -106,6 +127,7 @@ func toVaultSettingsResponse(v *models.Vault) *dto.VaultSettingsResponse {
 		desc = *v.Description
 	}
 	return &dto.VaultSettingsResponse{
+		CardDAVFilter:     v.CardDAVFilter,
 		ID:                v.ID,
 		Name:              v.Name,
 		Description:       desc,

@@ -1,28 +1,34 @@
 package dto
 
-import "time"
+import (
+	"github.com/naiba/bonds/internal/models"
+	"time"
+)
 
 // --- Vault Settings Index + Update ---
 
 type VaultSettingsResponse struct {
-	ID                string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name              string    `json:"name" example:"Family"`
-	Description       string    `json:"description" example:"Vault for family contacts"`
-	DefaultTemplateID *uint     `json:"default_template_id" example:"1"`
-	ShowGroupTab      bool      `json:"show_group_tab" example:"true"`
-	ShowTasksTab      bool      `json:"show_tasks_tab" example:"true"`
-	ShowFilesTab      bool      `json:"show_files_tab" example:"true"`
-	ShowJournalTab    bool      `json:"show_journal_tab" example:"true"`
-	ShowCompaniesTab  bool      `json:"show_companies_tab" example:"true"`
-	ShowReportsTab    bool      `json:"show_reports_tab" example:"true"`
-	ShowCalendarTab   bool      `json:"show_calendar_tab" example:"true"`
-	CreatedAt         time.Time `json:"created_at" example:"2026-01-15T10:30:00Z"`
-	UpdatedAt         time.Time `json:"updated_at" example:"2026-01-15T10:30:00Z"`
+	CardDAVFilter     *models.CardDAVFilter `json:"carddav_filter"`
+	ID                string                `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name              string                `json:"name" example:"Family"`
+	Description       string                `json:"description" example:"Vault for family contacts"`
+	DefaultTemplateID *uint                 `json:"default_template_id" example:"1"`
+	ShowGroupTab      bool                  `json:"show_group_tab" example:"true"`
+	ShowTasksTab      bool                  `json:"show_tasks_tab" example:"true"`
+	ShowFilesTab      bool                  `json:"show_files_tab" example:"true"`
+	ShowJournalTab    bool                  `json:"show_journal_tab" example:"true"`
+	ShowCompaniesTab  bool                  `json:"show_companies_tab" example:"true"`
+	ShowReportsTab    bool                  `json:"show_reports_tab" example:"true"`
+	ShowCalendarTab   bool                  `json:"show_calendar_tab" example:"true"`
+	CreatedAt         time.Time             `json:"created_at" example:"2026-01-15T10:30:00Z"`
+	UpdatedAt         time.Time             `json:"updated_at" example:"2026-01-15T10:30:00Z"`
 }
 
 type UpdateVaultSettingsRequest struct {
-	Name        string `json:"name" validate:"required,min=1,max=255" example:"Family"`
-	Description string `json:"description" validate:"max=1024" example:"Vault for family contacts"`
+	// Omitted or null preserves the existing filter; an empty fields array clears it.
+	CardDAVFilter *models.CardDAVFilter `json:"carddav_filter"`
+	Name          string                `json:"name" validate:"required,min=1,max=255" example:"Family"`
+	Description   string                `json:"description" validate:"max=1024" example:"Vault for family contacts"`
 }
 
 // --- Tab Visibility ---

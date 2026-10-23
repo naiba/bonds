@@ -1768,7 +1768,26 @@
       "errors": "Errors"
     },
     "activity_category_updated": "Activity category updated",
-    "activity_type_updated": "Activity type updated"
+    "activity_type_updated": "Activity type updated",
+    "carddav": {
+      "title": "CardDAV sync filters",
+      "description": "Choose which non-archived contacts appear in this vault’s CardDAV address book for all members. No fields selected means all non-archived contacts. A field must contain a non-blank value.",
+      "match": "Match selected fields",
+      "all": "All fields",
+      "any": "Any field",
+      "fields": "Contact has",
+      "sync_effect": "Excluded contacts disappear from devices on their next full sync, but remain in Bonds and its relationships. Clear the filters to include them again. Contacts created or edited on a device must still match the filters. External DAV subscriptions, CalDAV and vCard exports are unaffected.",
+      "field": {
+        "phone": "Phone number",
+        "email": "Email address",
+        "first_name": "First name",
+        "last_name": "Last name",
+        "nickname": "Nickname",
+        "organization": "Company",
+        "job_title": "Job title",
+        "address": "Postal address"
+      }
+    }
   },
   "backups": {
     "title": "Backups",

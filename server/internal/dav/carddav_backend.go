@@ -137,6 +137,18 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 		return nil, err
 	}
 
+	// The object path and every read entry point must use the same collection
+	// visibility; a cached multiget href must not bypass a vault's filter.
+	if contact.VaultID != extractVaultIDFromAddressObjectPath(path, userID) {
+		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+	}
+	visible, err := b.contactMatchesVaultFilter(&contact)
+	if err != nil {
+		return nil, err
+	}
+	if !visible {
+		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+	}
 	object, err := b.contactToAddressObject(&contact, userID)
 	if err != nil {
 		return nil, err
@@ -168,6 +180,10 @@ func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string,
 		return nil, err
 	}
 
+	var vault models.Vault
+	if err := b.db.First(&vault, "id = ?", vaultID).Error; err != nil {
+		return nil, err
+	}
 	var contacts []models.Contact
 	// Sync only listed contacts so archived entries stay off DAV clients.
 	if err := preloadContactForCardDAV(b.db).
@@ -177,6 +193,9 @@ func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string,
 
 	objects := make([]carddav.AddressObject, 0, len(contacts))
 	for i := range contacts {
+		if !matchesCardDAVFilter(&contacts[i], vault.CardDAVFilter) {
+			continue
+		}
 		object, err := b.contactToAddressObject(&contacts[i], userID)
 		if err != nil {
 			return nil, err
@@ -255,7 +274,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 		return nil, webdav.NewHTTPError(http.StatusBadRequest, fmt.Errorf("invalid path"))
 	}
 
-	if err := b.verifyVaultAccess(userID, vaultID); err != nil {
+	if err := b.verifyVaultWriteAccess(userID, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -289,11 +308,16 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			if contact.DeletedAt.Valid {
 				return nil, webdav.NewHTTPError(http.StatusGone, fmt.Errorf("address object was deleted"))
 			}
+			var current models.Contact
+			if err := preloadContactForCardDAV(b.db).First(&current, "id = ?", contact.ID).Error; err != nil {
+				return nil, err
+			}
+			// Stale clients may still have excluded objects. Do not overwrite them or
+			// reinterpret their existing IDs as new contacts after the filter changes.
+			if !matchesCardDAVFilter(&current, vault.CardDAVFilter) {
+				return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+			}
 			if options != nil {
-				var current models.Contact
-				if err := preloadContactForCardDAV(b.db).First(&current, "id = ?", contact.ID).Error; err != nil {
-					return nil, err
-				}
 				object, err := b.contactToAddressObject(&current, userID)
 				if err != nil {
 					return nil, err
@@ -316,12 +340,9 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			contact.FirstName = strPtrOrNil(firstName)
 			contact.LastName = strPtrOrNil(lastName)
 			contact.Nickname = strPtrOrNil(nickname)
-			contact.JobPosition = strPtrOrNil(title)
 			contact.LastUpdatedAt = &now
 			if err := b.db.Transaction(func(tx *gorm.DB) error {
-				if err := tx.Save(&contact).Error; err != nil {
-					return err
-				}
+				// Preserve legacy employment before writing the new profile title.
 				err := services.ReplaceContactVCardFields(tx, card, contact.ID, vaultID, accountID)
 				if errors.Is(err, services.ErrVCardInvalidData) {
 					return webdav.NewHTTPError(http.StatusBadRequest, err)
@@ -329,13 +350,20 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 				if errors.Is(err, services.ErrVCardUnsafeReplacement) {
 					return webdav.NewHTTPError(http.StatusConflict, err)
 				}
-				return err
+				if err != nil {
+					return err
+				}
+				// Reconciliation owns company_id; never restore its old selection.
+				return tx.Model(&contact).Select("first_name", "last_name", "nickname", "last_updated_at", "updated_at").Updates(&contact).Error
 			}); err != nil {
 				return nil, err
 			}
 
 			if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 				return nil, err
+			}
+			if !matchesCardDAVFilter(&contact, vault.CardDAVFilter) {
+				return nil, webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("contact does not match the address book filters"))
 			}
 			return b.contactToAddressObject(&contact, userID)
 		}
@@ -370,11 +398,21 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	}
 
 	if err := services.ImportContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+		// Ambiguous employment can also occur on create. Preserve the same
+		// conflict/rollback contract as updates, rather than reporting a 500.
+		if errors.Is(err, services.ErrVCardUnsafeReplacement) {
+			return nil, webdav.NewHTTPError(http.StatusConflict, err)
+		}
 		return nil, err
 	}
 
 	if err := preloadContactForCardDAV(b.db).First(&contact, "id = ?", contact.ID).Error; err != nil {
 		return nil, err
+	}
+	// Reject non-matching writes in the outer transaction so successful PUTs
+	// always remain readable and failed writes leave no contact or child rows.
+	if !matchesCardDAVFilter(&contact, vault.CardDAVFilter) {
+		return nil, webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("contact does not match the address book filters"))
 	}
 	return b.contactToAddressObject(&contact, userID)
 }
@@ -395,10 +433,13 @@ func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) e
 		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 	}
 
-	if err := b.verifyVaultAccess(userID, contact.VaultID); err != nil {
+	if err := b.verifyVaultWriteAccess(userID, contact.VaultID); err != nil {
 		return err
 	}
 
+	if contact.VaultID != extractVaultIDFromAddressObjectPath(path, userID) {
+		return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
+	}
 	if !contact.CanBeDeleted {
 		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("contact cannot be deleted"))
 	}
@@ -413,6 +454,19 @@ func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) e
 		}
 		if !contacts[0].CanBeDeleted {
 			return services.ErrContactCannotBeDeleted
+		}
+		var current models.Contact
+		if err := preloadContactForCardDAV(tx).First(&current, "id = ?", contactID).Error; err != nil {
+			return err
+		}
+		backend := *b
+		backend.db = tx
+		visible, err := backend.contactMatchesVaultFilter(&current)
+		if err != nil {
+			return err
+		}
+		if !visible {
+			return webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 		}
 		return tx.Delete(&contacts[0]).Error
 	})
@@ -432,6 +486,16 @@ func (b *CardDAVBackend) verifyVaultAccess(userID, vaultID string) error {
 	var uv models.UserVault
 	if err := b.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil {
 		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("access denied"))
+	}
+	return nil
+}
+
+// DAV membership permits reads, not writes. Apply the same Editor boundary as
+// REST before contact, company, employment or deletion side effects can occur.
+func (b *CardDAVBackend) verifyVaultWriteAccess(userID, vaultID string) error {
+	var uv models.UserVault
+	if err := b.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil || uv.Permission > models.PermissionEditor {
+		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("write access denied"))
 	}
 	return nil
 }
@@ -483,6 +547,8 @@ func preloadContactForCardDAV(db *gorm.DB) *gorm.DB {
 		Preload("Addresses").
 		Preload("ImportantDates.ContactImportantDateType").
 		Preload("Company").
+		Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
+		Preload("ContactCompanies.Company").
 		Preload("File")
 }
 
