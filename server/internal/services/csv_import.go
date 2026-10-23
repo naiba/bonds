@@ -280,7 +280,7 @@ func (s *CSVImportService) importRow(
 		s.searchService.IndexContact(&contact)
 	}
 	if s.davPushService != nil {
-		go s.davPushService.PushContactChange(contact.ID, vaultID)
+		s.davPushService.PushContactChangesAsync([]string{contact.ID}, vaultID)
 	}
 
 	// Note side effects: mirror NoteService.Create.

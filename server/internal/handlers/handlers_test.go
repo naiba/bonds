@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime"
 	"mime/multipart"
@@ -8165,4 +8166,105 @@ func TestContactDeletionRoutesRejectNewIntroducerReferences(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Exercise RegisterRoutes wiring and the real DAV HTTP client, not a manually
+// invoked push service: job/company writes must update an existing subscription.
+func TestJobSubscriptionPush_Handler(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "job-subscription@example.com")
+	vault := ts.createTestVault(t, token, "Job subscription")
+	type receivedCard struct {
+		card       vcard.Card
+		path, etag string
+	}
+	received := make(chan receivedCard, 8)
+	var revision atomic.Int64
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("unexpected DAV method %s", r.Method)
+			http.Error(w, "unexpected method", http.StatusMethodNotAllowed)
+			return
+		}
+		card, err := vcard.NewDecoder(r.Body).Decode()
+		if err != nil {
+			t.Errorf("decode remote vCard: %v", err)
+			http.Error(w, "invalid card", http.StatusBadRequest)
+			return
+		}
+		etag := fmt.Sprintf("job-%d", revision.Add(1))
+		received <- receivedCard{card: card, path: r.URL.Path, etag: etag}
+		w.Header().Set("ETag", fmt.Sprintf("%q", etag))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer remote.Close()
+	base := "/api/vaults/" + vault.ID
+	rec := ts.doRequest(http.MethodPost, base+"/dav/subscriptions", fmt.Sprintf(`{"uri":%q,"address_book_path":"/contacts/","username":"synthetic","password":"synthetic","sync_way":1}`, remote.URL+"/contacts/"), token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("subscription: %d %s", rec.Code, rec.Body.String())
+	}
+	var sub dto.DavSubscriptionResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &sub); err != nil {
+		t.Fatal(err)
+	}
+	contact := ts.createTestContact(t, token, vault.ID, "Subscribed employee")
+	expect := func(org, title string) {
+		t.Helper()
+		select {
+		case got := <-received:
+			if got.card.Value(vcard.FieldUID) != contact.ID || got.card.Value(vcard.FieldOrganization) != org || got.card.Value(vcard.FieldTitle) != title {
+				t.Fatalf("wrong remote projection: %v", got.card)
+			}
+			if got.path != "/contacts/"+contact.ID+".vcf" {
+				t.Fatalf("remote path changed: %s", got.path)
+			}
+			// The HTTP write precedes state/log persistence; wait for the completed push.
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				var log models.DavSyncLog
+				err := ts.db.Where("address_book_subscription_id = ? AND contact_id = ? AND distant_etag = ? AND action = ?", sub.ID, contact.ID, got.etag, "pushed").First(&log).Error
+				if err == nil {
+					break
+				}
+				if !errors.Is(err, gorm.ErrRecordNotFound) || time.Now().After(deadline) {
+					t.Fatalf("push completion log missing: %v", err)
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			var state models.ContactSubscriptionState
+			if err := ts.db.Where("address_book_subscription_id = ? AND contact_id = ?", sub.ID, contact.ID).First(&state).Error; err != nil {
+				t.Fatal(err)
+			}
+			if state.DistantEtag != got.etag || state.DistantURI != got.path {
+				t.Fatalf("subscription not updated: %+v", state)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("HTTP mutation did not trigger DAV push")
+		}
+	}
+	expect("", "")
+	rec = ts.doRequest(http.MethodPost, base+"/companies", `{"name":"HTTP company"}`, token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("company: %d %s", rec.Code, rec.Body.String())
+	}
+	var company dto.CompanyResponse
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &company); err != nil {
+		t.Fatal(err)
+	}
+	rec = ts.doRequest(http.MethodPost, base+"/contacts/"+contact.ID+"/jobs", fmt.Sprintf(`{"company_id":%d,"job_position":"Engineer"}`, company.ID), token)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("job: %d %s", rec.Code, rec.Body.String())
+	}
+	expect("HTTP company", "Engineer")
+	companyPath := fmt.Sprintf("%s/companies/%d", base, company.ID)
+	rec = ts.doRequest(http.MethodPut, companyPath, `{"name":"Renamed HTTP company"}`, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("rename company: %d %s", rec.Code, rec.Body.String())
+	}
+	expect("Renamed HTTP company", "Engineer")
+	rec = ts.doRequest(http.MethodDelete, companyPath, "", token)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("delete company: %d %s", rec.Code, rec.Body.String())
+	}
+	expect("", "")
 }

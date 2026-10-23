@@ -54,6 +54,29 @@ func (s *DavPushService) findPushSubscriptions(vaultID string) ([]models.Address
 	return subs, err
 }
 
+// PushContactChangesAsync starts one best-effort worker only when the vault has
+// push subscribers. Check before spawning: unsubscribed writes otherwise leave
+// needless database work running after the caller's lifecycle has ended.
+// Call after commit; each push reloads current data and rechecks subscriptions.
+func (s *DavPushService) PushContactChangesAsync(contactIDs []string, vaultID string) {
+	if len(contactIDs) == 0 {
+		return
+	}
+	subscriptions, err := s.findPushSubscriptions(vaultID)
+	if err != nil {
+		log.Printf("[dav-push] failed to find push subscriptions for vault %s: %v", vaultID, err)
+		return
+	}
+	if len(subscriptions) == 0 {
+		return
+	}
+	go func() {
+		for _, id := range contactIDs {
+			s.PushContactChange(id, vaultID)
+		}
+	}()
+}
+
 func (s *DavPushService) PushContactChange(contactID, vaultID string) {
 	release := s.operationLocks.lock(contactID)
 	defer release()

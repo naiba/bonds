@@ -11,11 +11,16 @@ import (
 var ErrCompanyNotFound = errors.New("company not found")
 
 type CompanyService struct {
-	db *gorm.DB
+	db             *gorm.DB
+	davPushService *DavPushService
 }
 
 func NewCompanyService(db *gorm.DB) *CompanyService {
 	return &CompanyService{db: db}
+}
+
+func (s *CompanyService) SetDavPushService(push *DavPushService) {
+	s.davPushService = push
 }
 
 func (s *CompanyService) List(vaultID, userID string) ([]dto.CompanyResponse, error) {
@@ -109,43 +114,87 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 	return &resp, nil
 }
 
+// companyContactIDs includes both job history and legacy-only contacts. Selecting
+// from contacts deduplicates employees with multiple jobs at the same company.
+func companyContactIDs(db *gorm.DB, companyID uint, vaultID string) ([]string, error) {
+	var ids []string
+	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
+	err := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
+		Where("company_id = ? OR id IN (?)", companyID, jobs).Pluck("id", &ids).Error
+	return ids, err
+}
+
+func (s *CompanyService) pushContactChanges(contactIDs []string, vaultID string) {
+	if s.davPushService == nil || len(contactIDs) == 0 {
+		return
+	}
+	// Capture IDs before deletion, but export fresh cards only after commit. One
+	// worker per company change avoids spawning a goroutine for every employee.
+	s.davPushService.PushContactChangesAsync(contactIDs, vaultID)
+}
+
 func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
 	var company models.Company
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrCompanyNotFound
+	var contactIDs []string
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCompanyNotFound
+			}
+			return err
 		}
+		// Only the name appears in vCards; changing company type needs no push.
+		if s.davPushService != nil && company.Name != req.Name {
+			var err error
+			contactIDs, err = companyContactIDs(tx, id, vaultID)
+			if err != nil {
+				return err
+			}
+		}
+		company.Name = req.Name
+		company.Type = strPtrOrNil(req.Type)
+		return tx.Save(&company).Error
+	})
+	if err != nil {
 		return nil, err
 	}
-	company.Name = req.Name
-	company.Type = strPtrOrNil(req.Type)
-	if err := s.db.Save(&company).Error; err != nil {
-		return nil, err
-	}
+	s.pushContactChanges(contactIDs, vaultID)
 	resp := toCompanyResponse(&company)
 	return &resp, nil
 }
 
 // Delete removes a company and cleans up related ContactCompany rows and legacy Contact.CompanyID references.
 func (s *CompanyService) Delete(id uint, vaultID string) error {
-	var company models.Company
-	if err := s.db.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrCompanyNotFound
+	var contactIDs []string
+	// Cleanup must be atomic: otherwise a failed company delete loses jobs and
+	// subscribers can observe a partially deleted organization.
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		var company models.Company
+		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrCompanyNotFound
+			}
+			return err
 		}
+		if s.davPushService != nil {
+			var err error
+			contactIDs, err = companyContactIDs(tx, id, vaultID)
+			if err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&company).Error
+	})
+	if err != nil {
 		return err
 	}
-	// Delete related ContactCompany join table rows
-	if err := s.db.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
-		return err
-	}
-	// Also null out legacy CompanyID on contacts for backward compatibility
-	if err := s.db.Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
-		return err
-	}
-	if err := s.db.Delete(&company).Error; err != nil {
-		return err
-	}
+	s.pushContactChanges(contactIDs, vaultID)
 	return nil
 }
 

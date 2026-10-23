@@ -241,7 +241,7 @@ func (s *ContactService) CreateContact(vaultID, userID string, req dto.CreateCon
 	}
 
 	if s.davPushService != nil {
-		go s.davPushService.PushContactChange(contact.ID, vaultID)
+		s.davPushService.PushContactChangesAsync([]string{contact.ID}, vaultID)
 	}
 
 	resp, err := toContactResponse(&contact, false, formatter)
@@ -380,7 +380,7 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	}
 
 	if s.davPushService != nil {
-		go s.davPushService.PushContactChange(contactID, vaultID)
+		s.davPushService.PushContactChangesAsync([]string{contactID}, vaultID)
 	}
 
 	resp, err := toContactResponse(&contact, false, formatter)

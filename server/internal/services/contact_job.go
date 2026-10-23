@@ -11,11 +11,24 @@ import (
 var ErrContactJobNotFound = errors.New("contact job not found")
 
 type ContactJobService struct {
-	db *gorm.DB
+	db             *gorm.DB
+	davPushService *DavPushService
 }
 
 func NewContactJobService(db *gorm.DB) *ContactJobService {
 	return &ContactJobService{db: db}
+}
+
+func (s *ContactJobService) SetDavPushService(push *DavPushService) {
+	s.davPushService = push
+}
+
+// Job fields live outside Contact, so their successful mutations must explicitly
+// notify DAV subscribers too. Call only after the owning transaction commits.
+func (s *ContactJobService) pushContactChange(contactID, vaultID string) {
+	if s.davPushService != nil {
+		s.davPushService.PushContactChangesAsync([]string{contactID}, vaultID)
+	}
 }
 
 // verifyContactInVault checks that a contact exists and belongs to the given vault.
@@ -78,6 +91,8 @@ func (s *ContactJobService) Create(contactID, vaultID string, req dto.CreateCont
 		return nil, err
 	}
 
+	s.pushContactChange(contactID, vaultID)
+
 	// Reload with Company preloaded for response
 	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
 		return nil, err
@@ -110,6 +125,7 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 	if err := updateContactRecord(s.db, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
 		return nil, err
 	}
+	s.pushContactChange(contactID, vaultID)
 
 	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
 		return nil, err
@@ -132,6 +148,7 @@ func (s *ContactJobService) Delete(contactID, vaultID string, jobID uint) error 
 	if result.RowsAffected == 0 {
 		return ErrContactJobNotFound
 	}
+	s.pushContactChange(contactID, vaultID)
 	return nil
 }
 
@@ -154,6 +171,7 @@ func (s *ContactJobService) AddEmployee(companyID uint, vaultID string, req dto.
 	if err := createContactRecord(s.db, &job, req.ContactID, vaultID); err != nil {
 		return nil, err
 	}
+	s.pushContactChange(req.ContactID, vaultID)
 
 	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
 		return nil, err
@@ -177,6 +195,7 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 	if result.RowsAffected == 0 {
 		return ErrContactJobNotFound
 	}
+	s.pushContactChange(contactID, vaultID)
 	return nil
 }
 
@@ -195,6 +214,9 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID, userID string, req 
 		result, err = NewContactJobService(tx).legacyUpdate(contactID, vaultID, userID, req)
 		return err
 	})
+	if err == nil {
+		s.pushContactChange(contactID, vaultID)
+	}
 	return result, err
 }
 
@@ -260,6 +282,24 @@ func (s *ContactJobService) legacyUpdate(contactID, vaultID, userID string, req 
 
 // LegacyDelete clears all jobs for a contact for backward compatibility with the old DELETE /jobInformation endpoint.
 func (s *ContactJobService) LegacyDelete(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
+	// Clearing joins and legacy fields is one mutation; a failed profile write
+	// must not remove jobs or send a partially cleared card to subscribers.
+	var result *dto.ContactResponse
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		var err error
+		result, err = NewContactJobService(tx).legacyDelete(contactID, vaultID, userID)
+		return err
+	})
+	if err == nil {
+		s.pushContactChange(contactID, vaultID)
+	}
+	return result, err
+}
+
+func (s *ContactJobService) legacyDelete(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
 	var contact models.Contact
 	if err := s.db.Where("id = ? AND vault_id = ?", contactID, vaultID).First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

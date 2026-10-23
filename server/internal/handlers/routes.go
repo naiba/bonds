@@ -185,6 +185,8 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	contactService.SetSearchService(searchService)
 	contactService.SetDavPushService(davPushService)
+	contactJobService.SetDavPushService(davPushService)
+	companyService.SetDavPushService(davPushService)
 	contactMoveService.SetSearchService(searchService)
 	contactMoveService.SetDavPushService(davPushService)
 	contactMoveService.SetFileService(vaultFileService)
