@@ -35,7 +35,7 @@ func waitForCompanyLockOrCompletion(t *testing.T, db *gorm.DB, done <-chan error
 			return false, nil
 		case <-tick.C:
 			var waiting int64
-			err := db.Raw(`SELECT count(*) FROM pg_stat_activity a WHERE a.pid <> pg_backend_pid() AND a.wait_event_type = 'Lock' AND a.query LIKE '%companies%FOR UPDATE%' AND EXISTS (SELECT 1 FROM pg_locks l WHERE l.pid = a.pid AND l.relation = 'companies'::regclass)`).Scan(&waiting).Error
+			err := db.Raw(`SELECT count(*) FROM pg_stat_activity a WHERE a.pid <> pg_backend_pid() AND a.wait_event_type = 'Lock' AND a.query LIKE '%companies%FOR %UPDATE%' AND EXISTS (SELECT 1 FROM pg_locks l WHERE l.pid = a.pid AND l.relation = 'companies'::regclass)`).Scan(&waiting).Error
 			if err != nil {
 				t.Fatal(err)
 			}

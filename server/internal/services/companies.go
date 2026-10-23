@@ -118,15 +118,28 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 // companyContactIDs includes both job history and legacy-only contacts. Selecting
 // from contacts deduplicates employees with multiple jobs at the same company.
 func companyContactIDs(db *gorm.DB, companyID uint, vaultID string, lockContacts bool) ([]string, error) {
-	var ids []string
+	var contacts []struct {
+		ID        string
+		DeletedAt gorm.DeletedAt
+	}
 	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
 	query := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
 		Where("company_id = ? OR id IN (?)", companyID, jobs).Order("id ASC")
 	if lockContacts {
-		query = query.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+		// Tombstones still enforce their company FK. Lock them for cleanup,
+		// but do not send notifications for contacts already deleted.
+		query = query.Unscoped().Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
 	}
-	err := query.Pluck("id", &ids).Error
-	return ids, err
+	if err := query.Select("id", "deleted_at").Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(contacts))
+	for _, contact := range contacts {
+		if !contact.DeletedAt.Valid {
+			ids = append(ids, contact.ID)
+		}
+	}
+	return ids, nil
 }
 
 func (s *CompanyService) pushContactChanges(contactIDs []string, vaultID string) {
@@ -142,7 +155,7 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 	var company models.Company
 	var contactIDs []string
 	err := s.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: companyWriteLockStrength}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
 			}
@@ -177,7 +190,7 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 	// subscribers can observe a partially deleted organization.
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var company models.Company
-		if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: companyWriteLockStrength}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
 			}
@@ -194,7 +207,9 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 		if err := tx.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
+		// Soft-deleted merge sources retain their profile but must not keep a
+		// foreign key to the company being removed.
+		if err := tx.Unscoped().Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
 			return err
 		}
 		return tx.Delete(&company).Error

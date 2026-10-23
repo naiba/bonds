@@ -93,11 +93,6 @@ func (s *ContactJobService) Create(contactID, vaultID string, req dto.CreateCont
 
 	s.pushContactChange(contactID, vaultID)
 
-	// Reload with Company preloaded for response
-	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
-		return nil, err
-	}
-
 	resp := toContactJobResponse(&job)
 	return &resp, nil
 }
@@ -129,15 +124,16 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
 			return err
 		}
-		return updateContactRecord(tx, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position")
+		if err := updateContactRecord(tx, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
+			return err
+		}
+		// Match creation: response reads belong to the write transaction, so
+		// later deletion cannot turn a successful update into a loading error.
+		return tx.Preload("Company").First(&job, job.ID).Error
 	}); err != nil {
 		return nil, err
 	}
 	s.pushContactChange(contactID, vaultID)
-
-	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
-		return nil, err
-	}
 
 	resp := toContactJobResponse(&job)
 	return &resp, nil
@@ -180,10 +176,6 @@ func (s *ContactJobService) AddEmployee(companyID uint, vaultID string, req dto.
 		return nil, err
 	}
 	s.pushContactChange(req.ContactID, vaultID)
-
-	if err := s.db.Preload("Company").First(&job, job.ID).Error; err != nil {
-		return nil, err
-	}
 
 	resp := toContactJobResponse(&job)
 	return &resp, nil
