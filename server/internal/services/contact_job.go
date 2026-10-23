@@ -141,17 +141,24 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 
 // Delete removes a specific job entry by its ID.
 func (s *ContactJobService) Delete(contactID, vaultID string, jobID uint) error {
-	if err := s.verifyContactInVault(contactID, vaultID); err != nil {
+	// Match DAV PUT/pull and other job writes: stabilize job existence while
+	// reconciling TITLE, so deleting the last job cannot revive its legacy value.
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
+		result := tx.Where("id = ? AND contact_id = ?", jobID, contactID).Delete(&models.ContactCompany{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrContactJobNotFound
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
 
-	result := s.db.Where("id = ? AND contact_id = ?", jobID, contactID).Delete(&models.ContactCompany{})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrContactJobNotFound
-	}
 	s.pushContactChange(contactID, vaultID)
 	return nil
 }
@@ -188,13 +195,26 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 		return err
 	}
 
-	result := s.db.Where("company_id = ? AND contact_id = ?", companyID, contactID).Delete(&models.ContactCompany{})
-	if result.Error != nil {
-		return result.Error
+	// The company-side entry must use the same contact-before-job boundary.
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+			if errors.Is(err, ErrContactNotFound) {
+				return ErrContactJobNotFound
+			}
+			return err
+		}
+		result := tx.Where("company_id = ? AND contact_id = ?", companyID, contactID).Delete(&models.ContactCompany{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrContactJobNotFound
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
-		return ErrContactJobNotFound
-	}
+
 	s.pushContactChange(contactID, vaultID)
 	return nil
 }
