@@ -88,7 +88,7 @@ func (h *VaultSettingsHandler) Get(c *echo.Context) error {
 // Update godoc
 //
 //	@Summary		Update vault settings
-//	@Description	Update name and description for a vault
+//	@Description	Update name, description and CardDAV presence filters for a vault
 //	@Tags			vault-settings
 //	@Accept			json
 //	@Produce		json
@@ -113,6 +113,9 @@ func (h *VaultSettingsHandler) Update(c *echo.Context) error {
 	}
 	settings, err := h.settingsService.Update(vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidCardDAVFilter) {
+			return response.ValidationError(c, map[string]string{"carddav_filter": err.Error()})
+		}
 		if errors.Is(err, services.ErrVaultNotFound) {
 			return response.NotFound(c, "err.vault_not_found")
 		}

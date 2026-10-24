@@ -278,7 +278,9 @@ func (h *CompanyHandler) RemoveEmployee(c *echo.Context) error {
 		if errors.Is(err, services.ErrCompanyNotFound) {
 			return response.NotFound(c, "err.company_not_found")
 		}
-		if errors.Is(err, services.ErrContactJobNotFound) {
+		// The parent lock can reject missing, deleted or out-of-vault contacts
+		// before the employee lookup. All represent a missing employee here.
+		if errors.Is(err, services.ErrContactJobNotFound) || errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.employee_not_found")
 		}
 		return response.InternalError(c, "err.failed_to_remove_employee")

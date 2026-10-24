@@ -132,7 +132,7 @@ func testCompanyWriterDuringMerge(t *testing.T, operation string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertVCardJob(t, card, "Synthetic company", "New role")
+		assertVCardJobs(t, card, [2]string{"Synthetic company", "Engineer"}, [2]string{"Synthetic company", "New role"})
 		return
 	}
 	if remainingJobs != 0 {
@@ -145,7 +145,7 @@ func testCompanyWriterDuringMerge(t *testing.T, operation string) {
 	if err := svc.db.Unscoped().First(&tombstone, "id = ?", source.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if survivor.CompanyID != nil || tombstone.CompanyID != nil || !tombstone.DeletedAt.Valid || ptrToStr(survivor.FirstName) != "Target" || ptrToStr(survivor.JobPosition) != "Engineer" {
+	if survivor.CompanyID != nil || tombstone.CompanyID != nil || !tombstone.DeletedAt.Valid || ptrToStr(survivor.FirstName) != "Target" || survivor.JobPosition != nil {
 		t.Fatal("company cleanup lost merged profile or retained references")
 	}
 	var count int64
@@ -213,8 +213,8 @@ func TestCompanyDeleteCleansMergedForeignKeyReferences(t *testing.T) {
 		t.Fatal("company deletion lost contacts")
 	}
 	for _, contact := range contacts {
-		if contact.CompanyID != nil || ptrToStr(contact.JobPosition) != "Engineer" {
-			t.Fatal("company cleanup retained FK or erased position")
+		if contact.CompanyID != nil || contact.PreferredJobID != nil || (contact.ID == target.ID && contact.JobPosition != nil) || (contact.ID == source.ID && ptrToStr(contact.JobPosition) != "Engineer") {
+			t.Fatal("company cleanup retained selection or changed tombstone position")
 		}
 		if contact.ID == source.ID && !contact.DeletedAt.Valid {
 			t.Fatal("merged contact revived")
@@ -253,7 +253,7 @@ func TestCompanyDeletionDoesNotPushTombstones(t *testing.T) {
 	if err := f.companies.Delete(company, f.vaultID); err != nil {
 		t.Fatal(err)
 	}
-	f.expect(t, map[string][2]string{active: {"", "Preserved title"}})
+	f.expect(t, map[string][2]string{active: {"", ""}})
 	f.expectNoPush(t)
 	var after models.ContactSubscriptionState
 	if err := f.push.db.Where("contact_id = ?", historical).First(&after).Error; err != nil {
@@ -298,7 +298,7 @@ func TestCompanyDeletionSerializesWithSuccessiveMerges(t *testing.T) {
 	svc.db = svc.db.WithContext(ctx)
 	mergeEntered, mergeResume := make(chan struct{}), make(chan struct{})
 	cleanupEntered, cleanupResume := make(chan struct{}), make(chan struct{})
-	var mergeOnce, cleanupOnce sync.Once
+	var mergeOnce, cleanupOnce, mergeBoundary, cleanupBoundary sync.Once
 	releaseMerge := func() { mergeOnce.Do(func() { close(mergeResume) }) }
 	releaseCleanup := func() { cleanupOnce.Do(func() { close(cleanupResume) }) }
 	const callback = "pause_company_cleanup_after_transferred_job_delete"
@@ -307,13 +307,13 @@ func TestCompanyDeletionSerializesWithSuccessiveMerges(t *testing.T) {
 			return
 		}
 		if row, ok := tx.Statement.Dest.(*models.Contact); ok && row.ID == target && row.CompanyID != nil {
-			close(mergeEntered)
-			<-mergeResume
+			mergeBoundary.Do(func() { close(mergeEntered); <-mergeResume })
 		}
 		if fields, ok := tx.Statement.Dest.(map[string]interface{}); ok {
 			if value, exists := fields["company_id"]; exists && value == nil {
-				close(cleanupEntered)
-				<-cleanupResume
+				// Live mirror cleanup and tombstone cleanup may both update company_id.
+				// Pause at the first boundary without assuming one SQL statement.
+				cleanupBoundary.Do(func() { close(cleanupEntered); <-cleanupResume })
 			}
 		}
 	}); err != nil {
@@ -411,7 +411,7 @@ func TestCompanyDeletionSerializesWithSuccessiveMerges(t *testing.T) {
 	if err := svc.db.First(&survivor, "id = ?", target).Error; err != nil {
 		t.Fatal(err)
 	}
-	if survivor.CompanyID != nil || ptrToStr(survivor.JobPosition) != "Engineer" || ptrToStr(survivor.FirstName) != "Target" {
+	if survivor.CompanyID != nil || survivor.JobPosition != nil || ptrToStr(survivor.FirstName) != "Target" {
 		t.Fatal("company cleanup or stale merge lost survivor fields")
 	}
 }

@@ -52,7 +52,7 @@ func (s *VCardService) ExportContact(contactID string, vaultID string) ([]byte, 
 func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 	var contacts []models.Contact
 	// Archived contacts are intentionally omitted from a full Vault export.
-	if err := PreloadContactVCardRelations(s.db).Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
+	if err := preloadContactVCardRelations(s.db).Where("vault_id = ? AND listed = ?", vaultID, true).Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 
@@ -71,7 +71,7 @@ func (s *VCardService) ExportVault(vaultID string) ([]byte, error) {
 
 func (s *VCardService) loadContactForVCard(contactID, vaultID string) (*models.Contact, error) {
 	var contact models.Contact
-	if err := PreloadContactVCardRelations(s.db).
+	if err := preloadContactVCardRelations(s.db).
 		Where("id = ? AND vault_id = ?", contactID, vaultID).
 		First(&contact).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -82,20 +82,12 @@ func (s *VCardService) loadContactForVCard(contactID, vaultID string) (*models.C
 	return &contact, nil
 }
 
-// PreloadContactVCardRelations keeps file exports, subscription pushes and CardDAV
-// reads on the same projection. Load only one job per contact even in bulk exports.
-func PreloadContactVCardRelations(db *gorm.DB) *gorm.DB {
+func preloadContactVCardRelations(db *gorm.DB) *gorm.DB {
 	return db.Preload("ContactInformations.ContactInformationType").
 		Preload("Addresses").
 		Preload("ImportantDates.ContactImportantDateType").
 		Preload("Company").
-		Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB {
-			return db.Where(`contact_companies.id = (
-				SELECT latest.id FROM contact_companies AS latest
-				WHERE latest.contact_id = contact_companies.contact_id
-				ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1
-			)`)
-		}).
+		Preload("ContactCompanies", func(db *gorm.DB) *gorm.DB { return db.Order("id ASC") }).
 		Preload("ContactCompanies.Company").
 		Preload("File")
 }
@@ -186,9 +178,12 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 	}, nil
 }
 
-// ImportContactVCardFields parses the shared TEL, EMAIL, ADR and BDAY projection.
+// ImportContactVCardFields parses the shared ORG, TEL, EMAIL, ADR and BDAY projection.
 // Callers must use their contact transaction so invalid fields cannot partially commit.
 func ImportContactVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
+	if err := reconcileVCardOrganization(tx, card, contactID, vaultID); err != nil {
+		return err
+	}
 	// TEL → ContactInformation
 	if fields := card[vcard.FieldTelephone]; len(fields) > 0 {
 		var phoneType models.ContactInformationType
@@ -345,12 +340,20 @@ func BuildContactVCard(contact *models.Contact) vcard.Card {
 	if contact.Nickname != nil && *contact.Nickname != "" {
 		card.SetValue(vcard.FieldNickname, *contact.Nickname)
 	}
-	organization, title := contactVCardJob(contact)
-	if title != "" {
-		card.SetValue(vcard.FieldTitle, title)
-	}
-	if organization != "" {
-		card.SetValue(vcard.FieldOrganization, organization)
+	employments := ContactVCardEmployments(contact)
+	for i, employment := range employments {
+		group := ""
+		if len(employments) > 1 {
+			group = fmt.Sprintf("employment%d", i+1)
+		}
+		if employment.Company != "" {
+			field := vcard.NewOrganization([]string{employment.Company})
+			field.Group = group
+			card.Add(vcard.FieldOrganization, field)
+		}
+		if employment.Title != "" {
+			card.Add(vcard.FieldTitle, &vcard.Field{Value: employment.Title, Group: group})
+		}
 	}
 	if contact.Description != nil && *contact.Description != "" {
 		card.SetValue(vcard.FieldNote, *contact.Description)
@@ -627,19 +630,16 @@ func extractFullNameFromCard(card vcard.Card) vcardNameComponents {
 // lastSyncAt is used for conflict detection: if the contact was locally modified after lastSyncAt, the local version wins.
 // Returns the contact ID and an action string: "created", "updated", "skipped", or "conflict_local_wins".
 func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID, existingContactID, distantURI, distantEtag string, lastSyncAt *time.Time) (contactID string, action string, err error) {
+	// Read conflict metadata under the same parent lock as local Jobs edits.
+	// Locking only during child reconciliation lets a stale Save undo a deletion.
 	var existing models.Contact
 	var findErr error
-	// Read the conflict marker under the same contact lock as local job writes.
-	// Locking only at Save would use a stale pre-deletion snapshot after waiting.
-	locked := func() *gorm.DB {
-		return tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
-	}
 	if existingContactID != "" {
-		findErr = locked().Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
+		findErr = tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
 	}
 	if existingContactID == "" || errors.Is(findErr, gorm.ErrRecordNotFound) {
 		if distantURI != "" {
-			findErr = locked().Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
+			findErr = tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
 		} else {
 			findErr = gorm.ErrRecordNotFound
 		}
@@ -666,17 +666,16 @@ func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaul
 		existing.Suffix = strPtrOrNil(nameComponents.suffix)
 		existing.Nickname = strPtrOrNil(nickname)
 		existing.DistantEtag = strPtrOrNil(distantEtag)
-		// LastUpdatedAt detects local edits, not accepted remote revisions. A
-		// partially failed batch retains lastSyncAt, so advancing this marker on
-		// a successful pull would falsely discard later remote changes on retry.
-		// Save still advances UpdatedAt for the changed contact representation.
-		if err := tx.Save(&existing).Error; err != nil {
-			return "", "", err
-		}
-
+		// Reconcile against the old profile before overwriting its legacy title.
 		if err := ReplaceContactVCardFields(tx, card, existing.ID, vaultID, accountID); err != nil {
 			return "", "", err
 		}
+		// Remote updates must neither overwrite local conflict metadata nor restore
+		// the old company selection changed by employment reconciliation.
+		if err := updateContactProfile(tx, &existing, vaultID, "first_name", "last_name", "middle_name", "prefix", "suffix", "nickname", "distant_etag"); err != nil {
+			return "", "", err
+		}
+
 		return existing.ID, "updated", nil
 	}
 

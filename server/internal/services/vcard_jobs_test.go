@@ -36,8 +36,8 @@ func TestVCardJobsExportLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Equal creation timestamps still have a stable newest entry, independently
-	// of database row order. Editing an older job must not promote it.
+	// Upstream selection remains stable; the newer job is also exported with its
+	// own title rather than being omitted or borrowing the selected title.
 	created := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
 	if err := svc.db.Model(&models.ContactCompany{}).Where("contact_id = ?", contactID).Update("created_at", created).Error; err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestVCardJobsExportLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertExports := func(org, title string) {
+	assertExports := func(want ...[2]string) {
 		t.Helper()
 		var before, after []models.ContactCompany
 		if err := svc.db.Order("id").Find(&before).Error; err != nil {
@@ -63,12 +63,12 @@ func TestVCardJobsExportLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertVCardJob(t, mustDecodeVCard(t, data), org, title)
+		assertVCardJobs(t, mustDecodeVCard(t, data), want...)
 		card, err := svc.ExportContactToVCard(contactID, vaultID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertVCardJob(t, card, org, title)
+		assertVCardJobs(t, card, want...)
 		data, err = svc.ExportVault(vaultID)
 		if err != nil {
 			t.Fatal(err)
@@ -90,7 +90,7 @@ func TestVCardJobsExportLifecycle(t *testing.T) {
 			seen[id] = true
 			switch id {
 			case contactID:
-				assertVCardJob(t, card, org, title)
+				assertVCardJobs(t, card, want...)
 			case second.ID:
 				assertVCardJob(t, card, "Earlier company", "Analyst")
 			default:
@@ -113,34 +113,34 @@ func TestVCardJobsExportLifecycle(t *testing.T) {
 		wantJobs := 0
 		for _, job := range before {
 			if job.ContactID == contactID {
-				wantJobs = 1
+				wantJobs++
 			}
 		}
 		if len(loaded.ContactCompanies) != wantJobs {
 			t.Fatalf("projection loaded %d jobs, want %d", len(loaded.ContactCompanies), wantJobs)
 		}
 	}
-	assertExports("最新 Company, Inc.", "Director")
+	assertExports([2]string{"Earlier company", "Senior engineer"}, [2]string{"最新 Company, Inc.", "Director"})
 	if _, err := companies.Update(newerCompany, vaultID, dto.UpdateCompanyRequest{Name: "Renamed company"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := jobs.Update(contactID, vaultID, newer.ID, dto.UpdateContactJobRequest{CompanyID: newerCompany}); err != nil {
 		t.Fatal(err)
 	}
-	assertExports("Renamed company", "")
-	// CreatedAt takes precedence over ID (including imported/backfilled rows).
+	assertExports([2]string{"Earlier company", "Senior engineer"}, [2]string{"Renamed company", ""})
+	// Changing historical timestamps must not retarget the selected employment.
 	if err := svc.db.Model(&models.ContactCompany{}).Where("id = ?", older.ID).Update("created_at", created.Add(time.Hour)).Error; err != nil {
 		t.Fatal(err)
 	}
-	assertExports("Earlier company", "Senior engineer")
+	assertExports([2]string{"Earlier company", "Senior engineer"}, [2]string{"Renamed company", ""})
 	if err := jobs.Delete(contactID, vaultID, older.ID); err != nil {
 		t.Fatal(err)
 	}
-	assertExports("Renamed company", "")
+	assertExports([2]string{"Renamed company", ""})
 	if err := companies.Delete(newerCompany, vaultID); err != nil {
 		t.Fatal(err)
 	}
-	assertExports("", "")
+	assertExports()
 }
 
 func TestVCardJobsLegacyAndVaultIsolation(t *testing.T) {
@@ -152,24 +152,20 @@ func TestVCardJobsLegacyAndVaultIsolation(t *testing.T) {
 	if err := svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Updates(map[string]any{"company_id": company.ID, "job_position": "Legacy title"}).Error; err != nil {
 		t.Fatal(err)
 	}
-	check := func(org, title string) {
+	check := func(want ...[2]string) {
 		t.Helper()
 		data, err := svc.ExportContact(contactID, vaultID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertVCardJob(t, mustDecodeVCard(t, data), org, title)
+		assertVCardJobs(t, mustDecodeVCard(t, data), want...)
 	}
-	check("Legacy company", "Legacy title")
+	check([2]string{"Legacy company", "Legacy title"})
 	job, err := NewContactJobService(svc.db).Create(contactID, vaultID, dto.CreateContactJobRequest{CompanyID: company.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	check("Legacy company", "") // Never borrow a title from a different source.
-	if err := svc.db.Model(&models.ContactCompany{}).Where("id = ?", job.ID).Update("job_position", "").Error; err != nil {
-		t.Fatal(err)
-	}
-	check("Legacy company", "")
+	check([2]string{"Legacy company", "Legacy title"}, [2]string{"Legacy company", ""})
 	var vault models.Vault
 	if err := svc.db.First(&vault, "id = ?", vaultID).Error; err != nil {
 		t.Fatal(err)
@@ -189,28 +185,57 @@ func TestVCardJobsLegacyAndVaultIsolation(t *testing.T) {
 	if err := svc.db.Model(&models.ContactCompany{}).Where("contact_id = ?", contactID).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
+	if count != 2 {
 		t.Fatalf("rejected create changed jobs: %d", count)
 	}
 	if _, err := svc.ExportContact(contactID, other.ID); !errors.Is(err, ErrContactNotFound) {
 		t.Fatalf("cross-vault export: %v", err)
 	}
-	// Historical invalid references must not expose a company from another vault.
-	if err := svc.db.Model(&models.ContactCompany{}).Where("id = ?", job.ID).Updates(map[string]any{"company_id": privateCompany.ID, "job_position": "Private position"}).Error; err != nil {
-		t.Fatal(err)
+	// Corrupt legacy references cannot leak either employer or role, and must
+	// not hide the independent valid relationship materialized above.
+	for _, invalidID := range []uint{privateCompany.ID, privateCompany.ID + 1000} {
+		if err := svc.db.Model(&models.ContactCompany{}).Where("id = ?", job.ID).Updates(map[string]any{"company_id": invalidID, "job_position": "Private position"}).Error; err != nil {
+			t.Fatal(err)
+		}
+		check([2]string{"Legacy company", "Legacy title"})
 	}
-	check("", "")
-	if err := svc.db.Model(&models.ContactCompany{}).Where("id = ?", job.ID).Update("company_id", privateCompany.ID+1000).Error; err != nil {
-		t.Fatal(err)
+}
+
+// Compare every exported company/title pair, including empty titles. Grouping
+// matters: card.Value(TITLE) can belong to a different employment than first ORG.
+func exportedJobPairs(card vcard.Card) [][2]string {
+	var pairs [][2]string
+	used := map[*vcard.Field]bool{}
+	for _, org := range card[vcard.FieldOrganization] {
+		title := ""
+		for _, field := range card[vcard.FieldTitle] {
+			if field.Group == org.Group {
+				title = field.Value
+				used[field] = true
+				break
+			}
+		}
+		components := org.Organization()
+		name := ""
+		if len(components) > 0 {
+			name = components[0]
+		}
+		pairs = append(pairs, [2]string{name, title})
 	}
-	check("", "")
-	if err := svc.db.Delete(&models.ContactCompany{}, job.ID).Error; err != nil {
-		t.Fatal(err)
+	for _, field := range card[vcard.FieldTitle] {
+		if !used[field] {
+			pairs = append(pairs, [2]string{"", field.Value})
+		}
 	}
-	if err := svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Update("company_id", privateCompany.ID).Error; err != nil {
-		t.Fatal(err)
+	return pairs
+}
+
+func assertVCardJobs(t *testing.T, card vcard.Card, want ...[2]string) {
+	t.Helper()
+	got := exportedJobPairs(card)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("employment pairs=%v want=%v", got, want)
 	}
-	check("", "Legacy title")
 }
 
 func assertVCardJob(t *testing.T, card vcard.Card, org, title string) {

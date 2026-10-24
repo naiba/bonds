@@ -421,7 +421,7 @@ func TestMonicaImportCompanyDeletionAtAssociationBoundary(t *testing.T) {
 				if result.ImportedContacts != 1 || len(contacts) != 1 {
 					t.Fatal("later job rejection lost committed imported contact")
 				}
-				if contacts[0].CompanyID != nil || ptrToStr(contacts[0].FirstName) != "Preserved imported name" || ptrToStr(contacts[0].JobPosition) != "Engineer" {
+				if contacts[0].CompanyID != nil || ptrToStr(contacts[0].FirstName) != "Preserved imported name" || contacts[0].JobPosition != nil {
 					t.Fatal("company cleanup did not preserve unrelated imported fields")
 				}
 			}

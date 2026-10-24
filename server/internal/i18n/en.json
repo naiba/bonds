@@ -1,4 +1,5 @@
 {
+  "err.ambiguous_vcard_employment": "The vCard employment is ambiguous. Use one clearly paired organization and title, or edit the employment in Bonds.",
   "err.invalid_request_body": "Invalid request body",
   "err.validation_error": "The given data was invalid.",
 

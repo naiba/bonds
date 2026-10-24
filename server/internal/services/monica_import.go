@@ -415,18 +415,28 @@ func (s *MonicaImportService) importContactReferences(
 	}
 }
 
-func (s *MonicaImportService) findOrCreateCompany(tx *gorm.DB, vaultID, name string) (*models.Company, error) {
+func (s *MonicaImportService) findOrCreateCompany(db *gorm.DB, vaultID, name string) (*models.Company, error) {
 	var company models.Company
-	err := tx.Where("vault_id = ? AND LOWER(name) = LOWER(?)", vaultID, name).First(&company).Error
-	if err == nil {
-		return &company, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	company = models.Company{VaultID: vaultID, Name: name}
-	if err := tx.Create(&company).Error; err != nil {
+	// Import passes an ordinary DB, not an enclosing transaction. Own this
+	// boundary so the transaction-scoped lock protects lookup AND creation;
+	// otherwise it is released after the lock statement and concurrent vCard
+	// import can create a second identity. Keep company failure isolated from
+	// Monica's existing partial contact import and case-insensitive matching.
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := lockCompanyResolution(tx, vaultID); err != nil {
+			return err
+		}
+		err := tx.Where("vault_id = ? AND LOWER(name) = LOWER(?)", vaultID, name).First(&company).Error
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		company = models.Company{VaultID: vaultID, Name: name}
+		return tx.Create(&company).Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &company, nil

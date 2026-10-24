@@ -49,15 +49,16 @@ func TestJobDeletionDuringSubscriptionPull(t *testing.T) {
 			original.SetName(&vcard.Name{GivenName: "Edited", FamilyName: "Name"})
 			original.SetValue(vcard.FieldFormattedName, "Edited Name")
 			entered, resume := make(chan struct{}), make(chan struct{})
-			var once sync.Once
+			var once, boundary sync.Once
 			release := func() { once.Do(func() { close(resume) }) }
 			putDone, deleteDone := make(chan error, 1), make(chan error, 1)
 			putFinished, deleteStarted, deleteFinished := false, false, false
 			const callback = "pause_subscription_pull_after_contact_save"
 			if err := db.Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
 				if c, ok := tx.Statement.Dest.(*models.Contact); ok && c.ID == contact.ID {
-					close(entered)
-					<-resume
+					// Incoming employment reconciliation can save the contact again.
+					// Coordinate the first locked save, not the number of SQL updates.
+					boundary.Do(func() { close(entered); <-resume })
 				}
 			}); err != nil {
 				t.Fatal(err)
@@ -187,7 +188,7 @@ func TestJobDeletionRejectsForeignContact(t *testing.T) {
 	if err := jobs.Delete(contact.ID, vault, job.ID); !errors.Is(err, ErrContactNotFound) {
 		t.Fatalf("job delete: %v", err)
 	}
-	if err := jobs.RemoveEmployee(company.ID, vault, contact.ID); !errors.Is(err, ErrContactJobNotFound) {
+	if err := jobs.RemoveEmployee(company.ID, vault, contact.ID); !errors.Is(err, ErrContactNotFound) {
 		t.Fatalf("employee delete: %v", err)
 	}
 	var stored models.ContactCompany

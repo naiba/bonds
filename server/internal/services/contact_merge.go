@@ -74,6 +74,26 @@ func (s *ContactService) MergeContacts(vaultID, userID string, req dto.MergeCont
 		if req.ReviewToken == "" || req.ReviewToken != review.ReviewToken {
 			return ErrContactMergeReviewChanged
 		}
+		// Capture legacy fallback identities before moving jobs between contacts.
+		// Otherwise an older source job can silently become the target's primary.
+		for id, contact := range byID {
+			loaded, err := loadContactEmployment(tx, id, vaultID)
+			if err != nil {
+				return err
+			}
+			// A selected legacy employer has no JobID yet. Materialize it before
+			// moving other jobs in, or export and the next edit would target an
+			// unrelated job despite the user's reviewed employment choice.
+			if err := materializeLegacyEmployment(tx, loaded); err != nil {
+				return err
+			}
+			projected := ContactVCardEmployments(loaded)
+			if len(projected) > 0 && projected[0].JobID != 0 {
+				jobID := projected[0].JobID
+				contact.PreferredJobID = &jobID
+				byID[id] = contact
+			}
+		}
 		target = byID[req.TargetContactID]
 		if err := applyContactMergeChoices(&target, byID, review.Fields, req.FieldChoices); err != nil {
 			return err

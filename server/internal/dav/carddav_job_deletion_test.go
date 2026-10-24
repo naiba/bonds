@@ -45,15 +45,16 @@ func TestJobDeletionDuringConditionalCardDAVPut(t *testing.T) {
 			original.Card.SetName(&vcard.Name{GivenName: "Edited", FamilyName: "Name"})
 			original.Card.SetValue(vcard.FieldFormattedName, "Edited Name")
 			entered, resume := make(chan struct{}), make(chan struct{})
-			var once sync.Once
+			var once, boundary sync.Once
 			release := func() { once.Do(func() { close(resume) }) }
 			putDone, deleteDone := make(chan error, 1), make(chan error, 1)
 			putFinished, deleteStarted, deleteFinished := false, false, false
 			const callback = "pause_conditional_put_after_contact_save"
 			if err := db.Callback().Update().After("gorm:update").Register(callback, func(tx *gorm.DB) {
 				if c, ok := tx.Statement.Dest.(*models.Contact); ok && c.ID == contact.ID {
-					close(entered)
-					<-resume
+					// Reconciliation may save the contact again for employment selection.
+					// The interleaving needs only the first save while its lock is held.
+					boundary.Do(func() { close(entered); <-resume })
 				}
 			}); err != nil {
 				t.Fatal(err)

@@ -19,17 +19,15 @@ import (
 // FKs allow these references, so upgrades must coordinate their cleanup too.
 func createHistoricalCompanyReference(t *testing.T, db *gorm.DB, contactID, vaultID, userID string, companyID uint) uint {
 	t.Helper()
+	// The current public writer correctly rejects this association. Recreate the
+	// physical legacy rows directly, with the same real foreign keys enforced.
+	job := models.ContactCompany{ContactID: contactID, CompanyID: companyID, JobPosition: strPtrOrNil("Historical role")}
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
+		if err := tx.Create(&job).Error; err != nil {
 			return err
 		}
-		_, err := NewContactJobService(tx).legacyUpdate(contactID, vaultID, userID, dto.UpdateJobInfoRequest{CompanyID: &companyID, JobPosition: "Historical role"})
-		return err
+		return tx.Model(&models.Contact{}).Where("id = ? AND vault_id = ?", contactID, vaultID).Updates(map[string]any{"company_id": companyID, "job_position": "Historical role"}).Error
 	}); err != nil {
-		t.Fatal(err)
-	}
-	var job models.ContactCompany
-	if err := db.Where("contact_id = ? AND company_id = ?", contactID, companyID).First(&job).Error; err != nil {
 		t.Fatal(err)
 	}
 	return job.ID

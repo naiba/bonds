@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,7 +16,10 @@ import (
 	"gorm.io/gorm"
 )
 
-type jobSubscriptionPush struct{ contactID, organization, title, path, etag string }
+type jobSubscriptionPush struct {
+	contactID, organization, title, path, etag string
+	employments                                [][2]string
+}
 type jobSubscriptionFixture struct {
 	push                                       *DavPushService
 	jobs                                       *ContactJobService
@@ -34,7 +38,7 @@ func setupJobSubscription(t *testing.T) *jobSubscriptionFixture {
 	var sequence atomic.Int64
 	push.SetClientFactory(&mockCardDAVClientFactory{client: &mockCardDAVClient{putAddrObjFn: func(ctx context.Context, path string, card vcard.Card) (*carddav.AddressObject, error) {
 		etag := fmt.Sprintf("job-revision-%d", sequence.Add(1))
-		f.received <- jobSubscriptionPush{card.Value(vcard.FieldUID), card.Value(vcard.FieldOrganization), card.Value(vcard.FieldTitle), path, etag}
+		f.received <- jobSubscriptionPush{card.Value(vcard.FieldUID), card.Value(vcard.FieldOrganization), card.Value(vcard.FieldTitle), path, etag, exportedJobPairs(card)}
 		if f.remoteFailure.Load() {
 			return nil, errors.New("synthetic DAV unavailable")
 		}
@@ -71,7 +75,13 @@ func (f *jobSubscriptionFixture) expect(t *testing.T, want map[string][2]string)
 		select {
 		case got := <-f.received:
 			projection, ok := want[got.contactID]
-			if !ok || got.organization != projection[0] || got.title != projection[1] {
+			matched := len(got.employments) == 0 && projection == [2]string{"", ""}
+			for _, pair := range got.employments {
+				if pair == projection {
+					matched = true
+				}
+			}
+			if !ok || !matched {
 				t.Fatalf("unexpected push %+v, expected %v", got, want)
 			}
 			// Wait for the real asynchronous push to persist its result, not just enter the mock transport.
@@ -189,13 +199,13 @@ func TestCompanySubscriptionLifecycle(t *testing.T) {
 	if err := f.companies.Delete(company, f.vaultID); err != nil {
 		t.Fatal(err)
 	}
-	f.expect(t, map[string][2]string{first: {"Previous company", "Earlier role"}, second: {"", ""}, legacy: {"", "Legacy role"}})
+	f.expect(t, map[string][2]string{first: {"Previous company", "Earlier role"}, second: {"", ""}, legacy: {"", ""}})
 	var count int64
 	if err := f.push.db.Model(&models.ContactCompany{}).Where("company_id = ?", company).Count(&count).Error; err != nil || count != 0 {
 		t.Fatalf("company jobs remain: %d %v", count, err)
 	}
 	var contact models.Contact
-	if err := f.push.db.First(&contact, "id = ?", legacy).Error; err != nil || contact.CompanyID != nil || ptrToStr(contact.JobPosition) != "Legacy role" {
+	if err := f.push.db.First(&contact, "id = ?", legacy).Error; err != nil || contact.CompanyID != nil || contact.JobPosition != nil {
 		t.Fatalf("legacy cleanup failed: %+v %v", contact, err)
 	}
 	var state models.ContactSubscriptionState
@@ -238,7 +248,7 @@ func TestJobSubscriptionRejectedAndRolledBackChanges(t *testing.T) {
 	if err = f.jobs.Delete(id, other.ID, job.ID); !errors.Is(err, ErrContactNotFound) {
 		t.Fatalf("cross-vault delete: %v", err)
 	}
-	if _, err = f.jobs.AddEmployee(company, other.ID, dto.AddEmployeeRequest{ContactID: id}); !errors.Is(err, ErrCompanyNotFound) {
+	if _, err = f.jobs.AddEmployee(company, other.ID, dto.AddEmployeeRequest{ContactID: id}); !errors.Is(err, ErrContactNotFound) {
 		t.Fatalf("cross-vault add: %v", err)
 	}
 	if err = f.jobs.RemoveEmployee(company, other.ID, id); !errors.Is(err, ErrCompanyNotFound) {
@@ -404,4 +414,62 @@ func TestJobSubscriptionWithoutActivePushSubscriber(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestJobSubscriptionExportsAllEmploymentsWhenCardDAVFiltered(t *testing.T) {
+	f := setupJobSubscription(t)
+	id := f.contact(t, "Filtered employee")
+	first := f.company(t, "Selected company")
+	second := f.company(t, "Secondary; company")
+	expectAll := func(want ...[2]string) {
+		t.Helper()
+		select {
+		case got := <-f.received:
+			if got.contactID != id || !reflect.DeepEqual(got.employments, want) {
+				t.Fatalf("push pairs=%v want=%v", got.employments, want)
+			}
+			// Retain the established URI/ETag and successful-log assertions too.
+			f.received <- got
+			pair := [2]string{}
+			if len(want) > 0 {
+				pair = want[0]
+			}
+			f.expect(t, map[string][2]string{id: pair})
+		case <-time.After(5 * time.Second):
+			t.Fatal("committed employment did not push")
+		}
+	}
+	selected, err := f.jobs.Create(id, f.vaultID, dto.CreateContactJobRequest{CompanyID: first, JobPosition: "Selected role"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectAll([2]string{"Selected company", "Selected role"})
+	if _, err := f.jobs.AddEmployee(second, f.vaultID, dto.AddEmployeeRequest{ContactID: id, JobPosition: "Secondary role"}); err != nil {
+		t.Fatal(err)
+	}
+	expectAll([2]string{"Selected company", "Selected role"}, [2]string{"Secondary; company", "Secondary role"})
+	filter := models.CardDAVFilter{Match: "all", Fields: []string{"phone"}}
+	if err := f.push.db.Model(&models.Vault{ID: f.vaultID}).Select("CardDAVFilter").Updates(models.Vault{CardDAVFilter: &filter}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.companies.Update(second, f.vaultID, dto.UpdateCompanyRequest{Name: "Renamed secondary"}); err != nil {
+		t.Fatal(err)
+	}
+	expectAll([2]string{"Selected company", "Selected role"}, [2]string{"Renamed secondary", "Secondary role"})
+	if err := f.jobs.Delete(id, f.vaultID, selected.ID); err != nil {
+		t.Fatal(err)
+	}
+	expectAll([2]string{"Renamed secondary", "Secondary role"})
+	var stored models.Contact
+	if err := f.push.db.First(&stored, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
+	if stored.PreferredJobID != nil && *stored.PreferredJobID == selected.ID {
+		t.Fatal("removed job remains selected")
+	}
+	if err := f.companies.Delete(second, f.vaultID); err != nil {
+		t.Fatal(err)
+	}
+	expectAll()
+	f.expectNoPush(t)
 }

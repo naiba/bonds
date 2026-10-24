@@ -30,7 +30,7 @@ func TestCardDAVJobsLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	previousETag := initial.ETag
-	check := func(org, title string) {
+	check := func(org, title string, additional ...[2]string) {
 		t.Helper()
 		object, err := backend.GetAddressObject(ctx, path, nil)
 		if err != nil {
@@ -55,8 +55,13 @@ func TestCardDAVJobsLifecycle(t *testing.T) {
 			card vcard.Card
 			etag string
 		}{{object.Card, object.ETag}, {listed[0].Card, listed[0].ETag}, {queried[0].Card, queried[0].ETag}} {
-			if result.card.Value(vcard.FieldOrganization) != org || result.card.Value(vcard.FieldTitle) != title {
-				t.Fatalf("unexpected job projection: %v", result.card)
+			var want [][2]string
+			if org != "" || title != "" {
+				want = append(want, [2]string{org, title})
+			}
+			want = append(want, additional...)
+			if got := cardDAVJobPairs(result.card); !reflect.DeepEqual(got, want) {
+				t.Fatalf("unexpected grouped jobs: got=%v want=%v", got, want)
 			}
 			if result.etag != object.ETag {
 				t.Fatal("list/query/GET ETags disagree")
@@ -104,7 +109,7 @@ func TestCardDAVJobsLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	check("Renamed company", "Newest job")
+	check("Renamed company", "Older job", [2]string{"Renamed company", "Newest job"})
 	var before, after []models.ContactCompany
 	if err := db.Order("id").Find(&before).Error; err != nil {
 		t.Fatal(err)
@@ -119,7 +124,7 @@ func TestCardDAVJobsLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Card.Value(vcard.FieldFormattedName) != "Edited" || updated.Card.Value(vcard.FieldTitle) != "Newest job" || updated.Card.Value(vcard.FieldOrganization) != "Renamed company" {
+	if updated.Card.Value(vcard.FieldFormattedName) != "Edited" || updated.Card.Value(vcard.FieldTitle) != "Older job" || updated.Card.Value(vcard.FieldOrganization) != "Renamed company" {
 		t.Fatal("unrelated DAV edit lost name or job projection")
 	}
 	if err := db.Order("id").Find(&after).Error; err != nil {
@@ -132,8 +137,11 @@ func TestCardDAVJobsLifecycle(t *testing.T) {
 	if err := db.First(&stored, "id = ?", contact.ID).Error; err != nil {
 		t.Fatal(err)
 	}
-	if stored.JobPosition != nil {
-		t.Fatalf("DAV round trip copied the projected title into legacy data: %q", *stored.JobPosition)
+	if stored.JobPosition == nil || *stored.JobPosition != "Older job" || stored.PreferredJobID == nil || stored.CompanyID == nil || *stored.CompanyID != company.ID {
+		t.Fatal("upstream employment selection was lost on the DAV round trip")
+	}
+	if !reflect.DeepEqual(cardDAVJobPairs(updated.Card), [][2]string{{"Renamed company", "Older job"}, {"Renamed company", "Newest job"}}) {
+		t.Fatal("DAV round trip lost a grouped employment")
 	}
 	for _, job := range after {
 		if err := jobs.Delete(contact.ID, vaultID, job.ID); err != nil {
@@ -141,4 +149,31 @@ func TestCardDAVJobsLifecycle(t *testing.T) {
 		}
 	}
 	check("", "")
+}
+
+func cardDAVJobPairs(card vcard.Card) [][2]string {
+	var pairs [][2]string
+	used := map[*vcard.Field]bool{}
+	for _, org := range card[vcard.FieldOrganization] {
+		name := ""
+		components := org.Organization()
+		if len(components) > 0 {
+			name = components[0]
+		}
+		title := ""
+		for _, field := range card[vcard.FieldTitle] {
+			if field.Group == org.Group {
+				title = field.Value
+				used[field] = true
+				break
+			}
+		}
+		pairs = append(pairs, [2]string{name, title})
+	}
+	for _, field := range card[vcard.FieldTitle] {
+		if !used[field] {
+			pairs = append(pairs, [2]string{"", field.Value})
+		}
+	}
+	return pairs
 }

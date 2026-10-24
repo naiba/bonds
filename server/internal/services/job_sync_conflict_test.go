@@ -129,7 +129,11 @@ func TestJobChangesRejectDelayedSubscriptionPull(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					assertVCardJob(t, card, wantOrg, wantTitle)
+					if entry == "add_job" || entry == "add_employee" {
+						assertVCardJobs(t, card, [2]string{"Current company", "Previous position"}, [2]string{wantOrg, wantTitle})
+					} else {
+						assertVCardJob(t, card, wantOrg, wantTitle)
+					}
 					var count int64
 					if err := f.push.db.Model(&models.DavSyncLog{}).Where("address_book_subscription_id = ? AND contact_id = ? AND action = ?", f.subscriptionID, id, "conflict_local_wins").Count(&count).Error; err != nil || count != 1 {
 						t.Fatalf("conflict log count=%d err=%v", count, err)

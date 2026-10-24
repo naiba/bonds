@@ -193,6 +193,10 @@ function GeneralTab({
           initialValues={{
             name: vaultSettings.name,
             description: vaultSettings.description,
+            carddav_filter: vaultSettings.carddav_filter ?? {
+              match: "all",
+              fields: [],
+            },
           }}
           onFinish={(values) => updateSettingsMutation.mutate(values)}
         >
@@ -209,6 +213,49 @@ function GeneralTab({
           >
             <Input.TextArea rows={3} />
           </Form.Item>
+          <Title level={5}>{t("vault_settings.carddav.title")}</Title>
+          <Text type="secondary" style={{ display: "block", marginBottom: 16 }}>
+            {t("vault_settings.carddav.description")}
+          </Text>
+          <Form.Item
+            name={["carddav_filter", "match"]}
+            label={t("vault_settings.carddav.match")}
+          >
+            <Select
+              options={[
+                { value: "all", label: t("vault_settings.carddav.all") },
+                { value: "any", label: t("vault_settings.carddav.any") },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item
+            name={["carddav_filter", "fields"]}
+            label={t("vault_settings.carddav.fields")}
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              options={[
+                "phone",
+                "email",
+                "first_name",
+                "last_name",
+                "nickname",
+                "organization",
+                "job_title",
+                "address",
+              ].map((field) => ({
+                value: field,
+                label: t(`vault_settings.carddav.field.${field}`),
+              }))}
+            />
+          </Form.Item>
+          <Alert
+            type="info"
+            showIcon
+            title={t("vault_settings.carddav.sync_effect")}
+            style={{ marginBottom: 16 }}
+          />
           <Form.Item>
             <Button
               type="primary"

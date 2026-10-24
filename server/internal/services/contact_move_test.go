@@ -290,6 +290,14 @@ func TestMoveManyUpdatesOwnedRowsAndCleansSourceScopedPivots(t *testing.T) {
 		t.Fatalf("set company id failed: %v", err)
 	}
 
+	var selectedJob models.ContactCompany
+	if err := svc.db.Where("contact_id = ?", contactID).First(&selectedJob).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.db.Model(&models.Contact{}).Where("id = ?", contactID).Update("preferred_job_id", selectedJob.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+
 	if _, err := svc.MoveMany([]string{contactID, second.ID, contactID}, vault1ID, vault2ID, userID); err != nil {
 		t.Fatalf("MoveMany failed: %v", err)
 	}
@@ -302,6 +310,9 @@ func TestMoveManyUpdatesOwnedRowsAndCleansSourceScopedPivots(t *testing.T) {
 	assertMoveCount(t, svc, &models.ContactGroup{}, "contact_id = ?", 0, contactID)
 	assertMoveCount(t, svc, &models.ContactCompany{}, "contact_id = ?", 0, contactID)
 	moved := getMoveTestContact(t, svc, contactID)
+	if moved.PreferredJobID != nil {
+		t.Fatal("cross-vault move retained source job identity")
+	}
 	if moved.CompanyID != nil {
 		t.Fatalf("expected source company_id cleared, got %v", *moved.CompanyID)
 	}
