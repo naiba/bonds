@@ -56,6 +56,18 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 	return result
 }
 
+// hasTitleOnlyJobs distinguishes Jobs with a non-visible employer name from
+// independent profile titles. Both export TITLE without ORG, but only the Job
+// has a persisted employment identity that reconciliation must preserve.
+func hasTitleOnlyJobs(contact *models.Contact) bool {
+	for _, job := range ContactVCardEmployments(contact) {
+		if job.JobID != 0 && job.Company == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // hasStandaloneEmployment distinguishes an independent title from a normal
 // Job's compatibility mirror. No synthetic company or duplicate job is needed.
 func hasStandaloneEmployment(contact *models.Contact) bool {
