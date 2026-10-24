@@ -115,27 +115,27 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 	return &resp, nil
 }
 
-// companyContactIDs includes both job history and legacy-only contacts. Selecting
-// from contacts deduplicates employees with multiple jobs at the same company.
-func companyContactIDs(db *gorm.DB, companyID uint, vaultID string, lockContacts bool) ([]string, error) {
+// lockCompanyContacts locks the owners of every physical company reference,
+// including historical cross-vault links and tombstones. Cleanup by company ID
+// touches all of them; filtering locks by vault would invert contact -> job
+// ordering against a concurrent legacy/job deletion. Notification recipients
+// remain restricted to live contacts in the company's vault.
+func lockCompanyContacts(db *gorm.DB, companyID uint, vaultID string) ([]string, error) {
 	var contacts []struct {
 		ID        string
+		VaultID   string
 		DeletedAt gorm.DeletedAt
 	}
 	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
-	query := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).
-		Where("company_id = ? OR id IN (?)", companyID, jobs).Order("id ASC")
-	if lockContacts {
-		// Tombstones still enforce their company FK. Lock them for cleanup,
-		// but do not send notifications for contacts already deleted.
-		query = query.Unscoped().Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
-	}
-	if err := query.Select("id", "deleted_at").Find(&contacts).Error; err != nil {
+	if err := db.Unscoped().Model(&models.Contact{}).
+		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		Where("company_id = ? OR id IN (?)", companyID, jobs).
+		Order("id ASC").Select("id", "vault_id", "deleted_at").Find(&contacts).Error; err != nil {
 		return nil, err
 	}
 	ids := make([]string, 0, len(contacts))
 	for _, contact := range contacts {
-		if !contact.DeletedAt.Valid {
+		if contact.VaultID == vaultID && !contact.DeletedAt.Valid {
 			ids = append(ids, contact.ID)
 		}
 	}
@@ -166,7 +166,7 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 		// Only the name appears in vCards; changing company type needs no push.
 		if company.Name != req.Name {
 			var err error
-			contactIDs, err = companyContactIDs(tx, id, vaultID, true)
+			contactIDs, err = lockCompanyContacts(tx, id, vaultID)
 			if err != nil {
 				return err
 			}
@@ -203,7 +203,7 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 		// writers and contact cleanup. Collecting recipients without the company
 		// lock can miss an employee that pushes before this deletion commits.
 		var err error
-		contactIDs, err = companyContactIDs(tx, id, vaultID, true)
+		contactIDs, err = lockCompanyContacts(tx, id, vaultID)
 		if err != nil {
 			return err
 		}
