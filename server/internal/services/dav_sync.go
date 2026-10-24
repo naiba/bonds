@@ -434,7 +434,7 @@ func (s *DavSyncService) upsertFromObject(
 		if stateErr != nil && !errors.Is(stateErr, gorm.ErrRecordNotFound) {
 			return stateErr
 		}
-		if stateErr == nil && state.DistantEtag != "" && state.DistantEtag == obj.ETag {
+		if stateErr == nil && obj.ETag != "" && (state.DistantEtag == obj.ETag || state.RejectedEtag == obj.ETag) {
 			var mappedContact models.Contact
 			findErr := tx.Select("id").Where("id = ? AND vault_id = ?", state.ContactID, vaultID).First(&mappedContact).Error
 			if findErr == nil {
@@ -473,22 +473,27 @@ func (s *DavSyncService) upsertFromObject(
 		}
 
 		if action == "conflict_local_wins" {
-			// A push may have committed a newer mapping while we waited for the
-			// contact lock. A rejected pull must not restore the earlier snapshot.
-			if stateErr == nil {
-				return nil
-			}
+			// The subscription checkpoint advances after a successful pull. Remember
+			// the rejected version separately, or the next pull can restore deleted
+			// fields. Only this column may change: a concurrent push owns its URI/ETag.
 			var contact models.Contact
 			if err := tx.Select("distant_etag").First(&contact, "id = ?", contactID).Error; err != nil {
 				return err
 			}
-			// Preserve legacy mapping migration without overwriting a concurrent
-			// push that inserted the subscription state after our initial lookup.
-			mapping := models.ContactSubscriptionState{ContactID: contactID, AddressBookSubscriptionID: subID, DistantURI: obj.Path, DistantEtag: ptrToStr(contact.DistantEtag)}
-			return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&mapping).Error
+			mapping := models.ContactSubscriptionState{ContactID: contactID, AddressBookSubscriptionID: subID, DistantURI: obj.Path, DistantEtag: ptrToStr(contact.DistantEtag), RejectedEtag: obj.ETag}
+			return tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "contact_id"}, {Name: "address_book_subscription_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"rejected_etag"}),
+			}).Create(&mapping).Error
 		}
 
-		return upsertContactSubscriptionState(tx, contactID, subID, obj.Path, obj.ETag)
+		if err := upsertContactSubscriptionState(tx, contactID, subID, obj.Path, obj.ETag); err != nil {
+			return err
+		}
+		// A newly accepted remote version ends the previous conflict lifecycle.
+		return tx.Model(&models.ContactSubscriptionState{}).
+			Where("contact_id = ? AND address_book_subscription_id = ?", contactID, subID).
+			UpdateColumn("rejected_etag", "").Error
 	})
 	if err != nil {
 		errMsg := fmt.Sprintf("upsert failed: %v", err)

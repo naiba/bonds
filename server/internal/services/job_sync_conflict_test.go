@@ -50,11 +50,16 @@ func TestJobChangesRejectDelayedSubscriptionPull(t *testing.T) {
 				var jobsBefore []models.ContactCompany
 				wantOrg, wantTitle := "", ""
 				syncer := NewDavSyncService(f.push.db, f.push.clientService, f.push.vcardService)
+				mutationApplied := false
 				syncer.SetClientFactory(&mockCardDAVClientFactory{client: &mockCardDAVClient{
 					syncCollFn: func(context.Context, string, *carddav.SyncQuery) (*carddav.SyncResponse, error) {
 						return &carddav.SyncResponse{}, nil
 					},
 					queryFn: func(context.Context, string, *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
+						if mutationApplied {
+							return []carddav.AddressObject{{Path: stateBefore.DistantURI, ETag: "delayed-remote-revision", Card: stale}}, nil
+						}
+						mutationApplied = true
 						switch entry {
 						case "delete_job":
 							err = f.jobs.Delete(id, f.vaultID, job.ID)
@@ -96,37 +101,41 @@ func TestJobChangesRejectDelayedSubscriptionPull(t *testing.T) {
 						return []carddav.AddressObject{{Path: stateBefore.DistantURI, ETag: "delayed-remote-revision", Card: stale}}, nil
 					},
 				}})
-				result, err := syncer.SyncSubscription(context.Background(), f.subscriptionID, f.vaultID)
-				if err != nil || result == nil || result.Errors != 0 || result.Created != 0 || result.Updated != 0 || result.Skipped != 1 {
-					t.Fatalf("stale pull must keep local change: %+v %v", result, err)
+				for round := 0; round < 3; round++ {
+					result, err := syncer.SyncSubscription(context.Background(), f.subscriptionID, f.vaultID)
+					if err != nil || result == nil || result.Errors != 0 || result.Created != 0 || result.Updated != 0 || result.Skipped != 1 {
+						t.Fatalf("stale pull must keep local change: %+v %v", result, err)
+					}
+					var stored models.Contact
+					var jobsAfter []models.ContactCompany
+					if err := f.push.db.First(&stored, "id = ?", id).Error; err != nil {
+						t.Fatal(err)
+					}
+					if err := f.push.db.Where("contact_id = ?", id).Order("id").Find(&jobsAfter).Error; err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(contactBefore, stored) || !reflect.DeepEqual(jobsBefore, jobsAfter) {
+						t.Fatal("conflicting pull modified the local contact or jobs")
+					}
+					if err := f.push.db.Where("contact_id = ? AND address_book_subscription_id = ?", id, f.subscriptionID).First(&stateAfter).Error; err != nil {
+						t.Fatal(err)
+					}
+					expectedState := stateBefore
+					expectedState.RejectedEtag = "delayed-remote-revision"
+					if !reflect.DeepEqual(expectedState, stateAfter) {
+						t.Fatalf("conflicting pull replaced successful push state: before=%+v after=%+v", stateBefore, stateAfter)
+					}
+					card, err := f.push.vcardService.ExportContactToVCard(id, f.vaultID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					assertVCardJob(t, card, wantOrg, wantTitle)
+					var count int64
+					if err := f.push.db.Model(&models.DavSyncLog{}).Where("address_book_subscription_id = ? AND contact_id = ? AND action = ?", f.subscriptionID, id, "conflict_local_wins").Count(&count).Error; err != nil || count != 1 {
+						t.Fatalf("conflict log count=%d err=%v", count, err)
+					}
+					f.expectNoPush(t)
 				}
-				var stored models.Contact
-				var jobsAfter []models.ContactCompany
-				if err := f.push.db.First(&stored, "id = ?", id).Error; err != nil {
-					t.Fatal(err)
-				}
-				if err := f.push.db.Where("contact_id = ?", id).Order("id").Find(&jobsAfter).Error; err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(contactBefore, stored) || !reflect.DeepEqual(jobsBefore, jobsAfter) {
-					t.Fatal("conflicting pull modified the local contact or jobs")
-				}
-				if err := f.push.db.Where("contact_id = ? AND address_book_subscription_id = ?", id, f.subscriptionID).First(&stateAfter).Error; err != nil {
-					t.Fatal(err)
-				}
-				if !reflect.DeepEqual(stateBefore, stateAfter) {
-					t.Fatalf("conflicting pull replaced successful push state: before=%+v after=%+v", stateBefore, stateAfter)
-				}
-				card, err := f.push.vcardService.ExportContactToVCard(id, f.vaultID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				assertVCardJob(t, card, wantOrg, wantTitle)
-				var count int64
-				if err := f.push.db.Model(&models.DavSyncLog{}).Where("address_book_subscription_id = ? AND contact_id = ? AND action = ?", f.subscriptionID, id, "conflict_local_wins").Count(&count).Error; err != nil || count != 1 {
-					t.Fatalf("conflict log count=%d err=%v", count, err)
-				}
-				f.expectNoPush(t)
 			})
 		}
 	}
