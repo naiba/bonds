@@ -183,24 +183,24 @@ func reconcileVCardEmploymentRecords(tx *gorm.DB, card vcard.Card, contactID, va
 	// A grouped TITLE can be an unchanged secondary record (#297). Group
 	// labels are not row IDs; if an omitted duplicate could be either the
 	// independent title or a Job, deletion/edit identity is unknowable.
-	if titleRecordsOnly {
-		for _, entry := range incoming {
-			candidates, supplied := 0, 0
-			standalone := false
-			for _, job := range projected {
-				if job.Company == entry.name && job.Title == entry.title {
-					candidates++
-					standalone = standalone || job.JobID == 0
-				}
+	// An unrelated paired ORG does not identify an unpaired TITLE. Check this
+	// before matching even in mixed cards, so omission cannot pick a duplicate.
+	for _, entry := range incoming {
+		candidates, supplied := 0, 0
+		standalone := false
+		for _, job := range projected {
+			if job.Company == entry.name && job.Title == entry.title {
+				candidates++
+				standalone = standalone || job.JobID == 0
 			}
-			for _, other := range incoming {
-				if other.name == entry.name && other.title == entry.title {
-					supplied++
-				}
+		}
+		for _, other := range incoming {
+			if other.name == entry.name && other.title == entry.title {
+				supplied++
 			}
-			if standalone && candidates > supplied {
-				return ErrVCardUnsafeReplacement
-			}
+		}
+		if standalone && candidates > supplied {
+			return ErrVCardUnsafeReplacement
 		}
 	}
 	used := map[uint]bool{}
