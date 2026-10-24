@@ -209,6 +209,11 @@ func (h *ContactJobHandler) LegacyUpdate(c *echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
+		// The company may disappear while the association waits for its lock.
+		// Keep this rejection consistent with the newer job endpoints.
+		if errors.Is(err, services.ErrCompanyNotFound) {
+			return response.NotFound(c, "err.company_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_update_job_info")
 	}
 	return response.OK(c, contact)

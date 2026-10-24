@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -12,11 +11,24 @@ import (
 var ErrContactJobNotFound = errors.New("contact job not found")
 
 type ContactJobService struct {
-	db *gorm.DB
+	db             *gorm.DB
+	davPushService *DavPushService
 }
 
 func NewContactJobService(db *gorm.DB) *ContactJobService {
 	return &ContactJobService{db: db}
+}
+
+func (s *ContactJobService) SetDavPushService(push *DavPushService) {
+	s.davPushService = push
+}
+
+// Job fields live outside Contact, so their successful mutations must explicitly
+// notify DAV subscribers too. Call only after the owning transaction commits.
+func (s *ContactJobService) pushContactChange(contactID, vaultID string) {
+	if s.davPushService != nil {
+		s.davPushService.PushContactChangesAsync([]string{contactID}, vaultID)
+	}
 }
 
 // verifyContactInVault checks that a contact exists and belongs to the given vault.
@@ -84,7 +96,7 @@ func (s *ContactJobService) create(contactID, vaultID string, req dto.CreateCont
 // Update modifies an existing job entry by its ID.
 func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dto.UpdateContactJobRequest) (*dto.ContactJobResponse, error) {
 	var result *dto.ContactJobResponse
-	err := s.withLocalEmploymentChange(contactID, vaultID, func(tx *gorm.DB) error {
+	err := s.withLocalEmploymentChange(contactID, vaultID, &req.CompanyID, func(tx *gorm.DB) error {
 		var err error
 		result, err = NewContactJobService(tx).update(contactID, vaultID, jobID, req)
 		return err
@@ -137,7 +149,7 @@ func (s *ContactJobService) update(contactID, vaultID string, jobID uint, req dt
 
 // Delete removes a specific job entry by its ID.
 func (s *ContactJobService) Delete(contactID, vaultID string, jobID uint) error {
-	return s.withLocalEmploymentChange(contactID, vaultID, func(tx *gorm.DB) error {
+	return s.withLocalEmploymentChange(contactID, vaultID, nil, func(tx *gorm.DB) error {
 		var job models.ContactCompany
 		if err := tx.Where("id = ? AND contact_id = ?", jobID, contactID).First(&job).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -193,7 +205,7 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 	if err := s.verifyCompanyInVault(companyID, vaultID); err != nil {
 		return err
 	}
-	return s.withLocalEmploymentChange(contactID, vaultID, func(tx *gorm.DB) error {
+	return s.withLocalEmploymentChange(contactID, vaultID, nil, func(tx *gorm.DB) error {
 		result := tx.Where("company_id = ? AND contact_id = ?", companyID, contactID).Delete(&models.ContactCompany{})
 		if result.Error != nil {
 			return result.Error
@@ -248,7 +260,7 @@ func (s *ContactJobService) LegacyUpdate(contactID, vaultID, userID string, req 
 		return nil, err
 	}
 	var result *dto.ContactResponse
-	err := s.withLocalEmploymentChange(contactID, vaultID, func(tx *gorm.DB) error {
+	err := s.withLocalEmploymentChange(contactID, vaultID, req.CompanyID, func(tx *gorm.DB) error {
 		var err error
 		result, err = NewContactJobService(tx).legacyUpdate(contactID, vaultID, userID, req)
 		return err
@@ -403,8 +415,18 @@ func (s *ContactJobService) isSelectedJob(contactID, vaultID string, jobID uint)
 // Only local Jobs entry points advance the subscription conflict marker. Shared
 // vCard reconciliation also runs for remote pulls and must never mark those as
 // local edits. Commit the job and marker together under the parent contact lock.
-func (s *ContactJobService) withLocalEmploymentChange(contactID, vaultID string, change func(*gorm.DB) error) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+func (s *ContactJobService) withLocalEmploymentChange(contactID, vaultID string, companyID *uint, change func(*gorm.DB) error) error {
+	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return err
+	}
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		// Local associations join company -> contact ordering before upstream
+		// selection/legacy materialization takes the parent lock.
+		if companyID != nil {
+			if err := lockCompanyForJobWrite(tx, *companyID, vaultID); err != nil {
+				return err
+			}
+		}
 		if err := lockContactsBelongToVault(tx, []string{contactID}, vaultID); err != nil {
 			return err
 		}
@@ -431,11 +453,15 @@ func (s *ContactJobService) withLocalEmploymentChange(contactID, vaultID string,
 		}
 		return markLocalEmploymentChanged(tx, contactID, vaultID)
 	})
+	if err == nil {
+		s.pushContactChange(contactID, vaultID)
+	}
+	return err
 }
 
 func (s *ContactJobService) Create(contactID, vaultID string, req dto.CreateContactJobRequest) (*dto.ContactJobResponse, error) {
 	var result *dto.ContactJobResponse
-	err := s.withLocalEmploymentChange(contactID, vaultID, func(tx *gorm.DB) error {
+	err := s.withLocalEmploymentChange(contactID, vaultID, &req.CompanyID, func(tx *gorm.DB) error {
 		var err error
 		result, err = NewContactJobService(tx).create(contactID, vaultID, req)
 		return err
@@ -445,7 +471,7 @@ func (s *ContactJobService) Create(contactID, vaultID string, req dto.CreateCont
 
 func (s *ContactJobService) AddEmployee(companyID uint, vaultID string, req dto.AddEmployeeRequest) (*dto.ContactJobResponse, error) {
 	var result *dto.ContactJobResponse
-	err := s.withLocalEmploymentChange(req.ContactID, vaultID, func(tx *gorm.DB) error {
+	err := s.withLocalEmploymentChange(req.ContactID, vaultID, &companyID, func(tx *gorm.DB) error {
 		var err error
 		result, err = NewContactJobService(tx).addEmployee(companyID, vaultID, req)
 		return err
@@ -455,7 +481,7 @@ func (s *ContactJobService) AddEmployee(companyID uint, vaultID string, req dto.
 
 func (s *ContactJobService) LegacyDelete(contactID, vaultID, userID string) (*dto.ContactResponse, error) {
 	var result *dto.ContactResponse
-	err := s.withLocalEmploymentChange(contactID, vaultID, func(tx *gorm.DB) error {
+	err := s.withLocalEmploymentChange(contactID, vaultID, nil, func(tx *gorm.DB) error {
 		var err error
 		result, err = NewContactJobService(tx).legacyDelete(contactID, vaultID, userID)
 		return err
@@ -466,7 +492,7 @@ func (s *ContactJobService) LegacyDelete(contactID, vaultID, userID string) (*dt
 // Company-side deletion and contact-side edits share the same local-wins marker.
 // Call only for local mutations, inside their parent-locked transaction.
 func markLocalEmploymentChanged(tx *gorm.DB, contactID, vaultID string) error {
-	now := time.Now()
+	now := tx.NowFunc()
 	contact := models.Contact{ID: contactID, LastUpdatedAt: &now}
 	return updateContactProfile(tx, &contact, vaultID, "last_updated_at")
 }

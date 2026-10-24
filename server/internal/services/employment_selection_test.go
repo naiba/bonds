@@ -66,50 +66,80 @@ func TestEmploymentCompanyDeletionConcurrentNewEmployee(t *testing.T) {
 	if err := svc.db.Create(&company).Error; err != nil {
 		t.Fatal(err)
 	}
-	// Restore the production CompanyID foreign key, intentionally omitted by SetupTestDB.
-	if err := svc.db.Exec("ALTER TABLE contacts ADD CONSTRAINT employment_company_constraint FOREIGN KEY (company_id) REFERENCES companies(id)").Error; err != nil {
+	installCompanyForeignKeys(t, svc.db)
+	var before models.Contact
+	if err := svc.db.First(&before, "id = ?", id).Error; err != nil {
 		t.Fatal(err)
 	}
-	enumerated, resume := make(chan struct{}), make(chan struct{})
-	var paused atomic.Bool
-	const hook = "employment:pause_company_employee_enumeration"
-	if err := svc.db.Callback().Query().After("gorm:after_query").Register(hook, func(tx *gorm.DB) {
-		if _, ok := tx.Statement.Dest.(*[]string); ok && tx.Statement.Table == "contacts" && paused.CompareAndSwap(false, true) {
-			close(enumerated)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	entered, resume := make(chan struct{}), make(chan struct{})
+	var released bool
+	release := func() {
+		if !released {
+			close(resume)
+			released = true
+		}
+	}
+	done, writerDone := make(chan error, 1), make(chan error, 1)
+	deleteFinished, writerFinished, writerStarted := false, false, false
+	const hook = "employment:pause_company_cleanup_with_owner_set_locked"
+	if err := svc.db.Callback().Delete().Before("gorm:delete").Register(hook, func(tx *gorm.DB) {
+		if tx.Statement.Table == "contact_companies" {
+			close(entered)
 			select {
 			case <-resume:
-			case <-time.After(10 * time.Second):
-				tx.AddError(errors.New("test scheduling timeout"))
+			case <-ctx.Done():
+				tx.AddError(ctx.Err())
 			}
 		}
 	}); err != nil {
 		t.Fatal(err)
 	}
-	defer svc.db.Callback().Query().Remove(hook)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	done := make(chan error, 1)
+	defer func() {
+		release()
+		if !deleteFinished {
+			<-done
+		}
+		if writerStarted && !writerFinished {
+			<-writerDone
+		}
+		svc.db.Callback().Delete().Remove(hook)
+	}()
 	go func() { done <- NewCompanyService(svc.db.WithContext(ctx)).Delete(company.ID, vault) }()
 	select {
-	case <-enumerated:
+	case <-entered:
+	case err := <-done:
+		deleteFinished = true
+		t.Fatalf("delete missed boundary: %v", err)
 	case <-ctx.Done():
-		close(resume)
-		err := <-done
-		t.Fatalf("enumeration was not reached: %v", err)
+		t.Fatal(ctx.Err())
 	}
-	_, writeErr := NewContactJobService(svc.db.WithContext(ctx)).LegacyUpdate(id, vault, user, dto.UpdateJobInfoRequest{CompanyID: &company.ID, JobPosition: "Engineer"})
-	close(resume)
+	// Company-first discovery excludes new associations until commit. Observe
+	// the writer's real lock wait instead of depending on a []string SQL shape.
+	writerStarted = true
+	go func() {
+		_, err := NewContactJobService(svc.db.WithContext(ctx)).LegacyUpdate(id, vault, user, dto.UpdateJobInfoRequest{CompanyID: &company.ID, JobPosition: "Engineer"})
+		writerDone <- err
+	}()
+	early, writeErr := waitForCompanyLockOrCompletion(t, svc.db, writerDone)
+	writerFinished = early
+	release()
 	deleteErr := <-done
-	if writeErr != nil {
-		t.Fatalf("concurrent association failed: %v", writeErr)
+	deleteFinished = true
+	if !writerFinished {
+		writeErr = <-writerDone
+		writerFinished = true
 	}
-	t.Logf("association committed; delete result=%v", deleteErr)
-	if deleteErr != nil {
-		t.Fatalf("company deletion missed a committed employee: %v", deleteErr)
+	if early || deleteErr != nil || !errors.Is(writeErr, ErrCompanyNotFound) {
+		t.Fatalf("company/association did not serialize: early=%t delete=%v write=%v", early, deleteErr, writeErr)
 	}
-	var contact models.Contact
-	if err := svc.db.First(&contact, "id = ?", id).Error; err != nil {
+	var after models.Contact
+	if err := svc.db.First(&after, "id = ?", id).Error; err != nil {
 		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("rejected association changed profile or selection")
 	}
 	for _, model := range []any{&models.Company{}, &models.ContactCompany{}} {
 		var count int64
@@ -119,9 +149,6 @@ func TestEmploymentCompanyDeletionConcurrentNewEmployee(t *testing.T) {
 		if count != 0 {
 			t.Fatal("company deletion left records")
 		}
-	}
-	if contact.CompanyID != nil || contact.JobPosition != nil || contact.LastUpdatedAt == nil {
-		t.Fatal("new employee compatibility fields or local marker were not cleaned")
 	}
 }
 

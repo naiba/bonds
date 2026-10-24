@@ -12,6 +12,14 @@ import (
 // another vault after authorization, and reverses the order used by edits.
 func lockContactMergeOwners(tx *gorm.DB, vaultID string, req dto.MergeContactsRequest) ([]models.Contact, map[string]bool, error) {
 	ids := append([]string{req.TargetContactID}, req.SourceContactIDs...)
+	// Merging transfers jobs and may inherit CompanyID. Join the company-first
+	// protocol before taking contact locks: deletion must not retain a stale
+	// owner set while another merge moves those jobs to a new contact.
+	var companyIDs []uint
+	if err := contactMergeCompanyQuery(tx, vaultID, ids).
+		Clauses(clause.Locking{Strength: companyWriteLockStrength}).Pluck("id", &companyIDs).Error; err != nil {
+		return nil, nil, err
+	}
 	var relationships []models.Relationship
 	if err := tx.Where("contact_id IN ? OR related_contact_id IN ?", ids, ids).Order("id ASC").Find(&relationships).Error; err != nil {
 		return nil, nil, err
@@ -51,5 +59,29 @@ func lockContactMergeOwners(tx *gorm.DB, vaultID string, req dto.MergeContactsRe
 	if len(contacts) != len(ids) {
 		return nil, nil, ErrContactNotFound
 	}
+	// Discovery was before the parent locks. Never acquire a newly found
+	// company here: that would invert the ordering with an association writer.
+	var currentCompanyIDs []uint
+	if err := contactMergeCompanyQuery(tx, vaultID, ids).Pluck("id", &currentCompanyIDs).Error; err != nil {
+		return nil, nil, err
+	}
+	lockedCompanies := make(map[uint]bool, len(companyIDs))
+	for _, id := range companyIDs {
+		lockedCompanies[id] = true
+	}
+	for _, id := range currentCompanyIDs {
+		if !lockedCompanies[id] {
+			return nil, nil, ErrContactMergeReviewChanged
+		}
+	}
 	return contacts, locked, nil
+}
+
+// Only company IDs are needed for coordination. Read references from the merge's
+// own live contacts, including legacy fields and every job that may be moved.
+func contactMergeCompanyQuery(tx *gorm.DB, vaultID string, ids []string) *gorm.DB {
+	legacy := tx.Model(&models.Contact{}).Select("company_id").Where("id IN ? AND vault_id = ? AND company_id IS NOT NULL", ids, vaultID)
+	owners := tx.Model(&models.Contact{}).Select("id").Where("id IN ? AND vault_id = ?", ids, vaultID)
+	jobs := tx.Model(&models.ContactCompany{}).Select("company_id").Where("contact_id IN (?)", owners)
+	return tx.Model(&models.Company{}).Where("id IN (?) OR id IN (?)", legacy, jobs).Order("id ASC")
 }

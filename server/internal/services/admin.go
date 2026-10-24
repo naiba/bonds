@@ -300,7 +300,8 @@ func (s *AdminService) DeleteUser(actorID, targetID string) error {
 // deleteEntireAccount removes the user, the account, and all associated data (vaults, contacts, files, etc.).
 func (s *AdminService) deleteEntireAccount(user models.User) error {
 	var fileUUIDs []string
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
+		fileUUIDs = nil // A retry must only publish file removals from its committed attempt.
 		// Collect physical file paths while the rows still exist; the files
 		// themselves are removed only after the transaction commits.
 		if err := tx.Model(&models.File{}).
@@ -311,7 +312,7 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 		}
 
 		var vaults []models.Vault
-		if err := tx.Where("account_id = ?", user.AccountID).Find(&vaults).Error; err != nil {
+		if err := tx.Where("account_id = ?", user.AccountID).Order("id ASC").Find(&vaults).Error; err != nil {
 			return err
 		}
 
@@ -433,103 +434,10 @@ func (s *AdminService) deleteUserDirectData(tx *gorm.DB, userID string) error {
 	return nil
 }
 
+// Use the same company/contact lock order and complete cascade as vault deletion
+// and account cancellation; a separate child list previously missed jobs.
 func (s *AdminService) deleteVaultData(tx *gorm.DB, vaultID string) error {
-	contactTemplateSubquery := tx.Model(&models.VaultContactTemplate{}).Select("id").Where("vault_id = ?", vaultID)
-	contactPageSubquery := tx.Model(&models.VaultContactTemplatePage{}).Select("id").Where("template_id IN (?)", contactTemplateSubquery)
-	if err := tx.Where("template_page_id IN (?)", contactPageSubquery).Delete(&models.VaultContactTemplateModule{}).Error; err != nil {
-		return fmt.Errorf("delete vault contact template modules: %w", err)
-	}
-	if err := tx.Where("template_id IN (?)", contactTemplateSubquery).Delete(&models.VaultContactTemplatePage{}).Error; err != nil {
-		return fmt.Errorf("delete vault contact template pages: %w", err)
-	}
-	if err := tx.Where("vault_id = ?", vaultID).Delete(&models.VaultContactTemplate{}).Error; err != nil {
-		return fmt.Errorf("delete vault contact templates: %w", err)
-	}
-	var contacts []models.Contact
-	if err := tx.Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
-		return err
-	}
-
-	for _, c := range contacts {
-		if err := s.deleteContactData(tx, c.ID); err != nil {
-			return fmt.Errorf("delete contact %s data: %w", c.ID, err)
-		}
-	}
-
-	if err := tx.Where("vault_id = ?", vaultID).Delete(&models.Contact{}).Error; err != nil {
-		return err
-	}
-
-	journalSubquery := tx.Model(&models.Journal{}).Select("id").Where("vault_id = ?", vaultID)
-	postSubquery := tx.Model(&models.Post{}).Select("id").Where("journal_id IN (?)", journalSubquery)
-	if err := tx.Where("vault_id = ?", vaultID).Delete(&models.ContentFileReference{}).Error; err != nil {
-		return fmt.Errorf("delete content file references: %w", err)
-	}
-
-	for _, model := range []interface{}{&models.PostSection{}, &models.PostMetric{}, &models.PostTag{}} {
-		if err := tx.Where("post_id IN (?)", postSubquery).Delete(model).Error; err != nil {
-			return fmt.Errorf("delete post sub-data for %T: %w", model, err)
-		}
-	}
-	if err := tx.Where("journal_id IN (?)", journalSubquery).Delete(&models.Post{}).Error; err != nil {
-		return fmt.Errorf("delete posts: %w", err)
-	}
-	if err := tx.Where("journal_id IN (?)", journalSubquery).Delete(&models.SliceOfLife{}).Error; err != nil {
-		return fmt.Errorf("delete slices of life: %w", err)
-	}
-	if err := tx.Where("journal_id IN (?)", journalSubquery).Delete(&models.JournalMetric{}).Error; err != nil {
-		return fmt.Errorf("delete journal metrics: %w", err)
-	}
-
-	activitySubquery := tx.Model(&models.Activity{}).Select("id").Where("vault_id = ?", vaultID)
-	if err := tx.Where("activity_id IN (?)", activitySubquery).Delete(&models.ActivityParticipant{}).Error; err != nil {
-		return fmt.Errorf("delete activity participants: %w", err)
-	}
-	if err := tx.Where("vault_id = ?", vaultID).Delete(&models.Activity{}).Error; err != nil {
-		return fmt.Errorf("delete activities: %w", err)
-	}
-
-	lifeCategorySubquery := tx.Model(&models.ActivityCategory{}).Select("id").Where("vault_id = ?", vaultID)
-	if err := tx.Where("activity_category_id IN (?)", lifeCategorySubquery).Delete(&models.ActivityType{}).Error; err != nil {
-		return fmt.Errorf("delete activity types: %w", err)
-	}
-
-	abSubquery := tx.Model(&models.AddressBookSubscription{}).Select("id").Where("vault_id = ?", vaultID)
-	if err := tx.Where("address_book_subscription_id IN (?)", abSubquery).Delete(&models.DavSyncLog{}).Error; err != nil {
-		return fmt.Errorf("delete dav sync logs: %w", err)
-	}
-	if err := tx.Where("address_book_subscription_id IN (?)", abSubquery).Delete(&models.ContactSubscriptionState{}).Error; err != nil {
-		return fmt.Errorf("delete contact subscription states: %w", err)
-	}
-
-	vaultTables := []interface{}{
-		&models.MoodTrackingEvent{},
-		&models.UserVault{},
-		&models.ContactVaultUser{},
-		&models.File{},
-		&models.Label{},
-		&models.Tag{},
-		&models.ContactImportantDateType{},
-		&models.MoodTrackingParameter{},
-		&models.ActivityCategory{},
-		&models.VaultQuickFactsTemplate{},
-		&models.Group{},
-		&models.Journal{},
-		&models.Company{},
-		&models.AddressBookSubscription{},
-		&models.Address{},
-		&models.Loan{},
-		&models.ContactTask{},
-		&models.LifeMetric{},
-	}
-
-	for _, model := range vaultTables {
-		if err := tx.Where("vault_id = ?", vaultID).Delete(model).Error; err != nil {
-			return fmt.Errorf("delete vault data for %T: %w", model, err)
-		}
-	}
-
-	return nil
+	return deleteVaultCascade(tx, vaultID)
 }
 
 func (s *AdminService) deleteContactData(tx *gorm.DB, contactID string) error {

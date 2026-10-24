@@ -22,7 +22,7 @@ func ReplaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 	if err := preloadContactVCardRelations(db).First(&current, "id = ? AND vault_id = ?", contactID, vaultID).Error; err != nil {
 		return err
 	}
-	if err := reconcileVCardOrganization(db, card, contactID, vaultID); err != nil {
+	if err := reconcileVCardOrganization(db, card, contactID, vaultID, true); err != nil {
 		return err
 	}
 	// A full replacement can remove a standalone title without deleting a job.

@@ -223,9 +223,16 @@ func (s *DavSyncService) discoverAddressBookPath(ctx context.Context, client Car
 }
 
 func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID string) (*dto.TriggerSyncResponse, error) {
+	startedAt := time.Now()
 	sub, password, err := s.clientService.GetDecryptedPassword(subID, vaultID)
 	if err != nil {
 		return nil, err
+	}
+
+	// A first sync has no checkpoint, but must still preserve local changes
+	// committed while its remote requests are in flight. This is not persisted.
+	if sub.LastSynchronizedAt == nil {
+		sub.LastSynchronizedAt = &startedAt
 	}
 
 	client, err := s.clientFactory.NewClient(sub.URI, sub.Username, password, DavTLSConfig{CustomCAPEM: sub.CustomCAPEM, SkipTLSVerify: sub.SkipTLSVerify})
@@ -427,7 +434,7 @@ func (s *DavSyncService) upsertFromObject(
 		if stateErr != nil && !errors.Is(stateErr, gorm.ErrRecordNotFound) {
 			return stateErr
 		}
-		if stateErr == nil && state.DistantEtag != "" && state.DistantEtag == obj.ETag {
+		if stateErr == nil && obj.ETag != "" && (state.DistantEtag == obj.ETag || state.RejectedEtag == obj.ETag) {
 			var mappedContact models.Contact
 			findErr := tx.Select("id").Where("id = ? AND vault_id = ?", state.ContactID, vaultID).First(&mappedContact).Error
 			if findErr == nil {
@@ -465,20 +472,28 @@ func (s *DavSyncService) upsertFromObject(
 			stateErr = gorm.ErrRecordNotFound
 		}
 
-		stateEtag := obj.ETag
 		if action == "conflict_local_wins" {
-			if stateErr == nil {
-				stateEtag = state.DistantEtag
-			} else {
-				var contact models.Contact
-				if err := tx.Select("distant_etag").First(&contact, "id = ?", contactID).Error; err != nil {
-					return err
-				}
-				stateEtag = ptrToStr(contact.DistantEtag)
+			// The subscription checkpoint advances after a successful pull. Remember
+			// the rejected version separately, or the next pull can restore deleted
+			// fields. Only this column may change: a concurrent push owns its URI/ETag.
+			var contact models.Contact
+			if err := tx.Select("distant_etag").First(&contact, "id = ?", contactID).Error; err != nil {
+				return err
 			}
+			mapping := models.ContactSubscriptionState{ContactID: contactID, AddressBookSubscriptionID: subID, DistantURI: obj.Path, DistantEtag: ptrToStr(contact.DistantEtag), RejectedEtag: obj.ETag}
+			return tx.Clauses(clause.OnConflict{
+				Columns:   []clause.Column{{Name: "contact_id"}, {Name: "address_book_subscription_id"}},
+				DoUpdates: clause.AssignmentColumns([]string{"rejected_etag"}),
+			}).Create(&mapping).Error
 		}
 
-		return upsertContactSubscriptionState(tx, contactID, subID, obj.Path, stateEtag)
+		if err := upsertContactSubscriptionState(tx, contactID, subID, obj.Path, obj.ETag); err != nil {
+			return err
+		}
+		// A newly accepted remote version ends the previous conflict lifecycle.
+		return tx.Model(&models.ContactSubscriptionState{}).
+			Where("contact_id = ? AND address_book_subscription_id = ?", contactID, subID).
+			UpdateColumn("rejected_etag", "").Error
 	})
 	if err != nil {
 		errMsg := fmt.Sprintf("upsert failed: %v", err)

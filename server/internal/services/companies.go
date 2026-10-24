@@ -12,11 +12,16 @@ import (
 var ErrCompanyNotFound = errors.New("company not found")
 
 type CompanyService struct {
-	db *gorm.DB
+	db             *gorm.DB
+	davPushService *DavPushService
 }
 
 func NewCompanyService(db *gorm.DB) *CompanyService {
 	return &CompanyService{db: db}
+}
+
+func (s *CompanyService) SetDavPushService(push *DavPushService) {
+	s.davPushService = push
 }
 
 func (s *CompanyService) List(vaultID, userID string) ([]dto.CompanyResponse, error) {
@@ -103,11 +108,11 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 		Name:    req.Name,
 		Type:    strPtrOrNil(req.Type),
 	}
-	if err := s.db.Transaction(func(tx *gorm.DB) error {
+	if err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		if err := lockCompanyResolution(tx, vaultID); err != nil {
 			return err
 		}
-		return tx.Create(&company).Error
+		return createResolvedCompany(tx, &company)
 	}); err != nil {
 		return nil, err
 	}
@@ -115,58 +120,126 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 	return &resp, nil
 }
 
+// lockCompanyContacts locks the owners of every physical company reference,
+// including historical cross-vault links and tombstones. Cleanup by company ID
+// touches all of them; filtering locks by vault would invert contact -> job
+// ordering against a concurrent legacy/job deletion. Notification recipients
+// remain restricted to live contacts in the company's vault.
+func lockCompanyContacts(db *gorm.DB, companyID uint, vaultID string) ([]string, error) {
+	var contacts []struct {
+		ID        string
+		VaultID   string
+		DeletedAt gorm.DeletedAt
+	}
+	if err := companyContactQuery(db, companyID).
+		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		Select("id", "vault_id", "deleted_at").Find(&contacts).Error; err != nil {
+		return nil, err
+	}
+	if err := tryCompanyResolution(db, vaultID); err != nil {
+		return nil, err
+	}
+	// NO KEY UPDATE permits a resolver's foreign-key KEY SHARE lock. A pull
+	// can commit a new owner after discovery and release its name lock before
+	// our try succeeds (#297). Revalidate under resolution exclusion; never
+	// append contact locks here, which could invert the global ID lock order.
+	// Roll back the entire transaction and rediscover if membership changed.
+	var currentIDs []string
+	if err := companyContactQuery(db, companyID).Pluck("id", &currentIDs).Error; err != nil {
+		return nil, err
+	}
+	if len(currentIDs) != len(contacts) {
+		return nil, errCompanyDiscoveryChanged
+	}
+	for i, id := range currentIDs {
+		if id != contacts[i].ID {
+			return nil, errCompanyDiscoveryChanged
+		}
+	}
+	ids := make([]string, 0, len(contacts))
+	for _, contact := range contacts {
+		if contact.VaultID == vaultID && !contact.DeletedAt.Valid {
+			ids = append(ids, contact.ID)
+		}
+	}
+	return ids, nil
+}
+
+func companyContactQuery(db *gorm.DB, companyID uint) *gorm.DB {
+	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
+	return db.Unscoped().Model(&models.Contact{}).
+		Where("company_id = ? OR id IN (?)", companyID, jobs).Order("id ASC")
+}
+
+func (s *CompanyService) pushContactChanges(contactIDs []string, vaultID string) {
+	if s.davPushService == nil || len(contactIDs) == 0 {
+		return
+	}
+	// Capture IDs before deletion, but export fresh cards only after commit. One
+	// worker per company change avoids spawning a goroutine for every employee.
+	s.davPushService.PushContactChangesAsync(contactIDs, vaultID)
+}
+
 func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
 	var company models.Company
-	err := companyEmploymentTransaction(s.db, vaultID, func(tx *gorm.DB) error {
-		// Rename changes every employee's vCard. Lock the same parents as deletion,
-		// then read the company and commit its name together with local-wins markers.
-		contactIDs, err := lockCompanyEmploymentContacts(tx, id, vaultID)
-		if err != nil {
-			return err
-		}
-		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+	var contactIDs []string
+	err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: companyWriteLockStrength}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
 			}
 			return err
 		}
-		renamed := company.Name != req.Name
+		// Only the name appears in vCards; changing company type needs no push.
+		// Reset recipients on retry in case another writer already renamed it.
+		contactIDs = nil
+		if company.Name != req.Name {
+			var err error
+			contactIDs, err = lockCompanyContacts(tx, id, vaultID)
+			if err != nil {
+				return err
+			}
+		} else if err := tryCompanyResolution(tx, vaultID); err != nil {
+			return err
+		}
 		company.Name = req.Name
 		company.Type = strPtrOrNil(req.Type)
 		if err := tx.Save(&company).Error; err != nil {
 			return err
 		}
-		if renamed {
-			for _, contactID := range contactIDs {
-				if err := markLocalEmploymentChanged(tx, contactID, vaultID); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+		return markContactJobsChanged(tx, contactIDs, vaultID)
 	})
 	if err != nil {
 		return nil, err
 	}
+	s.pushContactChanges(contactIDs, vaultID)
 	resp := toCompanyResponse(&company)
 	return &resp, nil
 }
 
 // Delete removes a company and cleans up related ContactCompany rows and legacy Contact.CompanyID references.
 func (s *CompanyService) Delete(id uint, vaultID string) error {
-	return companyEmploymentTransaction(s.db, vaultID, func(tx *gorm.DB) error {
+	var contactIDs []string
+	// Cleanup must be atomic: otherwise a failed company delete loses jobs and
+	// subscribers can observe a partially deleted organization.
+	err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		var company models.Company
-		if err := tx.Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: companyWriteLockStrength}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
 			}
 			return err
 		}
-		// Company deletion is also a local employment edit. Discover both normal
-		// jobs and legacy-only owners, then use the same parent lock order as Jobs
-		// and merge. Cleanup and the local-wins marker must commit together.
-		contactIDs, err := lockCompanyEmploymentContacts(tx, id, vaultID)
+		// Lock company -> contacts (in ID order) -> jobs, matching association
+		// writers and contact cleanup. The helper also freezes name resolution
+		// and revalidates recipients before any destructive write.
+		var err error
+		contactIDs, err = lockCompanyContacts(tx, id, vaultID)
 		if err != nil {
+			return err
+		}
+		var removedJobIDs []uint
+		if err := tx.Model(&models.ContactCompany{}).Where("company_id = ?", id).Pluck("id", &removedJobIDs).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("company_id = ?", id).Delete(&models.ContactCompany{}).Error; err != nil {
@@ -176,12 +249,29 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 			if err := clearLegacyJobSelection(tx, contactID, vaultID, id); err != nil {
 				return err
 			}
-			if err := markLocalEmploymentChanged(tx, contactID, vaultID); err != nil {
+		}
+		// A removed job cannot remain selected, including historical foreign or
+		// tombstone owners. Clear only references to the jobs removed here.
+		if len(removedJobIDs) > 0 {
+			if err := tx.Unscoped().Model(&models.Contact{}).Where("preferred_job_id IN ?", removedJobIDs).Update("preferred_job_id", nil).Error; err != nil {
 				return err
 			}
 		}
-		return tx.Delete(&company).Error
+		// Soft-deleted merge sources retain their profile but must not keep a
+		// foreign key to the company being removed.
+		if err := tx.Unscoped().Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&company).Error; err != nil {
+			return err
+		}
+		return markContactJobsChanged(tx, contactIDs, vaultID)
 	})
+	if err != nil {
+		return err
+	}
+	s.pushContactChanges(contactIDs, vaultID)
+	return nil
 }
 
 func toCompanyResponse(c *models.Company) dto.CompanyResponse {
@@ -217,86 +307,6 @@ func toCompanyResponseWithEmployees(c *models.Company, formatter *contactNameFor
 	return resp, nil
 }
 
-// Company rename and deletion affect both normal jobs and legacy-only owners.
-// Keep the parent lock order shared with Jobs and contact merge operations.
-func companyEmploymentContactIDs(tx *gorm.DB, companyID uint, vaultID string) ([]string, error) {
-	var ids []string
-	employees := tx.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
-	err := tx.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Where("company_id = ? OR id IN (?)", companyID, employees).Pluck("id", &ids).Error
-	return ids, err
-}
-
-var errCompanyEmployeesChanged = errors.New("company employee set changed while locking")
-
-// Discovery is not a stable employee set. Lock parents first, then the company
-// (the same order as association writers), and recheck while new links are
-// blocked. If new parents appeared, release everything before acquiring them;
-// acquiring more parent locks while holding the company would invert the order.
-func lockCompanyEmploymentContacts(tx *gorm.DB, companyID uint, vaultID string) ([]string, error) {
-	ids, err := companyEmploymentContactIDs(tx, companyID, vaultID)
-	if err != nil {
-		return nil, err
-	}
-	if err := lockContactsBelongToVault(tx, ids, vaultID); err != nil {
-		return nil, err
-	}
-	var company models.Company
-	if err := tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).First(&company, "id = ? AND vault_id = ?", companyID, vaultID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrCompanyNotFound
-		}
-		return nil, err
-	}
-	actual, err := companyEmploymentContactIDs(tx, companyID, vaultID)
-	if err != nil {
-		return nil, err
-	}
-	locked := map[string]bool{}
-	for _, id := range ids {
-		locked[id] = true
-	}
-	for _, id := range actual {
-		if !locked[id] {
-			return nil, errCompanyEmployeesChanged
-		}
-	}
-	// Resolution holds the Vault lock before attaching a new employee. Never
-	// wait for that lock while holding parents/company: the resolver may need
-	// this company row. Roll back, wait without row locks, then rediscover all
-	// employees so a rename also marks employees added by the resolver.
-	if tx.Dialector.Name() == "postgres" {
-		var acquired bool
-		if err := tx.Raw("SELECT pg_try_advisory_xact_lock(hashtextextended(?, 0))", "bonds:vcard-company:"+vaultID).Scan(&acquired).Error; err != nil {
-			return nil, err
-		}
-		if !acquired {
-			return nil, errCompanyResolutionBusy
-		}
-	}
-	return actual, nil
-}
-
-func companyEmploymentTransaction(db *gorm.DB, vaultID string, change func(*gorm.DB) error) error {
-	for {
-		if err := db.Statement.Context.Err(); err != nil {
-			return err
-		}
-		err := db.Transaction(change)
-		if errors.Is(err, errCompanyResolutionBusy) {
-			// The failed attempt is fully rolled back before this blocking wait.
-			if err := db.Transaction(func(tx *gorm.DB) error { return lockCompanyResolution(tx, vaultID) }); err != nil {
-				return err
-			}
-			continue
-		}
-		// Only this read-only discovery race is retried; all other errors and all
-		// mutation failures are returned. The failed attempt has already rolled back.
-		if !errors.Is(err, errCompanyEmployeesChanged) {
-			return err
-		}
-	}
-}
-
 // Call inside the contact transaction, after its parent lock. KEY SHARE permits
 // independent employee writes while excluding employer deletion/key changes.
 func lockCompanyForEmployment(tx *gorm.DB, companyID uint, vaultID string) error {
@@ -310,7 +320,8 @@ func lockCompanyForEmployment(tx *gorm.DB, companyID uint, vaultID string) error
 	return nil
 }
 
-var errCompanyResolutionBusy = errors.New("company candidates are being resolved")
+var errCompanyResolutionBusy = errors.New("company coordination is busy")
+var errCompanyDiscoveryChanged = errors.New("company lock discovery changed")
 
 // Company names are not unique identities. Serialize candidate membership
 // (create/rename/delete) with automatic resolution without adding a constraint.
@@ -320,4 +331,90 @@ func lockCompanyResolution(tx *gorm.DB, vaultID string) error {
 		return nil
 	}
 	return tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "bonds:vcard-company:"+vaultID).Error
+}
+
+// A resolver holds a contact and the vault name lock before taking a compatible
+// company KEY SHARE lock. Never wait for its name lock while holding company or
+// contact locks: release this transaction first, then rediscover the owners.
+func tryCompanyResolution(tx *gorm.DB, vaultID string) error {
+	if tx.Dialector.Name() != "postgres" {
+		return nil
+	}
+	var acquired bool
+	if err := tx.Raw("SELECT pg_try_advisory_xact_lock(hashtextextended(?, 0))", "bonds:vcard-company:"+vaultID).Scan(&acquired).Error; err != nil {
+		return err
+	}
+	if !acquired {
+		return &companyCoordinationBusyError{vaultID: vaultID}
+	}
+	return nil
+}
+
+// Carry the busy vault through account-wide cascades so the whole outer
+// transaction can roll back before waiting, including already visited vaults.
+type companyCoordinationWait uint8
+
+const (
+	companyResolutionWait companyCoordinationWait = iota
+	vaultOwnerWait
+	vaultCompaniesWait
+	vaultContactsWait
+)
+
+type companyCoordinationBusyError struct {
+	vaultID    string
+	waitFor    companyCoordinationWait
+	companyIDs []uint
+}
+
+func (e *companyCoordinationBusyError) Error() string { return errCompanyResolutionBusy.Error() }
+func (e *companyCoordinationBusyError) Unwrap() error { return errCompanyResolutionBusy }
+
+func companyEmploymentTransaction(db *gorm.DB, change func(*gorm.DB) error) error {
+	for {
+		if err := db.Statement.Context.Err(); err != nil {
+			return err
+		}
+		err := db.Transaction(change)
+		if errors.Is(err, errCompanyDiscoveryChanged) {
+			continue
+		}
+		var busy *companyCoordinationBusyError
+		if !errors.As(err, &busy) {
+			return err
+		}
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			// The outer transaction has ended. Acquire only one ordered resource
+			// class here; retaining an earlier vault's locks recreates the cycle.
+			switch busy.waitFor {
+			case vaultOwnerWait:
+				return lockVaultCompanyDeletionOwner(tx, busy.vaultID, false)
+			case vaultCompaniesWait:
+				var ids []uint
+				return vaultCompanyDeletionQuery(tx, busy.vaultID, "").Pluck("id", &ids).Error
+			case vaultContactsWait:
+				var ids []string
+				return vaultCompanyOwnerQuery(tx, busy.vaultID, busy.companyIDs).
+					Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Pluck("id", &ids).Error
+			default:
+				return lockCompanyResolution(tx, busy.vaultID)
+			}
+		}); err != nil {
+			return err
+		}
+	}
+}
+
+// Call under company-resolution exclusion. A creator may have waited until a
+// vault cascade committed; reject its missing owner before inserting, even on
+// databases without foreign-key enforcement (#297).
+func createResolvedCompany(tx *gorm.DB, company *models.Company) error {
+	var vault models.Vault
+	if err := tx.Select("id").First(&vault, "id = ?", company.VaultID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrVaultNotFound
+		}
+		return err
+	}
+	return tx.Create(company).Error
 }

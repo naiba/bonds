@@ -135,7 +135,7 @@ func (s *VaultService) DeleteVault(vaultID string) error {
 		return err
 	}
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		return deleteVaultCascade(tx, vaultID)
 	})
 }
@@ -152,6 +152,9 @@ func (s *VaultService) DeleteVault(vaultID string) error {
 //  5. Delete contacts themselves
 //  6. Delete the vault
 func deleteVaultCascade(tx *gorm.DB, vaultID string) error {
+	if err := lockVaultCompanyOwnersForDeletion(tx, vaultID); err != nil {
+		return fmt.Errorf("lock vault company owners: %w", err)
+	}
 	// Step 1: Collect ALL contact IDs in this vault (including soft-deleted ones,
 	// since child tables still reference them).
 	var contactIDs []string

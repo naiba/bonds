@@ -22,7 +22,9 @@ type VCardEmployment struct {
 func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 	result := make([]VCardEmployment, 0, len(contact.ContactCompanies))
 	for _, job := range contact.ContactCompanies {
-		if job.Company.VaultID != "" && job.Company.VaultID != contact.VaultID {
+		// An orphan or historical foreign association must not turn its title into
+		// a standalone employment in exports or presence filters (#297).
+		if job.Company.ID == 0 || job.Company.VaultID != contact.VaultID {
 			continue
 		}
 		result = append(result, VCardEmployment{Company: strings.TrimSpace(job.Company.Name), Title: strings.TrimSpace(ptrToStr(job.JobPosition)), JobID: job.ID, CompanyID: job.CompanyID})
@@ -52,6 +54,18 @@ func ContactVCardEmployments(contact *models.Contact) []VCardEmployment {
 	})
 
 	return result
+}
+
+// hasTitleOnlyJobs distinguishes Jobs with a non-visible employer name from
+// independent profile titles. Both export TITLE without ORG, but only the Job
+// has a persisted employment identity that reconciliation must preserve.
+func hasTitleOnlyJobs(contact *models.Contact) bool {
+	for _, job := range ContactVCardEmployments(contact) {
+		if job.JobID != 0 && job.Company == "" {
+			return true
+		}
+	}
+	return false
 }
 
 // hasStandaloneEmployment distinguishes an independent title from a normal

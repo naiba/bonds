@@ -71,10 +71,18 @@ func TestDavPushService_PushContactChange_NewContact(t *testing.T) {
 
 	var putCalled bool
 	var putPath string
+	company, err := NewCompanyService(pushSvc.db).Create(vaultID, dto.CreateCompanyRequest{Name: "Push company"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewContactJobService(pushSvc.db).Create(contact.ID, vaultID, dto.CreateContactJobRequest{CompanyID: company.ID, JobPosition: "Engineer"}); err != nil {
+		t.Fatal(err)
+	}
 	mc := &mockCardDAVClient{
 		putAddrObjFn: func(ctx context.Context, path string, card vcard.Card) (*carddav.AddressObject, error) {
 			putCalled = true
 			putPath = path
+			assertVCardJob(t, card, "Push company", "Engineer")
 			return &carddav.AddressObject{
 				Path: path,
 				ETag: "new-etag-1",

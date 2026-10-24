@@ -181,7 +181,7 @@ func (s *VCardService) ImportVCard(vaultID, userID string, data io.Reader) (*dto
 // ImportContactVCardFields parses the shared ORG, TEL, EMAIL, ADR and BDAY projection.
 // Callers must use their contact transaction so invalid fields cannot partially commit.
 func ImportContactVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, accountID string) error {
-	if err := reconcileVCardOrganization(tx, card, contactID, vaultID); err != nil {
+	if err := reconcileVCardOrganization(tx, card, contactID, vaultID, false); err != nil {
 		return err
 	}
 	// TEL → ContactInformation
