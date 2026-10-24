@@ -131,12 +131,30 @@ func lockCompanyContacts(db *gorm.DB, companyID uint, vaultID string) ([]string,
 		VaultID   string
 		DeletedAt gorm.DeletedAt
 	}
-	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
-	if err := db.Unscoped().Model(&models.Contact{}).
+	if err := companyContactQuery(db, companyID).
 		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
-		Where("company_id = ? OR id IN (?)", companyID, jobs).
-		Order("id ASC").Select("id", "vault_id", "deleted_at").Find(&contacts).Error; err != nil {
+		Select("id", "vault_id", "deleted_at").Find(&contacts).Error; err != nil {
 		return nil, err
+	}
+	if err := tryCompanyResolution(db, vaultID); err != nil {
+		return nil, err
+	}
+	// NO KEY UPDATE permits a resolver's foreign-key KEY SHARE lock. A pull
+	// can commit a new owner after discovery and release its name lock before
+	// our try succeeds (#297). Revalidate under resolution exclusion; never
+	// append contact locks here, which could invert the global ID lock order.
+	// Roll back the entire transaction and rediscover if membership changed.
+	var currentIDs []string
+	if err := companyContactQuery(db, companyID).Pluck("id", &currentIDs).Error; err != nil {
+		return nil, err
+	}
+	if len(currentIDs) != len(contacts) {
+		return nil, errCompanyContactsChanged
+	}
+	for i, id := range currentIDs {
+		if id != contacts[i].ID {
+			return nil, errCompanyContactsChanged
+		}
 	}
 	ids := make([]string, 0, len(contacts))
 	for _, contact := range contacts {
@@ -145,6 +163,12 @@ func lockCompanyContacts(db *gorm.DB, companyID uint, vaultID string) ([]string,
 		}
 	}
 	return ids, nil
+}
+
+func companyContactQuery(db *gorm.DB, companyID uint) *gorm.DB {
+	jobs := db.Model(&models.ContactCompany{}).Select("contact_id").Where("company_id = ?", companyID)
+	return db.Unscoped().Model(&models.Contact{}).
+		Where("company_id = ? OR id IN (?)", companyID, jobs).Order("id ASC")
 }
 
 func (s *CompanyService) pushContactChanges(contactIDs []string, vaultID string) {
@@ -166,17 +190,16 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 			}
 			return err
 		}
-		// Hold the company lock through recipient discovery and commit so a new
-		// association cannot push the old name after being missed by this batch.
 		// Only the name appears in vCards; changing company type needs no push.
+		// Reset recipients on retry in case another writer already renamed it.
+		contactIDs = nil
 		if company.Name != req.Name {
 			var err error
 			contactIDs, err = lockCompanyContacts(tx, id, vaultID)
 			if err != nil {
 				return err
 			}
-		}
-		if err := tryCompanyResolution(tx, vaultID); err != nil {
+		} else if err := tryCompanyResolution(tx, vaultID); err != nil {
 			return err
 		}
 		company.Name = req.Name
@@ -208,14 +231,11 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 			return err
 		}
 		// Lock company -> contacts (in ID order) -> jobs, matching association
-		// writers and contact cleanup. Collecting recipients without the company
-		// lock can miss an employee that pushes before this deletion commits.
+		// writers and contact cleanup. The helper also freezes name resolution
+		// and revalidates recipients before any destructive write.
 		var err error
 		contactIDs, err = lockCompanyContacts(tx, id, vaultID)
 		if err != nil {
-			return err
-		}
-		if err := tryCompanyResolution(tx, vaultID); err != nil {
 			return err
 		}
 		var removedJobIDs []uint
@@ -301,6 +321,7 @@ func lockCompanyForEmployment(tx *gorm.DB, companyID uint, vaultID string) error
 }
 
 var errCompanyResolutionBusy = errors.New("company candidates are being resolved")
+var errCompanyContactsChanged = errors.New("company references changed during discovery")
 
 // Company names are not unique identities. Serialize candidate membership
 // (create/rename/delete) with automatic resolution without adding a constraint.
@@ -335,6 +356,9 @@ func companyEmploymentTransaction(db *gorm.DB, vaultID string, change func(*gorm
 			return err
 		}
 		err := db.Transaction(change)
+		if errors.Is(err, errCompanyContactsChanged) {
+			continue
+		}
 		if !errors.Is(err, errCompanyResolutionBusy) {
 			return err
 		}
