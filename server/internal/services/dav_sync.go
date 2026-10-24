@@ -223,9 +223,16 @@ func (s *DavSyncService) discoverAddressBookPath(ctx context.Context, client Car
 }
 
 func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID string) (*dto.TriggerSyncResponse, error) {
+	startedAt := time.Now()
 	sub, password, err := s.clientService.GetDecryptedPassword(subID, vaultID)
 	if err != nil {
 		return nil, err
+	}
+
+	// A first sync has no checkpoint, but must still preserve local changes
+	// committed while its remote requests are in flight. This is not persisted.
+	if sub.LastSynchronizedAt == nil {
+		sub.LastSynchronizedAt = &startedAt
 	}
 
 	client, err := s.clientFactory.NewClient(sub.URI, sub.Username, password, DavTLSConfig{CustomCAPEM: sub.CustomCAPEM, SkipTLSVerify: sub.SkipTLSVerify})
@@ -465,20 +472,23 @@ func (s *DavSyncService) upsertFromObject(
 			stateErr = gorm.ErrRecordNotFound
 		}
 
-		stateEtag := obj.ETag
 		if action == "conflict_local_wins" {
+			// A push may have committed a newer mapping while we waited for the
+			// contact lock. A rejected pull must not restore the earlier snapshot.
 			if stateErr == nil {
-				stateEtag = state.DistantEtag
-			} else {
-				var contact models.Contact
-				if err := tx.Select("distant_etag").First(&contact, "id = ?", contactID).Error; err != nil {
-					return err
-				}
-				stateEtag = ptrToStr(contact.DistantEtag)
+				return nil
 			}
+			var contact models.Contact
+			if err := tx.Select("distant_etag").First(&contact, "id = ?", contactID).Error; err != nil {
+				return err
+			}
+			// Preserve legacy mapping migration without overwriting a concurrent
+			// push that inserted the subscription state after our initial lookup.
+			mapping := models.ContactSubscriptionState{ContactID: contactID, AddressBookSubscriptionID: subID, DistantURI: obj.Path, DistantEtag: ptrToStr(contact.DistantEtag)}
+			return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&mapping).Error
 		}
 
-		return upsertContactSubscriptionState(tx, contactID, subID, obj.Path, stateEtag)
+		return upsertContactSubscriptionState(tx, contactID, subID, obj.Path, obj.ETag)
 	})
 	if err != nil {
 		errMsg := fmt.Sprintf("upsert failed: %v", err)

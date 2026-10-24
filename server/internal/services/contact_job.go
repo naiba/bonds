@@ -127,6 +127,9 @@ func (s *ContactJobService) Update(contactID, vaultID string, jobID uint, req dt
 		if err := updateContactRecord(tx, &job, contactID, vaultID, ErrContactJobNotFound, "company_id", "job_position"); err != nil {
 			return err
 		}
+		if err := markContactJobsChanged(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		// Match creation: response reads belong to the write transaction, so
 		// later deletion cannot turn a successful update into a loading error.
 		return tx.Preload("Company").First(&job, job.ID).Error
@@ -154,7 +157,7 @@ func (s *ContactJobService) Delete(contactID, vaultID string, jobID uint) error 
 		if result.RowsAffected == 0 {
 			return ErrContactJobNotFound
 		}
-		return nil
+		return markContactJobsChanged(tx, []string{contactID}, vaultID)
 	}); err != nil {
 		return err
 	}
@@ -210,7 +213,7 @@ func (s *ContactJobService) RemoveEmployee(companyID uint, vaultID, contactID st
 		if result.RowsAffected == 0 {
 			return ErrContactJobNotFound
 		}
-		return nil
+		return markContactJobsChanged(tx, []string{contactID}, vaultID)
 	}); err != nil {
 		return err
 	}
@@ -287,7 +290,9 @@ func (s *ContactJobService) legacyUpdate(contactID, vaultID, userID string, req 
 	// Also update legacy fields on Contact for backward compatibility
 	contact.CompanyID = req.CompanyID
 	contact.JobPosition = strPtrOrNil(req.JobPosition)
-	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position"); err != nil {
+	now := s.db.NowFunc()
+	contact.LastUpdatedAt = &now
+	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position", "last_updated_at"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {
@@ -341,7 +346,9 @@ func (s *ContactJobService) legacyDelete(contactID, vaultID, userID string) (*dt
 	// Also clear legacy fields on Contact
 	contact.CompanyID = nil
 	contact.JobPosition = nil
-	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position"); err != nil {
+	now := s.db.NowFunc()
+	contact.LastUpdatedAt = &now
+	if err := updateContactProfile(s.db, &contact, vaultID, "company_id", "job_position", "last_updated_at"); err != nil {
 		return nil, err
 	}
 	if err := reloadContactWithSameVaultFirstMetThrough(s.db, &contact, vaultID); err != nil {

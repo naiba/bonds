@@ -164,16 +164,19 @@ func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRe
 		// Hold the company lock through recipient discovery and commit so a new
 		// association cannot push the old name after being missed by this batch.
 		// Only the name appears in vCards; changing company type needs no push.
-		if s.davPushService != nil && company.Name != req.Name {
+		if company.Name != req.Name {
 			var err error
-			contactIDs, err = companyContactIDs(tx, id, vaultID, false)
+			contactIDs, err = companyContactIDs(tx, id, vaultID, true)
 			if err != nil {
 				return err
 			}
 		}
 		company.Name = req.Name
 		company.Type = strPtrOrNil(req.Type)
-		return tx.Save(&company).Error
+		if err := tx.Save(&company).Error; err != nil {
+			return err
+		}
+		return markContactJobsChanged(tx, contactIDs, vaultID)
 	})
 	if err != nil {
 		return nil, err
@@ -212,7 +215,10 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 		if err := tx.Unscoped().Model(&models.Contact{}).Where("company_id = ?", id).Update("company_id", nil).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&company).Error
+		if err := tx.Delete(&company).Error; err != nil {
+			return err
+		}
+		return markContactJobsChanged(tx, contactIDs, vaultID)
 	})
 	if err != nil {
 		return err

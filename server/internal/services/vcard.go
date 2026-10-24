@@ -13,6 +13,7 @@ import (
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var ErrVCardInvalidData = errors.New("invalid vcard data")
@@ -628,12 +629,17 @@ func extractFullNameFromCard(card vcard.Card) vcardNameComponents {
 func (s *VCardService) UpsertContactFromVCard(tx *gorm.DB, card vcard.Card, vaultID, userID, accountID, existingContactID, distantURI, distantEtag string, lastSyncAt *time.Time) (contactID string, action string, err error) {
 	var existing models.Contact
 	var findErr error
+	// Read the conflict marker under the same contact lock as local job writes.
+	// Locking only at Save would use a stale pre-deletion snapshot after waiting.
+	locked := func() *gorm.DB {
+		return tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+	}
 	if existingContactID != "" {
-		findErr = tx.Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
+		findErr = locked().Where("id = ? AND vault_id = ?", existingContactID, vaultID).First(&existing).Error
 	}
 	if existingContactID == "" || errors.Is(findErr, gorm.ErrRecordNotFound) {
 		if distantURI != "" {
-			findErr = tx.Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
+			findErr = locked().Where("vault_id = ? AND distant_uri = ?", vaultID, distantURI).First(&existing).Error
 		} else {
 			findErr = gorm.ErrRecordNotFound
 		}

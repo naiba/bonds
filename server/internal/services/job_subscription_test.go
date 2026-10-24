@@ -225,6 +225,10 @@ func TestJobSubscriptionRejectedAndRolledBackChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var contactBeforeRejection models.Contact
+	if err := f.push.db.First(&contactBeforeRejection, "id = ?", id).Error; err != nil {
+		t.Fatal(err)
+	}
 	if _, err = f.jobs.Create(id, other.ID, dto.CreateContactJobRequest{CompanyID: company}); !errors.Is(err, ErrContactNotFound) {
 		t.Fatalf("cross-vault create: %v", err)
 	}
@@ -294,6 +298,9 @@ func TestJobSubscriptionRejectedAndRolledBackChanges(t *testing.T) {
 	var persistedContact models.Contact
 	if err = f.push.db.First(&persistedContact, "id = ?", id).Error; err != nil {
 		t.Fatal(err)
+	}
+	if contactBeforeRejection.LastUpdatedAt == nil || persistedContact.LastUpdatedAt == nil || !persistedContact.LastUpdatedAt.Equal(*contactBeforeRejection.LastUpdatedAt) {
+		t.Fatal("rejected or rolled back job operation advanced local conflict marker")
 	}
 	if persistedContact.CompanyID == nil || *persistedContact.CompanyID != company || ptrToStr(persistedContact.JobPosition) != "Preserved legacy role" || ptrToStr(persistedContact.FirstName) != "Preserved" {
 		t.Fatalf("rollback changed contact fields: %+v", persistedContact)

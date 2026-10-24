@@ -35,9 +35,24 @@ func createContactJobRecord(db *gorm.DB, job *models.ContactCompany, contactID, 
 		if err := createContactRecord(tx, job, contactID, vaultID); err != nil {
 			return err
 		}
+		if err := markContactJobsChanged(tx, []string{contactID}, vaultID); err != nil {
+			return err
+		}
 		// Capture the response while the company and contact are still locked.
 		// A post-commit reload can lose the row to a successful company deletion
 		// and report failure even though this job was committed and pushed.
 		return tx.Preload("Company").First(job, job.ID).Error
 	})
+}
+
+// Job/company edits change the exported contact even though they live in other
+// tables. Advance the existing local-edit marker in the owning transaction;
+// otherwise an in-flight subscription pull can resurrect a deleted TITLE (#297).
+// Callers already hold the affected contact locks, after any company locks.
+func markContactJobsChanged(tx *gorm.DB, contactIDs []string, vaultID string) error {
+	if len(contactIDs) == 0 {
+		return nil
+	}
+	return tx.Model(&models.Contact{}).Where("id IN ? AND vault_id = ?", contactIDs, vaultID).
+		UpdateColumn("last_updated_at", tx.NowFunc()).Error
 }
