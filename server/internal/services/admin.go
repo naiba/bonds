@@ -300,7 +300,8 @@ func (s *AdminService) DeleteUser(actorID, targetID string) error {
 // deleteEntireAccount removes the user, the account, and all associated data (vaults, contacts, files, etc.).
 func (s *AdminService) deleteEntireAccount(user models.User) error {
 	var fileUUIDs []string
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
+		fileUUIDs = nil // A retry must only publish file removals from its committed attempt.
 		// Collect physical file paths while the rows still exist; the files
 		// themselves are removed only after the transaction commits.
 		if err := tx.Model(&models.File{}).
@@ -311,7 +312,7 @@ func (s *AdminService) deleteEntireAccount(user models.User) error {
 		}
 
 		var vaults []models.Vault
-		if err := tx.Where("account_id = ?", user.AccountID).Find(&vaults).Error; err != nil {
+		if err := tx.Where("account_id = ?", user.AccountID).Order("id ASC").Find(&vaults).Error; err != nil {
 			return err
 		}
 

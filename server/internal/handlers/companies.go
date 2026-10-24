@@ -108,6 +108,7 @@ func (h *CompanyHandler) Get(c *echo.Context) error {
 //	@Param			request		body		dto.CreateCompanyRequest		true	"Company details"
 //	@Success		201			{object}	response.APIResponse{data=dto.CompanyResponse}
 //	@Failure		400			{object}	response.APIResponse
+//	@Failure		404			{object}	response.APIResponse
 //	@Failure		401			{object}	response.APIResponse
 //	@Failure		422			{object}	response.APIResponse
 //	@Failure		500			{object}	response.APIResponse
@@ -125,6 +126,9 @@ func (h *CompanyHandler) Create(c *echo.Context) error {
 
 	company, err := h.companyService.Create(vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrVaultNotFound) {
+			return response.NotFound(c, "err.vault_not_found")
+		}
 		return response.InternalError(c, "err.failed_to_create_company")
 	}
 	return response.Created(c, company)

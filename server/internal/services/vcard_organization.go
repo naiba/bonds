@@ -404,7 +404,7 @@ func resolveVCardCompany(tx *gorm.DB, vaultID, name string) (uint, error) {
 		return candidateID, nil
 	}
 	company := models.Company{VaultID: vaultID, Name: name}
-	if err := tx.Create(&company).Error; err != nil {
+	if err := createResolvedCompany(tx, &company); err != nil {
 		return 0, err
 	}
 	return company.ID, nil

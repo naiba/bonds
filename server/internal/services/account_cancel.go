@@ -33,7 +33,7 @@ func (s *AccountCancelService) Cancel(userID, accountID, password string) error 
 		}
 	}
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		// A user may belong to several accounts. Cancel only the selected account;
 		// never delete another account's identity or vault memberships.
 		var members []models.AccountMembership
@@ -41,7 +41,7 @@ func (s *AccountCancelService) Cancel(userID, accountID, password string) error 
 			return err
 		}
 		var vaults []models.Vault
-		if err := tx.Where("account_id = ?", accountID).Find(&vaults).Error; err != nil {
+		if err := tx.Where("account_id = ?", accountID).Order("id ASC").Find(&vaults).Error; err != nil {
 			return err
 		}
 		// Reuse deleteVaultCascade (same package) to properly clean up all

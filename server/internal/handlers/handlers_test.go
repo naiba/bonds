@@ -8619,3 +8619,39 @@ func TestVCardAmbiguousVCardImportReturnsClientError(t *testing.T) {
 		t.Fatalf("valid import failed after recoverable errors: %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// A request can pass both permission checks immediately before its vault is
+// deleted. The company service must recheck ownership, and the API reports404.
+func TestCompanyCreateRejectsVaultDeletedAfterAuthorization(t *testing.T) {
+	ts := setupTestServer(t)
+	token, _ := ts.registerTestUser(t, "company-deletion-boundary@example.test")
+	vault := ts.createTestVault(t, token, "Company deletion boundary")
+	unrelated := ts.createTestVault(t, token, "Unrelated vault")
+	var admitted atomic.Int32
+	const hook = "test:delete_vault_after_company_authorization"
+	if err := ts.db.Callback().Query().After("gorm:query").Register(hook, func(tx *gorm.DB) {
+		if tx.Statement.Table == "user_vault" && strings.Contains(tx.Statement.SQL.String(), "vaults.account_id") && admitted.Add(1) == 2 {
+			if err := services.NewVaultService(ts.db).DeleteVault(vault.ID); err != nil {
+				tx.AddError(err)
+			}
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	defer ts.db.Callback().Query().Remove(hook)
+	rec := ts.doRequest(http.MethodPost, "/api/vaults/"+vault.ID+"/companies", `{"name":"Late company"}`, token)
+	if admitted.Load() != 2 || rec.Code != http.StatusNotFound {
+		t.Fatalf("boundary checks=%d status=%d body=%s", admitted.Load(), rec.Code, rec.Body.String())
+	}
+	result := parseResponse(t, rec)
+	if result.Success || result.Error == nil {
+		t.Fatal("missing API error envelope")
+	}
+	var count int64
+	if err := ts.db.Model(&models.Company{}).Where("vault_id = ?", vault.ID).Count(&count).Error; err != nil || count != 0 {
+		t.Fatalf("orphan company: %d %v", count, err)
+	}
+	if err := ts.db.Model(&models.Vault{}).Where("id = ?", unrelated.ID).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("unrelated vault changed: %d %v", count, err)
+	}
+}

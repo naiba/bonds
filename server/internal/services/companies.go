@@ -108,11 +108,11 @@ func (s *CompanyService) Create(vaultID string, req dto.CreateCompanyRequest) (*
 		Name:    req.Name,
 		Type:    strPtrOrNil(req.Type),
 	}
-	if err := companyEmploymentTransaction(s.db, vaultID, func(tx *gorm.DB) error {
+	if err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		if err := lockCompanyResolution(tx, vaultID); err != nil {
 			return err
 		}
-		return tx.Create(&company).Error
+		return createResolvedCompany(tx, &company)
 	}); err != nil {
 		return nil, err
 	}
@@ -149,11 +149,11 @@ func lockCompanyContacts(db *gorm.DB, companyID uint, vaultID string) ([]string,
 		return nil, err
 	}
 	if len(currentIDs) != len(contacts) {
-		return nil, errCompanyContactsChanged
+		return nil, errCompanyDiscoveryChanged
 	}
 	for i, id := range currentIDs {
 		if id != contacts[i].ID {
-			return nil, errCompanyContactsChanged
+			return nil, errCompanyDiscoveryChanged
 		}
 	}
 	ids := make([]string, 0, len(contacts))
@@ -183,7 +183,7 @@ func (s *CompanyService) pushContactChanges(contactIDs []string, vaultID string)
 func (s *CompanyService) Update(id uint, vaultID string, req dto.UpdateCompanyRequest) (*dto.CompanyResponse, error) {
 	var company models.Company
 	var contactIDs []string
-	err := companyEmploymentTransaction(s.db, vaultID, func(tx *gorm.DB) error {
+	err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: companyWriteLockStrength}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrCompanyNotFound
@@ -222,7 +222,7 @@ func (s *CompanyService) Delete(id uint, vaultID string) error {
 	var contactIDs []string
 	// Cleanup must be atomic: otherwise a failed company delete loses jobs and
 	// subscribers can observe a partially deleted organization.
-	err := companyEmploymentTransaction(s.db, vaultID, func(tx *gorm.DB) error {
+	err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		var company models.Company
 		if err := tx.Clauses(clause.Locking{Strength: companyWriteLockStrength}).Where("id = ? AND vault_id = ?", id, vaultID).First(&company).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -320,8 +320,8 @@ func lockCompanyForEmployment(tx *gorm.DB, companyID uint, vaultID string) error
 	return nil
 }
 
-var errCompanyResolutionBusy = errors.New("company candidates are being resolved")
-var errCompanyContactsChanged = errors.New("company references changed during discovery")
+var errCompanyResolutionBusy = errors.New("company coordination is busy")
+var errCompanyDiscoveryChanged = errors.New("company lock discovery changed")
 
 // Company names are not unique identities. Serialize candidate membership
 // (create/rename/delete) with automatic resolution without adding a constraint.
@@ -345,25 +345,55 @@ func tryCompanyResolution(tx *gorm.DB, vaultID string) error {
 		return err
 	}
 	if !acquired {
-		return errCompanyResolutionBusy
+		return &companyCoordinationBusyError{vaultID: vaultID}
 	}
 	return nil
 }
 
-func companyEmploymentTransaction(db *gorm.DB, vaultID string, change func(*gorm.DB) error) error {
+// Carry the busy vault through account-wide cascades so the whole outer
+// transaction can roll back before waiting, including already visited vaults.
+type companyCoordinationBusyError struct {
+	vaultID    string
+	vaultOwner bool
+}
+
+func (e *companyCoordinationBusyError) Error() string { return errCompanyResolutionBusy.Error() }
+func (e *companyCoordinationBusyError) Unwrap() error { return errCompanyResolutionBusy }
+
+func companyEmploymentTransaction(db *gorm.DB, change func(*gorm.DB) error) error {
 	for {
 		if err := db.Statement.Context.Err(); err != nil {
 			return err
 		}
 		err := db.Transaction(change)
-		if errors.Is(err, errCompanyContactsChanged) {
+		if errors.Is(err, errCompanyDiscoveryChanged) {
 			continue
 		}
-		if !errors.Is(err, errCompanyResolutionBusy) {
+		var busy *companyCoordinationBusyError
+		if !errors.As(err, &busy) {
 			return err
 		}
-		if err := db.Transaction(func(tx *gorm.DB) error { return lockCompanyResolution(tx, vaultID) }); err != nil {
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if busy.vaultOwner {
+				return lockVaultCompanyDeletionOwner(tx, busy.vaultID, false)
+			}
+			return lockCompanyResolution(tx, busy.vaultID)
+		}); err != nil {
 			return err
 		}
 	}
+}
+
+// Call under company-resolution exclusion. A creator may have waited until a
+// vault cascade committed; reject its missing owner before inserting, even on
+// databases without foreign-key enforcement (#297).
+func createResolvedCompany(tx *gorm.DB, company *models.Company) error {
+	var vault models.Vault
+	if err := tx.Select("id").First(&vault, "id = ?", company.VaultID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrVaultNotFound
+		}
+		return err
+	}
+	return tx.Create(company).Error
 }

@@ -434,7 +434,7 @@ func (s *MonicaImportService) findOrCreateCompany(db *gorm.DB, vaultID, name str
 			return err
 		}
 		company = models.Company{VaultID: vaultID, Name: name}
-		return tx.Create(&company).Error
+		return createResolvedCompany(tx, &company)
 	})
 	if err != nil {
 		return nil, err

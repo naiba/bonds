@@ -135,7 +135,7 @@ func (s *VaultService) DeleteVault(vaultID string) error {
 		return err
 	}
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	return companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		return deleteVaultCascade(tx, vaultID)
 	})
 }
