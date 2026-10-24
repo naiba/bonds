@@ -16,16 +16,18 @@ import (
 // detaches, without loading or copying their profiles.
 func lockVaultCompanyOwnersForDeletion(tx *gorm.DB, vaultID string) error {
 	var companyIDs []uint
-	if err := tx.Model(&models.Company{}).
-		Clauses(clause.Locking{Strength: companyWriteLockStrength}).
-		Where("vault_id = ?", vaultID).Order("id ASC").Pluck("id", &companyIDs).Error; err != nil {
-		return err
+	// Account-wide cascades retain locks from earlier vaults. Even an ordered
+	// query in this vault can invert a merge's global company/contact order.
+	// Fail before waiting, roll back the entire account transaction, then wait
+	// without any earlier vault locks (#297).
+	if err := vaultCompanyDeletionQuery(tx, vaultID, "NOWAIT").Pluck("id", &companyIDs).Error; err != nil {
+		return companyCoordinationLockError(err, &companyCoordinationBusyError{vaultID: vaultID, waitFor: vaultCompaniesWait})
 	}
 	var contactIDs []string
 	if err := vaultCompanyOwnerQuery(tx, vaultID, companyIDs).
-		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).
+		Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate, Options: "NOWAIT"}).
 		Pluck("id", &contactIDs).Error; err != nil {
-		return err
+		return companyCoordinationLockError(err, &companyCoordinationBusyError{vaultID: vaultID, waitFor: vaultContactsWait, companyIDs: companyIDs})
 	}
 	// A company created after discovery can be held by a job writer waiting
 	// for our contacts (#297). Never lock that new company in reverse order.
@@ -74,9 +76,22 @@ func lockVaultCompanyDeletionOwner(tx *gorm.DB, vaultID string, nowait bool) err
 	var vault models.Vault
 	err := tx.Select("id").Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate, Options: options}).
 		Where("id = ?", vaultID).Find(&vault).Error
+	if nowait {
+		return companyCoordinationLockError(err, &companyCoordinationBusyError{vaultID: vaultID, waitFor: vaultOwnerWait})
+	}
+	return err
+}
+
+func vaultCompanyDeletionQuery(tx *gorm.DB, vaultID, options string) *gorm.DB {
+	return tx.Model(&models.Company{}).
+		Clauses(clause.Locking{Strength: companyWriteLockStrength, Options: options}).
+		Where("vault_id = ?", vaultID).Order("id ASC")
+}
+
+func companyCoordinationLockError(err error, busy *companyCoordinationBusyError) error {
 	var state interface{ SQLState() string }
-	if nowait && errors.As(err, &state) && state.SQLState() == "55P03" {
-		return &companyCoordinationBusyError{vaultID: vaultID, vaultOwner: true}
+	if errors.As(err, &state) && state.SQLState() == "55P03" {
+		return busy
 	}
 	return err
 }

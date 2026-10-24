@@ -352,9 +352,19 @@ func tryCompanyResolution(tx *gorm.DB, vaultID string) error {
 
 // Carry the busy vault through account-wide cascades so the whole outer
 // transaction can roll back before waiting, including already visited vaults.
+type companyCoordinationWait uint8
+
+const (
+	companyResolutionWait companyCoordinationWait = iota
+	vaultOwnerWait
+	vaultCompaniesWait
+	vaultContactsWait
+)
+
 type companyCoordinationBusyError struct {
 	vaultID    string
-	vaultOwner bool
+	waitFor    companyCoordinationWait
+	companyIDs []uint
 }
 
 func (e *companyCoordinationBusyError) Error() string { return errCompanyResolutionBusy.Error() }
@@ -374,10 +384,21 @@ func companyEmploymentTransaction(db *gorm.DB, change func(*gorm.DB) error) erro
 			return err
 		}
 		if err := db.Transaction(func(tx *gorm.DB) error {
-			if busy.vaultOwner {
+			// The outer transaction has ended. Acquire only one ordered resource
+			// class here; retaining an earlier vault's locks recreates the cycle.
+			switch busy.waitFor {
+			case vaultOwnerWait:
 				return lockVaultCompanyDeletionOwner(tx, busy.vaultID, false)
+			case vaultCompaniesWait:
+				var ids []uint
+				return vaultCompanyDeletionQuery(tx, busy.vaultID, "").Pluck("id", &ids).Error
+			case vaultContactsWait:
+				var ids []string
+				return vaultCompanyOwnerQuery(tx, busy.vaultID, busy.companyIDs).
+					Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate}).Pluck("id", &ids).Error
+			default:
+				return lockCompanyResolution(tx, busy.vaultID)
 			}
-			return lockCompanyResolution(tx, busy.vaultID)
 		}); err != nil {
 			return err
 		}
