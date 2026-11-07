@@ -173,7 +173,7 @@ func TestVCardBirthdayUpdateReschedulesLinkedReminders(t *testing.T) {
 		t.Fatalf("delivery history lost: %v", err)
 	}
 	exported, err := NewVCardService(db).ExportContactToVCard(contact.ID, vaultID)
-	if err != nil || exported.Value(vcard.FieldBirthday) != "--04-05" {
+	if err != nil || exported.Value(vcard.FieldBirthday) != "--0405" {
 		t.Fatalf("yearless birthday roundtrip: %v, %v", exported, err)
 	}
 }

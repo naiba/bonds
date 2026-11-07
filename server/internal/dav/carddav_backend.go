@@ -398,6 +398,10 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	}
 
 	if err := services.ImportContactVCardFields(b.db, card, contact.ID, vaultID, accountID); err != nil {
+		// Invalid birthday metadata must reject creates just as it rejects updates.
+		if errors.Is(err, services.ErrVCardInvalidData) {
+			return nil, webdav.NewHTTPError(http.StatusBadRequest, err)
+		}
 		// Ambiguous employment can also occur on create. Preserve the same
 		// conflict/rollback contract as updates, rather than reporting a 500.
 		if errors.Is(err, services.ErrVCardUnsafeReplacement) {
