@@ -187,7 +187,7 @@ func TestVCardLegacyBirthdayMigrationSelectsProjectedDate(t *testing.T) {
 		wantBirthday                            string
 	}{
 		{name: "year_before_full_date", projectedYear: &year, hasProjectedDate: true, wantBirthday: "1980-04-06"},
-		{name: "missing_day_before_yearless_date", partialMonth: &month, hasProjectedDate: true, wantBirthday: "--04-06"},
+		{name: "missing_day_before_yearless_date", partialMonth: &month, hasProjectedDate: true, wantBirthday: "--0406"},
 		{name: "missing_month_before_full_date", partialDay: &day, projectedYear: &year, hasProjectedDate: true, wantBirthday: "1980-04-06"},
 		{name: "only_year"},
 		{name: "only_year_and_month", partialMonth: &month},

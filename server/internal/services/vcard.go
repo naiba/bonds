@@ -266,24 +266,28 @@ func ImportContactVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, 
 	}
 
 	// BDAY → ContactImportantDate
-	if bday := card.Value(vcard.FieldBirthday); bday != "" {
-		year, month, day := parseBirthdayString(bday)
-		if month > 0 && day > 0 {
-			var bdayType models.ContactImportantDateType
-			if err := tx.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&bdayType).Error; err == nil {
-				cid := models.ContactImportantDate{
-					ContactID:                  contactID,
-					ContactImportantDateTypeID: &bdayType.ID,
-					Label:                      "Birthdate",
-					Day:                        &day,
-					Month:                      &month,
-				}
-				if year > 0 {
-					cid.Year = &year
-				}
-				if err := tx.Create(&cid).Error; err != nil {
-					return err
-				}
+	year, month, day, birthdayErr := parseVCardBirthday(card)
+	if birthdayErr != nil {
+		return birthdayErr
+	}
+	if month > 0 && day > 0 {
+		var bdayType models.ContactImportantDateType
+		if err := tx.Where("vault_id = ? AND internal_type = ?", vaultID, "birthdate").First(&bdayType).Error; err == nil {
+			cid := models.ContactImportantDate{
+				ContactID:                  contactID,
+				ContactImportantDateTypeID: &bdayType.ID,
+				Label:                      "Birthdate",
+				Day:                        &day,
+				Month:                      &month,
+				IsYearUnknown:              year == 0,
+				DatePrecision:              importantDatePrecisionMonthDay,
+			}
+			if year > 0 {
+				cid.Year = &year
+				cid.DatePrecision = importantDatePrecisionFull
+			}
+			if err := tx.Create(&cid).Error; err != nil {
+				return err
 			}
 		}
 	}
@@ -577,7 +581,8 @@ func formatImportantDateVCardValue(date *models.ContactImportantDate) string {
 	if date.Year != nil {
 		return fmt.Sprintf("%04d-%02d-%02d", *date.Year, *date.Month, *date.Day)
 	}
-	return fmt.Sprintf("--%02d-%02d", *date.Month, *date.Day)
+	// RFC 6350 reduced dates omit the separator between month and day.
+	return fmt.Sprintf("--%02d%02d", *date.Month, *date.Day)
 }
 
 func isAnniversaryImportantDate(date *models.ContactImportantDate) bool {

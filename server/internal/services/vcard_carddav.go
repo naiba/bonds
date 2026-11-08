@@ -1,6 +1,9 @@
 package services
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/emersion/go-vcard"
 	"github.com/naiba/bonds/internal/models"
 )
@@ -10,6 +13,14 @@ func BuildContactCardDAVV3(contact *models.Contact) vcard.Card {
 	card := BuildContactVCard(contact)
 	card.SetValue(vcard.FieldVersion, "3.0")
 	delete(card, vcard.FieldKind)
+
+	// vCard 3.0 requires a year. Apple's explicit omit-year parameter keeps
+	// this leap-safe placeholder distinguishable from a real birth year.
+	if birthday := card.Get(vcard.FieldBirthday); birthday != nil && strings.HasPrefix(birthday.Value, "--") {
+		_, month, day := parseBirthdayString(birthday.Value)
+		birthday.Value = fmt.Sprintf("1604-%02d-%02d", month, day)
+		birthday.Params = vcard.Params{vcardParamAppleOmitYear: {"1604"}}
+	}
 
 	if anniversary := card.Value(vcard.FieldAnniversary); anniversary != "" {
 		card.SetValue("X-ANNIVERSARY", anniversary)

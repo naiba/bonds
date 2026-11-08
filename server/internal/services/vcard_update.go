@@ -47,6 +47,13 @@ func ReplaceContactVCardFields(db *gorm.DB, card vcard.Card, contactID, vaultID,
 func reconcileVCardBirthday(db *gorm.DB, card vcard.Card, current *models.Contact) error {
 	birthday := contactBirthdayImportantDate(current.ImportantDates)
 	incoming := strings.TrimSpace(card.Value(vcard.FieldBirthday))
+	year, month, day, err := parseVCardBirthday(card)
+	if err != nil {
+		return err
+	}
+	if incoming != "" && (month == 0 || day == 0) {
+		return ErrVCardInvalidData
+	}
 	// Partial dates have no BDAY projection, so omission cannot mean deletion.
 	if birthday != nil && (birthday.Month == nil || birthday.Day == nil) && incoming == "" {
 		return nil
@@ -55,15 +62,7 @@ func reconcileVCardBirthday(db *gorm.DB, card vcard.Card, current *models.Contac
 		if incoming == "" {
 			return nil
 		}
-		year, month, day := parseBirthdayString(incoming)
-		if month == 0 || day == 0 || !isValidReminderMonthDay(month, day) || (year > 0 && !isValidReminderDay(year, month, day)) {
-			return ErrVCardInvalidData
-		}
 		return ImportContactVCardFields(db, vcard.Card{vcard.FieldBirthday: card[vcard.FieldBirthday]}, current.ID, current.VaultID, "")
-	}
-	year, month, day := parseBirthdayString(incoming)
-	if incoming != "" && (month == 0 || day == 0 || !isValidReminderMonthDay(month, day) || (year > 0 && !isValidReminderDay(year, month, day))) {
-		return ErrVCardInvalidData
 	}
 	if incoming != "" && birthday.Month != nil && birthday.Day != nil && *birthday.Month == month && *birthday.Day == day && ((birthday.Year == nil && year == 0) || (birthday.Year != nil && *birthday.Year == year)) {
 		return nil
