@@ -75,6 +75,10 @@ func formatLine(key string, field *Field) string {
 
 	if strings.EqualFold(key, FieldOrganization) {
 		s += ":" + formatOrganization(field.Organization())
+	} else if strings.EqualFold(field.Params.Get(ParamValue), "uri") {
+		// URI values are not TEXT: escaping the comma breaks data: PHOTO URIs.
+		// Encode line breaks/backslashes as URI octets, never as content lines.
+		s += ":" + uriValueFormatter.Replace(field.Value)
 	} else {
 		s += ":" + formatValue(field.Value)
 	}
@@ -84,6 +88,8 @@ func formatLine(key string, field *Field) string {
 func formatParam(k, v string) string {
 	return k + "=" + formatValue(v)
 }
+
+var uriValueFormatter = strings.NewReplacer("\r", "%0D", "\n", "%0A", "\\", "%5C")
 
 var valueFormatter = strings.NewReplacer("\\", "\\\\", "\n", "\\n", ",", "\\,")
 

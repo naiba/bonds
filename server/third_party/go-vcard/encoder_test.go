@@ -133,3 +133,32 @@ func TestEncoderDeterminism(t *testing.T) {
 		}
 	}
 }
+
+// Check the wire representation as well as decoding: symmetric TEXT escaping
+// can hide a URI that standards-compliant clients cannot load.
+func TestEncoderURIValues(t *testing.T) {
+	for _, version := range []string{"3.0", "4.0"} {
+		t.Run(version, func(t *testing.T) {
+			card := Card{}
+			card.SetValue(FieldVersion, version)
+			card.SetValue(FieldNote, "Text, comma")
+			card.Set(FieldPhoto, &Field{Value: "data:image/png;base64,aGVsbG8=", Params: Params{ParamValue: {"uri"}}})
+			var output bytes.Buffer
+			if err := NewEncoder(&output).Encode(card); err != nil {
+				t.Fatal(err)
+			}
+			expected := "BEGIN:VCARD\r\nVERSION:" + version + "\r\nNOTE:Text\\, comma\r\nPHOTO;VALUE=uri:data:image/png;base64,aGVsbG8=\r\nEND:VCARD\r\n"
+			if output.String() != expected {
+				t.Fatalf("wire value: %q, want %q", output.String(), expected)
+			}
+			decoded, err := NewDecoder(&output).Decode()
+			if err != nil || decoded.Value(FieldPhoto) != card.Value(FieldPhoto) || decoded.Value(FieldNote) != card.Value(FieldNote) {
+				t.Fatalf("round trip: %v, %v", decoded, err)
+			}
+		})
+	}
+	line := formatLine(FieldPhoto, &Field{Value: "https://example.test/a\r\nFN:injected\\portrait", Params: Params{ParamValue: {"URI"}}})
+	if line != "PHOTO;VALUE=URI:https://example.test/a%0D%0AFN:injected%5Cportrait" {
+		t.Fatalf("unsafe URI line: %q", line)
+	}
+}
