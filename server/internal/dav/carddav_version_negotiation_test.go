@@ -198,3 +198,48 @@ func TestDAVVersionNegotiationLifecycle(t *testing.T) {
 	}
 
 }
+
+func TestDAVRemotePhotoURIBytes(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	e := echo.New()
+	SetupDAVRoutes(e, db, "")
+	user, email, password := createDAVHTTPTestUser(t, db)
+	vault, contact := createDAVHTTPTestContact(t, db, user, "Remote", "Portrait")
+	photoURL := "https://example.test/portraits/a,b.png"
+	file := models.File{VaultID: vault, UUID: "synthetic-remote-portrait", OriginalURL: &photoURL, MimeType: "image/png", Name: "portrait.png", Type: "image"}
+	if err := db.Create(&file).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&models.Contact{}).Where("id = ?", contact).Update("file_id", file.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	book := "/dav/addressbooks/" + user + "/" + vault + "/"
+	exported, err := services.NewVCardService(db).ExportContact(contact, vault)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(exported), ":"+photoURL+"\r\n") {
+		t.Errorf("export PHOTO URI bytes changed: %q", exported)
+	}
+	for _, version := range []string{"3.0", "4.0"} {
+		t.Run(version, func(t *testing.T) {
+			body := `<C:addressbook-multiget xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav"><D:prop><C:address-data version="` + version + `"/></D:prop><D:href>` + book + contact + `.vcf</D:href></C:addressbook-multiget>`
+			req := httptest.NewRequest("REPORT", book, strings.NewReader(body))
+			req.SetBasicAuth(email, password)
+			req.Header.Set("Content-Type", "application/xml")
+			rec := httptest.NewRecorder()
+			e.ServeHTTP(rec, req)
+			var report cardDAVMultigetReport
+			if err := xml.Unmarshal(rec.Body.Bytes(), &report); err != nil {
+				t.Fatal(err)
+			}
+			if rec.Code != 207 || len(report.Responses) != 1 || report.Responses[0].Propstat.Status != "HTTP/1.1 200 OK" {
+				t.Fatalf("REPORT: %d %s", rec.Code, rec.Body.String())
+			}
+			wire := report.Responses[0].Propstat.Prop.AddressData
+			if !strings.Contains(wire, ":"+photoURL+"\r\n") {
+				t.Fatalf("URI bytes changed in PHOTO: %q", wire)
+			}
+		})
+	}
+}

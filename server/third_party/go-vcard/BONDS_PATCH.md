@@ -14,7 +14,11 @@ NewOrganization expose unescaped components; the encoder escapes each component
 individually. No protocol-visible
 private marker or runtime monkey patch is used.
 
-The encoder also preserves commas in explicit VALUE=uri fields. Applying TEXT
+The encoder also preserves commas in URI values, using explicit VALUE first and
+then the property default for the card version (RFC 6350 for v4; SOURCE/URL
+and RFC 4770 IMPP for v3). In particular, v4 PHOTO defaults to URI even without
+VALUE=uri, while v3 PHOTO retains its existing binary encoding. Explicit
+VALUE=text overrides a URI default. Applying TEXT
 escaping to a data URI produces `data:image/png;base64\,` and breaks vCard 4.0
 photos in clients that follow RFC 6350's URI value grammar. CR, LF and backslash
 are percent-encoded to avoid introducing content lines. Other TEXT values retain

@@ -28,7 +28,7 @@ func (enc *Encoder) Encode(c Card) error {
 	if version == nil {
 		return errors.New("vcard: VERSION field missing")
 	}
-	if _, err := io.WriteString(enc.w, formatLine(FieldVersion, version)+"\r\n"); err != nil {
+	if _, err := io.WriteString(enc.w, formatLine(FieldVersion, version, version.Value)+"\r\n"); err != nil {
 		return err
 	}
 
@@ -43,7 +43,7 @@ func (enc *Encoder) Encode(c Card) error {
 			continue
 		}
 		for _, f := range fields {
-			if _, err := io.WriteString(enc.w, formatLine(k, f)+"\r\n"); err != nil {
+			if _, err := io.WriteString(enc.w, formatLine(k, f, version.Value)+"\r\n"); err != nil {
 				return err
 			}
 		}
@@ -54,7 +54,7 @@ func (enc *Encoder) Encode(c Card) error {
 	return err
 }
 
-func formatLine(key string, field *Field) string {
+func formatLine(key string, field *Field, version string) string {
 	var s string
 
 	if field.Group != "" {
@@ -75,7 +75,7 @@ func formatLine(key string, field *Field) string {
 
 	if strings.EqualFold(key, FieldOrganization) {
 		s += ":" + formatOrganization(field.Organization())
-	} else if strings.EqualFold(field.Params.Get(ParamValue), "uri") {
+	} else if isURIValue(key, field, version) {
 		// URI values are not TEXT: escaping the comma breaks data: PHOTO URIs.
 		// Encode line breaks/backslashes as URI octets, never as content lines.
 		s += ":" + uriValueFormatter.Replace(field.Value)
@@ -83,6 +83,24 @@ func formatLine(key string, field *Field) string {
 		s += ":" + formatValue(field.Value)
 	}
 	return s
+}
+
+// Explicit VALUE overrides the version's default type. PHOTO is URI by default
+// in v4, but not v3; checking only VALUE=uri corrupts remote photos whose builders
+// correctly omit that optional parameter. Keep this independent of data source.
+func isURIValue(key string, field *Field, version string) bool {
+	if valueType := field.Params.Get(ParamValue); valueType != "" {
+		return strings.EqualFold(valueType, "uri")
+	}
+	switch strings.ToUpper(key) {
+	case FieldSource, FieldURL, FieldIMPP:
+		return version == "3.0" || version == "4.0"
+	case FieldPhoto, FieldGeolocation, FieldLogo, FieldMember, FieldRelated,
+		FieldSound, FieldUID, FieldKey, FieldFreeOrBusyURL, FieldCalendarAddressURI, FieldCalendarURI:
+		return version == "4.0"
+	default:
+		return false
+	}
 }
 
 func formatParam(k, v string) string {
