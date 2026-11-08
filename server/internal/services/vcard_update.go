@@ -116,16 +116,21 @@ func reconcileVCardInformation(db *gorm.DB, card vcard.Card, current *models.Con
 		}
 		retained := map[uint]bool{}
 		for _, field := range card[group.field] {
-			if field.Value == "" {
+			value, err := vcardInformationValue(field, group.kind)
+			if err != nil {
+				return err
+			}
+			if value == "" {
 				continue
 			}
 			kind, preferred := vcardInformationMetadata(field, group.kind)
 			var match *models.ContactInformation
 			// Semantic matching keeps IDs and user kind aliases across v3/v4 wire
 			// normalization. An email edit must never recreate unrelated phone rows.
+			// Accept exact legacy TEXT too: GET then PUT must preserve its row identity.
 			for i := range current.ContactInformations {
 				info := &current.ContactInformations[i]
-				if retained[info.ID] || ptrToStr(info.ContactInformationType.Type) != group.kind || info.Data != field.Value {
+				if retained[info.ID] || ptrToStr(info.ContactInformationType.Type) != group.kind || (info.Data != value && storedVCardInformationValue(info.Data, group.kind) != value) {
 					continue
 				}
 				if match == nil {
@@ -138,14 +143,21 @@ func reconcileVCardInformation(db *gorm.DB, card vcard.Card, current *models.Con
 			}
 			if match != nil {
 				retained[match.ID] = true
-				if normalizedInformationKind(match, group.kind) == kind && match.Pref == preferred {
+				updates := map[string]any{}
+				if match.Data != value {
+					updates["data"] = value
+				}
+				if normalizedInformationKind(match, group.kind) != kind || match.Pref != preferred {
+					updates["kind"], updates["pref"] = strPtrOrNil(kind), preferred
+				}
+				if len(updates) == 0 {
 					continue
 				}
-				if err := db.Model(&models.ContactInformation{}).Where("id = ?", match.ID).Updates(map[string]any{"kind": strPtrOrNil(kind), "pref": preferred}).Error; err != nil {
+				if err := db.Model(&models.ContactInformation{}).Where("id = ?", match.ID).Updates(updates).Error; err != nil {
 					return err
 				}
 			} else {
-				info := models.ContactInformation{ContactID: current.ID, TypeID: infoType.ID, Data: field.Value, Kind: strPtrOrNil(kind), Pref: preferred}
+				info := models.ContactInformation{ContactID: current.ID, TypeID: infoType.ID, Data: value, Kind: strPtrOrNil(kind), Pref: preferred}
 				if err := db.Create(&info).Error; err != nil {
 					return err
 				}

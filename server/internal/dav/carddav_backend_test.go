@@ -710,18 +710,6 @@ func TestCardDAVPhoneMetadataSurvivesCreationAndEmailEdit(t *testing.T) {
 			card.Add(vcard.FieldTelephone, &vcard.Field{Value: "+15550101010", Params: vcard.Params{vcard.ParamType: []string{"CELL", "VOICE"}}})
 			path := "/dav/addressbooks/" + userID + "/" + vaultID + "/synthetic-phone.vcf"
 			object, err := backend.PutAddressObject(ctx, path, card, nil)
-			// Bonds advertises vCard 3.0 for its own CardDAV endpoint; subscription
-			// vCard 4.0 parsing is covered separately without widening this protocol.
-			if version == "4.0" {
-				if err == nil || !strings.Contains(err.Error(), "supported-address-data") {
-					t.Fatalf("unexpected unsupported-version result: %v", err)
-				}
-				var count int64
-				if err := db.Model(&models.Contact{}).Where("vault_id = ?", vaultID).Count(&count).Error; err != nil || count != 0 {
-					t.Fatalf("rejected version created contact: %d, %v", count, err)
-				}
-				return
-			}
 			if err != nil {
 				t.Fatal(err)
 			}

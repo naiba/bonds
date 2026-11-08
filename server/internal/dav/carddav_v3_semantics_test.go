@@ -52,7 +52,7 @@ type cardDAVMultigetErrorReport struct {
 	Response []cardDAVMultigetErrorResponse `xml:"DAV: response"`
 }
 
-func TestDAVSupportedAddressDataAdvertisesOnlyV3(t *testing.T) {
+func TestDAVSupportedAddressDataAdvertisesV3AndV4(t *testing.T) {
 	// Given an authenticated CardDAV address book with a contact.
 	e, db := setupDAVHTTPTestWithDB(t)
 	userID, email, password := createDAVHTTPTestUser(t, db)
@@ -85,7 +85,7 @@ func TestDAVSupportedAddressDataAdvertisesOnlyV3(t *testing.T) {
 		t.Fatalf("read PROPFIND response: %v", err)
 	}
 
-	// Then the address book advertises exactly text/vcard version 3.0 and no v4.
+	// Both supported representations must be discoverable.
 	if response.StatusCode != http.StatusMultiStatus {
 		t.Fatalf("expected 207 Multi-Status, got %d: %s", response.StatusCode, body)
 	}
@@ -107,20 +107,17 @@ func TestDAVSupportedAddressDataAdvertisesOnlyV3(t *testing.T) {
 		t.Fatalf("expected successful propstat, got %q", addressBook.Propstats[0].Status)
 	}
 	types := addressBook.Propstats[0].Prop.SupportedAddressData.Types
-	if len(types) != 1 {
-		t.Fatalf("expected exactly one address-data-type, got %d", len(types))
+	if len(types) != 2 {
+		t.Fatalf("expected two address-data types, got %v", types)
 	}
-	if types[0].ContentType != "text/vcard" || types[0].Version != "3.0" {
-		t.Fatalf("expected text/vcard version 3.0, got content-type=%q version=%q", types[0].ContentType, types[0].Version)
-	}
-	for _, addressDataType := range types {
-		if addressDataType.ContentType == "text/vcard" && addressDataType.Version == "4.0" {
-			t.Fatal("address book must not advertise text/vcard version 4.0")
+	for i, version := range []string{"3.0", "4.0"} {
+		if types[i].ContentType != "text/vcard" || types[i].Version != version {
+			t.Fatalf("unexpected supported representation: %+v", types[i])
 		}
 	}
 }
 
-func TestDAVAddressBookMultigetRejectsV4AddressDataRequest(t *testing.T) {
+func TestDAVAddressBookMultigetRejectsUnsupportedVersionAddressDataRequest(t *testing.T) {
 	// Given an authenticated CardDAV address book containing a contact.
 	e, db := setupDAVHTTPTestWithDB(t)
 	userID, email, password := createDAVHTTPTestUser(t, db)
@@ -132,7 +129,7 @@ func TestDAVAddressBookMultigetRejectsV4AddressDataRequest(t *testing.T) {
 	reportBody := `<?xml version="1.0" encoding="utf-8"?>
 <C:addressbook-multiget xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
   <D:prop>
-    <C:address-data content-type="text/vcard" version="4.0"/>
+    <C:address-data content-type="text/vcard" version="2.1"/>
   </D:prop>
   <D:href>` + href + `</D:href>
 </C:addressbook-multiget>`
@@ -143,7 +140,7 @@ func TestDAVAddressBookMultigetRejectsV4AddressDataRequest(t *testing.T) {
 	request.Header.Set("Content-Type", "application/xml; charset=utf-8")
 	request.SetBasicAuth(email, password)
 
-	// When the client requests the contact as an unsupported vCard 4.0 representation.
+	// When the client requests the contact as an unsupported vCard 2.1 representation.
 	response, err := server.Client().Do(request)
 	if err != nil {
 		t.Fatalf("perform REPORT request: %v", err)
@@ -180,7 +177,7 @@ func TestDAVAddressBookMultigetRejectsV4AddressDataRequest(t *testing.T) {
 	}
 }
 
-func TestDAVAddressBookQueryRejectsV4AddressDataRequest(t *testing.T) {
+func TestDAVAddressBookQueryRejectsUnsupportedVersionAddressDataRequest(t *testing.T) {
 	// Given an authenticated CardDAV address book containing a contact.
 	e, db := setupDAVHTTPTestWithDB(t)
 	userID, email, password := createDAVHTTPTestUser(t, db)
@@ -191,7 +188,7 @@ func TestDAVAddressBookQueryRejectsV4AddressDataRequest(t *testing.T) {
 	reportBody := `<?xml version="1.0" encoding="utf-8"?>
 	<C:addressbook-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:carddav">
 	  <D:prop>
-	    <C:address-data content-type="text/vcard" version="4.0"/>
+	    <C:address-data content-type="text/vcard" version="2.1"/>
 	  </D:prop>
 	  <C:filter test="anyof">
 	    <C:prop-filter name="UID">
@@ -206,7 +203,7 @@ func TestDAVAddressBookQueryRejectsV4AddressDataRequest(t *testing.T) {
 	request.Header.Set("Content-Type", "application/xml; charset=utf-8")
 	request.SetBasicAuth(email, password)
 
-	// When the client queries for an unsupported vCard 4.0 representation.
+	// When the client queries for an unsupported vCard 2.1 representation.
 	response, err := server.Client().Do(request)
 	if err != nil {
 		t.Fatalf("perform REPORT request: %v", err)
@@ -236,7 +233,7 @@ func TestDAVAddressBookQueryRejectsV4AddressDataRequest(t *testing.T) {
 	}
 }
 
-func TestDAVPutAddressObjectRejectsV4WithoutChangingContact(t *testing.T) {
+func TestDAVPutAddressObjectRejectsUnsupportedVersionWithoutChangingContact(t *testing.T) {
 	// Given an authenticated CardDAV contact stored with its original name.
 	e, db := setupDAVHTTPTestWithDB(t)
 	userID, email, password := createDAVHTTPTestUser(t, db)
@@ -244,7 +241,7 @@ func TestDAVPutAddressObjectRejectsV4WithoutChangingContact(t *testing.T) {
 	server := httptest.NewServer(e)
 	defer server.Close()
 
-	cardBody := "BEGIN:VCARD\r\nVERSION:4.0\r\nUID:" + contactID + "\r\nFN:Grace Hopper\r\nN:Hopper;Grace;;;\r\nEND:VCARD\r\n"
+	cardBody := "BEGIN:VCARD\r\nVERSION:2.1\r\nUID:" + contactID + "\r\nFN:Grace Hopper\r\nN:Hopper;Grace;;;\r\nEND:VCARD\r\n"
 	request, err := http.NewRequest(http.MethodPut, server.URL+"/dav/addressbooks/"+userID+"/"+vaultID+"/"+contactID+".vcf", strings.NewReader(cardBody))
 	if err != nil {
 		t.Fatalf("create PUT request: %v", err)
@@ -252,7 +249,7 @@ func TestDAVPutAddressObjectRejectsV4WithoutChangingContact(t *testing.T) {
 	request.Header.Set("Content-Type", "text/vcard; charset=utf-8")
 	request.SetBasicAuth(email, password)
 
-	// When the client uploads an unsupported vCard 4.0 representation.
+	// When the client uploads an unsupported vCard 2.1 representation.
 	response, err := server.Client().Do(request)
 	if err != nil {
 		t.Fatalf("perform PUT request: %v", err)

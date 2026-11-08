@@ -32,6 +32,7 @@ Monica 是一个拥有 24k+ star 的优秀开源个人 CRM。但作为一个由�
 - **提醒系统**：一次性和周期性（每周、每月、每年），支持邮件和兼容 Shoutrrr 的通知渠道。
 - **全文搜索**：基于 Bleve 的中英文混合搜索，覆盖联系人和笔记。
 - **CardDAV / CalDAV**：与 Apple 通讯录、Thunderbird 等 DAV 客户端同步联系人和日历。支持个人访问令牌认证。
+  CardDAV 同时公布 vCard 3.0 和 4.0。GET 及未指定版本的 REPORT 默认保持 3.0；在 addressbook-query 或 addressbook-multiget REPORT 中使用 `<C:address-data content-type="text/vcard" version="4.0"/>` 可获取 4.0。PUT 接受两种版本，沿用相同权限与字段协调规则。上传头像在 3.0 中使用内嵌二进制 PHOTO，在 4.0 中使用 data URI。REPORT 的 getetag 跨版本保持为默认 GET 资源的校验标签。
   无年份生日在 vCard 4.0 中导出为 `--MMDD`；CardDAV 3.0 使用 `BDAY;X-APPLE-OMIT-YEAR=1604:1604-MM-DD` 兼容 Apple 客户端，导入时依据此参数保留未知年份。丢弃此参数的客户端无法区分占位年与真实年份。
   CardDAV REPORT 请求体上限为 16 MiB，超限返回 HTTP 413；较大的 multiget 请求请分批发送。响应大小不受此上限限制。
   Vault 管理员可在 **Vault 设置 → 常规** 配置 CardDAV 字段存在筛选（电话、邮箱、姓名、昵称、公司、职位或邮寄地址，可满足全部或任一字段）。空筛选保持默认行为：同步所有未归档联系人。被排除的联系人仍保留在 Bonds 和关系网中，在设备下次完整同步时移除，清空筛选后恢复同步。旧客户端向已排除联系人写入返回 404；设备新建或编辑后不满足筛选返回 409 且不保存。设置对所有 Vault 成员生效，不影响外部 DAV 订阅、CalDAV 或 vCard 导出。

@@ -189,7 +189,11 @@ func ImportContactVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, 
 		var phoneType models.ContactInformationType
 		if err := tx.Where("account_id = ? AND type = ?", accountID, "phone").First(&phoneType).Error; err == nil {
 			for _, f := range fields {
-				if f.Value == "" {
+				value, err := vcardInformationValue(f, "phone")
+				if err != nil {
+					return err
+				}
+				if value == "" {
 					continue
 				}
 				kind, preferred := vcardInformationMetadata(f, "phone")
@@ -197,7 +201,7 @@ func ImportContactVCardFields(tx *gorm.DB, card vcard.Card, contactID, vaultID, 
 					Kind: strPtrOrNil(kind), Pref: preferred,
 					ContactID: contactID,
 					TypeID:    phoneType.ID,
-					Data:      f.Value,
+					Data:      value,
 				}
 				if err := tx.Create(&ci).Error; err != nil {
 					return err

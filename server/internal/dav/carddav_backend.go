@@ -149,7 +149,7 @@ func (b *CardDAVBackend) GetAddressObject(ctx context.Context, path string, requ
 	if !visible {
 		return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 	}
-	object, err := b.contactToAddressObject(&contact, userID)
+	object, err := b.contactToAddressObject(&contact, userID, request)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (b *CardDAVBackend) collectAddressObjects(ctx context.Context, path string,
 		if !matchesCardDAVFilter(&contacts[i], vault.CardDAVFilter) {
 			continue
 		}
-		object, err := b.contactToAddressObject(&contacts[i], userID)
+		object, err := b.contactToAddressObject(&contacts[i], userID, request)
 		if err != nil {
 			return nil, err
 		}
@@ -258,8 +258,9 @@ func (b *CardDAVBackend) PutAddressObject(ctx context.Context, path string, card
 }
 
 func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card vcard.Card, options *carddav.PutAddressObjectOptions) (*carddav.AddressObject, error) {
-	// Keep PUT input aligned with the vCard 3.0 representation advertised by this address book.
-	if card.Value(vcard.FieldVersion) != "3.0" {
+	// Accept the same versions we advertise, through the same permission and
+	// transactional reconciliation path; negotiation must not bypass write safety.
+	if version := card.Value(vcard.FieldVersion); version != "3.0" && version != "4.0" {
 		return nil, carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
 	}
 
@@ -318,7 +319,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 				return nil, webdav.NewHTTPError(http.StatusNotFound, fmt.Errorf("address object not found"))
 			}
 			if options != nil {
-				object, err := b.contactToAddressObject(&current, userID)
+				object, err := b.contactToAddressObject(&current, userID, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -365,7 +366,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 			if !matchesCardDAVFilter(&contact, vault.CardDAVFilter) {
 				return nil, webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("contact does not match the address book filters"))
 			}
-			return b.contactToAddressObject(&contact, userID)
+			return b.contactToAddressObject(&contact, userID, nil)
 		}
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
@@ -418,7 +419,7 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	if !matchesCardDAVFilter(&contact, vault.CardDAVFilter) {
 		return nil, webdav.NewHTTPError(http.StatusConflict, fmt.Errorf("contact does not match the address book filters"))
 	}
-	return b.contactToAddressObject(&contact, userID)
+	return b.contactToAddressObject(&contact, userID, nil)
 }
 
 func (b *CardDAVBackend) DeleteAddressObject(ctx context.Context, path string) error {
@@ -505,7 +506,10 @@ func (b *CardDAVBackend) verifyVaultWriteAccess(userID, vaultID string) error {
 }
 
 func cardDAVSupportedAddressData() []carddav.AddressDataType {
-	return []carddav.AddressDataType{{ContentType: vcard.MIMEType, Version: "3.0"}}
+	return []carddav.AddressDataType{
+		{ContentType: vcard.MIMEType, Version: "3.0"},
+		{ContentType: vcard.MIMEType, Version: "4.0"},
+	}
 }
 
 func validateCardDAVAddressDataRequest(request *carddav.AddressDataRequest) error {
@@ -515,14 +519,14 @@ func validateCardDAVAddressDataRequest(request *carddav.AddressDataRequest) erro
 	if request.ContentType != "" && request.ContentType != vcard.MIMEType {
 		return carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
 	}
-	if request.Version != "" && request.Version != "3.0" {
+	if request.Version != "" && request.Version != "3.0" && request.Version != "4.0" {
 		return carddav.NewPreconditionError(carddav.PreconditionSupportedAddressData)
 	}
 	return nil
 }
 
 // contactToAddressObject converts a Contact model to a CardDAV AddressObject.
-func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string) (*carddav.AddressObject, error) {
+func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string, request *carddav.AddressDataRequest) (*carddav.AddressObject, error) {
 	// A stale or invalid avatar reference must never expose another vault's file.
 	projection := *c
 	if projection.File != nil && projection.File.VaultID != c.VaultID {
@@ -536,6 +540,22 @@ func (b *CardDAVBackend) contactToAddressObject(c *models.Contact, userID string
 	hash := sha256.New()
 	if err := vcard.NewEncoder(hash).Encode(card); err != nil {
 		return nil, fmt.Errorf("encode CardDAV v3 card: %w", err)
+	}
+	// REPORT getetag identifies the default GET resource, not its requested
+	// address-data conversion. Hash the full v3 card before projecting v4 so
+	// clients can use either REPORT's ETag for subsequent conditional writes.
+	if request != nil && request.Version == "4.0" {
+		cardV4 := services.BuildContactVCard(&projection)
+		if photo := card.Get(vcard.FieldPhoto); photo != nil && photo.Params.Get("ENCODING") == "b" {
+			// v4 removed ENCODING=b: embedded bytes belong in a data URI.
+			// Reuse the bounded, vault-confined read above rather than reopening.
+			mediaType := "image/" + strings.ToLower(photo.Params.Get(vcard.ParamType))
+			cardV4.Set(vcard.FieldPhoto, &vcard.Field{
+				Value:  "data:" + mediaType + ";base64," + photo.Value,
+				Params: vcard.Params{vcard.ParamValue: {"uri"}},
+			})
+		}
+		card = cardV4
 	}
 	// Content-derived ETags keep DAV caches coherent when related fields change.
 	return &carddav.AddressObject{

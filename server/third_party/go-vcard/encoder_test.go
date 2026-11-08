@@ -31,7 +31,7 @@ func TestFormatLine_withGroup(t *testing.T) {
 	l := formatLine("FN", &Field{
 		Value: "Akiyama Mio",
 		Group: "item1",
-	})
+	}, "4.0")
 
 	expected := "item1.FN:Akiyama Mio"
 	if l != expected {
@@ -130,6 +130,83 @@ func TestEncoderDeterminism(t *testing.T) {
 		}
 		if b.String() != canonical {
 			t.Fatalf("Encode: expected canonical %q, got %q", canonical, b.String())
+		}
+	}
+}
+
+// Check the wire representation as well as decoding: symmetric TEXT escaping
+// can hide a URI that standards-compliant clients cannot load.
+func TestEncoderURIValues(t *testing.T) {
+	for _, version := range []string{"3.0", "4.0"} {
+		t.Run(version, func(t *testing.T) {
+			card := Card{}
+			card.SetValue(FieldVersion, version)
+			card.SetValue(FieldNote, "Text, comma")
+			card.Set(FieldPhoto, &Field{Value: "data:image/png;base64,aGVsbG8=", Params: Params{ParamValue: {"uri"}}})
+			var output bytes.Buffer
+			if err := NewEncoder(&output).Encode(card); err != nil {
+				t.Fatal(err)
+			}
+			expected := "BEGIN:VCARD\r\nVERSION:" + version + "\r\nNOTE:Text\\, comma\r\nPHOTO;VALUE=uri:data:image/png;base64,aGVsbG8=\r\nEND:VCARD\r\n"
+			if output.String() != expected {
+				t.Fatalf("wire value: %q, want %q", output.String(), expected)
+			}
+			decoded, err := NewDecoder(&output).Decode()
+			if err != nil || decoded.Value(FieldPhoto) != card.Value(FieldPhoto) || decoded.Value(FieldNote) != card.Value(FieldNote) {
+				t.Fatalf("round trip: %v, %v", decoded, err)
+			}
+		})
+	}
+	line := formatLine(FieldPhoto, &Field{Value: "https://example.test/a\r\nFN:injected\\portrait", Params: Params{ParamValue: {"URI"}}}, "4.0")
+	if line != "PHOTO;VALUE=URI:https://example.test/a%0D%0AFN:injected%5Cportrait" {
+		t.Fatalf("unsafe URI line: %q", line)
+	}
+}
+
+// Default value types matter even when a producer omits VALUE. Check wire bytes
+// rather than decoding with the same codec, which can hide TEXT over-escaping.
+func TestEncoderDefaultURIValues(t *testing.T) {
+	for _, key := range []string{FieldSource, FieldPhoto, FieldIMPP, FieldGeolocation, FieldLogo, FieldMember, FieldRelated, FieldSound, FieldUID, FieldURL, FieldKey, FieldFreeOrBusyURL, FieldCalendarAddressURI, FieldCalendarURI} {
+		t.Run(key, func(t *testing.T) {
+			for _, explicit := range []bool{false, true} {
+				card := Card{}
+				card.SetValue(FieldVersion, "4.0")
+				field := &Field{Value: "https://example.test/a,b"}
+				expected := key + ":https://example.test/a,b\r\n"
+				if explicit {
+					field.Params = Params{ParamValue: {"text"}}
+					expected = key + ";VALUE=text:https://example.test/a\\,b\r\n"
+				}
+				card.Set(key, field)
+				var output bytes.Buffer
+				if err := NewEncoder(&output).Encode(card); err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Contains(output.Bytes(), []byte(expected)) {
+					t.Fatalf("VALUE text=%v: expected %q in %q", explicit, expected, output.String())
+				}
+			}
+		})
+	}
+	for _, version := range []string{"3.0", "4.0"} {
+		card := Card{}
+		card.SetValue(FieldVersion, version)
+		card.SetValue(FieldURL, "https://example.test/a,b")
+		card.SetValue(FieldIMPP, "xmpp:person@example.test,a")
+		card.SetValue(FieldNote, "Text, comma")
+		card.SetValue(FieldPhoto, "data:image/png;base64,aGVsbG8=")
+		var output bytes.Buffer
+		if err := NewEncoder(&output).Encode(card); err != nil {
+			t.Fatal(err)
+		}
+		photo := "PHOTO:data:image/png;base64,aGVsbG8=\r\n"
+		if version == "3.0" {
+			photo = "PHOTO:data:image/png;base64\\,aGVsbG8=\r\n"
+		}
+		for _, expected := range []string{photo, "URL:https://example.test/a,b\r\n", "IMPP:xmpp:person@example.test,a\r\n", "NOTE:Text\\, comma\r\n"} {
+			if !bytes.Contains(output.Bytes(), []byte(expected)) {
+				t.Errorf("version %s: expected %q in %q", version, expected, output.String())
+			}
 		}
 	}
 }

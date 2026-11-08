@@ -2,7 +2,7 @@ module github.com/naiba/bonds
 
 go 1.26.0
 
-// Preserve structured ORG escapes until upstream provides a component-aware codec.
+// Preserve structured ORG components and URI values until upstream provides equivalent codecs.
 replace github.com/emersion/go-vcard => ./third_party/go-vcard
 
 require (
