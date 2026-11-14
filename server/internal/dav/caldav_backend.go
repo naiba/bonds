@@ -254,7 +254,7 @@ func (b *CalDAVBackend) PutCalendarObject(ctx context.Context, path string, cale
 		return nil, webdav.NewHTTPError(http.StatusBadRequest, fmt.Errorf("invalid path"))
 	}
 
-	if err := b.verifyVaultAccess(userID, vaultID); err != nil {
+	if err := b.verifyVaultWriteAccess(userID, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -460,7 +460,7 @@ func (b *CalDAVBackend) DeleteCalendarObject(ctx context.Context, path string) e
 	// Try important date
 	var importantDate models.ContactImportantDate
 	if err := b.db.Preload("Contact").First(&importantDate, "uuid = ?", objectID).Error; err == nil {
-		if err := b.verifyVaultAccess(userID, importantDate.Contact.VaultID); err != nil {
+		if err := b.verifyVaultWriteAccess(userID, importantDate.Contact.VaultID); err != nil {
 			return err
 		}
 		return b.db.Delete(&importantDate).Error
@@ -468,7 +468,7 @@ func (b *CalDAVBackend) DeleteCalendarObject(ctx context.Context, path string) e
 
 	var task models.ContactTask
 	if err := b.db.First(&task, "uuid = ?", objectID).Error; err == nil {
-		if err := b.verifyVaultAccess(userID, task.VaultID); err != nil {
+		if err := b.verifyVaultWriteAccess(userID, task.VaultID); err != nil {
 			return err
 		}
 		return b.db.Transaction(func(tx *gorm.DB) error {
@@ -486,6 +486,14 @@ func (b *CalDAVBackend) verifyVaultAccess(userID, vaultID string) error {
 	var uv models.UserVault
 	if err := b.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil {
 		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("access denied"))
+	}
+	return nil
+}
+
+func (b *CalDAVBackend) verifyVaultWriteAccess(userID, vaultID string) error {
+	var uv models.UserVault
+	if err := b.db.Where("user_id = ? AND vault_id = ?", userID, vaultID).First(&uv).Error; err != nil || uv.Permission > models.PermissionEditor {
+		return webdav.NewHTTPError(http.StatusForbidden, fmt.Errorf("write access denied"))
 	}
 	return nil
 }
