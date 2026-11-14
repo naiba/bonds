@@ -431,6 +431,40 @@ func TestMCPAcceptsPersonalAccessToken(t *testing.T) {
 	}
 }
 
+func TestMCPDeniesScopedPATDirectReadTools(t *testing.T) {
+	ts := setupTestServer(t)
+	jwtToken, _ := ts.registerTestUser(t, "mcp-scoped-pat@example.com")
+	vault := ts.createTestVault(t, jwtToken, "Scoped MCP Vault")
+	contact := ts.createTestContact(t, jwtToken, vault.ID, "Scoped")
+
+	rec := ts.doRequest(http.MethodPost, "/api/settings/tokens",
+		`{"name":"Scoped MCP token","scopes":["calendar:read"]}`, jwtToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create scoped PAT: expected 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	apiResp := parseResponse(t, rec)
+	var created struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(apiResp.Data, &created); err != nil {
+		t.Fatalf("failed to parse scoped PAT response: %v", err)
+	}
+
+	requests := []struct {
+		name string
+		args string
+	}{
+		{name: "search_bonds", args: fmt.Sprintf(`{"vault_id":%q,"query":"Scoped"}`, vault.ID)},
+		{name: "fetch_resource", args: fmt.Sprintf(`{"uri":"bonds://contact/%s"}`, contact.ID)},
+	}
+	for i, request := range requests {
+		rec := ts.doRequest(http.MethodPost, "/mcp", mcpToolCall(i+1, request.name, request.args), created.Token)
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("%s with scoped PAT: expected 403, got %d: %s", request.name, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestMCPFetchResourceRejectsUnlistedContact(t *testing.T) {
 	ts := setupTestServer(t)
 	token, _ := ts.registerTestUser(t, "mcp-unlisted@example.com")

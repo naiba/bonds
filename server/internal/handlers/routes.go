@@ -899,7 +899,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	mcpSearcher := internalmcp.NewBondsSearcher(db, searchService, vaultService)
 	mcpFetcher := internalmcp.NewResourceFetcher(db, vaultService)
 	mcpHandler := internalmcp.NewHandler(db, mcpRegistry, mcpExecutor, mcpSearcher, mcpFetcher)
-	mcpMiddleware := []echo.MiddlewareFunc{internalmcp.RequireAllowedOrigin(cfg.App.URL, "http://localhost:5173", "http://localhost:3000"), authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired)}
+	mcpMiddleware := []echo.MiddlewareFunc{internalmcp.RequireAllowedOrigin(cfg.App.URL, "http://localhost:5173", "http://localhost:3000"), authMiddleware.Authenticate, middleware.RequireEmailVerification(emailVerificationRequired), middleware.DenyScopedPAT}
 	e.POST("/mcp", mcpHandler.Handle, mcpMiddleware...)
 	e.GET("/mcp", mcpHandler.MethodNotAllowed, mcpMiddleware...)
 	e.DELETE("/mcp", mcpHandler.MethodNotAllowed, mcpMiddleware...)

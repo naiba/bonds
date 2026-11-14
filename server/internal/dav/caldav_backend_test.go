@@ -63,6 +63,105 @@ func TestListCalendars(t *testing.T) {
 	}
 }
 
+func TestCalDAVVaultWritePermissions(t *testing.T) {
+	for _, role := range []struct {
+		name       string
+		permission int
+		canWrite   bool
+	}{
+		{name: "viewer", permission: models.PermissionViewer},
+		{name: "editor", permission: models.PermissionEditor, canWrite: true},
+		{name: "manager", permission: models.PermissionManager, canWrite: true},
+	} {
+		t.Run(role.name, func(t *testing.T) {
+			backend, db, ctx, vaultID, userID := setupCalDAVTest(t)
+			contact := createTestContact(t, db, vaultID, userID, "Calendar", "Owner")
+
+			eventUID := uuid.NewString()
+			day, month, year := 15, 6, 2027
+			date := models.ContactImportantDate{
+				ContactID: contact.ID,
+				UUID:      &eventUID,
+				Label:     "Existing event",
+				Day:       &day,
+				Month:     &month,
+				Year:      &year,
+			}
+			if err := db.Create(&date).Error; err != nil {
+				t.Fatal(err)
+			}
+
+			taskUID := uuid.NewString()
+			task := models.ContactTask{VaultID: vaultID, UUID: &taskUID, Label: "Existing task", AuthorName: "test"}
+			if err := db.Create(&task).Error; err != nil {
+				t.Fatal(err)
+			}
+
+			if err := db.Model(&models.UserVault{}).
+				Where("user_id = ? AND vault_id = ?", userID, vaultID).
+				Update("permission", role.permission).Error; err != nil {
+				t.Fatal(err)
+			}
+
+			eventPath := "/dav/calendars/" + userID + "/" + vaultID + "/" + eventUID + ".ics"
+			if _, err := backend.GetCalendarObject(ctx, eventPath, nil); err != nil {
+				t.Fatalf("read should remain available: %v", err)
+			}
+
+			for _, kind := range []string{ical.CompEvent, ical.CompToDo} {
+				uid := uuid.NewString()
+				path := "/dav/calendars/" + userID + "/" + vaultID + "/" + uid + ".ics"
+				_, err := backend.PutCalendarObject(ctx, path, calendarOwnershipPayload(uid, kind), nil)
+				if role.canWrite && err != nil {
+					t.Errorf("%s PUT should succeed: %v", kind, err)
+				} else if !role.canWrite && err == nil {
+					t.Errorf("%s PUT should be forbidden for viewers", kind)
+				}
+				var count int64
+				if kind == ical.CompEvent {
+					if err := db.Model(&models.ContactImportantDate{}).Where("uuid = ?", uid).Count(&count).Error; err != nil {
+						t.Fatal(err)
+					}
+				} else if err := db.Model(&models.ContactTask{}).Where("uuid = ?", uid).Count(&count).Error; err != nil {
+					t.Fatal(err)
+				}
+				wantCount := int64(0)
+				if role.canWrite {
+					wantCount = 1
+				}
+				if count != wantCount {
+					t.Errorf("%s PUT persisted %d objects, want %d", kind, count, wantCount)
+				}
+			}
+
+			for _, uid := range []string{eventUID, taskUID} {
+				path := "/dav/calendars/" + userID + "/" + vaultID + "/" + uid + ".ics"
+				err := backend.DeleteCalendarObject(ctx, path)
+				if role.canWrite && err != nil {
+					t.Errorf("DELETE should succeed: %v", err)
+				} else if !role.canWrite && err == nil {
+					t.Error("DELETE should be forbidden for viewers")
+				}
+				var count int64
+				if uid == eventUID {
+					if err := db.Model(&models.ContactImportantDate{}).Where("uuid = ?", uid).Count(&count).Error; err != nil {
+						t.Fatal(err)
+					}
+				} else if err := db.Model(&models.ContactTask{}).Where("uuid = ?", uid).Count(&count).Error; err != nil {
+					t.Fatal(err)
+				}
+				wantCount := int64(1)
+				if role.canWrite {
+					wantCount = 0
+				}
+				if count != wantCount {
+					t.Errorf("DELETE left %d objects, want %d", count, wantCount)
+				}
+			}
+		})
+	}
+}
+
 func TestListCalendarObjects(t *testing.T) {
 	backend, db, ctx, vaultID, userID := setupCalDAVTest(t)
 
