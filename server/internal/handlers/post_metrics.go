@@ -48,8 +48,11 @@ func (h *PostMetricHandler) Create(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return response.BadRequest(c, "err.invalid_request_body", nil)
 	}
-	metric, err := h.svc.Create(uint(postID), uint(journalID), req)
+	metric, err := h.svc.Create(uint(postID), uint(journalID), c.Param("vault_id"), req)
 	if err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}
@@ -85,8 +88,11 @@ func (h *PostMetricHandler) List(c *echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_post_id", nil)
 	}
-	metrics, err := h.svc.List(uint(postID), uint(journalID))
+	metrics, err := h.svc.List(uint(postID), uint(journalID), c.Param("vault_id"))
 	if err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}
@@ -124,7 +130,10 @@ func (h *PostMetricHandler) Delete(c *echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_metric_id", nil)
 	}
-	if err := h.svc.Delete(uint(metricID), uint(postID), uint(journalID)); err != nil {
+	if err := h.svc.Delete(uint(metricID), uint(postID), uint(journalID), c.Param("vault_id")); err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}

@@ -18,7 +18,10 @@ func NewPostMetricService(db *gorm.DB) *PostMetricService {
 	return &PostMetricService{db: db}
 }
 
-func (s *PostMetricService) Create(postID uint, journalID uint, req dto.CreatePostMetricRequest) (*dto.PostMetricResponse, error) {
+func (s *PostMetricService) Create(postID uint, journalID uint, vaultID string, req dto.CreatePostMetricRequest) (*dto.PostMetricResponse, error) {
+	if err := s.validateJournal(journalID, vaultID); err != nil {
+		return nil, err
+	}
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -48,7 +51,10 @@ func (s *PostMetricService) Create(postID uint, journalID uint, req dto.CreatePo
 	return &resp, nil
 }
 
-func (s *PostMetricService) List(postID uint, journalID uint) ([]dto.PostMetricResponse, error) {
+func (s *PostMetricService) List(postID uint, journalID uint, vaultID string) ([]dto.PostMetricResponse, error) {
+	if err := s.validateJournal(journalID, vaultID); err != nil {
+		return nil, err
+	}
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -69,7 +75,10 @@ func (s *PostMetricService) List(postID uint, journalID uint) ([]dto.PostMetricR
 	return resp, nil
 }
 
-func (s *PostMetricService) Delete(metricID uint, postID uint, journalID uint) error {
+func (s *PostMetricService) Delete(metricID uint, postID uint, journalID uint, vaultID string) error {
+	if err := s.validateJournal(journalID, vaultID); err != nil {
+		return err
+	}
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -83,6 +92,17 @@ func (s *PostMetricService) Delete(metricID uint, postID uint, journalID uint) e
 	}
 	if result.RowsAffected == 0 {
 		return ErrPostMetricNotFound
+	}
+	return nil
+}
+
+func (s *PostMetricService) validateJournal(journalID uint, vaultID string) error {
+	var journal models.Journal
+	if err := s.db.Where("id = ? AND vault_id = ?", journalID, vaultID).First(&journal).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrJournalNotFound
+		}
+		return err
 	}
 	return nil
 }

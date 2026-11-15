@@ -110,7 +110,7 @@ func TestDeleteJournalMetricRemovesPostValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create metric failed: %v", err)
 	}
-	if _, err := NewPostMetricService(db).Create(post.ID, journal.ID, dto.CreatePostMetricRequest{JournalMetricID: metric.ID, Value: 8}); err != nil {
+	if _, err := NewPostMetricService(db).Create(post.ID, journal.ID, vault.ID, dto.CreatePostMetricRequest{JournalMetricID: metric.ID, Value: 8}); err != nil {
 		t.Fatalf("Create post metric failed: %v", err)
 	}
 
@@ -159,7 +159,7 @@ func TestPostMetricCreateDelete(t *testing.T) {
 	jm, _ := jmSvc.Create(journal.ID, vault.ID, dto.CreateJournalMetricRequest{Label: "Mood"})
 
 	pmSvc := NewPostMetricService(db)
-	pm, err := pmSvc.Create(post.ID, journal.ID, dto.CreatePostMetricRequest{
+	pm, err := pmSvc.Create(post.ID, journal.ID, vault.ID, dto.CreatePostMetricRequest{
 		JournalMetricID: jm.ID, Value: 8,
 	})
 	if err != nil {
@@ -169,7 +169,7 @@ func TestPostMetricCreateDelete(t *testing.T) {
 		t.Errorf("Expected value 8, got %d", pm.Value)
 	}
 
-	err = pmSvc.Delete(pm.ID, post.ID, journal.ID)
+	err = pmSvc.Delete(pm.ID, post.ID, journal.ID, vault.ID)
 	if err != nil {
 		t.Fatalf("Delete post metric failed: %v", err)
 	}
@@ -200,10 +200,10 @@ func TestPostMetricList(t *testing.T) {
 	jm2, _ := jmSvc.Create(journal.ID, vault.ID, dto.CreateJournalMetricRequest{Label: "Energy"})
 
 	pmSvc := NewPostMetricService(db)
-	pmSvc.Create(post.ID, journal.ID, dto.CreatePostMetricRequest{JournalMetricID: jm1.ID, Value: 8})
-	pmSvc.Create(post.ID, journal.ID, dto.CreatePostMetricRequest{JournalMetricID: jm2.ID, Value: 5})
+	pmSvc.Create(post.ID, journal.ID, vault.ID, dto.CreatePostMetricRequest{JournalMetricID: jm1.ID, Value: 8})
+	pmSvc.Create(post.ID, journal.ID, vault.ID, dto.CreatePostMetricRequest{JournalMetricID: jm2.ID, Value: 5})
 
-	metrics, err := pmSvc.List(post.ID, journal.ID)
+	metrics, err := pmSvc.List(post.ID, journal.ID, vault.ID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -213,10 +213,10 @@ func TestPostMetricList(t *testing.T) {
 }
 
 func TestPostMetricListNotFound(t *testing.T) {
-	db := testutil.SetupTestDB(t)
-	pmSvc := NewPostMetricService(db)
+	svc, _, journalID, vaultID := setupJournalMetricTest(t)
+	pmSvc := NewPostMetricService(svc.db)
 
-	_, err := pmSvc.List(99999, 1)
+	_, err := pmSvc.List(99999, journalID, vaultID)
 	if err != ErrPostNotFound {
 		t.Errorf("Expected ErrPostNotFound, got %v", err)
 	}
