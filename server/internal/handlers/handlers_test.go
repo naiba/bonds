@@ -4964,6 +4964,77 @@ func TestPostMetricList_Success(t *testing.T) {
 	}
 }
 
+func TestPostMetric_CrossVaultIsolation(t *testing.T) {
+	ts := setupTestServer(t)
+	owner, _ := ts.registerTestUser(t, "pm-owner@test.com")
+	attacker, _ := ts.registerTestUser(t, "pm-attacker@test.com")
+	ownerVault := ts.createTestVault(t, owner, "Owner Vault")
+	attackerVault := ts.createTestVault(t, attacker, "Attacker Vault")
+	journalID := ts.createTestJournal(t, owner, ownerVault.ID, "Journal")
+	postID := ts.createTestPost(t, owner, ownerVault.ID, journalID, "Post")
+
+	journalMetricPath := fmt.Sprintf("/api/vaults/%s/journals/%d/metrics", ownerVault.ID, journalID)
+	rec := ts.doRequest(http.MethodPost, journalMetricPath, `{"label":"Mood"}`, owner)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create journal metric: %d %s", rec.Code, rec.Body.String())
+	}
+	var journalMetric struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &journalMetric); err != nil {
+		t.Fatal(err)
+	}
+	ownerPath := fmt.Sprintf("/api/vaults/%s/journals/%d/posts/%d/metrics", ownerVault.ID, journalID, postID)
+	body := fmt.Sprintf(`{"journal_metric_id":%d,"value":7}`, journalMetric.ID)
+	rec = ts.doRequest(http.MethodPost, ownerPath, body, owner)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create post metric: %d %s", rec.Code, rec.Body.String())
+	}
+	var postMetric struct {
+		ID uint `json:"id"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &postMetric); err != nil {
+		t.Fatal(err)
+	}
+
+	attackerPath := fmt.Sprintf("/api/vaults/%s/journals/%d/posts/%d/metrics", attackerVault.ID, journalID, postID)
+	for _, tc := range []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{http.MethodGet, attackerPath, ""},
+		{http.MethodPost, attackerPath, body},
+		{http.MethodDelete, fmt.Sprintf("%s/%d", attackerPath, postMetric.ID), ""},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			rec := ts.doRequest(tc.method, tc.path, tc.body, attacker)
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("expected 404, got %d: %s", rec.Code, rec.Body.String())
+			}
+		})
+	}
+
+	rec = ts.doRequest(http.MethodGet, ownerPath, "", owner)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("owner list: %d %s", rec.Code, rec.Body.String())
+	}
+	var metrics []struct {
+		ID    uint `json:"id"`
+		Value int  `json:"value"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &metrics); err != nil {
+		t.Fatal(err)
+	}
+	if len(metrics) != 1 || metrics[0].ID != postMetric.ID || metrics[0].Value != 7 {
+		t.Fatalf("owner metrics changed: %+v", metrics)
+	}
+	rec = ts.doRequest(http.MethodDelete, fmt.Sprintf("%s/%d", ownerPath, postMetric.ID), "", owner)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("owner delete: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestContactTabs_Success(t *testing.T) {
 	ts := setupTestServer(t)
 	_, auth := ts.registerTestUser(t, "tabs@example.com")
