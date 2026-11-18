@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"time"
 
@@ -118,53 +119,87 @@ func (m *AuthMiddleware) authenticateWithJWT(c *echo.Context, next echo.HandlerF
 	return next(c)
 }
 
-func (m *AuthMiddleware) authenticateWithPAT(c *echo.Context, next echo.HandlerFunc, rawToken string) error {
-	hash := sha256Hash(rawToken)
+var (
+	ErrPATInvalid      = errors.New("personal access token invalid or expired")
+	ErrPATUserNotFound = errors.New("personal access token user not found")
+	ErrPATUserDisabled = errors.New("personal access token user disabled")
+)
 
+// PATIdentity is the result of validating a personal access token.
+type PATIdentity struct {
+	Token   models.PersonalAccessToken
+	User    models.User
+	IsAdmin bool
+}
+
+// IsScoped reports whether the token is limited to specific scopes. Scoped
+// tokens must only reach endpoints that opt in via RequireScope.
+func (p *PATIdentity) IsScoped() bool {
+	return strings.TrimSpace(p.Token.Scopes) != ""
+}
+
+// ResolvePersonalAccessToken is the single PAT validation path shared by REST
+// and DAV. DAV used to keep its own copy that skipped the account-membership
+// check and ignored scopes (GHSA-hc8x-cmcm-2jwf); keep every PAT consumer on
+// this helper so the checks cannot drift apart again.
+func ResolvePersonalAccessToken(db *gorm.DB, rawToken string) (*PATIdentity, error) {
 	var pat models.PersonalAccessToken
-	if err := m.db.Where("token_hash = ?", hash).First(&pat).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return response.Unauthorized(c, "err.invalid_or_expired_token")
+	if err := db.Where("token_hash = ?", sha256Hash(rawToken)).First(&pat).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPATInvalid
 		}
-		return response.InternalError(c, "err.database_error")
+		return nil, err
 	}
-
 	if pat.ExpiresAt != nil && time.Now().After(*pat.ExpiresAt) {
-		return response.Unauthorized(c, "err.invalid_or_expired_token")
+		return nil, ErrPATInvalid
 	}
 
 	var user models.User
-
-	if err := m.db.Where("id = ?", pat.UserID).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return response.Unauthorized(c, "err.user_not_found")
+	if err := db.Where("id = ?", pat.UserID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrPATUserNotFound
 		}
-		return response.InternalError(c, "err.database_error")
+		return nil, err
 	}
 	if user.Disabled {
-		return response.Forbidden(c, "err.user_account_disabled")
+		return nil, ErrPATUserDisabled
 	}
-	admin, ok, err := accountMembershipAdmin(m.db, &user, pat.AccountID)
+	admin, ok, err := accountMembershipAdmin(db, &user, pat.AccountID)
 	if err != nil {
-		return response.InternalError(c, "err.database_error")
+		return nil, err
 	}
 	if !ok {
-		return response.Unauthorized(c, "err.invalid_or_expired_token")
+		return nil, ErrPATInvalid
 	}
 
 	now := time.Now()
+	db.Model(&pat).Update("last_used_at", &now)
 
-	m.db.Model(&pat).Update("last_used_at", &now)
+	return &PATIdentity{Token: pat, User: user, IsAdmin: admin}, nil
+}
 
-	c.Set("user_id", user.ID)
-	c.Set("account_id", pat.AccountID)
-	c.Set("email", user.Email)
-	c.Set("is_admin", admin)
-	c.Set("is_instance_admin", user.IsInstanceAdministrator)
-	c.Set("email_verified", user.EmailVerifiedAt != nil)
+func (m *AuthMiddleware) authenticateWithPAT(c *echo.Context, next echo.HandlerFunc, rawToken string) error {
+	identity, err := ResolvePersonalAccessToken(m.db, rawToken)
+	switch {
+	case errors.Is(err, ErrPATInvalid):
+		return response.Unauthorized(c, "err.invalid_or_expired_token")
+	case errors.Is(err, ErrPATUserNotFound):
+		return response.Unauthorized(c, "err.user_not_found")
+	case errors.Is(err, ErrPATUserDisabled):
+		return response.Forbidden(c, "err.user_account_disabled")
+	case err != nil:
+		return response.InternalError(c, "err.database_error")
+	}
+
+	c.Set("user_id", identity.User.ID)
+	c.Set("account_id", identity.Token.AccountID)
+	c.Set("email", identity.User.Email)
+	c.Set("is_admin", identity.IsAdmin)
+	c.Set("is_instance_admin", identity.User.IsInstanceAdministrator)
+	c.Set("email_verified", identity.User.EmailVerifiedAt != nil)
 	c.Set("auth_type", "pat")
-	c.Set(ctxPATScopes, pat.Scopes)
-	c.Set(ctxIsScopedPAT, strings.TrimSpace(pat.Scopes) != "")
+	c.Set(ctxPATScopes, identity.Token.Scopes)
+	c.Set(ctxIsScopedPAT, identity.IsScoped())
 
 	return next(c)
 }

@@ -289,10 +289,10 @@ func (b *CardDAVBackend) putAddressObject(ctx context.Context, path string, card
 	if err := b.db.First(&vault, "id = ?", vaultID).Error; err != nil {
 		return nil, fmt.Errorf("vault not found: %w", err)
 	}
-	accountID := AccountIDFromContext(ctx)
-	if accountID == "" {
-		accountID = vault.AccountID
-	}
+	// Contact information types belong to the vault's account. The session
+	// account can differ for cross-account shared vaults, and resolving types
+	// from it silently dropped TEL/EMAIL values or bound foreign-account types.
+	accountID := vault.AccountID
 
 	title := card.Value(vcard.FieldTitle)
 

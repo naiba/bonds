@@ -331,14 +331,18 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	})
 
 	auth := api.Group("/auth")
+	// Authenticated /auth routes live outside the protected group, so each one
+	// must carry DenyScopedPAT itself. Without it a calendar:read PAT could call
+	// switch-account to mint a full-access JWT or oauth/link to bind an
+	// attacker-controlled login identity.
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
-	auth.POST("/refresh", authHandler.Refresh, authMiddleware.Authenticate)
-	auth.GET("/me", authHandler.Me, authMiddleware.Authenticate)
-	auth.GET("/accounts", authHandler.ListAccounts, authMiddleware.Authenticate)
-	auth.POST("/switch-account", authHandler.SwitchAccount, authMiddleware.Authenticate)
+	auth.POST("/refresh", authHandler.Refresh, authMiddleware.Authenticate, middleware.DenyScopedPAT)
+	auth.GET("/me", authHandler.Me, authMiddleware.Authenticate, middleware.DenyScopedPAT)
+	auth.GET("/accounts", authHandler.ListAccounts, authMiddleware.Authenticate, middleware.DenyScopedPAT)
+	auth.POST("/switch-account", authHandler.SwitchAccount, authMiddleware.Authenticate, middleware.DenyScopedPAT)
 	auth.GET("/providers", oauthHandler.AvailableProviders)
-	auth.POST("/oauth/link", oauthHandler.LinkProvider, authMiddleware.Authenticate)
+	auth.POST("/oauth/link", oauthHandler.LinkProvider, authMiddleware.Authenticate, middleware.DenyScopedPAT)
 	auth.POST("/oauth/link-register", oauthHandler.LinkRegister)
 	auth.GET("/:provider", oauthHandler.BeginAuth)
 	auth.GET("/:provider/callback", oauthHandler.Callback)
@@ -347,7 +351,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	auth.POST("/verify-email", authHandler.VerifyEmail)
 	auth.POST("/set-password", credentialHandler.Complete)
 	auth.POST("/confirm-email-change", credentialHandler.ConfirmEmailChange)
-	auth.POST("/resend-verification", authHandler.ResendVerification, authMiddleware.Authenticate)
+	auth.POST("/resend-verification", authHandler.ResendVerification, authMiddleware.Authenticate, middleware.DenyScopedPAT)
 
 	auth.POST("/webauthn/login/begin", webauthnHandler.BeginLogin)
 	auth.POST("/webauthn/login/finish", webauthnHandler.FinishLogin)

@@ -1,12 +1,10 @@
 package dav
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 	"strings"
-	"time"
 
+	"github.com/naiba/bonds/internal/middleware"
 	"github.com/naiba/bonds/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -40,12 +38,16 @@ func BasicAuthMiddleware(db *gorm.DB) func(next http.Handler) http.Handler {
 				return
 			}
 
+			accountID := user.AccountID
 			if strings.HasPrefix(password, "bonds_") {
-				if !authenticateWithPAT(db, password, user.ID) {
+				identity, ok := authenticateWithPAT(db, password, user.ID)
+				if !ok {
 					w.Header().Set("WWW-Authenticate", `Basic realm="Bonds DAV"`)
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
+				// The PAT is bound to one account; DAV must act in that account, not the user's home account.
+				accountID = identity.Token.AccountID
 			} else {
 				if user.TwoFactorConfirmedAt != nil {
 					w.Header().Set("WWW-Authenticate", `Basic realm="Bonds DAV"`)
@@ -65,27 +67,22 @@ func BasicAuthMiddleware(db *gorm.DB) func(next http.Handler) http.Handler {
 			}
 
 			ctx := WithUserID(r.Context(), user.ID)
-			ctx = WithAccountID(ctx, user.AccountID)
+			ctx = WithAccountID(ctx, accountID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-func authenticateWithPAT(db *gorm.DB, rawToken, userID string) bool {
-	h := sha256.Sum256([]byte(rawToken))
-	hash := hex.EncodeToString(h[:])
-
-	var pat models.PersonalAccessToken
-	if err := db.Where("token_hash = ? AND user_id = ?", hash, userID).First(&pat).Error; err != nil {
-		return false
+// authenticateWithPAT delegates to the shared REST validator so DAV gets the
+// same expiry, disabled-user and account-membership checks. Scoped PATs are
+// rejected outright: DAV exposes full read-write access to every address book
+// and calendar, while scopes (calendar:read) are only meant for the .ics feed
+// URL. Accepting them here let a leaked feed token read and rewrite all
+// contacts (GHSA-hc8x-cmcm-2jwf).
+func authenticateWithPAT(db *gorm.DB, rawToken, userID string) (*middleware.PATIdentity, bool) {
+	identity, err := middleware.ResolvePersonalAccessToken(db, rawToken)
+	if err != nil || identity.User.ID != userID || identity.IsScoped() {
+		return nil, false
 	}
-
-	if pat.ExpiresAt != nil && time.Now().After(*pat.ExpiresAt) {
-		return false
-	}
-
-	now := time.Now()
-	db.Model(&pat).Update("last_used_at", &now)
-
-	return true
+	return identity, true
 }

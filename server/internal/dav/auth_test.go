@@ -264,6 +264,11 @@ func TestBasicAuth_PAT_Valid(t *testing.T) {
 		t.Fatalf("create user: %v", err)
 	}
 
+	// Registration always creates the home-account membership; PAT auth requires it.
+	if err := db.Create(&models.AccountMembership{AccountID: user.AccountID, UserID: user.ID}).Error; err != nil {
+		t.Fatalf("create membership: %v", err)
+	}
+
 	rawToken := "bonds_abc123testtoken"
 	h := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(h[:])
@@ -399,6 +404,11 @@ func TestBasicAuth_PAT_TwoFactorEnabled(t *testing.T) {
 	}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("create user: %v", err)
+	}
+
+	// Registration always creates the home-account membership; PAT auth requires it.
+	if err := db.Create(&models.AccountMembership{AccountID: user.AccountID, UserID: user.ID}).Error; err != nil {
+		t.Fatalf("create membership: %v", err)
 	}
 
 	rawToken := "bonds_2fapat123token"
