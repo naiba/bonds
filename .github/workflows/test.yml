@@ -116,7 +116,7 @@ jobs:
             echo "PostgreSQL backup round-trip tests were skipped" >&2
             exit 1
           fi
-          test "$(grep -c -- '--- PASS: TestBackupRestore_' "$RUNNER_TEMP/postgres-backup-round-trip.log")" -eq 3
+          test "$(grep -c '^--- PASS: TestBackupRestore_' "$RUNNER_TEMP/postgres-backup-round-trip.log")" -eq 3
 
       - name: Test against PostgreSQL
         working-directory: ./server
