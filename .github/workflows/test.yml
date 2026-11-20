@@ -25,18 +25,6 @@ jobs:
       - name: Install SQLite
         run: sudo apt-get install -y gcc sqlite3 libsqlite3-dev
 
-      # The runner ships an older pg_dump that refuses to dump PostgreSQL 18,
-      # which made the backup round-trip tests skip themselves. Install the
-      # client that matches the service container so they really run.
-      - name: Install PostgreSQL 18 client tools
-        run: |
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-postgresql-18-client.list
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-18
-          echo /usr/lib/postgresql/18/bin >> "$GITHUB_PATH"
-
       - name: Download dependencies
         working-directory: ./server
         run: GOPROXY=https://goproxy.cn,direct go mod download
@@ -90,6 +78,21 @@ jobs:
 
       - name: Install SQLite
         run: sudo apt-get install -y gcc sqlite3 libsqlite3-dev
+
+      # The runner ships an older pg_dump that refuses to dump PostgreSQL 18,
+      # which made the backup round-trip tests skip themselves. Install the
+      # client that matches the service container so they really run.
+      - name: Install PostgreSQL 18 client tools
+        run: |
+          # Registering the repository twice with different keys makes apt fail.
+          if ! grep -rqs apt.postgresql.org /etc/apt/sources.list /etc/apt/sources.list.d; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+            echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg-postgresql-18-client.list
+          fi
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          echo /usr/lib/postgresql/18/bin >> "$GITHUB_PATH"
 
       - name: Download dependencies
         working-directory: ./server
