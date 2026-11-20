@@ -150,7 +150,10 @@ func (s *BackupService) backupPostgres(zw *zip.Writer) error {
 	tmpFile := filepath.Join(os.TempDir(), fmt.Sprintf("bonds-backup-%d.sql", time.Now().UnixNano()))
 	defer os.Remove(tmpFile)
 
-	cmd := exec.Command(pgDump, "--dbname="+s.cfg.Database.DSN, "-f", tmpFile)
+	// --clean --if-exists 让导出文件先 DROP 再 CREATE。恢复的目标是正在使用的库，
+	// 表都已存在：不带这两个参数的导出一上来就会在 CREATE TABLE 处报“已存在”，
+	// 根本恢复不进去。
+	cmd := exec.Command(pgDump, "--dbname="+s.cfg.Database.DSN, "--clean", "--if-exists", "-f", tmpFile)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("pg_dump failed: %s: %w", string(output), err)
 	}
@@ -409,7 +412,11 @@ func (s *BackupService) restorePostgres(tmpDir string) error {
 		return fmt.Errorf("psql not found: %w", err)
 	}
 
-	cmd := exec.Command(psql, "--dbname="+s.cfg.Database.DSN, "-f", dumpFile)
+	// ON_ERROR_STOP 必不可少：psql 默认遇到 SQL 错误只打印后继续，最终仍以 0 退出。
+	// 没有它时一次几乎什么都没恢复的导入也会报成功，随后 Restore 还会照常清空并
+	// 替换上传目录，留下“旧数据库 + 新附件”的不一致状态。
+	// --single-transaction 让失败的恢复整体回滚，而不是停在半截。
+	cmd := exec.Command(psql, "--dbname="+s.cfg.Database.DSN, "-v", "ON_ERROR_STOP=1", "--single-transaction", "-f", dumpFile)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("psql restore failed: %s: %w", string(output), err)
 	}

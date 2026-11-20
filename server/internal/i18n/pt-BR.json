@@ -18,6 +18,7 @@
   "err.invalid_authorization_format": "Formato de autorização inválido",
   "err.invalid_or_expired_token": "Token inválido ou expirado",
   "err.two_factor_required": "Autenticação de dois fatores necessária",
+  "err.two_factor_already_enabled": "A autenticação de dois fatores já está ativada. Desative-a antes de configurá-la novamente.",
   "err.user_account_disabled": "A conta do usuário está desativada",
   "err.database_error": "Ocorreu um erro no banco de dados",
   "err.administrator_access_required": "Acesso de administrador necessário",

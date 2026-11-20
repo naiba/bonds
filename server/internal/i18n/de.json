@@ -21,6 +21,7 @@
   "err.invalid_authorization_format": "Ungültiges Autorisierungsformat",
   "err.invalid_or_expired_token": "Ungültiges oder abgelaufenes Token",
   "err.two_factor_required": "Zwei-Faktor-Authentifizierung erforderlich",
+  "err.two_factor_already_enabled": "Die Zwei-Faktor-Authentifizierung ist bereits aktiviert. Deaktivieren Sie sie, bevor Sie sie neu einrichten.",
   "err.user_account_disabled": "Benutzerkonto ist deaktiviert",
   "err.database_error": "Datenbankfehler aufgetreten",
   "err.administrator_access_required": "Administratorzugriff erforderlich",

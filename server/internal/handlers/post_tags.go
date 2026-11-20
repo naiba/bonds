@@ -51,6 +51,9 @@ func (h *PostTagHandler) Add(c *echo.Context) error {
 	}
 	tag, err := h.svc.Add(uint(postID), uint(journalID), vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}
@@ -86,8 +89,11 @@ func (h *PostTagHandler) List(c *echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_post_id", nil)
 	}
-	tags, err := h.svc.List(uint(postID), uint(journalID))
+	tags, err := h.svc.List(uint(postID), uint(journalID), c.Param("vault_id"))
 	if err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}
@@ -137,6 +143,9 @@ func (h *PostTagHandler) Update(c *echo.Context) error {
 	}
 	tag, err := h.svc.Update(uint(tagID), uint(postID), uint(journalID), vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}
@@ -177,7 +186,10 @@ func (h *PostTagHandler) Remove(c *echo.Context) error {
 	if err != nil {
 		return response.BadRequest(c, "err.invalid_tag_id", nil)
 	}
-	if err := h.svc.Remove(uint(tagID), uint(postID), uint(journalID)); err != nil {
+	if err := h.svc.Remove(uint(tagID), uint(postID), uint(journalID), c.Param("vault_id")); err != nil {
+		if errors.Is(err, services.ErrJournalNotFound) {
+			return response.NotFound(c, "err.journal_not_found")
+		}
 		if errors.Is(err, services.ErrPostNotFound) {
 			return response.NotFound(c, "err.post_not_found")
 		}

@@ -59,6 +59,34 @@ func TestBackupCreate_writesDatabaseSQL_whenDatabaseDriverIsPostgres(t *testing.
 	}
 }
 
+// The dump is restored into the live database, where every table already
+// exists. It therefore has to drop objects before recreating them.
+func TestBackupCreate_dumpsDropStatements_whenDatabaseDriverIsPostgres(t *testing.T) {
+	svc, _ := setupBackupTest(t)
+	svc.cfg.Database.Driver = "postgres"
+	svc.cfg.Database.DSN = "postgres://bonds:test@db.example.com:5432/bonds"
+
+	binDir := t.TempDir()
+	invocationLogPath := filepath.Join(t.TempDir(), "pg_dump-invocation.log")
+	pgDumpScript := fmt.Sprintf("#!/bin/sh\nset -eu\nprintf '%%s\\n' \"$@\" > %q\nwhile [ $# -gt 0 ]; do\n  if [ \"$1\" = \"-f\" ]; then printf 'SELECT 1;\\n' > \"$2\"; fi\n  shift 1\ndone\n", invocationLogPath)
+	prependExecutableToPath(t, binDir, "pg_dump", pgDumpScript)
+
+	if _, err := svc.Create(); err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+
+	invocationLog, err := os.ReadFile(invocationLogPath)
+	if err != nil {
+		t.Fatalf("read pg_dump invocation log: %v", err)
+	}
+	invocationText := string(invocationLog)
+	for _, requiredArgument := range []string{"--clean", "--if-exists", "--dbname=" + svc.cfg.Database.DSN} {
+		if !strings.Contains(invocationText, requiredArgument+"\n") {
+			t.Fatalf("expected pg_dump to be invoked with %s, got %q", requiredArgument, invocationText)
+		}
+	}
+}
+
 func TestBackupRestore_invokesPSQLWithDumpPath_whenDatabaseDriverIsPostgres(t *testing.T) {
 	svc, backupDir := setupBackupTest(t)
 	svc.cfg.Database.Driver = "postgres"
@@ -104,6 +132,13 @@ func TestBackupRestore_invokesPSQLWithDumpPath_whenDatabaseDriverIsPostgres(t *t
 	}
 	if !strings.Contains(invocationText, string(filepath.Separator)+"database.sql") {
 		t.Fatalf("expected psql to receive extracted database.sql path, got %q", invocationText)
+	}
+	// Without these psql exits 0 after SQL errors and a restore that changed
+	// nothing is reported as a success.
+	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction"} {
+		if !strings.Contains(invocationText, requiredArgument+"\n") {
+			t.Fatalf("expected psql to be invoked with %s, got %q", requiredArgument, invocationText)
+		}
 	}
 }
 

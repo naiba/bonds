@@ -109,7 +109,8 @@ func (h *OAuthHandler) Callback(c *echo.Context) error {
 	}
 
 	locale := middleware.GetLocale(c)
-	authResp, linkInfo, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, gothUser.Name, locale)
+	emailVerified := h.oauthService.EmailVerifiedByProvider(provider, gothUser.RawData)
+	authResp, linkInfo, err := h.oauthService.FindOrCreateUser(provider, gothUser.UserID, gothUser.Email, emailVerified, gothUser.Name, locale)
 	if err != nil {
 		if errors.Is(err, services.ErrOAuthAccountNotLinked) {
 			linkToken, tokenErr := h.oauthService.GenerateLinkToken(linkInfo)

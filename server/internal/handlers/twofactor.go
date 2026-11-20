@@ -41,6 +41,9 @@ func (h *TwoFactorHandler) Enable(c *echo.Context) error {
 		if errors.Is(err, services.ErrUserNotFound) {
 			return response.NotFound(c, "err.user_not_found")
 		}
+		if errors.Is(err, services.ErrTwoFactorAlreadyEnabled) {
+			return response.Conflict(c, "err.two_factor_already_enabled")
+		}
 		return response.InternalError(c, "err.failed_to_enable_2fa")
 	}
 

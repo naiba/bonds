@@ -20,12 +20,26 @@ func NewPostTagService(db *gorm.DB) *PostTagService {
 	return &PostTagService{db: db}
 }
 
-func (s *PostTagService) Add(postID uint, journalID uint, vaultID string, req dto.AddPostTagRequest) (*dto.PostTagResponse, error) {
+// findPostInVault 是所有 post-tag 操作的入口校验。
+// 路由中间件只证明调用者是 :vault_id 的成员，路径里的 journal_id / post id 由调用者任填；
+// 只按 "id = ? AND journal_id = ?" 查 post 的话，任何用户都能拿自己的 vault 作掩护，
+// 枚举 ID 去读、改、删别的租户的帖子标签。必须先把 journal 绑回这个 vault。
+func (s *PostTagService) findPostInVault(postID uint, journalID uint, vaultID string) (*models.Post, error) {
+	if err := validateJournalBelongsToVault(s.db, journalID, vaultID); err != nil {
+		return nil, err
+	}
 	var post models.Post
 	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrPostNotFound
 		}
+		return nil, err
+	}
+	return &post, nil
+}
+
+func (s *PostTagService) Add(postID uint, journalID uint, vaultID string, req dto.AddPostTagRequest) (*dto.PostTagResponse, error) {
+	if _, err := s.findPostInVault(postID, journalID, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -67,17 +81,14 @@ func (s *PostTagService) Add(postID uint, journalID uint, vaultID string, req dt
 	return &resp, nil
 }
 
-func (s *PostTagService) List(postID uint, journalID uint) ([]dto.PostTagResponse, error) {
-	var post models.Post
-	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrPostNotFound
-		}
+func (s *PostTagService) List(postID uint, journalID uint, vaultID string) ([]dto.PostTagResponse, error) {
+	post, err := s.findPostInVault(postID, journalID, vaultID)
+	if err != nil {
 		return nil, err
 	}
 
 	var tags []models.Tag
-	if err := s.db.Model(&post).Association("Tags").Find(&tags); err != nil {
+	if err := s.db.Model(post).Association("Tags").Find(&tags); err != nil {
 		return nil, err
 	}
 
@@ -93,11 +104,7 @@ func (s *PostTagService) List(postID uint, journalID uint) ([]dto.PostTagRespons
 }
 
 func (s *PostTagService) Update(tagID uint, postID uint, journalID uint, vaultID string, req dto.UpdatePostTagRequest) (*dto.PostTagResponse, error) {
-	var post models.Post
-	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrPostNotFound
-		}
+	if _, err := s.findPostInVault(postID, journalID, vaultID); err != nil {
 		return nil, err
 	}
 
@@ -123,12 +130,8 @@ func (s *PostTagService) Update(tagID uint, postID uint, journalID uint, vaultID
 	return &resp, nil
 }
 
-func (s *PostTagService) Remove(tagID uint, postID uint, journalID uint) error {
-	var post models.Post
-	if err := s.db.Where("id = ? AND journal_id = ?", postID, journalID).First(&post).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrPostNotFound
-		}
+func (s *PostTagService) Remove(tagID uint, postID uint, journalID uint, vaultID string) error {
+	if _, err := s.findPostInVault(postID, journalID, vaultID); err != nil {
 		return err
 	}
 	result := s.db.Where("post_id = ? AND tag_id = ?", postID, tagID).Delete(&models.PostTag{})

@@ -208,8 +208,10 @@ func rescheduleRecurringReminder(db *gorm.DB, scheduled *models.ContactReminderS
 }
 
 func nextRecurringSchedule(reminder *models.ContactReminder, preferredTime *string, base time.Time, location *time.Location) (time.Time, bool) {
+	// 频率小于 1 时“下一次”会等于（甚至早于）本次，调度器每一轮都会重发同一条提醒。
+	// 接口层已拒绝这种取值，这里兜底的是历史数据和导入数据（Monica 导出里可能是 0）。
 	frequency := 1
-	if reminder.FrequencyNumber != nil {
+	if reminder.FrequencyNumber != nil && *reminder.FrequencyNumber > 1 {
 		frequency = *reminder.FrequencyNumber
 	}
 	var next time.Time

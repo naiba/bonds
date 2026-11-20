@@ -87,8 +87,12 @@ func (s *AuthService) sendVerificationEmail(user *models.User) {
 func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.AuthResponse, error) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 	// Check if registration is enabled (first user always allowed)
+	// 计数失败必须中止注册：忽略错误时 userCount 保持 0，注册者会被当成首个用户，
+	// 绕过“关闭注册”并拿到实例管理员。
 	var userCount int64
-	s.db.Model(&models.User{}).Count(&userCount)
+	if err := s.db.Model(&models.User{}).Count(&userCount).Error; err != nil {
+		return nil, err
+	}
 	isFirstUser := userCount == 0
 	if !isFirstUser && s.settings != nil && !s.settings.GetBool("registration.enabled", true) {
 		return nil, ErrRegistrationDisabled

@@ -63,7 +63,7 @@ func TestRemovePostTag(t *testing.T) {
 	svc, postID, journalID, vaultID := setupPostTagTest(t)
 
 	tag, _ := svc.Add(postID, journalID, vaultID, dto.AddPostTagRequest{Name: "temp"})
-	if err := svc.Remove(tag.ID, postID, journalID); err != nil {
+	if err := svc.Remove(tag.ID, postID, journalID, vaultID); err != nil {
 		t.Fatalf("Remove failed: %v", err)
 	}
 }
@@ -74,7 +74,7 @@ func TestListPostTags(t *testing.T) {
 	svc.Add(postID, journalID, vaultID, dto.AddPostTagRequest{Name: "alpha"})
 	svc.Add(postID, journalID, vaultID, dto.AddPostTagRequest{Name: "beta"})
 
-	tags, err := svc.List(postID, journalID)
+	tags, err := svc.List(postID, journalID, vaultID)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -84,9 +84,9 @@ func TestListPostTags(t *testing.T) {
 }
 
 func TestListPostTagsNotFound(t *testing.T) {
-	svc, _, journalID, _ := setupPostTagTest(t)
+	svc, _, journalID, vaultID := setupPostTagTest(t)
 
-	_, err := svc.List(99999, journalID)
+	_, err := svc.List(99999, journalID, vaultID)
 	if err != ErrPostNotFound {
 		t.Errorf("Expected ErrPostNotFound, got %v", err)
 	}

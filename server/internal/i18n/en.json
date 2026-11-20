@@ -34,6 +34,7 @@
   "err.invalid_authorization_format": "Invalid authorization format",
   "err.invalid_or_expired_token": "Invalid or expired token",
   "err.two_factor_required": "Two-factor authentication required",
+  "err.two_factor_already_enabled": "Two-factor authentication is already enabled. Disable it first to set it up again.",
   "err.user_account_disabled": "User account is disabled",
   "err.database_error": "Database error occurred",
   "err.administrator_access_required": "Administrator access required",

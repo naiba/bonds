@@ -147,6 +147,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 	}
 
 	oauthService := services.NewOAuthService(db, &cfg.JWT)
+	oauthService.SetAuthService(authService)
 	webauthnService, err := services.NewWebAuthnService(db, &cfg.WebAuthn)
 	if err != nil {
 		log.Printf("WARNING: Failed to initialize WebAuthn: %v — WebAuthn disabled", err)

@@ -115,6 +115,17 @@ func (h *PostPhotoHandler) Upload(c *echo.Context) error {
 	}
 	defer src.Close()
 
+	// multipart 里的 Content-Type 由客户端任填，而帖子照片会按存下来的类型内联返回：
+	// 只看 "image/" 前缀的话 image/svg+xml 能带着脚本存进来，形成存储型 XSS。
+	// 这里和通用文件上传用同一套按字节嗅探的白名单（jpeg/png/gif/webp）。
+	validImage, err := verifyUploadedMediaContent(src, mimeType)
+	if err != nil {
+		return response.InternalError(c, "err.failed_to_read_file")
+	}
+	if !validImage {
+		return response.BadRequest(c, "err.file_type_not_allowed", nil)
+	}
+
 	result, err := h.vaultFileService.UploadPostPhoto(uint(postID), vaultID, fileHeader.Filename, mimeType, fileHeader.Size, src)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_upload_post_photo")

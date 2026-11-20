@@ -16,6 +16,40 @@ export type QueryInvalidationScopes = {
 
 export type QueryInvalidationFilters = Omit<InvalidateQueryFilters, "queryKey">;
 
+export type ContactListQueryFilterValues = readonly [
+  labelFilter: unknown,
+  groupFilter: unknown,
+  companyFilter: unknown,
+  currentPage: unknown,
+  pageSize: unknown,
+  sortBy: unknown,
+  search: unknown,
+  statusFilter: unknown,
+];
+
+// 联系人列表页的 query key 只能由这个函数生成。
+// 删除、移动联系人后清理列表缓存时，是靠 key 的长度把“分页列表”和
+// ["vaults", id, "contacts", contactId, ...] 这类单个联系人的 key 区分开的。
+// 以前两边各写各的：页面加了一个筛选条件后 key 变成 11 段，而清理逻辑还在匹配 10 段，
+// 结果永远匹配不到，被删除的联系人会一直留在列表缓存里。
+export function contactListQueryKey(
+  vaultId: unknown,
+  filterValues: ContactListQueryFilterValues,
+): QueryKey {
+  return ["vaults", vaultId, "contacts", ...filterValues];
+}
+
+const contactListQueryKeyLength = contactListQueryKey("", [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+]).length;
+
 export const queryKeyPrefixes = {
   contacts: {
     vault: (vaultId: string) =>
@@ -240,7 +274,7 @@ function isPaginatedContactListQueryKey(
     queryKey[0] === "vaults" &&
     queryKey[1] === vaultId &&
     queryKey[2] === "contacts" &&
-    queryKey.length === 10
+    queryKey.length === contactListQueryKeyLength
   );
 }
 

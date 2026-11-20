@@ -90,10 +90,20 @@ func TestJobPanicRecovery(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	s := NewScheduler(db)
 
-	// Should not panic
+	var panickingJobRan, laterJobRan bool
 	s.runJob("panic-job", func() {
+		panickingJobRan = true
 		panic("test panic")
 	})
+	// 恢复之后调度器必须还能继续跑别的任务。
+	s.runJob("job-after-panic", func() { laterJobRan = true })
+
+	if !panickingJobRan {
+		t.Fatal("the panicking job body never ran, so recovery was not exercised")
+	}
+	if !laterJobRan {
+		t.Fatal("a job scheduled after the panic did not run")
+	}
 }
 
 func TestUpsertJobReplacesSpec(t *testing.T) {
@@ -170,7 +180,23 @@ func TestStartAndStop(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	s := NewScheduler(db)
 
+	var runsAfterStop atomic.Int32
+	if err := s.RegisterJob("@every 1s", "start-stop-job", func() { runsAfterStop.Add(1) }); err != nil {
+		t.Fatalf("RegisterJob failed: %v", err)
+	}
+
 	s.Start()
 	ctx := s.Stop()
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not finish: a running job or the scheduler loop is stuck")
+	}
+
+	// Stop 之后不能再触发任务。
+	runsAfterStop.Store(0)
+	time.Sleep(1500 * time.Millisecond)
+	if got := runsAfterStop.Load(); got != 0 {
+		t.Fatalf("job ran %d time(s) after the scheduler was stopped", got)
+	}
 }

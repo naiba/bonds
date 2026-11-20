@@ -7829,7 +7829,8 @@ func TestContactMergeAuthorizationValidationAndResponse(t *testing.T) {
 	}{
 		{"anonymous", "", body, http.StatusUnauthorized},
 		{"self", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, target.ID), http.StatusBadRequest},
-		{"empty", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[]}`, target.ID), http.StatusBadRequest},
+		// An empty list violates the DTO's min=1 rule, so it is a request validation failure (422).
+		{"empty", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[]}`, target.ID), http.StatusUnprocessableEntity},
 		{"other vault", token, fmt.Sprintf(`{"target_contact_id":%q,"source_contact_ids":[%q]}`, target.ID, other.ID), http.StatusNotFound},
 	} {
 		t.Run(test.name, func(t *testing.T) {

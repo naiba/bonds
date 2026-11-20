@@ -18,6 +18,7 @@
   "err.invalid_authorization_format": "Format d'autorisation invalide",
   "err.invalid_or_expired_token": "Jeton invalide ou expiré",
   "err.two_factor_required": "Authentification à deux facteurs requise",
+  "err.two_factor_already_enabled": "L'authentification à deux facteurs est déjà activée. Désactivez-la avant de la reconfigurer.",
   "err.user_account_disabled": "Le compte utilisateur est désactivé",
   "err.database_error": "Une erreur de base de données s'est produite",
   "err.administrator_access_required": "Accès administrateur requis",

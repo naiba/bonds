@@ -7,6 +7,7 @@ import { describe, expect, it, vi, type MockInstance } from "vitest";
 import {
   invalidateCalendarQueries,
   invalidateContactQueries,
+  contactListQueryKey,
   invalidateFeedQueries,
   invalidateReminderQueries,
   queryKeyPrefixes,
@@ -141,10 +142,8 @@ describe("removeContactFromVaultListCaches", () => {
     const queryClient = new QueryClient();
     const movedContact = { id: "contact-1", first_name: "Moved" };
     const remainingContact = { id: "contact-2", first_name: "Remaining" };
-    const firstPageKey = [
-      "vaults",
-      "source-vault",
-      "contacts",
+    const firstPageKey = contactListQueryKey("source-vault", [
+      null,
       null,
       null,
       1,
@@ -152,23 +151,19 @@ describe("removeContactFromVaultListCaches", () => {
       "name",
       "",
       "active",
-    ] as const;
-    const filteredPageKey = [
-      "vaults",
-      "source-vault",
-      "contacts",
+    ]);
+    const filteredPageKey = contactListQueryKey("source-vault", [
       7,
+      null,
       null,
       2,
       20,
       "updated",
       "move",
       "all",
-    ] as const;
-    const pageWithoutContactKey = [
-      "vaults",
-      "source-vault",
-      "contacts",
+    ]);
+    const pageWithoutContactKey = contactListQueryKey("source-vault", [
+      null,
       null,
       null,
       3,
@@ -176,11 +171,9 @@ describe("removeContactFromVaultListCaches", () => {
       "name",
       "",
       "active",
-    ] as const;
-    const zeroTotalKey = [
-      "vaults",
-      "source-vault",
-      "contacts",
+    ]);
+    const zeroTotalKey = contactListQueryKey("source-vault", [
+      null,
       null,
       null,
       4,
@@ -188,7 +181,7 @@ describe("removeContactFromVaultListCaches", () => {
       "name",
       "",
       "active",
-    ] as const;
+    ]);
     const firstPage = {
       contacts: [movedContact, remainingContact],
       meta: { total: 8, current_page: 1 },

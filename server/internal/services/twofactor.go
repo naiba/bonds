@@ -14,9 +14,11 @@ import (
 )
 
 var (
-	ErrInvalidTOTPCode  = errors.New("invalid totp code")
-	ErrTwoFactorNotSet  = errors.New("two factor not set up")
-	ErrTwoFactorPending = errors.New("two factor authentication required")
+	ErrInvalidTOTPCode = errors.New("invalid totp code")
+	ErrTwoFactorNotSet = errors.New("two factor not set up")
+	// ErrTwoFactorAlreadyEnabled 表示账号的 2FA 已经确认生效，必须先用验证码停用才能重新设置。
+	ErrTwoFactorAlreadyEnabled = errors.New("two factor already enabled")
+	ErrTwoFactorPending        = errors.New("two factor authentication required")
 )
 
 type TwoFactorService struct {
@@ -34,6 +36,12 @@ func (s *TwoFactorService) Enable(userID string) (*dto.TwoFactorSetupResponse, e
 			return nil, ErrUserNotFound
 		}
 		return nil, err
+	}
+
+	// 已确认生效的 2FA 不能在这里被重置：下面会换掉密钥并清空 confirmed_at，
+	// 等于不凭验证码就关掉 2FA。重新绑定必须先走 Disable（需要当前验证码）。
+	if user.TwoFactorConfirmedAt != nil {
+		return nil, ErrTwoFactorAlreadyEnabled
 	}
 
 	key, err := totp.Generate(totp.GenerateOpts{

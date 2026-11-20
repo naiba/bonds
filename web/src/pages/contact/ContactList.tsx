@@ -55,6 +55,7 @@ import {
   invalidateFeedQueries,
   invalidateReminderQueries,
   type QueryInvalidationScopes,
+  contactListQueryKey,
 } from "@/utils/queryInvalidation";
 import { invalidateVaultTaskImpactQueries } from "@/utils/taskQueryInvalidation";
 import { refreshMostConsultedProjections } from "@/utils/mostConsultedProjection";
@@ -198,10 +199,7 @@ export default function ContactList() {
   });
 
   const { data: contactsResponse, isLoading } = useQuery({
-    queryKey: [
-      "vaults",
-      vaultId,
-      "contacts",
+    queryKey: contactListQueryKey(vaultId, [
       labelFilter,
       groupFilter,
       companyFilter,
@@ -210,7 +208,7 @@ export default function ContactList() {
       sortBy,
       search,
       statusFilter,
-    ],
+    ]),
     queryFn: async () => {
       if (labelFilter && !companyFilter) {
         const res = await api.contacts.contactsLabelsDetail(

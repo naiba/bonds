@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrReminderNotFound               = errors.New("reminder not found")
+	ErrReminderInvalidFrequency       = errors.New("reminder frequency_number must be at least 1")
 	ErrReminderInvalidAudience        = errors.New("invalid reminder audience")
 	ErrReminderAudienceUserNotInVault = errors.New("reminder audience user is not in vault")
 )
@@ -44,6 +45,9 @@ func (s *ReminderService) List(contactID, vaultID string) ([]dto.ReminderRespons
 
 func (s *ReminderService) Create(contactID, vaultID string, req dto.CreateReminderRequest) (*dto.ReminderResponse, error) {
 	if err := validateContactBelongsToVault(s.db, contactID, vaultID); err != nil {
+		return nil, err
+	}
+	if err := validateReminderFrequency(req.FrequencyNumber); err != nil {
 		return nil, err
 	}
 	reminder := models.ContactReminder{
@@ -111,6 +115,9 @@ func (s *ReminderService) Update(id uint, contactID, vaultID string, req dto.Upd
 	if err != nil {
 		return nil, err
 	}
+	if err := validateReminderFrequency(req.FrequencyNumber); err != nil {
+		return nil, err
+	}
 	reminder.Label = req.Label
 	reminder.Day = req.Day
 	reminder.Month = req.Month
@@ -168,6 +175,14 @@ func (s *ReminderService) Delete(id uint, contactID, vaultID string) error {
 		return tx.Delete(&reminder).Error
 	}); err != nil {
 		return err
+	}
+	return nil
+}
+
+// validateReminderFrequency 拒绝小于 1 的重复间隔；nil 表示使用默认间隔 1。
+func validateReminderFrequency(frequency *int) error {
+	if frequency != nil && *frequency < 1 {
+		return ErrReminderInvalidFrequency
 	}
 	return nil
 }

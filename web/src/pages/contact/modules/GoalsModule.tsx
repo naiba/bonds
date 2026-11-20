@@ -247,7 +247,10 @@ export default function GoalsModule({
             onSelect={(date) => {
               streakMutation.mutate({
                 goalId: selectedGoal,
-                date: (date as Dayjs).format("YYYY-MM-DD"),
+                // 后端把 happened_at 绑定到 time.Time，只接受 RFC 3339；
+                // 发 "YYYY-MM-DD" 会直接 400。取所选日期的本地零点，
+                // 这样按本地日期展示打卡记录时仍落在同一天。
+                date: (date as Dayjs).startOf("day").toISOString(),
               });
             }}
           />

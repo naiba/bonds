@@ -27,11 +27,29 @@ type OAuthLinkInfo struct {
 	ProviderUserID string
 	Email          string
 	Name           string
+	// EmailVerified 记录身份提供方是否声明该邮箱已验证。只有为 true 时，
+	// 这个邮箱才能被当作账号归属的证据（自动绑定、免验证注册）。
+	EmailVerified bool
 }
 
 type OAuthService struct {
-	db  *gorm.DB
-	jwt *config.JWTConfig
+	db   *gorm.DB
+	jwt  *config.JWTConfig
+	auth *AuthService
+}
+
+// SetAuthService 注入应用里那个已经配置好系统设置和邮件发送的 AuthService。
+// OAuth 注册必须复用它：临时 new 出来的 AuthService 没有设置项，会无视
+// “关闭注册”开关，也不会要求邮箱验证。
+func (s *OAuthService) SetAuthService(auth *AuthService) {
+	s.auth = auth
+}
+
+func (s *OAuthService) authService() *AuthService {
+	if s.auth != nil {
+		return s.auth
+	}
+	return NewAuthService(s.db, s.jwt)
 }
 
 func NewOAuthService(db *gorm.DB, jwt *config.JWTConfig) *OAuthService {
@@ -43,7 +61,12 @@ func NewOAuthService(db *gorm.DB, jwt *config.JWTConfig) *OAuthService {
 // If no matching email exists, returns ErrOAuthAccountNotLinked instead of
 // auto-creating an account — the caller must redirect the user to the
 // account-binding flow (login existing account or register new one).
-func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, locale string) (*dto.AuthResponse, *OAuthLinkInfo, error) {
+//
+// 按邮箱自动绑定只在 emailVerified 为 true 时进行。很多提供方（Discord、
+// 自建 OIDC）允许用任意未验证的邮箱注册：不看这个标志的话，攻击者在提供方
+// 用受害者的邮箱注册一个号，就能直接登录受害者的账号，密码和 2FA 都被绕过。
+// 未验证时退回绑定流程，由用户登录已有账号来证明归属。
+func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email string, emailVerified bool, name, locale string) (*dto.AuthResponse, *OAuthLinkInfo, error) {
 	var token models.UserToken
 	err := s.db.Where("driver = ? AND driver_id = ?", provider, providerUserID).First(&token).Error
 	if err == nil {
@@ -56,6 +79,17 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, l
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil, err
+	}
+
+	linkInfo := &OAuthLinkInfo{
+		Provider:       provider,
+		ProviderUserID: providerUserID,
+		Email:          email,
+		Name:           name,
+		EmailVerified:  emailVerified,
+	}
+	if !emailVerified {
+		return nil, linkInfo, ErrOAuthAccountNotLinked
 	}
 
 	var existingUser models.User
@@ -86,12 +120,6 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email, name, l
 
 	// No matching email — do NOT auto-create account.
 	// Return link info so the handler can redirect to the binding flow.
-	linkInfo := &OAuthLinkInfo{
-		Provider:       provider,
-		ProviderUserID: providerUserID,
-		Email:          email,
-		Name:           name,
-	}
 	return nil, linkInfo, ErrOAuthAccountNotLinked
 }
 
@@ -142,6 +170,7 @@ type oauthLinkClaims struct {
 	ProviderUserID string `json:"provider_user_id"`
 	Email          string `json:"email"`
 	Name           string `json:"name"`
+	EmailVerified  bool   `json:"email_verified"`
 	jwt.RegisteredClaims
 }
 
@@ -151,6 +180,7 @@ func (s *OAuthService) GenerateLinkToken(info *OAuthLinkInfo) (string, error) {
 		ProviderUserID: info.ProviderUserID,
 		Email:          info.Email,
 		Name:           info.Name,
+		EmailVerified:  info.EmailVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -176,6 +206,7 @@ func (s *OAuthService) ParseLinkToken(linkToken string) (*OAuthLinkInfo, error) 
 		ProviderUserID: claims.ProviderUserID,
 		Email:          claims.Email,
 		Name:           claims.Name,
+		EmailVerified:  claims.EmailVerified,
 	}, nil
 }
 
@@ -224,8 +255,7 @@ func (s *OAuthService) LinkOAuthAndRegister(linkToken string, req dto.OAuthLinkR
 		return nil, ErrOAuthAlreadyLinked
 	}
 
-	authSvc := NewAuthService(s.db, s.jwt)
-	authResp, err := authSvc.Register(dto.RegisterRequest{
+	authResp, err := s.authService().Register(dto.RegisterRequest{
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Email:     req.Email,
@@ -235,9 +265,16 @@ func (s *OAuthService) LinkOAuthAndRegister(linkToken string, req dto.OAuthLinkR
 		return nil, err
 	}
 
-	// OAuth emails are trusted — auto-verify
-	now := time.Now()
-	s.db.Model(&models.User{}).Where("id = ?", authResp.User.ID).Update("email_verified_at", now)
+	// 只有“提供方声明已验证”且“注册用的就是这个邮箱”时才能免验证。
+	// 注册邮箱来自请求体，由调用者任填：无条件标记为已验证的话，任何人都能拿一个
+	// OAuth 身份给别人的邮箱地址盖上“已验证”。其余情况走普通的邮箱验证流程。
+	if info.EmailVerified && strings.EqualFold(strings.TrimSpace(req.Email), strings.TrimSpace(info.Email)) {
+		now := time.Now()
+		if err := s.db.Model(&models.User{}).Where("id = ?", authResp.User.ID).
+			Updates(map[string]interface{}{"email_verified_at": now, "email_verification_token": nil}).Error; err != nil {
+			return nil, err
+		}
+	}
 
 	newToken := models.UserToken{
 		UserID:   authResp.User.ID,
@@ -255,6 +292,44 @@ func (s *OAuthService) LinkOAuthAndRegister(linkToken string, req dto.OAuthLinkR
 }
 
 func (s *OAuthService) generateAuthResponse(user *models.User) (*dto.AuthResponse, error) {
-	authSvc := NewAuthService(s.db, s.jwt)
-	return authSvc.generateAuthResponse(user)
+	return s.authService().generateAuthResponse(user)
+}
+
+// EmailVerifiedByProvider 判断身份提供方是否声明了用户邮箱已验证。
+// rawData 是 goth 从提供方 userinfo / ID token 取回的原始字段。
+//
+// 各提供方的字段不同：OIDC 用 email_verified，Google 的 userinfo v2 用 verified_email，
+// Discord 用 verified，GitLab 用 confirmed_at。GitHub 没有对应字段，但它只会返回
+// 已验证的邮箱（公开邮箱必须先验证，goth 回退到 /user/emails 时也只取 verified 的主邮箱）。
+// 取不到任何声明时一律视为未验证。
+func (s *OAuthService) EmailVerifiedByProvider(providerName string, rawData map[string]interface{}) bool {
+	var provider models.OAuthProvider
+	providerType := providerName
+	if err := s.db.Where("name = ?", providerName).First(&provider).Error; err == nil {
+		providerType = provider.Type
+	}
+	return oauthEmailVerified(providerType, rawData)
+}
+
+func oauthEmailVerified(providerType string, rawData map[string]interface{}) bool {
+	switch providerType {
+	case "github":
+		return true
+	case "gitlab":
+		confirmedAt, _ := rawData["confirmed_at"].(string)
+		return confirmedAt != ""
+	}
+	for _, claim := range []string{"email_verified", "verified_email", "verified"} {
+		switch verified := rawData[claim].(type) {
+		case bool:
+			if verified {
+				return true
+			}
+		case string:
+			if strings.EqualFold(verified, "true") {
+				return true
+			}
+		}
+	}
+	return false
 }

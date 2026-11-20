@@ -30,6 +30,7 @@ import type {
 } from "@tanstack/react-query";
 import type { NormalizedFeedSource } from "@/utils/feedSourceLink";
 import { mostConsultedQueryKey } from "@/utils/mostConsultedProjection";
+import { contactListQueryKey } from "@/utils/queryInvalidation";
 
 type MutationOptions<TVariables> = {
   readonly mutationFn?: (variables: TVariables) => Promise<unknown> | unknown;
@@ -316,32 +317,12 @@ const STALE_MOVE_TASK_QUERY_KEYS = [
 ] as const satisfies readonly QueryKey[];
 
 const STALE_MOVE_CONTACT_QUERY_KEYS = [
-  [
-    "vaults",
-    SOURCE_VAULT_ID,
-    "contacts",
-    null,
-    null,
-    1,
-    20,
-    "name",
-    "",
-    "active",
-  ],
+  // Built by the same function as the list page, so the fixture cannot drift from the real key shape.
+  contactListQueryKey(SOURCE_VAULT_ID, [null, null, null, 1, 20, "name", "", "active"]),
   ["vaults", SOURCE_VAULT_ID, "contacts", SOURCE_CONTACT_ID],
-  [
-    "vaults",
-    TARGET_VAULT_ID,
-    "contacts",
-    null,
-    null,
-    1,
-    20,
-    "name",
-    "",
-    "active",
-  ],
-] as const satisfies readonly QueryKey[];
+  // Built by the same function as the list page, so the fixture cannot drift from the real key shape.
+  contactListQueryKey(TARGET_VAULT_ID, [null, null, null, 1, 20, "name", "", "active"]),
+] satisfies readonly QueryKey[];
 
 const STALE_MOVE_FEED_QUERY_KEYS = [
   ["vaults", SOURCE_VAULT_ID, "feed", 1],

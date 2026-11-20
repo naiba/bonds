@@ -19,7 +19,7 @@ func setupOAuthTest(t *testing.T) *OAuthService {
 func TestFindOrCreateUserNew_ReturnsNotLinked(t *testing.T) {
 	svc := setupOAuthTest(t)
 
-	resp, linkInfo, err := svc.FindOrCreateUser("github", "gh-12345", "newuser@example.com", "John Doe", "en")
+	resp, linkInfo, err := svc.FindOrCreateUser("github", "gh-12345", "newuser@example.com", true, "John Doe", "en")
 	if !errors.Is(err, ErrOAuthAccountNotLinked) {
 		t.Fatalf("Expected ErrOAuthAccountNotLinked, got %v", err)
 	}
@@ -63,7 +63,7 @@ func TestFindOrCreateUserExisting(t *testing.T) {
 		t.Fatalf("Register failed: %v", err)
 	}
 
-	resp1, _, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", "Existing User", "en")
+	resp1, _, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", true, "Existing User", "en")
 	if err != nil {
 		t.Fatalf("First FindOrCreateUser failed: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestFindOrCreateUserExisting(t *testing.T) {
 		t.Errorf("Expected user ID %s, got %s", regResp.User.ID, resp1.User.ID)
 	}
 
-	resp2, _, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", "Existing User", "en")
+	resp2, _, err := svc.FindOrCreateUser("github", "gh-12345", "existing@example.com", true, "Existing User", "en")
 	if err != nil {
 		t.Fatalf("Second FindOrCreateUser failed: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestFindOrCreateUserLinkEmail(t *testing.T) {
 	}
 	existingUserID := regResp.User.ID
 
-	resp, _, err := svc.FindOrCreateUser("google", "goo-99999", "link@example.com", "Link User", "en")
+	resp, _, err := svc.FindOrCreateUser("google", "goo-99999", "link@example.com", true, "Link User", "en")
 	if err != nil {
 		t.Fatalf("FindOrCreateUser failed: %v", err)
 	}
