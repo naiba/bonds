@@ -85,16 +85,19 @@ export function contactFirstMetToCalendarDate(contact: Pick<Contact, "first_met_
   if (!timestamp) {
     return undefined;
   }
-  const parsed = dayjs(timestamp);
-  if (!parsed.isValid()) {
+  // 这是一个“日历日期”，后端存成当天的 UTC 零点。只能取字符串里的年月日，
+  // 不能当成时刻交给 dayjs 按本地时区解析：在 UTC 以西的时区会读成前一天，
+  // 而编辑表单会把读到的值原样存回去，于是每保存一次就再往前挪一天。
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(timestamp);
+  if (!match) {
     return undefined;
   }
 
   return {
     calendarType: "gregorian",
-    year: parsed.year(),
-    month: parsed.month() + 1,
-    day: parsed.date(),
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
     datePrecision: "full",
   };
 }

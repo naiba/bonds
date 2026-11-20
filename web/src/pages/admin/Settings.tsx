@@ -1,4 +1,17 @@
-import { Card, Typography, Button, App, Spin, Form, Input, Select, Collapse, InputNumber, Segmented } from "antd";
+import {
+  Card,
+  Typography,
+  Button,
+  App,
+  Spin,
+  Form,
+  Input,
+  Select,
+  Collapse,
+  InputNumber,
+  Segmented,
+  Result,
+} from "antd";
 import { SettingOutlined, TeamOutlined, DatabaseOutlined, KeyOutlined, SearchOutlined } from "@ant-design/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -76,7 +89,7 @@ export default function AdminSettings() {
   const [form] = Form.useForm();
   const qk = ["admin", "settings"];
 
-  const { isLoading, data: initialSettings } = useQuery({
+  const { isLoading, isError, refetch, data: initialSettings } = useQuery({
     queryKey: qk,
     queryFn: async () => {
       const res = await api.admin.settingsList();
@@ -113,6 +126,8 @@ export default function AdminSettings() {
   });
 
   function handleSave() {
+    // 没加载到现有设置就不能保存：表单此时是空的，提交会把每一项都写成空字符串。
+    if (!initialSettings) return;
     const values = form.getFieldsValue(true) as Record<string, unknown>;
     const loadedSettings = new Map((initialSettings ?? []).map(s => [s.key, s.value ?? ""]));
     const settings: SystemSettingItem[] = KNOWN_SETTINGS.map((ks) => {
@@ -197,6 +212,24 @@ export default function AdminSettings() {
         <div style={{ textAlign: "center", padding: 80 }}>
           <Spin size="large" />
         </div>
+      </Form>
+    );
+  }
+
+  // 加载失败时不渲染表单。空表单一旦点了保存，所有设置（包括“密码登录”
+  // “开放注册”这些开关）都会被空值覆盖。
+  if (isError || !initialSettings) {
+    return (
+      <Form form={form}>
+        <Result
+          status="error"
+          title={t("admin.settings.load_failed")}
+          extra={
+            <Button type="primary" onClick={() => refetch()}>
+              {t("admin.settings.reload")}
+            </Button>
+          }
+        />
       </Form>
     );
   }

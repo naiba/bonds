@@ -16,14 +16,14 @@ import (
 const utf8Charset = "utf-8"
 
 // SetupDAVRoutes registers CardDAV and CalDAV routes on the Echo instance.
-func SetupDAVRoutes(e *echo.Echo, db *gorm.DB, uploadDir string) {
+func SetupDAVRoutes(e *echo.Echo, db *gorm.DB, uploadDir string, authOptions ...AuthOption) {
 	cardBackend := NewCardDAVBackend(db, uploadDir)
 	calBackend := NewCalDAVBackend(db)
 
 	cardHandler := newCardDAVHandler(cardBackend)
 	calHandler := &caldav.Handler{Backend: calBackend, Prefix: "/dav"}
 
-	authMw := BasicAuthMiddleware(db)
+	authMw := BasicAuthMiddleware(db, authOptions...)
 
 	davHandler := authMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path

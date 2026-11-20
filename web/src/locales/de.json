@@ -2022,7 +2022,9 @@
       "section_search": "Suche",
       "rebuild_index": "Suchindex neu aufbauen",
       "rebuild_index_description": "Alle Kontakte und Notizen für die Volltextsuche neu indizieren. Verwenden Sie dies, wenn Suchergebnisse unvollständig oder fehlerhaft erscheinen.",
-      "rebuild_index_success": "Suchindex neu aufgebaut: {{contacts}} Kontakte, {{notes}} Notizen indiziert"
+      "rebuild_index_success": "Suchindex neu aufgebaut: {{contacts}} Kontakte, {{notes}} Notizen indiziert",
+      "load_failed": "Die Systemeinstellungen konnten nicht geladen werden",
+      "reload": "Neu laden"
     }
   },
   "verify_email": {

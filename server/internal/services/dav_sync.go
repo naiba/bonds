@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/emersion/go-vcard"
@@ -53,6 +56,7 @@ type DefaultCardDAVClientFactory struct{}
 
 func (f *DefaultCardDAVClientFactory) NewClient(uri, username, password string, tlsConfig DavTLSConfig) (CardDAVClient, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second, Control: rejectLinkLocalDial}).DialContext
 	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: tlsConfig.SkipTLSVerify} //nolint:gosec -- explicit per-subscription opt-in
 	if tlsConfig.CustomCAPEM != "" {
 		roots, err := x509.SystemCertPool()
@@ -227,6 +231,13 @@ func (s *DavSyncService) SyncSubscription(ctx context.Context, subID, vaultID st
 	sub, password, err := s.clientService.GetDecryptedPassword(subID, vaultID)
 	if err != nil {
 		return nil, err
+	}
+
+	// 仅推送（push-only）的订阅不能从远端读取：这个函数做的是“拉取”，
+	// 会把远端的联系人导入本地，并且把远端的删除当成本地删除来执行。
+	// 用户选仅推送就是要 Bonds 作为唯一的数据来源。
+	if sub.SyncWay&SyncWayPull == 0 {
+		return &dto.TriggerSyncResponse{}, nil
 	}
 
 	// A first sync has no checkpoint, but must still preserve local changes
@@ -664,4 +675,24 @@ func (s *DavSyncService) GetSyncLogs(subID, vaultID string, page, perPage int) (
 		TotalPages: int(math.Ceil(float64(total) / float64(perPage))),
 	}
 	return result, meta, nil
+}
+
+// rejectLinkLocalDial 拒绝连接链路本地地址（169.254.0.0/16、fe80::/10）。
+// 订阅地址由用户填写，而云厂商的实例元数据服务（含临时凭据）就在 169.254.169.254：
+// 不拦的话任何注册用户都能让服务器替他去读，并从同步日志里看到返回内容。
+// 这里在连接建立时检查解析后的 IP，域名解析到该网段同样会被拦下。
+// 回环和局域网地址不拦：自建环境里通讯录服务器常常就在内网。
+func rejectLinkLocalDial(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		host = address
+	}
+	if zone := strings.IndexByte(host, '%'); zone >= 0 {
+		host = host[:zone]
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && (ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) {
+		return fmt.Errorf("refusing to connect to link-local address %s", host)
+	}
+	return nil
 }

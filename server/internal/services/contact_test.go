@@ -1732,3 +1732,34 @@ func TestListContacts_BirthdayAgeGroups(t *testing.T) {
 		t.Errorf("Expected 0 groups for Bob, got %d", len(bob.Groups))
 	}
 }
+
+// The contact edit form does not carry template_id, so a full-replace
+// semantic would silently drop the contact's template on every edit. The
+// template has its own endpoint; a general update that omits it must keep it.
+func TestUpdateContact_KeepsTemplateWhenRequestOmitsIt(t *testing.T) {
+	svc, vaultID, userID, _ := setupContactTest(t)
+	var template models.VaultContactTemplate
+	if err := svc.db.Where("vault_id = ?", vaultID).First(&template).Error; err != nil {
+		t.Fatalf("find a contact template of the vault: %v", err)
+	}
+	created, err := svc.CreateContact(vaultID, userID, dto.CreateContactRequest{FirstName: "Templated", TemplateID: &template.ID})
+	if err != nil {
+		t.Fatalf("CreateContact failed: %v", err)
+	}
+
+	updated, err := svc.UpdateContact(created.ID, vaultID, userID, dto.UpdateContactRequest{FirstName: "Renamed"})
+
+	if err != nil {
+		t.Fatalf("UpdateContact failed: %v", err)
+	}
+	if updated.TemplateID == nil || *updated.TemplateID != template.ID {
+		t.Fatalf("template_id after an update without template_id = %v, want %d", updated.TemplateID, template.ID)
+	}
+	var stored models.Contact
+	if err := svc.db.First(&stored, "id = ?", created.ID).Error; err != nil {
+		t.Fatalf("reload contact: %v", err)
+	}
+	if stored.TemplateID == nil || *stored.TemplateID != template.ID {
+		t.Fatalf("stored template_id = %v, want %d", stored.TemplateID, template.ID)
+	}
+}

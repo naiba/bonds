@@ -122,7 +122,7 @@ func Load() *Config {
 			DSN:    getEnv("DB_DSN", "bonds.db"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "change-me-in-production"),
+			Secret:     getEnv("JWT_SECRET", builtInJWTSecret),
 			ExpiryHrs:  getEnvInt("JWT_EXPIRY_HRS", 24),
 			RefreshHrs: getEnvInt("JWT_REFRESH_HRS", 168),
 		},
@@ -216,4 +216,12 @@ func getEnvInt64(key string, fallback int64) int64 {
 		}
 	}
 	return fallback
+}
+
+// builtInJWTSecret 是 JWT_SECRET 未设置时的默认值，写在公开的源码里。
+const builtInJWTSecret = "change-me-in-production"
+
+// UsesBuiltInJWTSecret 报告实例是否在用公开的内置密钥签发会话。
+func (c *Config) UsesBuiltInJWTSecret() bool {
+	return strings.TrimSpace(c.JWT.Secret) == builtInJWTSecret
 }

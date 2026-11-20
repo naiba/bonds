@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,8 @@ import (
 var (
 	ErrNotificationChannelNotFound = errors.New("notification channel not found")
 	ErrInvalidVerificationToken    = errors.New("invalid verification token")
+	// ErrNotificationChannelNotVerified 表示邮件渠道的地址尚未验证，不能启用。
+	ErrNotificationChannelNotVerified = errors.New("notification channel is not verified")
 )
 
 type NotificationService struct {
@@ -147,6 +150,23 @@ func (s *NotificationService) Toggle(id uint, userID string) (*dto.NotificationC
 		}
 		return nil, err
 	}
+	if !ch.Active {
+		// 邮件渠道必须先证明地址归属才能启用。提醒内容由用户自己填写，
+		// 不验证就能启用的话，任何账号都能让本实例向任意邮箱发送任意内容。
+		if ch.Type == "email" && ch.VerifiedAt == nil {
+			verified, err := s.verifyOwnAccountAddress(&ch, userID)
+			if err != nil {
+				return nil, err
+			}
+			if !verified {
+				s.resendChannelVerification(&ch, userID)
+				return nil, ErrNotificationChannelNotVerified
+			}
+		}
+		// 连续失败被自动停用的渠道，手动重新启用时要清零失败计数，
+		// 否则下一次失败就会立刻再次被停用。
+		ch.Fails = 0
+	}
 	ch.Active = !ch.Active
 	if err := s.db.Save(&ch).Error; err != nil {
 		return nil, err
@@ -259,4 +279,36 @@ func (s *NotificationService) ListLogs(id uint, userID string) ([]dto.Notificati
 
 func (s *NotificationService) ScheduleAllContactReminders(channelID uint, userID string) error {
 	return scheduleAllContactReminders(s.db, channelID, userID)
+}
+
+// verifyOwnAccountAddress 把“地址就是该用户已验证的登录邮箱”视为已证明归属，
+// 并把渠道标记为已验证。这也是 SMTP 配置之前创建的渠道（当时发不出验证邮件）
+// 仍能启用的途径。
+func (s *NotificationService) verifyOwnAccountAddress(ch *models.UserNotificationChannel, userID string) (bool, error) {
+	var user models.User
+	if err := s.db.First(&user, "id = ?", userID).Error; err != nil {
+		return false, err
+	}
+	if user.EmailVerifiedAt == nil || !strings.EqualFold(strings.TrimSpace(user.Email), strings.TrimSpace(ch.Content)) {
+		return false, nil
+	}
+	now := time.Now()
+	ch.VerifiedAt = &now
+	return true, nil
+}
+
+// resendChannelVerification 给尚未验证的邮件渠道重发验证邮件，沿用已有的验证令牌。
+func (s *NotificationService) resendChannelVerification(ch *models.UserNotificationChannel, userID string) {
+	if s.mailer == nil {
+		return
+	}
+	if ch.VerificationToken == nil {
+		token := uuid.New().String()
+		if err := s.db.Model(ch).Update("verification_token", token).Error; err != nil {
+			return
+		}
+		ch.VerificationToken = &token
+	}
+	subject, body := notificationVerificationContent(s.getAppURL(), ch.ID, *ch.VerificationToken, s.loadUserLocale(userID))
+	_ = s.mailer.Send(ch.Content, subject, body)
 }

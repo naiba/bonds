@@ -2022,7 +2022,9 @@
       "section_search": "Pesquisa",
       "rebuild_index": "Reconstruir Índice de Pesquisa",
       "rebuild_index_description": "Re-indexar todos os contactos e notas para pesquisa de texto completo. Use isto se os resultados de pesquisa parecerem incompletos ou incorretos.",
-      "rebuild_index_success": "Índice de pesquisa reconstruído: {{contacts}} contactos, {{notes}} notas indexadas"
+      "rebuild_index_success": "Índice de pesquisa reconstruído: {{contacts}} contactos, {{notes}} notas indexadas",
+      "load_failed": "Não foi possível carregar as definições do sistema",
+      "reload": "Recarregar"
     }
   },
   "verify_email": {

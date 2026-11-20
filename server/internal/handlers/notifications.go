@@ -135,6 +135,9 @@ func (h *NotificationHandler) Toggle(c *echo.Context) error {
 		if errors.Is(err, services.ErrNotificationChannelNotFound) {
 			return response.NotFound(c, "err.notification_channel_not_found")
 		}
+		if errors.Is(err, services.ErrNotificationChannelNotVerified) {
+			return response.BadRequest(c, "err.notification_channel_not_verified", nil)
+		}
 		return response.InternalError(c, "err.failed_to_toggle_notification_channel")
 	}
 	return response.OK(c, channel)

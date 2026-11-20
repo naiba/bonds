@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/naiba/bonds/internal/dto"
@@ -17,8 +19,10 @@ import (
 
 var (
 	ErrSubscriptionNotFound = errors.New("subscription not found")
-	ErrEncryptionFailed     = errors.New("encryption failed")
-	ErrDecryptionFailed     = errors.New("decryption failed")
+	// ErrSubscriptionPasswordRequired 表示订阅改指向了另一台主机，必须重新提供远端密码。
+	ErrSubscriptionPasswordRequired = errors.New("changing the server of a subscription requires its password")
+	ErrEncryptionFailed             = errors.New("encryption failed")
+	ErrDecryptionFailed             = errors.New("decryption failed")
 )
 
 type DavClientService struct {
@@ -146,6 +150,11 @@ func (s *DavClientService) Update(id, vaultID string, req dto.UpdateDavSubscript
 	}
 
 	if req.URI != "" {
+		// 保存的远端密码会发给订阅指向的主机。改主机却不重新输入密码的话，任何有权编辑
+		// 订阅的成员都能把它指向自己的服务器，骗走创建者保存的远端凭据。
+		if req.Password == "" && davSubscriptionHost(req.URI) != davSubscriptionHost(sub.URI) {
+			return nil, ErrSubscriptionPasswordRequired
+		}
 		sub.URI = req.URI
 	}
 	if req.Username != "" {
@@ -257,4 +266,14 @@ func toDavSubscriptionResponse(sub *models.AddressBookSubscription) dto.DavSubsc
 		CreatedAt:          sub.CreatedAt,
 		UpdatedAt:          sub.UpdatedAt,
 	}
+}
+
+// davSubscriptionHost 返回订阅地址里决定“凭据发给谁”的部分：协议、主机和端口。
+// 解析不了的地址原样返回，保证它只和自己相等。
+func davSubscriptionHost(rawURI string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURI))
+	if err != nil || parsed.Host == "" {
+		return rawURI
+	}
+	return strings.ToLower(parsed.Scheme + "://" + parsed.Host)
 }

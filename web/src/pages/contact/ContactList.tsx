@@ -60,6 +60,7 @@ import {
 import { invalidateVaultTaskImpactQueries } from "@/utils/taskQueryInvalidation";
 import { refreshMostConsultedProjections } from "@/utils/mostConsultedProjection";
 import { sortLabelsByName } from "@/utils/labelSort";
+import { contactSearchParam } from "@/utils/contactSearchTerm";
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -231,7 +232,7 @@ export default function ContactList() {
           per_page: 9999,
           sort: SORT_MAP[sortBy] ?? "updated_at",
           filter: statusFilter,
-          ...(search.length > 2 ? { search } : {}),
+          ...contactSearchParam(search),
         });
         const filtered = (
           (res.data ?? []) as (Contact & { groups?: ContactGroupSummary[] })[]
@@ -251,7 +252,7 @@ export default function ContactList() {
         sort: SORT_MAP[sortBy] ?? "updated_at",
         filter: statusFilter,
         ...(companyFilter ? { company_id: companyFilter } : {}),
-        ...(search.length > 2 ? { search } : {}),
+        ...contactSearchParam(search),
       });
       return {
         contacts: res.data ?? [],

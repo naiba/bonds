@@ -2022,7 +2022,9 @@
       "section_search": "Pesquisa",
       "rebuild_index": "Recriar Índice de Pesquisa",
       "rebuild_index_description": "Reindexe todos os contatos e anotações para busca de texto completo. Use isto se os resultados da pesquisa parecerem incompletos ou incorretos.",
-      "rebuild_index_success": "Índice de pesquisa recriado: {{contacts}} contatos, {{notes}} anotações indexadas"
+      "rebuild_index_success": "Índice de pesquisa recriado: {{contacts}} contatos, {{notes}} anotações indexadas",
+      "load_failed": "Não foi possível carregar as configurações do sistema",
+      "reload": "Recarregar"
     }
   },
   "verify_email": {

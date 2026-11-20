@@ -193,6 +193,8 @@
   "err.failed_to_create_notification_channel": "Échec de la création du canal de notification",
   "err.invalid_channel_id": "ID de chaîne invalide",
   "err.notification_channel_not_found": "Canal de notification introuvable",
+  "err.notification_channel_not_verified": "Cette adresse e-mail n'a pas encore été vérifiée. L'e-mail de vérification a été renvoyé ; ouvrez le lien qu'il contient pour activer le canal.",
+  "err.dav_subscription_password_required": "La modification de l'adresse du serveur nécessite de saisir à nouveau le mot de passe.",
   "err.failed_to_toggle_notification_channel": "Échec du basculement du canal de notification",
   "err.failed_to_delete_notification_channel": "Échec de la suppression du canal de notification",
   "err.failed_to_list_templates": "Échec de la liste des modèles",

@@ -166,13 +166,11 @@ func (s *AuthService) Login(req dto.LoginRequest) (*dto.AuthResponse, error) {
 	var user models.User
 	if err := s.db.Where("LOWER(email) = ?", strings.ToLower(strings.TrimSpace(req.Email))).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 账号不存在时也做一次等价的 bcrypt 比较，避免靠响应耗时分辨邮箱是否注册过。
+			_ = bcrypt.CompareHashAndPassword(loginTimingEqualizerHash, []byte(req.Password))
 			return nil, ErrInvalidCredentials
 		}
 		return nil, err
-	}
-
-	if user.Disabled {
-		return nil, ErrUserDisabled
 	}
 
 	if user.Password == nil {
@@ -181,6 +179,12 @@ func (s *AuthService) Login(req dto.LoginRequest) (*dto.AuthResponse, error) {
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(req.Password)); err != nil {
 		return nil, ErrInvalidCredentials
+	}
+
+	// “账号已禁用”必须放在密码校验之后：先于密码返回的话，任何人都能用它
+	// 确认某个邮箱在本实例注册过。
+	if user.Disabled {
+		return nil, ErrUserDisabled
 	}
 
 	if user.TwoFactorConfirmedAt != nil {
@@ -433,3 +437,13 @@ func userResponseForAccount(user *models.User, accountID string, isAdmin bool) *
 	resp.IsAdmin = isAdmin
 	return resp
 }
+
+// loginTimingEqualizerHash 是一个固定口令的 bcrypt 哈希，只用于让“账号不存在”的
+// 登录请求消耗和真实校验相近的时间。
+var loginTimingEqualizerHash = func() []byte {
+	hash, err := bcrypt.GenerateFromPassword([]byte("bonds-login-timing-equalizer"), bcrypt.DefaultCost)
+	if err != nil {
+		return nil
+	}
+	return hash
+}()

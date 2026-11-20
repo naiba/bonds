@@ -3,6 +3,8 @@ package services
 import (
 	"archive/zip"
 	"bufio"
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/dto"
 	"gorm.io/gorm"
@@ -371,6 +374,17 @@ func (s *BackupService) extractZipFile(f *zip.File, destDir string) error {
 	return err
 }
 
+// restoreSQLite 用 SQLite 的在线备份接口，把备份文件的内容经由应用自己的连接写回
+// 正在使用的数据库。
+//
+// 不能直接覆盖数据库文件（早期实现是 os.Create(DSN) 后整文件拷贝）：
+//   - 服务运行在 WAL 模式下，其他连接和 -wal 文件里还保留着备份之后提交的内容，
+//     覆盖主文件后读到的仍是“恢复之前”的数据，或者直接得到一个损坏的库；
+//   - DB_DSN 可以带驱动参数（bonds.db?_busy_timeout=5000），把整个 DSN 当文件名
+//     会写出一个同名的野文件，真正的数据库原封不动，却报恢复成功。
+//
+// 在线备份接口按页复制并遵守 SQLite 自己的锁和日志，连接池里的其他连接随后
+// 读到的就是恢复后的内容。
 func (s *BackupService) restoreSQLite(tmpDir string) error {
 	backupDB := filepath.Join(tmpDir, "database.db")
 	if _, err := os.Stat(backupDB); err != nil {
@@ -382,23 +396,69 @@ func (s *BackupService) restoreSQLite(tmpDir string) error {
 		return fmt.Errorf("cannot restore to in-memory database")
 	}
 
-	// Copy backup DB over current DB
-	src, err := os.Open(backupDB)
+	ctx := context.Background()
+	source, err := sql.Open("sqlite3", "file:"+filepath.ToSlash(backupDB)+"?mode=ro")
 	if err != nil {
 		return fmt.Errorf("open backup db: %w", err)
 	}
-	defer src.Close()
-
-	dst, err := os.Create(dbPath)
+	defer source.Close()
+	sourceConn, err := source.Conn(ctx)
 	if err != nil {
-		return fmt.Errorf("create db file: %w", err)
+		return fmt.Errorf("open backup db: %w", err)
 	}
-	defer dst.Close()
+	defer sourceConn.Close()
 
-	if _, err := io.Copy(dst, src); err != nil {
-		return fmt.Errorf("copy db: %w", err)
+	live, err := s.db.DB()
+	if err != nil {
+		return fmt.Errorf("access live db: %w", err)
 	}
+	liveConn, err := live.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("access live db: %w", err)
+	}
+	defer liveConn.Close()
 
+	return sourceConn.Raw(func(sourceDriverConn interface{}) error {
+		return liveConn.Raw(func(liveDriverConn interface{}) error {
+			sourceSQLite, ok := sourceDriverConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("backup db: unexpected driver connection %T", sourceDriverConn)
+			}
+			liveSQLite, ok := liveDriverConn.(*sqlite3.SQLiteConn)
+			if !ok {
+				return fmt.Errorf("live db: unexpected driver connection %T", liveDriverConn)
+			}
+			return copySQLiteDatabase(liveSQLite, sourceSQLite)
+		})
+	})
+}
+
+// copySQLiteDatabase 把 source 的全部页复制到 destination。其他连接持有读事务时
+// 一步会返回 busy / locked，稍等后重试即可，持续拿不到锁则放弃并报错。
+func copySQLiteDatabase(destination, source *sqlite3.SQLiteConn) error {
+	backup, err := destination.Backup("main", source, "main")
+	if err != nil {
+		return fmt.Errorf("start sqlite restore: %w", err)
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		done, stepErr := backup.Step(-1)
+		if done {
+			break
+		}
+		if stepErr != nil {
+			var sqliteErr sqlite3.Error
+			retryable := errors.As(stepErr, &sqliteErr) && (sqliteErr.Code == sqlite3.ErrBusy || sqliteErr.Code == sqlite3.ErrLocked)
+			if !retryable || time.Now().After(deadline) {
+				_ = backup.Finish()
+				return fmt.Errorf("copy sqlite pages: %w", stepErr)
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if err := backup.Finish(); err != nil {
+		return fmt.Errorf("finish sqlite restore: %w", err)
+	}
 	return nil
 }
 
@@ -413,20 +473,22 @@ func (s *BackupService) restorePostgres(tmpDir string) error {
 		return fmt.Errorf("psql not found: %w", err)
 	}
 
-	args := []string{"--dbname=" + s.cfg.Database.DSN}
 	cleanDump, err := postgresDumpDropsObjects(dumpFile)
 	if err != nil {
 		return fmt.Errorf("inspect database.sql: %w", err)
 	}
-	if cleanDump {
-		// 带 DROP 的导出可以整体原子恢复。ON_ERROR_STOP 必不可少：psql 默认遇到 SQL 错误
-		// 只打印后继续并以 0 退出，一次什么都没恢复的导入也会报成功，随后 Restore 还会
-		// 照常清空并替换上传目录。--single-transaction 让失败的恢复整体回滚。
-		args = append(args, "-v", "ON_ERROR_STOP=1", "--single-transaction")
+	// ON_ERROR_STOP 必不可少：psql 默认遇到 SQL 错误只打印后继续并以 0 退出，一次什么都
+	// 没恢复的导入也会报成功，随后 Restore 还会照常清空并替换上传目录。
+	// --single-transaction 让失败的恢复整体回滚，数据库保持原样。
+	args := []string{"--dbname=" + s.cfg.Database.DSN, "-v", "ON_ERROR_STOP=1", "--single-transaction"}
+	if !cleanDump {
+		// 旧版本生成的备份不带 DROP 语句，而恢复的目标库里表都已存在。
+		// 实测（PostgreSQL 18）直接灌这种导出文件从来就恢复不完整：CREATE 全部报“已存在”，
+		// COPY 在已有数据的库上因主键冲突整表失败，在刚迁移好的空库上也会因为外键顺序
+		// 丢表（contacts 先于 vaults 导入）。所以先在同一个事务里重建 public schema，
+		// 再让导出文件自己把结构和数据建回来。
+		args = append(args, "-c", "DROP SCHEMA IF EXISTS public CASCADE", "-c", "CREATE SCHEMA public")
 	}
-	// 不带 DROP 的是旧版本生成的备份：它们只能靠 psql 跳过“已存在”错误继续执行来恢复
-	// （新实例的表由迁移建好，数据靠后面的 COPY 灌入）。对它们启用严格模式会让所有
-	// 旧备份在第一条 CREATE TABLE 就失败，所以保持原来的调用方式。
 	args = append(args, "-f", dumpFile)
 	cmd := exec.Command(psql, args...)
 	if output, err := cmd.CombinedOutput(); err != nil {

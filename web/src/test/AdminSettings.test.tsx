@@ -55,6 +55,25 @@ describe("AdminSettings", () => {
     expect(document.querySelector(".ant-spin")).toBeInTheDocument();
   });
 
+  // With nothing loaded the form is empty. Saving it would write an empty
+  // string over every setting, including the ones that keep login working.
+  it("offers a reload instead of the form when the settings failed to load", async () => {
+    const refetch = vi.fn();
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+    renderAdminSettings();
+
+    expect(screen.queryByText("Save Settings")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reload" }));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(mockSettingsUpdate).not.toHaveBeenCalled();
+  });
+
   it("renders settings form when loaded", () => {
     mockUseQuery.mockReturnValue({
       data: [],

@@ -319,7 +319,11 @@ func (s *ContactService) UpdateContact(contactID, vaultID, userID string, req dt
 	contact.Suffix = strPtrOrNil(req.Suffix)
 	contact.GenderID = req.GenderID
 	contact.PronounID = req.PronounID
-	contact.TemplateID = req.TemplateID
+	// template_id 缺省时保持原值。联系人编辑表单不带这个字段，按“整体替换”处理的话，
+	// 每次编辑联系人都会把它的自定义模板清空。模板有自己的接口负责修改。
+	if req.TemplateID != nil {
+		contact.TemplateID = req.TemplateID
+	}
 	contact.LastTalkedTo = req.LastTalkedTo
 	contact.FirstMetThroughContactID = req.FirstMetThroughContactID
 	contact.StayInTouchFrequencyDays = req.StayInTouchFrequencyDays

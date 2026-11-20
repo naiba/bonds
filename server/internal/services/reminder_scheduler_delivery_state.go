@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"html"
 	"log"
 	"time"
 
@@ -132,7 +133,15 @@ func reminderDeliveryContent(reminder *models.ContactReminder, scheduledAt time.
 	date := formatReminderDate(reminder, scheduledAt, enableAltCalendar)
 	params := map[string]string{"label": reminder.Label, "contact": contactName, "date": date}
 	subject := i18n.Tt(locale, "reminder.subject", params)
-	body := i18n.Tt(locale, "reminder.body", params)
+	// 正文是 HTML（模板自带 <p>/<strong>），而标签和联系人姓名是 vault 成员随手填的文本，
+	// 邮件还会发给其他成员：不转义的话可以往别人收到的邮件里塞链接、图片。
+	// 标题是纯文本邮件头，保持原样。
+	htmlParams := map[string]string{
+		"label":   html.EscapeString(reminder.Label),
+		"contact": html.EscapeString(contactName),
+		"date":    html.EscapeString(date),
+	}
+	body := i18n.Tt(locale, "reminder.body", htmlParams)
 	return subject, body
 }
 
@@ -219,12 +228,12 @@ func nextRecurringSchedule(reminder *models.ContactReminder, preferredTime *stri
 	case "recurring_week":
 		next = base.AddDate(0, 0, frequency*7)
 	case "recurring_month":
-		next = base.AddDate(0, frequency, 0)
+		next = addMonthsOnAnchorDay(base, frequency, reminder.Day)
 	case "recurring_year":
 		if yearly, ok := calcNextYearlySchedule(reminder, base, location); ok {
 			next = yearly
 		} else {
-			next = base.AddDate(frequency, 0, 0)
+			next = addMonthsOnAnchorDay(base, 12*frequency, reminder.Day)
 		}
 	default:
 		return time.Time{}, false
@@ -248,4 +257,22 @@ func calcNextYearlySchedule(reminder *models.ContactReminder, now time.Time, loc
 		return time.Time{}, false
 	}
 	return time.Date(next.Year, time.Month(next.Month), next.Day, now.Hour(), now.Minute(), 0, 0, location), true
+}
+
+// addMonthsOnAnchorDay 把 base 往后推 months 个月，日子取提醒自己的锚点日，
+// 并截断到目标月份的天数。
+//
+// 不能用 base.AddDate(0, months, 0)：1 月 31 日 + 1 个月会被规整成 3 月 3 日，
+// 之后每一次都从 3 日接着推，月底的提醒就永久漂走了；2 月 29 日的每年提醒同理
+// 会漂到 3 月 1 日。锚点日缺失时退回 base 当天的日子。
+func addMonthsOnAnchorDay(base time.Time, months int, anchorDay *int) time.Time {
+	day := base.Day()
+	if anchorDay != nil && *anchorDay >= 1 && *anchorDay <= 31 {
+		day = *anchorDay
+	}
+	firstOfTarget := time.Date(base.Year(), base.Month(), 1, base.Hour(), base.Minute(), 0, 0, base.Location()).AddDate(0, months, 0)
+	if lastDay := firstOfTarget.AddDate(0, 1, -1).Day(); day > lastDay {
+		day = lastDay
+	}
+	return time.Date(firstOfTarget.Year(), firstOfTarget.Month(), day, base.Hour(), base.Minute(), 0, 0, base.Location())
 }

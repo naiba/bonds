@@ -1,9 +1,12 @@
 package handlers_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -1218,18 +1221,33 @@ func TestCrossVaultGroupBulkMembersAddBlocked(t *testing.T) {
 // ==================== L. Cross-Vault IDOR Tests for Files ====================
 
 func TestCrossVaultFileDownloadBlocked(t *testing.T) {
-	ts := setupTestServer(t)
+	ts := setupTestServerWithStorage(t)
 
 	token, _ := ts.registerTestUser(t, "cross-vault-file-download@example.com")
 	vault1 := ts.createTestVault(t, token, "File Download Vault A")
 	vault2 := ts.createTestVault(t, token, "File Download Vault B")
 
 	fileID := createTestFile(t, ts, vault1.ID)
+	// The file must really exist on disk. Without it the download answers 404
+	// for every vault, and this test stays green even with the vault check
+	// removed.
+	storedContent := []byte("contents that belong to vault A only")
+	if err := os.WriteFile(filepath.Join(ts.cfg.Storage.UploadDir, "test-uuid-perm"), storedContent, 0o600); err != nil {
+		t.Fatalf("write stored file: %v", err)
+	}
+	ownVaultPath := fmt.Sprintf("/api/vaults/%s/files/%d/download", vault1.ID, fileID)
+	ownVaultDownload := ts.doRequest(http.MethodGet, ownVaultPath, "", token)
+	if ownVaultDownload.Code != http.StatusOK || !bytes.Equal(ownVaultDownload.Body.Bytes(), storedContent) {
+		t.Fatalf("test setup: owning vault download = %d %q, want 200 with the stored content", ownVaultDownload.Code, ownVaultDownload.Body.String())
+	}
 
 	path := fmt.Sprintf("/api/vaults/%s/files/%d/download", vault2.ID, fileID)
 	rec := ts.doRequest(http.MethodGet, path, "", token)
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404 for cross-vault file download, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if bytes.Contains(rec.Body.Bytes(), storedContent) {
+		t.Error("cross-vault download leaked the file content")
 	}
 }
 

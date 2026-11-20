@@ -22,7 +22,18 @@ jobs:
     steps:
       - name: Extract tag
         id: tag
-        run: echo "tag=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+        # head_branch 是推送者可控的 ref 名：必须经环境变量传入，直接用表达式拼进
+        # 脚本等于让 ref 名里的内容在持有写权限 token 的 job 里当命令执行。
+        # 另外分支推送也会带 head_branch，名字以 v 开头的分支不是发版，要确认它确实是 tag。
+        env:
+          HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+          REPOSITORY_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          if ! git ls-remote --exit-code --tags "$REPOSITORY_URL" "refs/tags/$HEAD_REF" >/dev/null; then
+            echo "::error::$HEAD_REF is not a tag, refusing to release"
+            exit 1
+          fi
+          echo "tag=$HEAD_REF" >> "$GITHUB_OUTPUT"
 
   build-image:
     name: Build Docker (${{ matrix.arch }})

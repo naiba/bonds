@@ -60,6 +60,19 @@ func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder
 	for index := range channels {
 		channel := &channels[index]
 		scheduledAt := calcInitialSchedule(reminder, channel.PreferredTime, userLocation(channel.User)).UTC()
+		if reminder.Type == "one_time" {
+			// 一次性提醒在这个渠道上已经按这个时间发过，就不能再排一次：
+			// 编辑提醒（哪怕只改标签）会走到这里，日期没变时再排就是重发。
+			var delivered int64
+			if err := db.Model(&models.ContactReminderScheduled{}).
+				Where("contact_reminder_id = ? AND user_notification_channel_id = ? AND scheduled_at = ? AND triggered_at IS NOT NULL", reminder.ID, channel.ID, scheduledAt).
+				Count(&delivered).Error; err != nil {
+				return err
+			}
+			if delivered > 0 {
+				continue
+			}
+		}
 		if err := db.Create(&models.ContactReminderScheduled{UserNotificationChannelID: channel.ID, ContactReminderID: reminder.ID, ScheduledAt: scheduledAt}).Error; err != nil {
 			return err
 		}
@@ -68,7 +81,10 @@ func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder
 }
 
 func calcInitialSchedule(reminder *models.ContactReminder, preferredTime *string, location *time.Location) time.Time {
-	now := time.Now().In(location)
+	return calcInitialScheduleAt(reminder, preferredTime, location, time.Now().In(location))
+}
+
+func calcInitialScheduleAt(reminder *models.ContactReminder, preferredTime *string, location *time.Location, now time.Time) time.Time {
 	hour, minute := parsePreferredNotificationTime(preferredTime)
 	calendarType := calendarPkg.CalendarType(reminder.CalendarType)
 	if calendarType != "" && calendarType != calendarPkg.Gregorian && reminder.OriginalMonth != nil && reminder.OriginalDay != nil {
@@ -98,8 +114,25 @@ func calcInitialSchedule(reminder *models.ContactReminder, preferredTime *string
 		day = *reminder.Day
 	}
 	scheduled := time.Date(year, month, day, hour, minute, 0, 0, location)
-	if (recurring || reminder.Year == nil) && scheduled.Before(now) {
-		scheduled = scheduled.AddDate(1, 0, 0)
+	if !scheduled.Before(now) {
+		return scheduled
+	}
+	switch reminder.Type {
+	case "recurring_week", "recurring_month":
+		// 每周 / 每月的提醒要顺着自己的周期推进到下一次。这个函数在每次编辑提醒时
+		// 都会被调用：以前这里统一 +1 年，于是锚点日期已过的每周提醒一经编辑，
+		// 就要沉默到明年才再触发。
+		for scheduled.Before(now) {
+			next, ok := nextRecurringSchedule(reminder, preferredTime, scheduled, location)
+			if !ok || !next.After(scheduled) {
+				break
+			}
+			scheduled = next
+		}
+	default:
+		if recurring || reminder.Year == nil {
+			scheduled = scheduled.AddDate(1, 0, 0)
+		}
 	}
 	return scheduled
 }

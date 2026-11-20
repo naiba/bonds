@@ -48,6 +48,11 @@ func main() {
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("Invalid configuration: %v", err)
 	}
+	if cfg.UsesBuiltInJWTSecret() {
+		// 只告警、不拒绝启动：非 production 环境一直允许用内置密钥，改成报错会让现有部署起不来；
+		// 换成随机密钥则会让已有会话和已保存的 CardDAV 订阅密码全部失效。
+		log.Printf("WARNING: JWT_SECRET is the built-in default, which is public. Anyone can forge login sessions for this instance. Set JWT_SECRET to a random value of at least 32 characters.")
+	}
 
 	db, err := database.Connect(&cfg.Database, cfg.Debug)
 	if err != nil {
@@ -162,7 +167,9 @@ func main() {
 
 	handlers.RegisterRoutes(e, db, cfg, Version, reloadBackup)
 
-	dav.SetupDAVRoutes(e, db, cfg.Storage.UploadDir)
+	dav.SetupDAVRoutes(e, db, cfg.Storage.UploadDir, dav.WithPasswordAuthPolicy(func() bool {
+		return systemSettingService.GetBool("auth.password.enabled", true)
+	}))
 
 	if frontend.HasDistFiles() {
 		frontend.RegisterSPARoutes(e)

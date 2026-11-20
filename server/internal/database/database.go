@@ -19,7 +19,7 @@ func Connect(cfg *config.DatabaseConfig, debug bool) (*gorm.DB, error) {
 
 	switch cfg.Driver {
 	case "sqlite":
-		dialector = sqlite.Open(cfg.DSN)
+		dialector = sqlite.Open(sqliteDSNWithForeignKeys(cfg.DSN))
 	case "postgres":
 		dialector = postgres.Open(cfg.DSN)
 	default:
@@ -486,4 +486,21 @@ func quoteIdentifiers(names []string) []string {
 
 func quoteIdentifier(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+// sqliteDSNWithForeignKeys 把外键开关写进 DSN，让连接池打开的每一条连接都启用外键。
+//
+// PRAGMA foreign_keys 是“每条连接”的设置。只在 Connect 之后执行一次 PRAGMA，
+// 生效的只有碰巧执行它的那一条连接，之后连接池新开的连接全都不检查外键、
+// 也不执行 ON DELETE CASCADE，于是同一个请求的结果取决于拿到了哪条连接。
+// 用户已经在 DSN 里显式写了这个参数时保持原样。
+func sqliteDSNWithForeignKeys(dsn string) string {
+	if strings.Contains(dsn, "_foreign_keys=") || strings.Contains(dsn, "_fk=") {
+		return dsn
+	}
+	separator := "?"
+	if strings.Contains(dsn, "?") {
+		separator = "&"
+	}
+	return dsn + separator + "_foreign_keys=on"
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	"github.com/naiba/bonds/internal/i18n"
@@ -16,6 +17,8 @@ type ReminderSchedulerService struct {
 	db     *gorm.DB
 	mailer Mailer
 	sender NotificationSender
+	// processing 保证同一进程内不会有两轮处理同时进行，见 ProcessDueReminders。
+	processing sync.Mutex
 }
 
 func NewReminderSchedulerService(db *gorm.DB, mailer Mailer, sender NotificationSender) *ReminderSchedulerService {
@@ -24,6 +27,15 @@ func NewReminderSchedulerService(db *gorm.DB, mailer Mailer, sender Notification
 
 // ProcessDueReminders finds all scheduled reminders that are due and processes them.
 func (s *ReminderSchedulerService) ProcessDueReminders() {
+	// 这个任务每分钟触发一次，而“已发送”要等发送完成才落库。上一轮还在发
+	// （SMTP 变慢、到期提醒很多）时下一轮查到的是同一批未发送的记录，两轮都会发。
+	// 上一轮没结束就直接跳过这一轮，到期的提醒下一分钟仍会被处理。
+	if !s.processing.TryLock() {
+		log.Printf("[reminder-scheduler] Previous run is still sending, skipping this tick")
+		return
+	}
+	defer s.processing.Unlock()
+
 	now := time.Now().UTC().Truncate(time.Minute)
 
 	var scheduled []models.ContactReminderScheduled

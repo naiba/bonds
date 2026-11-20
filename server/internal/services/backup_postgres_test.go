@@ -133,12 +133,11 @@ func TestBackupRestore_invokesPSQLWithDumpPath_whenDatabaseDriverIsPostgres(t *t
 	if !strings.Contains(invocationText, string(filepath.Separator)+"database.sql") {
 		t.Fatalf("expected psql to receive extracted database.sql path, got %q", invocationText)
 	}
-	// This archive predates --clean dumps. Such backups only ever restored by
-	// letting psql continue past "already exists" errors, so they must keep
-	// being restored the lenient way.
-	for _, strictArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction"} {
-		if strings.Contains(invocationText, strictArgument) {
-			t.Fatalf("legacy dump must be restored without %s, got %q", strictArgument, invocationText)
+	// This archive predates --clean dumps: it has no DROP statements, so the
+	// schema has to be reset before its CREATE statements can run.
+	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction", "DROP SCHEMA IF EXISTS public CASCADE", "CREATE SCHEMA public"} {
+		if !strings.Contains(invocationText, requiredArgument+"\n") {
+			t.Fatalf("expected psql to be invoked with %q, got %q", requiredArgument, invocationText)
 		}
 	}
 }
@@ -189,6 +188,11 @@ func TestBackupRestore_appliesCleanDumpAtomically_whenDatabaseDriverIsPostgres(t
 		if !strings.Contains(invocationText, requiredArgument+"\n") {
 			t.Fatalf("expected psql to be invoked with %s, got %q", requiredArgument, invocationText)
 		}
+	}
+	// The dump drops its own objects; resetting the schema as well would also
+	// destroy objects the dump does not know about.
+	if strings.Contains(invocationText, "DROP SCHEMA") {
+		t.Fatalf("clean dump must not reset the schema, got %q", invocationText)
 	}
 }
 

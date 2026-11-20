@@ -224,6 +224,8 @@
   "err.failed_to_create_notification_channel": "Benachrichtigungskanal konnte nicht erstellt werden",
   "err.invalid_channel_id": "Ungültige Kanal-ID",
   "err.notification_channel_not_found": "Benachrichtigungskanal nicht gefunden",
+  "err.notification_channel_not_verified": "Diese E-Mail-Adresse wurde noch nicht bestätigt. Die Bestätigungs-E-Mail wurde erneut gesendet; öffnen Sie den Link darin, um den Kanal zu aktivieren.",
+  "err.dav_subscription_password_required": "Zum Ändern der Serveradresse muss das Passwort erneut eingegeben werden.",
   "err.failed_to_toggle_notification_channel": "Benachrichtigungskanal konnte nicht umgeschaltet werden",
   "err.failed_to_delete_notification_channel": "Benachrichtigungskanal konnte nicht gelöscht werden",
 

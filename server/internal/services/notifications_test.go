@@ -138,9 +138,12 @@ func TestNotificationList(t *testing.T) {
 func TestNotificationToggle(t *testing.T) {
 	svc, userID := setupNotificationTest(t)
 
+	// The account's own verified address may be switched on without the
+	// verification mail; a foreign address may not (see
+	// TestNotificationToggle_DoesNotActivateUnverifiedForeignAddress).
 	created, err := svc.Create(userID, dto.CreateNotificationChannelRequest{
 		Type:    "email",
-		Content: "toggle@example.com",
+		Content: "notifications-test@example.com",
 	})
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)

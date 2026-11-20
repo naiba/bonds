@@ -8,6 +8,7 @@ import { api } from "@/api";
 type MockVditorOptions = {
   readonly after?: () => void;
   readonly input?: (value: string) => void;
+  readonly blur?: (value: string) => void;
   readonly upload?: {
     readonly handler?: (files: File[]) => Promise<string | null>;
   };
@@ -197,5 +198,38 @@ describe("VditorMarkdownEditor uploads", () => {
 
     expect(ref.current?.getValue()).toBe("Favorite tea is oolong");
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("publishes text typed just before the editor loses focus", async () => {
+    const onChange = vi.fn();
+    render(
+      <VditorMarkdownEditor
+        vaultId="vault-1"
+        value="Favorite tea is"
+        onChange={onChange}
+        ariaLabel="Post section"
+        placeholder="Write a post"
+      />,
+    );
+    await waitFor(() => expect(vditorState.options?.after).toBeDefined());
+    if (!vditorState.options?.blur) {
+      throw new Error("editor did not register a blur callback");
+    }
+
+    // Clicking Save moves focus out of the editor before Vditor's delayed
+    // input callback has reported the last keystrokes.
+    act(() => vditorState.options?.blur?.("Favorite tea is oolong"));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith("Favorite tea is oolong");
+
+    // The delayed input callback then reports the same text; announcing it
+    // again would make the page believe a newer draft exists.
+    act(() => vditorState.options?.input?.("Favorite tea is oolong"));
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    act(() => vditorState.options?.input?.("Favorite tea is oolong, hot"));
+    expect(onChange).toHaveBeenLastCalledWith("Favorite tea is oolong, hot");
+    expect(onChange).toHaveBeenCalledTimes(2);
   });
 });

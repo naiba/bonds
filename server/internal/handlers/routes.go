@@ -21,6 +21,7 @@ import (
 )
 
 func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version string, backupReloader func(), mailerOverride ...services.Mailer) {
+	e.Use(middleware.SecurityHeaders())
 	e.Use(middleware.Audit(db))
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret, db)
 
@@ -35,6 +36,7 @@ func RegisterRoutes(e *echo.Echo, db *gorm.DB, cfg *config.Config, version strin
 
 	authService := services.NewAuthService(db, &cfg.JWT)
 	vaultService := services.NewVaultService(db)
+	vaultService.SetUploadDir(cfg.Storage.UploadDir)
 	contactService := services.NewContactService(db)
 	noteService := services.NewNoteService(db)
 	reminderService := services.NewReminderService(db)

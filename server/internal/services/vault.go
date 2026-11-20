@@ -3,6 +3,9 @@ package services
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -16,7 +19,13 @@ var (
 )
 
 type VaultService struct {
-	db *gorm.DB
+	db        *gorm.DB
+	uploadDir string
+}
+
+// SetUploadDir 告诉 VaultService 上传文件存在哪里，删除 vault 时才能把磁盘上的文件一并清掉。
+func (s *VaultService) SetUploadDir(uploadDir string) {
+	s.uploadDir = uploadDir
 }
 
 func NewVaultService(db *gorm.DB) *VaultService {
@@ -135,9 +144,32 @@ func (s *VaultService) DeleteVault(vaultID string) error {
 		return err
 	}
 
-	return companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
+	// 文件记录会随级联删除消失，磁盘上的文件必须趁记录还在时记下来。
+	// 不清理的话，vault 里的照片和文档会一直留在上传目录里，没有任何记录再指向它们。
+	var fileUUIDs []string
+	if s.uploadDir != "" {
+		if err := s.db.Unscoped().Model(&models.File{}).Where("vault_id = ?", vaultID).Pluck("uuid", &fileUUIDs).Error; err != nil {
+			return err
+		}
+	}
+
+	if err := companyEmploymentTransaction(s.db, func(tx *gorm.DB) error {
 		return deleteVaultCascade(tx, vaultID)
-	})
+	}); err != nil {
+		return err
+	}
+
+	// 事务提交之后再删文件：删除失败只是留下孤儿文件，不能反过来让数据还在、文件没了。
+	for _, fileUUID := range fileUUIDs {
+		// UUID 由服务端生成；再过一遍 Base，保证只会删上传目录内的文件。
+		if fileUUID == "" || filepath.Base(fileUUID) != fileUUID {
+			continue
+		}
+		if err := os.Remove(filepath.Join(s.uploadDir, fileUUID)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Printf("[vault] remove uploaded file %s of deleted vault %s: %v", fileUUID, vaultID, err)
+		}
+	}
+	return nil
 }
 
 // deleteVaultCascade deletes ALL data associated with a vault in the correct order

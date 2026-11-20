@@ -43,6 +43,7 @@ import {
   invalidateDeletedVaultTask,
   invalidateUpdatedVaultTask,
 } from "./vaultTaskMutationInvalidation";
+import { contactSearchParam } from "@/utils/contactSearchTerm";
 
 interface TaskEditModalProps {
   vaultId: string;
@@ -207,10 +208,8 @@ function TaskEditModalContent({
       // by prefix we must call the API instead of relying on local option filtering.
       const params: Parameters<typeof api.contacts.contactsList>[1] = {
         per_page: 200,
+        ...contactSearchParam(contactSearch),
       };
-      if (contactSearch.length > 2) {
-        params.search = contactSearch;
-      }
       const res = await api.contacts.contactsList(String(vaultId), params);
       return (res.data ?? []) as Contact[];
     },

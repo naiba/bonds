@@ -5300,7 +5300,8 @@ func TestDavSubscription_Update_Success(t *testing.T) {
 
 	created := ts.createTestDavSubscription(t, token, vault.ID)
 
-	body := `{"uri":"https://dav2.example.com/contacts/","username":"newuser","sync_way":3,"frequency":60}`
+	// Pointing the subscription at another server requires its password again.
+	body := `{"uri":"https://dav2.example.com/contacts/","username":"newuser","password":"new-remote-password","sync_way":3,"frequency":60}`
 	rec := ts.doRequest(http.MethodPut,
 		fmt.Sprintf("/api/vaults/%s/dav/subscriptions/%s", vault.ID, created.ID),
 		body, token)

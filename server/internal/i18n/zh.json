@@ -237,6 +237,8 @@
   "err.failed_to_create_notification_channel": "创建通知渠道失败",
   "err.invalid_channel_id": "无效的渠道ID",
   "err.notification_channel_not_found": "通知渠道未找到",
+  "err.notification_channel_not_verified": "该邮箱地址尚未验证。已重新发送验证邮件，请点击邮件中的链接后再启用此渠道。",
+  "err.dav_subscription_password_required": "修改服务器地址时需要重新输入密码。",
   "err.failed_to_toggle_notification_channel": "切换通知渠道失败",
   "err.failed_to_delete_notification_channel": "删除通知渠道失败",
 

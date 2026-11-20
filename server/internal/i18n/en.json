@@ -237,6 +237,8 @@
   "err.failed_to_create_notification_channel": "Failed to create notification channel",
   "err.invalid_channel_id": "Invalid channel ID",
   "err.notification_channel_not_found": "Notification channel not found",
+  "err.notification_channel_not_verified": "This email address has not been verified yet. We sent the verification email again; open the link in it to enable the channel.",
+  "err.dav_subscription_password_required": "Changing the server address requires entering the password again.",
   "err.failed_to_toggle_notification_channel": "Failed to toggle notification channel",
   "err.failed_to_delete_notification_channel": "Failed to delete notification channel",
 

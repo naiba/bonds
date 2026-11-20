@@ -141,6 +141,9 @@ func (h *DavClientHandler) Update(c *echo.Context) error {
 
 	sub, err := h.clientService.Update(subID, vaultID, req)
 	if err != nil {
+		if errors.Is(err, services.ErrSubscriptionPasswordRequired) {
+			return response.BadRequest(c, "err.dav_subscription_password_required", nil)
+		}
 		if errors.Is(err, services.ErrSubscriptionNotFound) {
 			return response.NotFound(c, "err.subscription_not_found")
 		}

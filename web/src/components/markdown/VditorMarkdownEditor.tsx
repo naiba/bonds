@@ -117,6 +117,17 @@ const VditorMarkdownEditor = forwardRef<
     let editorReady = false;
     let destroyed = false;
     const previewURLs = previewURLsRef.current;
+    // Blur and the delayed input callback can both report the same text;
+    // announcing it twice makes pages think the draft changed after saving.
+    const publishEditorValue = (editorValue: string) => {
+      const canonicalValue = canonicalizeLocalPreviewURLs(
+        editorValue,
+        previewURLs,
+      );
+      if (canonicalValue === valueRef.current) return;
+      valueRef.current = canonicalValue;
+      onChangeRef.current(canonicalValue);
+    };
     const pendingPreviews = new Set<string>();
 
     const applyLocalImagePreviews = () => {
@@ -302,18 +313,17 @@ const VditorMarkdownEditor = forwardRef<
           },
         },
         input: (nextValue: string) => {
-          const canonicalValue = canonicalizeLocalPreviewURLs(
-            nextValue,
-            previewURLs,
-          );
-          valueRef.current = canonicalValue;
           if (editor)
             localStorage.setItem(MODE_STORAGE_KEY, editor.getCurrentMode());
-          onChangeRef.current(canonicalValue);
+          publishEditorValue(nextValue);
         },
-        blur: () => {
+        // Vditor reports typing through "input" only after undoDelay (800ms).
+        // Clicking Save inside that window used to submit the text without
+        // the last keystrokes, so publish the live text as focus leaves.
+        blur: (currentValue: string) => {
           if (editor)
             localStorage.setItem(MODE_STORAGE_KEY, editor.getCurrentMode());
+          publishEditorValue(currentValue);
         },
         after: () => {
           if (!editor) return;

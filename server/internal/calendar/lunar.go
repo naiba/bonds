@@ -17,16 +17,30 @@ func (l *lunarConverter) Type() CalendarType {
 	return Lunar
 }
 
-func (l *lunarConverter) ToGregorian(date DateInfo) (GregorianDate, error) {
+func (l *lunarConverter) ToGregorian(date DateInfo) (result GregorianDate, err error) {
+	// lunar-go 对不存在的农历日期（比如当年没有的闰月）直接 panic。
+	// 日历导出会把同一个日期按之后几十年逐年投影，这里必须把它变成普通错误，
+	// 否则一个闰月生日就能让整份日历导出失败。
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result, err = GregorianDate{}, fmt.Errorf("invalid lunar date %d-%d-%d: %v", date.Year, date.Month, date.Day, recovered)
+		}
+	}()
+
+	month := date.Month
+	if date.IsLeapMonth() && lunarCalendar.NewLunarYear(date.Year).GetLeapMonth() != date.AbsMonth() {
+		// 这一年没有对应的闰月：按习惯落在同名的平月，与 tryOccurrenceInYear 保持一致。
+		month = date.AbsMonth()
+	}
 	day := date.Day
-	lunarMonthObj := lunarCalendar.NewLunarMonthFromYm(date.Year, date.Month)
+	lunarMonthObj := lunarCalendar.NewLunarMonthFromYm(date.Year, month)
 	if lunarMonthObj != nil {
 		dayCount := lunarMonthObj.GetDayCount()
 		if day > dayCount {
 			day = dayCount
 		}
 	}
-	lunar := lunarCalendar.NewLunarFromYmd(date.Year, date.Month, day)
+	lunar := lunarCalendar.NewLunarFromYmd(date.Year, month, day)
 	solar := lunar.GetSolar()
 	return GregorianDate{
 		Day:   solar.GetDay(),

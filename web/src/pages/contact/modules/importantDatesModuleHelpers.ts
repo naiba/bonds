@@ -25,6 +25,24 @@ export function buildImportantDatePickerValue(
     };
   }
 
+  // A yearless lunar date stores a Gregorian projection in month/day and the
+  // lunar month/day the user picked in original_*. Opening it as Gregorian
+  // used to turn it into a Gregorian date on the next save.
+  if (
+    datePrecision === "month_day"
+    && calendarType !== "gregorian"
+    && date.original_day != null
+    && date.original_month != null
+  ) {
+    return {
+      calendarType,
+      day: date.original_day,
+      month: date.original_month,
+      year: null,
+      datePrecision,
+    };
+  }
+
   return {
     calendarType: "gregorian",
     day: date.day ?? null,

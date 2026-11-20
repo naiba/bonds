@@ -193,6 +193,8 @@
   "err.failed_to_create_notification_channel": "Error al crear el canal de notificación",
   "err.invalid_channel_id": "ID de canal inválido",
   "err.notification_channel_not_found": "Canal de notificación no encontrado",
+  "err.notification_channel_not_verified": "Esta dirección de correo aún no ha sido verificada. Hemos reenviado el correo de verificación; abra el enlace que contiene para activar el canal.",
+  "err.dav_subscription_password_required": "Para cambiar la dirección del servidor es necesario volver a introducir la contraseña.",
   "err.failed_to_toggle_notification_channel": "Error al cambiar el estado del canal de notificación",
   "err.failed_to_delete_notification_channel": "Error al eliminar el canal de notificación",
   "err.failed_to_list_templates": "Error al listar las plantillas",

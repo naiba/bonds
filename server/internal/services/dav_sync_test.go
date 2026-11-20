@@ -1080,3 +1080,66 @@ func TestDavSyncService_SyncSubscription_BidirectionalStillDeletes(t *testing.T)
 		t.Error("expected contact to be soft-deleted in bidirectional mode")
 	}
 }
+
+// A push-only subscription publishes Bonds contacts to the remote address book
+// and must never read from it: not importing its cards, and above all not
+// deleting local contacts because the remote side removed them.
+func TestDavSyncService_SyncSubscription_PushOnlyNeverPullsOrDeletes(t *testing.T) {
+	syncSvc, clientSvc, _, vaultID, userID, _ := setupDavSyncTest(t)
+	sub, err := clientSvc.Create(vaultID, userID, dto.CreateDavSubscriptionRequest{
+		URI: "https://dav.example.com/contacts/", Username: "user", Password: "pwd", SyncWay: SyncWayPush,
+	})
+	if err != nil {
+		t.Fatalf("Create subscription failed: %v", err)
+	}
+	token := "sync-token-1"
+	syncSvc.db.Model(&models.AddressBookSubscription{}).Where("id = ?", sub.ID).
+		Updates(map[string]interface{}{"distant_sync_token": token, "address_book_path": "/contacts/"})
+	published := models.Contact{
+		VaultID: vaultID, FirstName: strPtrOrNil("Published"),
+		DistantURI: strPtrOrNil("/contacts/published.vcf"), DistantEtag: strPtrOrNil("etag1"),
+	}
+	if err := syncSvc.db.Create(&published).Error; err != nil {
+		t.Fatalf("create contact: %v", err)
+	}
+
+	remoteRequests := 0
+	mc := &mockCardDAVClient{
+		syncCollFn: func(ctx context.Context, path string, query *carddav.SyncQuery) (*carddav.SyncResponse, error) {
+			remoteRequests++
+			return &carddav.SyncResponse{
+				SyncToken: "sync-token-2",
+				Deleted:   []string{"/contacts/published.vcf"},
+				Updated:   []carddav.AddressObject{{Path: "/contacts/remote-only.vcf", ETag: "etag9"}},
+			}, nil
+		},
+		multiGetFn: func(ctx context.Context, path string, mg *carddav.AddressBookMultiGet) ([]carddav.AddressObject, error) {
+			remoteRequests++
+			return []carddav.AddressObject{{Path: "/contacts/remote-only.vcf", ETag: "etag9", Card: makeVCard("Remote", "Only", "remote-only-uid")}}, nil
+		},
+		queryFn: func(ctx context.Context, path string, query *carddav.AddressBookQuery) ([]carddav.AddressObject, error) {
+			remoteRequests++
+			return nil, nil
+		},
+	}
+	syncSvc.SetClientFactory(&mockCardDAVClientFactory{client: mc})
+
+	result, err := syncSvc.SyncSubscription(context.Background(), sub.ID, vaultID)
+
+	if err != nil {
+		t.Fatalf("SyncSubscription failed: %v", err)
+	}
+	if result.Created != 0 || result.Updated != 0 || result.Deleted != 0 {
+		t.Fatalf("result = %+v, want nothing pulled for a push-only subscription", result)
+	}
+	if remoteRequests != 0 {
+		t.Fatalf("made %d read request(s) against the remote address book", remoteRequests)
+	}
+	var contacts []models.Contact
+	if err := syncSvc.db.Where("vault_id = ?", vaultID).Find(&contacts).Error; err != nil {
+		t.Fatalf("list contacts: %v", err)
+	}
+	if len(contacts) != 1 || contacts[0].ID != published.ID {
+		t.Fatalf("vault contacts after sync = %d, want only the locally published contact to remain", len(contacts))
+	}
+}
