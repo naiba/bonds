@@ -63,7 +63,9 @@ func TestOAuthEmailVerified_ReadsEachProvidersClaim(t *testing.T) {
 		{name: "oidc verified", providerType: "oidc", rawData: map[string]interface{}{"email_verified": true}, want: true},
 		{name: "oidc verified as string", providerType: "oidc", rawData: map[string]interface{}{"email_verified": "true"}, want: true},
 		{name: "oidc unverified", providerType: "oidc", rawData: map[string]interface{}{"email_verified": false}, want: false},
-		{name: "oidc without the claim", providerType: "oidc", rawData: map[string]interface{}{"email": "a@example.com"}, want: false},
+		// Many IdPs never send the claim. Those setups auto-linked before and must keep doing so.
+		{name: "oidc without the claim", providerType: "oidc", rawData: map[string]interface{}{"email": "a@example.com"}, want: true},
+		{name: "oidc unverified as string", providerType: "oidc", rawData: map[string]interface{}{"email_verified": "false"}, want: false},
 		{name: "google verified", providerType: "google", rawData: map[string]interface{}{"verified_email": true}, want: true},
 		{name: "google unverified", providerType: "google", rawData: map[string]interface{}{"verified_email": false}, want: false},
 		{name: "discord verified", providerType: "discord", rawData: map[string]interface{}{"verified": true}, want: true},
@@ -71,7 +73,8 @@ func TestOAuthEmailVerified_ReadsEachProvidersClaim(t *testing.T) {
 		{name: "gitlab confirmed", providerType: "gitlab", rawData: map[string]interface{}{"confirmed_at": "2024-01-01T00:00:00Z"}, want: true},
 		{name: "gitlab unconfirmed", providerType: "gitlab", rawData: map[string]interface{}{"confirmed_at": nil}, want: false},
 		{name: "github only returns verified emails", providerType: "github", rawData: nil, want: true},
-		{name: "unknown provider without claims", providerType: "custom", rawData: nil, want: false},
+		{name: "gitlab payload without the field", providerType: "gitlab", rawData: map[string]interface{}{"email": "a@example.com"}, want: true},
+		{name: "unknown provider without claims", providerType: "custom", rawData: nil, want: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -91,8 +94,8 @@ func TestEmailVerifiedByProvider_ResolvesTypeFromConfiguredName(t *testing.T) {
 	if !svc.EmailVerifiedByProvider("company-sso", nil) {
 		t.Fatal("a provider configured with type github must be resolved through its custom name")
 	}
-	if svc.EmailVerifiedByProvider("unconfigured-name", nil) {
-		t.Fatal("an unknown provider without claims must count as unverified")
+	if svc.EmailVerifiedByProvider("unconfigured-name", map[string]interface{}{"verified": false}) {
+		t.Fatal("an explicit unverified claim must be honoured for providers resolved by name only")
 	}
 }
 

@@ -3,6 +3,8 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -117,12 +119,13 @@ func (h *PostPhotoHandler) Upload(c *echo.Context) error {
 
 	// multipart 里的 Content-Type 由客户端任填，而帖子照片会按存下来的类型内联返回：
 	// 只看 "image/" 前缀的话 image/svg+xml 能带着脚本存进来，形成存储型 XSS。
-	// 这里和通用文件上传用同一套按字节嗅探的白名单（jpeg/png/gif/webp）。
-	validImage, err := verifyUploadedMediaContent(src, mimeType)
+	// 只拦“浏览器会当文档执行”的内容，不能改成固定白名单：HEIC、AVIF、BMP 等格式
+	// 一直可以作为帖子照片上传，收紧成白名单会让这些老用法失效。
+	scriptable, err := postPhotoIsScriptable(src, mimeType)
 	if err != nil {
 		return response.InternalError(c, "err.failed_to_read_file")
 	}
-	if !validImage {
+	if scriptable {
 		return response.BadRequest(c, "err.file_type_not_allowed", nil)
 	}
 
@@ -166,4 +169,26 @@ func (h *PostPhotoHandler) Delete(c *echo.Context) error {
 		return response.InternalError(c, "err.failed_to_delete_post_photo")
 	}
 	return response.NoContent(c)
+}
+
+// postPhotoIsScriptable 判断上传内容是否可能被浏览器当作可执行文档：
+// 声明为 SVG，或者字节嗅探出来是文本类（SVG / HTML / XML 都属于这一类）。
+// 真正的位图无论哪种格式都不会嗅探成 text/*。
+func postPhotoIsScriptable(src interface {
+	io.Reader
+	io.Seeker
+}, declaredMimeType string) (bool, error) {
+	var sniffBuffer [512]byte
+	n, err := src.Read(sniffBuffer[:])
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, err
+	}
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		return false, err
+	}
+	mediaType := strings.ToLower(strings.TrimSpace(strings.Split(declaredMimeType, ";")[0]))
+	if mediaType == "image/svg+xml" {
+		return true, nil
+	}
+	return strings.HasPrefix(http.DetectContentType(sniffBuffer[:n]), "text/"), nil
 }

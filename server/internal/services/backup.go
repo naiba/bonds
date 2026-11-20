@@ -2,6 +2,7 @@ package services
 
 import (
 	"archive/zip"
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -412,11 +413,22 @@ func (s *BackupService) restorePostgres(tmpDir string) error {
 		return fmt.Errorf("psql not found: %w", err)
 	}
 
-	// ON_ERROR_STOP 必不可少：psql 默认遇到 SQL 错误只打印后继续，最终仍以 0 退出。
-	// 没有它时一次几乎什么都没恢复的导入也会报成功，随后 Restore 还会照常清空并
-	// 替换上传目录，留下“旧数据库 + 新附件”的不一致状态。
-	// --single-transaction 让失败的恢复整体回滚，而不是停在半截。
-	cmd := exec.Command(psql, "--dbname="+s.cfg.Database.DSN, "-v", "ON_ERROR_STOP=1", "--single-transaction", "-f", dumpFile)
+	args := []string{"--dbname=" + s.cfg.Database.DSN}
+	cleanDump, err := postgresDumpDropsObjects(dumpFile)
+	if err != nil {
+		return fmt.Errorf("inspect database.sql: %w", err)
+	}
+	if cleanDump {
+		// 带 DROP 的导出可以整体原子恢复。ON_ERROR_STOP 必不可少：psql 默认遇到 SQL 错误
+		// 只打印后继续并以 0 退出，一次什么都没恢复的导入也会报成功，随后 Restore 还会
+		// 照常清空并替换上传目录。--single-transaction 让失败的恢复整体回滚。
+		args = append(args, "-v", "ON_ERROR_STOP=1", "--single-transaction")
+	}
+	// 不带 DROP 的是旧版本生成的备份：它们只能靠 psql 跳过“已存在”错误继续执行来恢复
+	// （新实例的表由迁移建好，数据靠后面的 COPY 灌入）。对它们启用严格模式会让所有
+	// 旧备份在第一条 CREATE TABLE 就失败，所以保持原来的调用方式。
+	args = append(args, "-f", dumpFile)
+	cmd := exec.Command(psql, args...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("psql restore failed: %s: %w", string(output), err)
 	}
@@ -535,4 +547,28 @@ func (s *BackupService) validateFilename(filename string) error {
 		return ErrBackupInvalidFilename
 	}
 	return nil
+}
+
+// postgresDumpDropsObjects 判断导出文件是否由 pg_dump --clean 生成（建表前先 DROP）。
+// DROP 语句集中在文件开头、第一张表的数据之前，所以只需要看到第一条 COPY 为止。
+func postgresDumpDropsObjects(dumpFile string) (bool, error) {
+	f, err := os.Open(dumpFile)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "DROP ") {
+			return true, nil
+		}
+		if strings.HasPrefix(line, "COPY ") {
+			return false, nil
+		}
+	}
+	// 超长行（bufio.ErrTooLong）只可能出现在数据区，按旧格式处理即可。
+	return false, nil
 }

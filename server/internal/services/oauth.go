@@ -62,9 +62,9 @@ func NewOAuthService(db *gorm.DB, jwt *config.JWTConfig) *OAuthService {
 // auto-creating an account — the caller must redirect the user to the
 // account-binding flow (login existing account or register new one).
 //
-// 按邮箱自动绑定只在 emailVerified 为 true 时进行。很多提供方（Discord、
-// 自建 OIDC）允许用任意未验证的邮箱注册：不看这个标志的话，攻击者在提供方
-// 用受害者的邮箱注册一个号，就能直接登录受害者的账号，密码和 2FA 都被绕过。
+// 按邮箱自动绑定只在 emailVerified 为 true 时进行（判定规则见 EmailVerifiedByProvider）。
+// 有的提供方（例如 Discord）允许用任意未验证的邮箱注册：不看这个标志的话，攻击者
+// 在提供方用受害者的邮箱注册一个号，就能直接登录受害者的账号，密码和 2FA 都被绕过。
 // 未验证时退回绑定流程，由用户登录已有账号来证明归属。
 func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email string, emailVerified bool, name, locale string) (*dto.AuthResponse, *OAuthLinkInfo, error) {
 	var token models.UserToken
@@ -295,13 +295,17 @@ func (s *OAuthService) generateAuthResponse(user *models.User) (*dto.AuthRespons
 	return s.authService().generateAuthResponse(user)
 }
 
-// EmailVerifiedByProvider 判断身份提供方是否声明了用户邮箱已验证。
+// EmailVerifiedByProvider 判断能否把提供方返回的邮箱当作账号归属的证据。
 // rawData 是 goth 从提供方 userinfo / ID token 取回的原始字段。
 //
-// 各提供方的字段不同：OIDC 用 email_verified，Google 的 userinfo v2 用 verified_email，
-// Discord 用 verified，GitLab 用 confirmed_at。GitHub 没有对应字段，但它只会返回
-// 已验证的邮箱（公开邮箱必须先验证，goth 回退到 /user/emails 时也只取 verified 的主邮箱）。
-// 取不到任何声明时一律视为未验证。
+// 只有提供方明确声明“未验证”时才返回 false：
+// OIDC 的 email_verified、Google userinfo v2 的 verified_email、Discord 的 verified
+// 为 false，或 GitLab 的 confirmed_at 为空。
+//
+// 提供方根本不下发这类字段时返回 true，保持原有的自动绑定行为。不少 OIDC 服务
+// 默认不带 email_verified，一刀切按未验证处理会让这些部署的单点登录无法再自动
+// 绑定已有账号（关闭密码登录时用户甚至无法自行绑定）。代价是：对这类提供方，
+// 邮箱是否可信仍取决于提供方自身，接入允许自填未验证邮箱的 OIDC 服务前要先确认这一点。
 func (s *OAuthService) EmailVerifiedByProvider(providerName string, rawData map[string]interface{}) bool {
 	var provider models.OAuthProvider
 	providerType := providerName
@@ -312,24 +316,28 @@ func (s *OAuthService) EmailVerifiedByProvider(providerName string, rawData map[
 }
 
 func oauthEmailVerified(providerType string, rawData map[string]interface{}) bool {
-	switch providerType {
-	case "github":
-		return true
-	case "gitlab":
-		confirmedAt, _ := rawData["confirmed_at"].(string)
-		return confirmedAt != ""
+	if providerType == "gitlab" {
+		if confirmedAt, present := rawData["confirmed_at"]; present {
+			confirmed, _ := confirmedAt.(string)
+			return confirmed != ""
+		}
 	}
+	explicitlyUnverified := false
 	for _, claim := range []string{"email_verified", "verified_email", "verified"} {
 		switch verified := rawData[claim].(type) {
 		case bool:
 			if verified {
 				return true
 			}
+			explicitlyUnverified = true
 		case string:
 			if strings.EqualFold(verified, "true") {
 				return true
 			}
+			if strings.EqualFold(verified, "false") {
+				explicitlyUnverified = true
+			}
 		}
 	}
-	return false
+	return !explicitlyUnverified
 }

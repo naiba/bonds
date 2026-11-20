@@ -80,7 +80,7 @@ func (h *ReminderHandler) Create(c *echo.Context) error {
 		if errors.Is(err, services.ErrContactNotFound) {
 			return response.NotFound(c, "err.contact_not_found")
 		}
-		if errors.Is(err, services.ErrReminderInvalidDate) || errors.Is(err, services.ErrReminderInvalidFrequency) {
+		if errors.Is(err, services.ErrReminderInvalidDate) {
 			return response.ValidationError(c, map[string]string{"validation": err.Error()})
 		}
 		if errors.Is(err, services.ErrReminderInvalidAudience) || errors.Is(err, services.ErrReminderAudienceUserNotInVault) {
@@ -134,7 +134,7 @@ func (h *ReminderHandler) Update(c *echo.Context) error {
 		if errors.Is(err, services.ErrReminderNotFound) {
 			return response.NotFound(c, "err.reminder_not_found")
 		}
-		if errors.Is(err, services.ErrReminderInvalidDate) || errors.Is(err, services.ErrReminderInvalidFrequency) {
+		if errors.Is(err, services.ErrReminderInvalidDate) {
 			return response.ValidationError(c, map[string]string{"validation": err.Error()})
 		}
 		if errors.Is(err, services.ErrReminderInvalidAudience) || errors.Is(err, services.ErrReminderAudienceUserNotInVault) {

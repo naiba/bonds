@@ -133,9 +133,59 @@ func TestBackupRestore_invokesPSQLWithDumpPath_whenDatabaseDriverIsPostgres(t *t
 	if !strings.Contains(invocationText, string(filepath.Separator)+"database.sql") {
 		t.Fatalf("expected psql to receive extracted database.sql path, got %q", invocationText)
 	}
-	// Without these psql exits 0 after SQL errors and a restore that changed
-	// nothing is reported as a success.
-	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction"} {
+	// This archive predates --clean dumps. Such backups only ever restored by
+	// letting psql continue past "already exists" errors, so they must keep
+	// being restored the lenient way.
+	for _, strictArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction"} {
+		if strings.Contains(invocationText, strictArgument) {
+			t.Fatalf("legacy dump must be restored without %s, got %q", strictArgument, invocationText)
+		}
+	}
+}
+
+// A dump that drops objects before recreating them can be applied atomically:
+// psql must stop on the first error and roll back, otherwise a restore that
+// changed nothing is reported as a success and the uploads get replaced anyway.
+func TestBackupRestore_appliesCleanDumpAtomically_whenDatabaseDriverIsPostgres(t *testing.T) {
+	svc, backupDir := setupBackupTest(t)
+	svc.cfg.Database.Driver = "postgres"
+	svc.cfg.Database.DSN = "postgres://bonds:test@db.example.com:5432/bonds"
+
+	backupArchivePath := filepath.Join(backupDir, "bonds-2026-01-02-000000.zip")
+	archiveFile, err := os.Create(backupArchivePath)
+	if err != nil {
+		t.Fatalf("create backup archive: %v", err)
+	}
+	zw := zip.NewWriter(archiveFile)
+	entry, err := zw.Create("database.sql")
+	if err != nil {
+		t.Fatalf("create database.sql entry: %v", err)
+	}
+	if _, err := entry.Write([]byte("--\n-- PostgreSQL database dump\n--\n\nDROP TABLE IF EXISTS public.contacts;\nCREATE TABLE public.contacts (id integer);\n")); err != nil {
+		t.Fatalf("write database.sql entry: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip writer: %v", err)
+	}
+	if err := archiveFile.Close(); err != nil {
+		t.Fatalf("close backup archive: %v", err)
+	}
+
+	binDir := t.TempDir()
+	invocationLogPath := filepath.Join(t.TempDir(), "psql-invocation.log")
+	psqlScript := fmt.Sprintf("#!/bin/sh\nset -eu\nprintf '%%s\\n' \"$@\" > %q\n", invocationLogPath)
+	prependExecutableToPath(t, binDir, "psql", psqlScript)
+
+	if err := svc.Restore(filepath.Base(backupArchivePath)); err != nil {
+		t.Fatalf("Restore() error: %v", err)
+	}
+
+	invocationLog, err := os.ReadFile(invocationLogPath)
+	if err != nil {
+		t.Fatalf("read psql invocation log: %v", err)
+	}
+	invocationText := string(invocationLog)
+	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction", "--dbname=" + svc.cfg.Database.DSN} {
 		if !strings.Contains(invocationText, requiredArgument+"\n") {
 			t.Fatalf("expected psql to be invoked with %s, got %q", requiredArgument, invocationText)
 		}

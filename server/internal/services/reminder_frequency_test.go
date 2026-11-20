@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -29,29 +28,37 @@ func TestNextRecurringSchedule_NonPositiveFrequencyStillMovesForward(t *testing.
 	}
 }
 
-func TestReminder_RejectsNonPositiveFrequency(t *testing.T) {
+// Clients (API, MCP, imports) have always been allowed to send 0 here, so the
+// request keeps working; the meaningless value is stored as "use the default".
+func TestReminder_StoresNonPositiveFrequencyAsDefault(t *testing.T) {
 	svc, contactID, vaultID := setupReminderTest(t)
 	day, month := 15, 6
 	zero := 0
 
-	_, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
-		Label: "Call", Day: &day, Month: &month, Type: "recurring_month", FrequencyNumber: &zero,
-	})
-	if !errors.Is(err, ErrReminderInvalidFrequency) {
-		t.Fatalf("Create with frequency 0: err = %v, want ErrReminderInvalidFrequency", err)
-	}
-
-	one := 1
 	created, err := svc.Create(contactID, vaultID, dto.CreateReminderRequest{
-		Label: "Call", Day: &day, Month: &month, Type: "recurring_month", FrequencyNumber: &one,
+		Label: "Call", Day: &day, Month: &month, Type: "recurring_month", FrequencyNumber: &zero,
 	})
 	if err != nil {
-		t.Fatalf("Create with frequency 1 failed: %v", err)
+		t.Fatalf("Create with frequency 0 must keep working: %v", err)
 	}
-	_, err = svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
-		Label: "Call", Day: &day, Month: &month, Type: "recurring_month", FrequencyNumber: &zero,
+	if created.FrequencyNumber != nil {
+		t.Fatalf("created frequency_number = %d, want nil (default interval)", *created.FrequencyNumber)
+	}
+
+	three, negative := 3, -2
+	updated, err := svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
+		Label: "Call", Day: &day, Month: &month, Type: "recurring_month", FrequencyNumber: &three,
 	})
-	if !errors.Is(err, ErrReminderInvalidFrequency) {
-		t.Fatalf("Update with frequency 0: err = %v, want ErrReminderInvalidFrequency", err)
+	if err != nil || updated.FrequencyNumber == nil || *updated.FrequencyNumber != 3 {
+		t.Fatalf("Update with frequency 3: reminder = %+v, err = %v", updated, err)
+	}
+	updated, err = svc.Update(created.ID, contactID, vaultID, dto.UpdateReminderRequest{
+		Label: "Call", Day: &day, Month: &month, Type: "recurring_month", FrequencyNumber: &negative,
+	})
+	if err != nil {
+		t.Fatalf("Update with a negative frequency must keep working: %v", err)
+	}
+	if updated.FrequencyNumber != nil {
+		t.Fatalf("updated frequency_number = %d, want nil (default interval)", *updated.FrequencyNumber)
 	}
 }

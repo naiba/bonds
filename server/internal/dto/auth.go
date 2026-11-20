@@ -10,7 +10,9 @@ type RegisterRequest struct {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email" example:"user@example.com"`
+	// 这里不加 email 格式规则：早期注册不校验邮箱格式，库里可能有不是标准邮箱的登录标识，
+	// 对“按邮箱查找已有账号”的请求做格式校验会把这些老账号挡在外面。
+	Email    string `json:"email" validate:"required" example:"user@example.com"`
 	Password string `json:"password" validate:"required" example:"secureP@ss123"`
 	TOTPCode string `json:"totp_code" example:"123456"`
 }

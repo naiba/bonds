@@ -87,3 +87,28 @@ func TestPostPhotoUpload_AcceptsRealImage(t *testing.T) {
 		t.Fatalf("stored mime_type = %q, want image/png", stored.MimeType)
 	}
 }
+
+// Formats outside the sniffable whitelist (HEIC from phones, AVIF, BMP...) were
+// always accepted as post photos. Closing the SVG hole must not take them away.
+func TestPostPhotoUpload_StillAcceptsOtherBinaryImageFormats(t *testing.T) {
+	ts := setupTestServerWithStorage(t)
+	token, _ := ts.registerTestUser(t, "post-photo-heic@example.com")
+	vault := ts.createTestVault(t, token, "Post Photo Vault")
+	photosPath := createJournalPostForPhotoTest(t, ts, token, vault.ID)
+	heic := []byte("\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic" + strings.Repeat("\x00", 64))
+
+	rec := ts.doMultipartUpload(t, photosPath, token, "file", "phone.heic", "image/heic", heic)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("HEIC upload: status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	var stored struct {
+		MimeType string `json:"mime_type"`
+	}
+	if err := json.Unmarshal(parseResponse(t, rec).Data, &stored); err != nil {
+		t.Fatalf("parse upload response: %v", err)
+	}
+	if stored.MimeType != "image/heic" {
+		t.Fatalf("stored mime_type = %q, want image/heic", stored.MimeType)
+	}
+}
