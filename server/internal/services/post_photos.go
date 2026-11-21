@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -76,8 +77,13 @@ func (s *VaultFileService) DeletePostPhoto(fileID, postID uint, vaultID string) 
 		return err
 	}
 
-	destPath := filepath.Join(s.uploadDir, file.UUID)
-	os.Remove(destPath)
-
-	return s.db.Delete(&file).Error
+	// 先删记录再删磁盘文件：照片被用作封面时记录会因为外键删不掉，先删文件的话
+	// 就留下一条指向空文件的记录（和 deleteFileRecord 里说明的是同一个问题）。
+	if err := s.db.Delete(&file).Error; err != nil {
+		return err
+	}
+	if err := os.Remove(filepath.Join(s.uploadDir, file.UUID)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove file %s: %w", file.UUID, err)
+	}
+	return nil
 }

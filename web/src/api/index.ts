@@ -122,6 +122,22 @@ httpClient.instance.interceptors.request.use((config) => {
     config.headers["Accept-Language"] = normalizeLanguageCode(i18n.language);
     return config;
   }
+  // A caller that supplies its own credentials is acting for the account they
+  // belong to, not for the session stored in this browser. Replacing them with
+  // the stored token made the OAuth binding page bind the provider identity to
+  // whichever account was still signed in here instead of the one whose
+  // password had just been entered.
+  const callerAuthorization = config.headers.get("Authorization");
+  const storedToken = localStorage.getItem("token");
+  if (
+    typeof callerAuthorization === "string" &&
+    callerAuthorization !== "" &&
+    callerAuthorization !== `Bearer ${storedToken}` &&
+    config.authenticationOwnership === undefined
+  ) {
+    config.headers["Accept-Language"] = normalizeLanguageCode(i18n.language);
+    return config;
+  }
   const existingOwnership = config.authenticationOwnership;
   const token = existingOwnership?.retryToken ?? localStorage.getItem("token");
   const authenticationOwnership =

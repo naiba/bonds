@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/dto"
 	"github.com/naiba/bonds/internal/models"
@@ -169,5 +170,59 @@ func TestLinkOAuthToUser_ProvesOwnershipForLaterProviders(t *testing.T) {
 	}
 	if _, err := svc.authService().Login(dto.LoginRequest{Email: "owner@example.com", Password: "owner-password"}); err != nil {
 		t.Errorf("the owner's password stopped working after binding: %v", err)
+	}
+}
+
+// The registrant may have switched on 2FA. The takeover clears it, so the owner
+// must get a session straight away; the stale in-memory user used to make this
+// sign-in answer with a 2FA challenge nobody could pass.
+func TestFindOrCreateUser_TakeoverOfAccountWithTwoFactorSignsTheOwnerIn(t *testing.T) {
+	svc, _ := setupOAuthTestRequiringEmailVerification(t)
+	registrant := registerWithPassword(t, svc, "victim@example.com", "registrant-password")
+	secret := "JBSWY3DPEHPK3PXP"
+	if err := svc.db.Model(&models.User{}).Where("id = ?", registrant.User.ID).Updates(map[string]interface{}{
+		"two_factor_secret": secret, "two_factor_confirmed_at": time.Now(),
+	}).Error; err != nil {
+		t.Fatalf("switch on 2FA: %v", err)
+	}
+
+	resp, _, err := svc.FindOrCreateUser("google", "google-real-owner", "victim@example.com", true, "Real Owner", "en")
+
+	if err != nil || resp == nil {
+		t.Fatalf("FindOrCreateUser = %+v, %v", resp, err)
+	}
+	if resp.RequiresTwoFactor || resp.Token == "" {
+		t.Fatalf("requires_two_factor = %v, session token present = %v; want a session, the registrant's 2FA is gone", resp.RequiresTwoFactor, resp.Token != "")
+	}
+}
+
+// A claim that is present counts as verified only when it clearly says so.
+func TestOAuthEmailVerified_OnlyAnExplicitTrueClaimCountsAsVerified(t *testing.T) {
+	cases := []struct {
+		name  string
+		claim interface{}
+		want  bool
+	}{
+		{"boolean true", true, true},
+		{"string true", "true", true},
+		{"string true with spaces and capitals", " TRUE ", true},
+		{"boolean false", false, false},
+		{"string false with spaces", " False ", false},
+		{"string zero", "0", false},
+		{"string no", "no", false},
+		{"number zero", float64(0), false},
+		{"number one", float64(1), false},
+		{"empty string", "", false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := oauthEmailVerified("oidc", map[string]interface{}{"email_verified": testCase.claim})
+			if got != testCase.want {
+				t.Fatalf("email_verified = %#v counted as verified = %v, want %v", testCase.claim, got, testCase.want)
+			}
+		})
+	}
+	if !oauthEmailVerified("oidc", map[string]interface{}{"sub": "no-claim"}) {
+		t.Fatal("a provider that sends no verification claim must keep being trusted")
 	}
 }

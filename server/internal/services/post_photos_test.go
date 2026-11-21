@@ -2,6 +2,8 @@ package services
 
 import (
 	"bytes"
+	"errors"
+	"gorm.io/gorm"
 	"os"
 	"path/filepath"
 	"testing"
@@ -164,5 +166,40 @@ func TestDeletePostPhotoNotFound(t *testing.T) {
 	err := svc.DeletePostPhoto(9999, postID, vaultID)
 	if err != ErrFileNotFound {
 		t.Errorf("Expected ErrFileNotFound, got %v", err)
+	}
+}
+
+// The photo's record can be undeletable (it is a cover, referenced by a foreign
+// key). The file on disk was removed before the record, leaving a record that
+// points at nothing.
+func TestDeletePostPhoto_KeepsTheFileOnDiskWhenTheRecordCannotBeDeleted(t *testing.T) {
+	svc, postID, vaultID := setupPostPhotoTest(t)
+	content := []byte("photo that must survive")
+	uploaded, err := svc.UploadPostPhoto(postID, vaultID, "cover.jpg", "image/jpeg", int64(len(content)), bytes.NewReader(content))
+	if err != nil {
+		t.Fatalf("UploadPostPhoto: %v", err)
+	}
+	storedPath := filepath.Join(svc.UploadDir(), uploaded.UUID)
+	recordDeletionFailure := errors.New("record deletion refused")
+	const hook = "bonds:test_refuse_post_photo_record_deletion"
+	if err := svc.db.Callback().Delete().Before("gorm:delete").Register(hook, func(tx *gorm.DB) {
+		if tx.Statement.Table == "files" {
+			_ = tx.AddError(recordDeletionFailure)
+		}
+	}); err != nil {
+		t.Fatalf("register hook: %v", err)
+	}
+	t.Cleanup(func() { _ = svc.db.Callback().Delete().Remove(hook) })
+
+	if err := svc.DeletePostPhoto(uploaded.ID, postID, vaultID); !errors.Is(err, recordDeletionFailure) {
+		t.Fatalf("DeletePostPhoto error = %v, want the record deletion failure", err)
+	}
+
+	stored, err := os.ReadFile(storedPath)
+	if err != nil {
+		t.Fatalf("the file was removed although its record is still there: %v", err)
+	}
+	if !bytes.Equal(stored, content) {
+		t.Fatalf("file content = %q, want %q", stored, content)
 	}
 }

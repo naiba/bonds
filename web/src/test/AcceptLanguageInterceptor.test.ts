@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { normalizeLanguageCode } from "@/i18n";
 import i18n from "@/i18n";
 import { httpClient } from "@/api";
-import type { InternalAxiosRequestConfig, AxiosHeaders } from "axios";
+import { AxiosHeaders } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 
 // Mirror what axios feeds the interceptor. The interceptors at runtime walk
 // through the registered handlers sequentially — call them the same way.
@@ -20,14 +21,7 @@ async function runRequestInterceptors(config: InternalAxiosRequestConfig) {
 }
 
 function makeConfig(): InternalAxiosRequestConfig {
-  return {
-    headers: {
-      set(key: string, value: string) {
-        (this as Record<string, unknown>)[key] = value;
-        return this;
-      },
-    } as unknown as AxiosHeaders,
-  } as InternalAxiosRequestConfig;
+  return { headers: new AxiosHeaders() } as InternalAxiosRequestConfig;
 }
 
 describe("Accept-Language request interceptor", () => {

@@ -374,7 +374,14 @@ func revokeCredentialsOfUnverifiedAccount(tx *gorm.DB, user *models.User) error 
 	if err := tx.Where("user_id = ?", user.ID).Delete(&models.UserToken{}).Error; err != nil {
 		return err
 	}
-	return tx.First(user, "id = ?", user.ID).Error
+	// 必须查进一个空结构体再赋值：直接查进 user 的话，库里已经变成 NULL 的列不会
+	// 清掉结构体里原有的指针字段，调用方会拿着“仍然开着 2FA”的旧值去发 2FA 挑战。
+	var reloaded models.User
+	if err := tx.First(&reloaded, "id = ?", user.ID).Error; err != nil {
+		return err
+	}
+	*user = reloaded
+	return nil
 }
 
 // EmailVerifiedByProvider 判断能否把提供方返回的邮箱当作账号归属的证据。
@@ -408,15 +415,23 @@ func oauthEmailVerified(providerType string, rawData map[string]interface{}) boo
 	// 含义不同的真值字段（比如表示账号状态的 verified）盖过去。
 	// 提供方根本不下发这类字段时仍按可信处理（见 EmailVerifiedByProvider 的说明）。
 	for _, claim := range []string{"email_verified", "verified_email", "verified"} {
-		switch verified := rawData[claim].(type) {
+		value, present := rawData[claim]
+		if !present {
+			continue
+		}
+		// 声明存在时只认明确的“真”：有的提供方把它写成 "0"、"no"、数字 0 或带空格的
+		// " False "，只比对字符串 "false" 会把这些都当成已验证。
+		switch verified := value.(type) {
 		case bool:
 			if !verified {
 				return false
 			}
 		case string:
-			if strings.EqualFold(verified, "false") {
+			if !strings.EqualFold(strings.TrimSpace(verified), "true") {
 				return false
 			}
+		default:
+			return false
 		}
 	}
 	return true

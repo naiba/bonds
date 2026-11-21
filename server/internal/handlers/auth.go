@@ -92,6 +92,11 @@ func (h *AuthHandler) Login(c *echo.Context) error {
 		if errors.Is(err, services.ErrUserDisabled) {
 			return response.Forbidden(c, "err.user_account_disabled")
 		}
+		// 登录请求可以直接带验证码（OAuth 绑定页就是这样提交的），验证码输错是
+		// 用户的输入问题，不能落到 500。
+		if errors.Is(err, services.ErrInvalidTOTPCode) {
+			return response.BadRequest(c, "err.invalid_totp_code", nil)
+		}
 		return response.InternalError(c, "err.failed_to_login")
 	}
 
