@@ -244,7 +244,10 @@ export default function GoalsModule({
           <Calendar
             fullscreen={false}
             cellRender={(date) => dateCellRender(date as Dayjs)}
-            onSelect={(date) => {
+            onSelect={(date, selectInfo) => {
+              // antd 切换头部的月份、年份下拉时也会回调 onSelect，
+              // 只有点了具体某一天才算打卡，否则翻一下月份就多一条打卡记录。
+              if (selectInfo.source !== "date") return;
               streakMutation.mutate({
                 goalId: selectedGoal,
                 // 后端把 happened_at 绑定到 time.Time，只接受 RFC 3339；

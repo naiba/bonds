@@ -59,6 +59,7 @@ interface AuthContextType {
   register: (data: RegisterRequest) => Promise<AuthenticationCompletion>;
   logout: () => void;
   setExternalToken: (jwt: string) => void;
+  beginExternalTwoFactor: (pendingTwoFactorToken: string) => void;
   verifyTwoFactor: (code: string) => Promise<AuthenticationCompletion>;
 }
 
@@ -273,6 +274,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [token, retireAuthenticationSubject],
   );
 
+  // OAuth sign-in for an account with 2FA comes back with a pending token
+  // instead of a session. Enter the same state a password login would be in
+  // while it waits for the code.
+  const beginExternalTwoFactor = useCallback(
+    (pendingTwoFactorToken: string) => {
+      advanceAuthenticationAttemptRevision();
+      commitAuthenticationSubject();
+      localStorage.removeItem("token");
+      setIsLoading(false);
+      setToken(null);
+      setTwoFactorPending(true);
+      setTempToken(pendingTwoFactorToken);
+    },
+    [commitAuthenticationSubject],
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -286,6 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       setExternalToken,
+      beginExternalTwoFactor,
       verifyTwoFactor,
     }),
     [
@@ -299,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       setExternalToken,
+      beginExternalTwoFactor,
       verifyTwoFactor,
     ],
   );

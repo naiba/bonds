@@ -301,11 +301,20 @@ func lockFileForMutation(tx *gorm.DB, id uint, vaultID string) (models.File, err
 }
 
 func (s *VaultFileService) deleteFileRecord(tx *gorm.DB, file *models.File) error {
+	// 顺序不能反：先做数据库这边的事，最后才动磁盘。磁盘上的文件删了就回不来，
+	// 以前先删文件再删记录，记录因为外键删不掉时事务回滚，留下一条指向空文件的记录。
+	// 被用作联系人头像的文件由 contacts.file_id 引用，要先解除引用记录才删得掉。
+	if err := tx.Model(&models.Contact{}).Where("file_id = ?", file.ID).Update("file_id", nil).Error; err != nil {
+		return err
+	}
+	if err := tx.Delete(file).Error; err != nil {
+		return err
+	}
 	destPath := s.localPath(file)
 	if err := os.Remove(destPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("remove file %s: %w", file.UUID, err)
 	}
-	return tx.Delete(file).Error
+	return nil
 }
 
 func toVaultFileResponse(f *models.File) dto.VaultFileResponse {

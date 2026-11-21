@@ -9,6 +9,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// expiredOneTimeReminderGrace is how far in the past a one-time reminder may
+// lie and still be scheduled, so one created after today's preferred time is
+// delivered late instead of never.
+const expiredOneTimeReminderGrace = 48 * time.Hour
+
 func (s *ReminderService) reschedulePendingReminder(reminder *models.ContactReminder) {
 	if err := reschedulePendingReminder(s.db, reminder); err != nil {
 		log.Printf("[reminder] failed to reschedule reminder %d: %v", reminder.ID, err)
@@ -61,6 +66,13 @@ func scheduleReminderForVaultUsers(db *gorm.DB, reminder *models.ContactReminder
 		channel := &channels[index]
 		scheduledAt := calcInitialSchedule(reminder, channel.PreferredTime, userLocation(channel.User)).UTC()
 		if reminder.Type == "one_time" {
+			// 早已过期的一次性提醒不再排期。导入历史数据、把联系人移到别的 Vault、
+			// 改了渠道的偏好时间后再编辑，都会带着过去的日期走到这里；排进去就会被
+			// 调度器当成“到点了”立刻发出，等于重发旧提醒。留一天余量，是为了当天
+			// 偏好时间已过才创建的提醒仍然能补发。
+			if scheduledAt.Before(time.Now().Add(-expiredOneTimeReminderGrace)) {
+				continue
+			}
 			// 一次性提醒在这个渠道上已经按这个时间发过，就不能再排一次：
 			// 编辑提醒（哪怕只改标签）会走到这里，日期没变时再排就是重发。
 			var delivered int64
@@ -104,7 +116,11 @@ func calcInitialScheduleAt(reminder *models.ContactReminder, preferredTime *stri
 	}
 	year, month, day := now.Year(), time.January, 1
 	recurring := reminder.Type != "one_time"
-	if reminder.Year != nil && !recurring {
+	// 每周 / 每月的提醒如果记录了起始年份，就要从真实的起始日期往后推：
+	// 只取“今年的同月同日”当锚点的话，去年 12 月开始的每月提醒在今年 1 月被编辑后
+	// 会一直沉默到今年 12 月，每周提醒则每年换一个星期几。
+	continuesFromStartDate := reminder.Type == "recurring_week" || reminder.Type == "recurring_month"
+	if reminder.Year != nil && (!recurring || continuesFromStartDate) {
 		year = *reminder.Year
 	}
 	if reminder.Month != nil {

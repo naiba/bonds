@@ -1,6 +1,6 @@
 import { App as AntApp, ConfigProvider } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import dayjs from "dayjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -79,5 +79,42 @@ describe("GoalsModule check-in", () => {
     expect(dayjs(happenedAt).format("YYYY-MM-DD")).toBe(
       selectedDay.format("YYYY-MM-DD"),
     );
+  });
+
+  // The calendar reports month and year changes through the same onSelect
+  // callback as a day click. Browsing to another month must not check in.
+  it("does not record a check-in when only the month is switched", async () => {
+    const user = userEvent.setup();
+    renderGoalsModule();
+    await user.click(await screen.findByRole("button", { name: "Streaks" }));
+
+    const monthSelect = document.querySelector<HTMLElement>(
+      ".ant-picker-calendar-month-select",
+    );
+    if (monthSelect === null) {
+      throw new Error("calendar month select was not rendered");
+    }
+    const shownBefore = document.querySelector("td.ant-picker-cell-in-view")
+      ?.getAttribute("title");
+    fireEvent.mouseDown(
+      monthSelect.querySelector("input, .ant-select-selector") ?? monthSelect,
+    );
+    const otherMonth = await waitFor(() => {
+      const option = document.querySelector<HTMLElement>(
+        ".ant-select-item-option:not(.ant-select-item-option-selected)",
+      );
+      if (option === null) throw new Error("month options did not open");
+      return option;
+    });
+    await user.click(otherMonth);
+
+    await waitFor(() => {
+      expect(
+        document
+          .querySelector("td.ant-picker-cell-in-view")
+          ?.getAttribute("title"),
+      ).not.toBe(shownBefore);
+    });
+    expect(api.goals.contactsGoalsStreaksUpdate).not.toHaveBeenCalled();
   });
 });

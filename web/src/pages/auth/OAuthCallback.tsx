@@ -6,12 +6,21 @@ import { useAuth } from "@/stores/auth";
 export default function OAuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setExternalToken } = useAuth();
+  const { setExternalToken, beginExternalTwoFactor } = useAuth();
 
   useEffect(() => {
     const linkToken = searchParams.get("link_token");
     if (linkToken) {
       navigate(`/auth/oauth-link?link_token=${encodeURIComponent(linkToken)}`, { replace: true });
+      return;
+    }
+
+    // An account with 2FA gets a pending token: OAuth proves the first factor
+    // only, the code still has to be entered.
+    const pendingTwoFactorToken = searchParams.get("temp_token");
+    if (pendingTwoFactorToken) {
+      beginExternalTwoFactor(pendingTwoFactorToken);
+      navigate("/login/2fa", { replace: true });
       return;
     }
 
@@ -24,7 +33,7 @@ export default function OAuthCallback() {
     } else {
       navigate("/login", { replace: true });
     }
-  }, [searchParams, navigate, setExternalToken]);
+  }, [searchParams, navigate, setExternalToken, beginExternalTwoFactor]);
 
   return (
     <div

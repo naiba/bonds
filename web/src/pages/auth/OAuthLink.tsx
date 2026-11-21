@@ -86,6 +86,7 @@ export default function OAuthLink() {
   const { token } = theme.useToken();
   const { themeMode, setThemeMode } = useTheme();
   const [loading, setLoading] = useState(false);
+  const [needsTwoFactorCode, setNeedsTwoFactorCode] = useState(false);
   const [mode, setMode] = useState<string>("login");
 
   const { setExternalToken } = useAuth();
@@ -118,13 +119,25 @@ export default function OAuthLink() {
     return null;
   }
 
-  async function onLoginLink(values: { email: string; password: string }) {
+  async function onLoginLink(values: {
+    email: string;
+    password: string;
+    totp_code?: string;
+  }) {
     setLoading(true);
     try {
       const loginRes = await httpClient.instance.post<{
         success: boolean;
-        data: { token: string };
+        data: { token: string; requires_two_factor?: boolean };
       }>("/auth/login", values);
+      // An account with 2FA answers the password with a challenge and no
+      // token. That used to surface as "login failed" with no way forward;
+      // ask for the code and submit again with it.
+      if (loginRes.data.data?.requires_two_factor) {
+        setNeedsTwoFactorCode(true);
+        message.info(t("auth.two_factor_verify.subtitle"));
+        return;
+      }
       const jwt = loginRes.data.data?.token;
       if (!jwt) throw new Error(t("auth.login.failed"));
 
@@ -400,6 +413,24 @@ export default function OAuthLink() {
                   <Input.Password prefix={<LockOutlined />} placeholder={t("auth.login.password_placeholder")} />
                 </Form.Item>
               </div>
+
+              {needsTwoFactorCode && (
+                <Form.Item
+                  name="totp_code"
+                  rules={[
+                    {
+                      required: true,
+                      message: t("auth.two_factor_verify.code_required"),
+                    },
+                  ]}
+                >
+                  <Input
+                    autoFocus
+                    autoComplete="one-time-code"
+                    placeholder={t("auth.two_factor_verify.code_placeholder")}
+                  />
+                </Form.Item>
+              )}
 
               <div style={fadeIn(5)}>
                 <Form.Item style={{ marginBottom: 16 }}>

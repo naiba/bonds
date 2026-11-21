@@ -304,9 +304,21 @@ func (h *VaultFileHandler) Serve(c *echo.Context) error {
 	}
 
 	c.Response().Header().Set("X-Content-Type-Options", "nosniff")
-	if c.QueryParam("preview") == "true" && (strings.HasPrefix(file.MimeType, "image/") || strings.HasPrefix(file.MimeType, "video/")) {
+	if c.QueryParam("preview") == "true" && canPreviewInline(file.MimeType) {
 		c.Response().Header().Set(echo.HeaderContentType, file.MimeType)
+		c.Response().Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'")
 		return serveLocalFileWithDisposition(c, filePath, file.Name, "inline")
 	}
 	return serveLocalFileWithDisposition(c, filePath, file.Name, "attachment")
+}
+
+// canPreviewInline 只允许位图和视频在浏览器里直接打开。
+// SVG 等基于 XML 的“图片”是可以带脚本的文档：内联返回就会以本站的源执行。
+// 上传端现在会拒绝它们，但旧版本存进来的文件还在，所以下载端也必须拦。
+func canPreviewInline(mimeType string) bool {
+	mimeType = strings.ToLower(mimeType)
+	if strings.Contains(mimeType, "svg") || strings.Contains(mimeType, "xml") {
+		return false
+	}
+	return strings.HasPrefix(mimeType, "image/") || strings.HasPrefix(mimeType, "video/")
 }

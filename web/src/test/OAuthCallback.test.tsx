@@ -14,9 +14,11 @@ vi.mock("react-router-dom", async () => {
 });
 
 const mockSetExternalToken = vi.fn();
+const mockBeginExternalTwoFactor = vi.fn();
 vi.mock("@/stores/auth", () => ({
   useAuth: () => ({
     setExternalToken: mockSetExternalToken,
+    beginExternalTwoFactor: mockBeginExternalTwoFactor,
   }),
 }));
 
@@ -47,6 +49,15 @@ describe("OAuthCallback", () => {
     renderOAuthCallback("");
     expect(mockSetExternalToken).not.toHaveBeenCalled();
     expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true });
+  });
+
+  it("asks for the 2FA code when the server returns a pending token", () => {
+    renderOAuthCallback("?temp_token=pending-two-factor-token");
+    expect(mockBeginExternalTwoFactor).toHaveBeenCalledWith(
+      "pending-two-factor-token",
+    );
+    expect(mockSetExternalToken).not.toHaveBeenCalled();
+    expect(mockNavigate).toHaveBeenCalledWith("/login/2fa", { replace: true });
   });
 
   it("redirects to oauth-link page when link_token present", () => {

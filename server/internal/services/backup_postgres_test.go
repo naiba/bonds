@@ -80,7 +80,7 @@ func TestBackupCreate_dumpsDropStatements_whenDatabaseDriverIsPostgres(t *testin
 		t.Fatalf("read pg_dump invocation log: %v", err)
 	}
 	invocationText := string(invocationLog)
-	for _, requiredArgument := range []string{"--clean", "--if-exists", "--dbname=" + svc.cfg.Database.DSN} {
+	for _, requiredArgument := range []string{"--clean", "--if-exists", "--dbname=postgres://bonds@db.example.com:5432/bonds"} {
 		if !strings.Contains(invocationText, requiredArgument+"\n") {
 			t.Fatalf("expected pg_dump to be invoked with %s, got %q", requiredArgument, invocationText)
 		}
@@ -127,18 +127,30 @@ func TestBackupRestore_invokesPSQLWithDumpPath_whenDatabaseDriverIsPostgres(t *t
 		t.Fatalf("read psql invocation log: %v", err)
 	}
 	invocationText := string(invocationLog)
-	if !strings.Contains(invocationText, "--dbname="+svc.cfg.Database.DSN) {
+	if !strings.Contains(invocationText, "--dbname=postgres://bonds@db.example.com:5432/bonds") {
 		t.Fatalf("expected psql to receive DSN, got %q", invocationText)
 	}
 	if !strings.Contains(invocationText, string(filepath.Separator)+"database.sql") {
 		t.Fatalf("expected psql to receive extracted database.sql path, got %q", invocationText)
 	}
 	// This archive predates --clean dumps: it has no DROP statements, so the
-	// schema has to be reset before its CREATE statements can run.
-	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction", "DROP SCHEMA IF EXISTS public CASCADE", "CREATE SCHEMA public"} {
+	// existing tables have to be dropped before its CREATE statements can run.
+	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction"} {
 		if !strings.Contains(invocationText, requiredArgument+"\n") {
 			t.Fatalf("expected psql to be invoked with %q, got %q", requiredArgument, invocationText)
 		}
+	}
+	if !strings.Contains(invocationText, "DROP TABLE IF EXISTS public.%I CASCADE") {
+		t.Fatalf("expected psql to drop the tables owned by the connecting role first, got %q", invocationText)
+	}
+	// Dropping the whole schema would also remove other applications' objects
+	// and needs ownership of the schema, which the application role lacks on
+	// PostgreSQL 15 and later.
+	if strings.Contains(invocationText, "DROP SCHEMA") {
+		t.Fatalf("restore must not drop the public schema, got %q", invocationText)
+	}
+	if strings.Contains(invocationText, "bonds:test@") {
+		t.Fatalf("database password leaked into the psql arguments: %q", invocationText)
 	}
 }
 
@@ -184,14 +196,14 @@ func TestBackupRestore_appliesCleanDumpAtomically_whenDatabaseDriverIsPostgres(t
 		t.Fatalf("read psql invocation log: %v", err)
 	}
 	invocationText := string(invocationLog)
-	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction", "--dbname=" + svc.cfg.Database.DSN} {
+	for _, requiredArgument := range []string{"ON_ERROR_STOP=1", "--single-transaction", "--dbname=postgres://bonds@db.example.com:5432/bonds"} {
 		if !strings.Contains(invocationText, requiredArgument+"\n") {
 			t.Fatalf("expected psql to be invoked with %s, got %q", requiredArgument, invocationText)
 		}
 	}
 	// The dump drops its own objects; resetting the schema as well would also
 	// destroy objects the dump does not know about.
-	if strings.Contains(invocationText, "DROP SCHEMA") {
+	if strings.Contains(invocationText, "DROP TABLE") {
 		t.Fatalf("clean dump must not reset the schema, got %q", invocationText)
 	}
 }

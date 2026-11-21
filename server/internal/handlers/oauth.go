@@ -132,6 +132,11 @@ func (h *OAuthHandler) Callback(c *echo.Context) error {
 	_ = h.oauthService.SaveToken(authResp.User.ID, provider, gothUser.UserID,
 		gothUser.AccessToken, gothUser.RefreshToken, expiresIn)
 
+	// 开了 2FA 的账号拿到的是待验证的临时令牌，前端据此进入验证码页面。
+	if authResp.RequiresTwoFactor {
+		return c.Redirect(http.StatusTemporaryRedirect,
+			fmt.Sprintf("%s/auth/callback?temp_token=%s", h.getAppURL(), authResp.TempToken))
+	}
 	return c.Redirect(http.StatusTemporaryRedirect,
 		fmt.Sprintf("%s/auth/callback?token=%s", h.getAppURL(), authResp.Token))
 }

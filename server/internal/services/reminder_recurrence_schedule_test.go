@@ -48,6 +48,52 @@ func TestCalcInitialSchedule_RecurringReminderContinuesAtItsNextOccurrence(t *te
 	}
 }
 
+// A weekly or monthly reminder that stores its start year has to continue the
+// series that began on that date. Rebuilding the anchor from "this year's"
+// month and day silenced a monthly reminder started last December until this
+// December, and moved a weekly reminder to a different weekday every year.
+func TestCalcInitialSchedule_RecurringReminderContinuesFromItsStartYear(t *testing.T) {
+	withStartYear := func(reminderType string, year, month, day int) *models.ContactReminder {
+		reminder := reminderWithAnchor(reminderType, month, day)
+		reminder.Year = &year
+		return reminder
+	}
+	cases := []struct {
+		name     string
+		reminder *models.ContactReminder
+		now      time.Time
+		want     time.Time
+	}{
+		{
+			"monthly started last December, edited in January",
+			withStartYear("recurring_month", 2025, 12, 15),
+			time.Date(2026, time.January, 5, 12, 0, 0, 0, time.UTC),
+			time.Date(2026, time.January, 15, 9, 0, 0, 0, time.UTC),
+		},
+		{
+			// 2025-03-10 is a Monday; 2026-03-10 is a Tuesday.
+			"weekly keeps the weekday it started on",
+			withStartYear("recurring_week", 2025, 3, 10),
+			time.Date(2026, time.November, 20, 12, 0, 0, 0, time.UTC),
+			time.Date(2026, time.November, 23, 9, 0, 0, 0, time.UTC),
+		},
+		{
+			"start date in a later year is used as is",
+			withStartYear("recurring_month", 2027, 2, 10),
+			time.Date(2026, time.November, 20, 12, 0, 0, 0, time.UTC),
+			time.Date(2027, time.February, 10, 9, 0, 0, 0, time.UTC),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := calcInitialScheduleAt(tc.reminder, nil, time.UTC, tc.now)
+			if !got.Equal(tc.want) {
+				t.Fatalf("first schedule = %s (%s), want %s (%s)", got, got.Weekday(), tc.want, tc.want.Weekday())
+			}
+		})
+	}
+}
+
 // Stepping from the previous occurrence lets Go normalise Jan 31 + 1 month to
 // Mar 3 and the reminder then stays on the 3rd for good. The day has to come
 // from the reminder's own anchor, clamped to the length of each month.
@@ -81,7 +127,8 @@ func TestReschedulePendingReminder_DoesNotResendDeliveredOneTimeReminder(t *test
 	ctx := setupReminderSchedulerTest(t)
 	channel := ctx.createEmailChannel(t)
 	reminder := ctx.createReminder(t, "one_time", nil)
-	year, month, day := 2020, 5, 17
+	yesterday := time.Now().UTC().AddDate(0, 0, -1)
+	year, month, day := yesterday.Year(), int(yesterday.Month()), yesterday.Day()
 	reminder.Year, reminder.Month, reminder.Day = &year, &month, &day
 	if err := ctx.db.Save(reminder).Error; err != nil {
 		t.Fatalf("save reminder date: %v", err)
@@ -113,6 +160,40 @@ func TestReschedulePendingReminder_DoesNotResendDeliveredOneTimeReminder(t *test
 	}
 	if pending != 0 {
 		t.Fatalf("pending schedules = %d, want 0", pending)
+	}
+}
+
+// Importing old data or moving a contact to another vault schedules reminders
+// again. A one-time reminder dated years ago would be due immediately and go
+// out as if it were new.
+func TestReschedulePendingReminder_SkipsLongExpiredOneTimeReminder(t *testing.T) {
+	ctx := setupReminderSchedulerTest(t)
+	ctx.createEmailChannel(t)
+	reminder := ctx.createReminder(t, "one_time", nil)
+	year, month, day := 2020, 5, 17
+	reminder.Year, reminder.Month, reminder.Day = &year, &month, &day
+	if err := ctx.db.Save(reminder).Error; err != nil {
+		t.Fatalf("save reminder date: %v", err)
+	}
+	if err := ctx.db.Where("contact_reminder_id = ?", reminder.ID).Delete(&models.ContactReminderScheduled{}).Error; err != nil {
+		t.Fatalf("clear schedules created with the reminder: %v", err)
+	}
+	deliveredBefore := len(ctx.mailer.calls)
+
+	if err := reschedulePendingReminder(ctx.db, reminder); err != nil {
+		t.Fatalf("reschedule: %v", err)
+	}
+	ctx.svc.ProcessDueReminders()
+
+	var scheduled int64
+	if err := ctx.db.Model(&models.ContactReminderScheduled{}).Where("contact_reminder_id = ?", reminder.ID).Count(&scheduled).Error; err != nil {
+		t.Fatalf("count schedules: %v", err)
+	}
+	if scheduled != 0 {
+		t.Errorf("schedules for a reminder dated 2020 = %d, want 0", scheduled)
+	}
+	if len(ctx.mailer.calls) != deliveredBefore {
+		t.Errorf("deliveries = %d, want still %d", len(ctx.mailer.calls), deliveredBefore)
 	}
 }
 

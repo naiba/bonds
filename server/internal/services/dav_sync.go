@@ -677,7 +677,8 @@ func (s *DavSyncService) GetSyncLogs(subID, vaultID string, page, perPage int) (
 	return result, meta, nil
 }
 
-// rejectLinkLocalDial 拒绝连接链路本地地址（169.254.0.0/16、fe80::/10）。
+// rejectLinkLocalDial 拒绝连接链路本地地址（169.254.0.0/16、fe80::/10）
+// 以及几家云厂商不在链路本地网段里的元数据地址。
 // 订阅地址由用户填写，而云厂商的实例元数据服务（含临时凭据）就在 169.254.169.254：
 // 不拦的话任何注册用户都能让服务器替他去读，并从同步日志里看到返回内容。
 // 这里在连接建立时检查解析后的 IP，域名解析到该网段同样会被拦下。
@@ -691,8 +692,23 @@ func rejectLinkLocalDial(_, address string, _ syscall.RawConn) error {
 		host = host[:zone]
 	}
 	ip := net.ParseIP(host)
-	if ip != nil && (ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()) {
+	if ip == nil {
+		return nil
+	}
+	if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
 		return fmt.Errorf("refusing to connect to link-local address %s", host)
 	}
+	for _, metadataAddress := range instanceMetadataAddresses {
+		if ip.Equal(metadataAddress) {
+			return fmt.Errorf("refusing to connect to instance metadata address %s", host)
+		}
+	}
 	return nil
+}
+
+// 不在链路本地网段里的实例元数据地址：AWS 的 IPv6 端点、阿里云、Oracle Cloud。
+var instanceMetadataAddresses = []net.IP{
+	net.ParseIP("fd00:ec2::254"),
+	net.ParseIP("100.100.100.200"),
+	net.ParseIP("192.0.0.192"),
 }

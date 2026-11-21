@@ -74,7 +74,7 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email string, 
 		if err := s.db.First(&user, "id = ?", token.UserID).Error; err != nil {
 			return nil, nil, err
 		}
-		resp, err := s.generateAuthResponse(&user)
+		resp, err := s.authResponseAfterProviderLogin(&user)
 		return resp, nil, err
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -95,11 +95,6 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email string, 
 	var existingUser models.User
 	err = s.db.Where("LOWER(email) = ?", strings.ToLower(strings.TrimSpace(email))).First(&existingUser).Error
 	if err == nil {
-		if existingUser.EmailVerifiedAt == nil {
-			verifiedNow := time.Now()
-			s.db.Model(&existingUser).Update("email_verified_at", verifiedNow)
-			existingUser.EmailVerifiedAt = &verifiedNow
-		}
 		newToken := models.UserToken{
 			UserID:   existingUser.ID,
 			Driver:   provider,
@@ -108,10 +103,18 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email string, 
 			Email:    &email,
 			Token:    "",
 		}
-		if err := s.db.Create(&newToken).Error; err != nil {
+		err := s.db.Transaction(func(tx *gorm.DB) error {
+			if existingUser.EmailVerifiedAt == nil {
+				if err := revokeCredentialsOfUnverifiedAccount(tx, &existingUser); err != nil {
+					return err
+				}
+			}
+			return tx.Create(&newToken).Error
+		})
+		if err != nil {
 			return nil, nil, err
 		}
-		resp, err := s.generateAuthResponse(&existingUser)
+		resp, err := s.authResponseAfterProviderLogin(&existingUser)
 		return resp, nil, err
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -295,6 +298,43 @@ func (s *OAuthService) generateAuthResponse(user *models.User) (*dto.AuthRespons
 	return s.authService().generateAuthResponse(user)
 }
 
+// authResponseAfterProviderLogin 用于“提供方已经确认身份”的登录。
+// 开了 2FA 的账号这里只发 2FA 待验证的临时令牌：以前直接发完整会话，
+// 第三方账号一旦失守，本地的 2FA 就形同虚设。
+func (s *OAuthService) authResponseAfterProviderLogin(user *models.User) (*dto.AuthResponse, error) {
+	if user.TwoFactorConfirmedAt != nil {
+		return s.authService().generateTempAuthResponse(user)
+	}
+	return s.generateAuthResponse(user)
+}
+
+// revokeCredentialsOfUnverifiedAccount 在把一个“邮箱从未验证过”的本地账号交给
+// 提供方确认过的邮箱所有者之前，作废这个账号此前的全部凭据。
+// 任何人都能拿别人的邮箱注册：不作废的话，抢注者设的密码在真正的所有者通过
+// 第三方登录、账号被标成已验证之后依然能登录（预劫持）。
+// 邮箱已验证的账号不会走到这里，密码原样保留。
+func revokeCredentialsOfUnverifiedAccount(tx *gorm.DB, user *models.User) error {
+	verifiedNow := time.Now()
+	if err := tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
+		"email_verified_at":         verifiedNow,
+		"email_verification_token":  nil,
+		"password":                  nil,
+		"two_factor_secret":         nil,
+		"two_factor_recovery_codes": nil,
+		"two_factor_confirmed_at":   nil,
+		"auth_version":              gorm.Expr("auth_version + 1"),
+	}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("user_id = ?", user.ID).Delete(&models.PersonalAccessToken{}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("user_id = ?", user.ID).Delete(&models.WebAuthnCredential{}).Error; err != nil {
+		return err
+	}
+	return tx.First(user, "id = ?", user.ID).Error
+}
+
 // EmailVerifiedByProvider 判断能否把提供方返回的邮箱当作账号归属的证据。
 // rawData 是 goth 从提供方 userinfo / ID token 取回的原始字段。
 //
@@ -322,22 +362,20 @@ func oauthEmailVerified(providerType string, rawData map[string]interface{}) boo
 			return confirmed != ""
 		}
 	}
-	explicitlyUnverified := false
+	// 任何一个声明明确说“未验证”就按未验证处理，不能被同一份数据里另一个
+	// 含义不同的真值字段（比如表示账号状态的 verified）盖过去。
+	// 提供方根本不下发这类字段时仍按可信处理（见 EmailVerifiedByProvider 的说明）。
 	for _, claim := range []string{"email_verified", "verified_email", "verified"} {
 		switch verified := rawData[claim].(type) {
 		case bool:
-			if verified {
-				return true
+			if !verified {
+				return false
 			}
-			explicitlyUnverified = true
 		case string:
-			if strings.EqualFold(verified, "true") {
-				return true
-			}
 			if strings.EqualFold(verified, "false") {
-				explicitlyUnverified = true
+				return false
 			}
 		}
 	}
-	return !explicitlyUnverified
+	return true
 }

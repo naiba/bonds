@@ -157,7 +157,9 @@ func (s *BackupService) backupPostgres(zw *zip.Writer) error {
 	// --clean --if-exists 让导出文件先 DROP 再 CREATE。恢复的目标是正在使用的库，
 	// 表都已存在：不带这两个参数的导出一上来就会在 CREATE TABLE 处报“已存在”，
 	// 根本恢复不进去。
-	cmd := exec.Command(pgDump, "--dbname="+s.cfg.Database.DSN, "--clean", "--if-exists", "-f", tmpFile)
+	connection, passwordEnvironment := postgresClientConnection(s.cfg.Database.DSN)
+	cmd := exec.Command(pgDump, "--dbname="+connection, "--clean", "--if-exists", "-f", tmpFile)
+	cmd.Env = append(os.Environ(), passwordEnvironment...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("pg_dump failed: %s: %w", string(output), err)
 	}
@@ -480,17 +482,22 @@ func (s *BackupService) restorePostgres(tmpDir string) error {
 	// ON_ERROR_STOP 必不可少：psql 默认遇到 SQL 错误只打印后继续并以 0 退出，一次什么都
 	// 没恢复的导入也会报成功，随后 Restore 还会照常清空并替换上传目录。
 	// --single-transaction 让失败的恢复整体回滚，数据库保持原样。
-	args := []string{"--dbname=" + s.cfg.Database.DSN, "-v", "ON_ERROR_STOP=1", "--single-transaction"}
+	connection, passwordEnvironment := postgresClientConnection(s.cfg.Database.DSN)
+	args := []string{"--dbname=" + connection, "-v", "ON_ERROR_STOP=1", "--single-transaction"}
 	if !cleanDump {
 		// 旧版本生成的备份不带 DROP 语句，而恢复的目标库里表都已存在。
 		// 实测（PostgreSQL 18）直接灌这种导出文件从来就恢复不完整：CREATE 全部报“已存在”，
 		// COPY 在已有数据的库上因主键冲突整表失败，在刚迁移好的空库上也会因为外键顺序
-		// 丢表（contacts 先于 vaults 导入）。所以先在同一个事务里重建 public schema，
+		// 丢表（contacts 先于 vaults 导入）。所以先在同一个事务里删掉已有的表，
 		// 再让导出文件自己把结构和数据建回来。
-		args = append(args, "-c", "DROP SCHEMA IF EXISTS public CASCADE", "-c", "CREATE SCHEMA public")
+		// 只删当前角色在 public 里拥有的表和序列，不能用 DROP SCHEMA public CASCADE：
+		// 那会连同库里其他应用的对象一起删掉，而且 PostgreSQL 15 起应用角色通常
+		// 不是 public 的属主，根本没有权限执行。
+		args = append(args, "-c", dropOwnedPublicTablesSQL)
 	}
 	args = append(args, "-f", dumpFile)
 	cmd := exec.Command(psql, args...)
+	cmd.Env = append(os.Environ(), passwordEnvironment...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("psql restore failed: %s: %w", string(output), err)
 	}
