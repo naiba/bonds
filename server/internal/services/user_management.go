@@ -11,8 +11,11 @@ import (
 )
 
 var (
-	ErrCannotDeleteSelf    = errors.New("cannot delete yourself")
-	ErrManagedUserNotFound = errors.New("managed user not found")
+	ErrCannotDeleteSelf = errors.New("cannot delete yourself")
+	// ErrProtectedAdministrator：账户里的用户管理不能删除或降级实例管理员，
+	// 也不能把账户降到没有管理员。
+	ErrProtectedAdministrator = errors.New("administrator cannot be removed or demoted here")
+	ErrManagedUserNotFound    = errors.New("managed user not found")
 )
 
 type UserManagementService struct {
@@ -76,6 +79,22 @@ func (s *UserManagementService) Update(id, accountID string, req dto.UpdateManag
 		}
 		return nil, err
 	}
+	if !req.IsAdmin {
+		// 账户管理员只是这个账户的协管理员。让他降级实例管理员，等于让低权限的人
+		// 拿掉高权限的人；把最后一个管理员降级，账户就再也没人能管理。
+		if user.IsInstanceAdministrator {
+			return nil, ErrProtectedAdministrator
+		}
+		var otherAdministrators int64
+		if err := s.db.Model(&models.AccountMembership{}).
+			Where("account_id = ? AND user_id <> ? AND is_admin = ?", accountID, id, true).
+			Count(&otherAdministrators).Error; err != nil {
+			return nil, err
+		}
+		if otherAdministrators == 0 {
+			return nil, ErrProtectedAdministrator
+		}
+	}
 	if user.AccountID == accountID {
 		user.FirstName = strPtrOrNil(req.FirstName)
 		user.LastName = strPtrOrNil(req.LastName)
@@ -106,6 +125,10 @@ func (s *UserManagementService) Delete(id, accountID, currentUserID string) erro
 			return ErrManagedUserNotFound
 		}
 		return err
+	}
+	// 理由同 Update：协管理员不能把实例管理员删掉。
+	if user.IsInstanceAdministrator {
+		return ErrProtectedAdministrator
 	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		vaultIDs := tx.Model(&models.Vault{}).Select("id").Where("account_id = ?", accountID)

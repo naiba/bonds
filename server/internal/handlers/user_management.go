@@ -71,6 +71,9 @@ func (h *UserManagementHandler) Update(c *echo.Context) error {
 		if errors.Is(err, services.ErrManagedUserNotFound) {
 			return response.NotFound(c, "err.user_not_found")
 		}
+		if errors.Is(err, services.ErrProtectedAdministrator) {
+			return response.Forbidden(c, "err.insufficient_permissions_short")
+		}
 		return response.InternalError(c, "err.failed_to_update_user")
 	}
 	return response.OK(c, user)
@@ -97,6 +100,9 @@ func (h *UserManagementHandler) Delete(c *echo.Context) error {
 	if err := h.userManagementService.Delete(id, accountID, userID); err != nil {
 		if errors.Is(err, services.ErrCannotDeleteSelf) {
 			return response.BadRequest(c, "err.cannot_delete_self", nil)
+		}
+		if errors.Is(err, services.ErrProtectedAdministrator) {
+			return response.Forbidden(c, "err.insufficient_permissions_short")
 		}
 		if errors.Is(err, services.ErrManagedUserNotFound) {
 			return response.NotFound(c, "err.user_not_found")
