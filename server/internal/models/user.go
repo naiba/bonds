@@ -8,13 +8,18 @@ import (
 )
 
 type User struct {
-	ID                      string     `json:"id" gorm:"primaryKey;type:text"`
-	AccountID               string     `json:"account_id" gorm:"type:text;not null;index"`
-	FirstName               *string    `json:"first_name"`
-	LastName                *string    `json:"last_name"`
-	Email                   string     `json:"email" gorm:"uniqueIndex;not null"`
-	EmailVerifiedAt         *time.Time `json:"email_verified_at"`
-	EmailVerificationToken  *string    `json:"-" gorm:"type:text"`
+	ID                     string     `json:"id" gorm:"primaryKey;type:text"`
+	AccountID              string     `json:"account_id" gorm:"type:text;not null;index"`
+	FirstName              *string    `json:"first_name"`
+	LastName               *string    `json:"last_name"`
+	Email                  string     `json:"email" gorm:"uniqueIndex;not null"`
+	EmailVerifiedAt        *time.Time `json:"email_verified_at"`
+	EmailVerificationToken *string    `json:"-" gorm:"type:text"`
+	// EmailOwnershipUnproven 为 true 表示 EmailVerifiedAt 只是因为实例不要求邮箱验证
+	// 才被填上的，没有任何人证明过这个邮箱属于注册者。EmailVerifiedAt 同时被用来
+	// 放行功能，不能拿它当归属证明：否则在不发验证邮件的实例上，任何人用别人的邮箱
+	// 注册后，账号都会被第三方登录按邮箱自动绑定给真正的所有者，而抢注者的密码照样能用。
+	EmailOwnershipUnproven  bool       `json:"-" gorm:"not null;default:false"`
 	Password                *string    `json:"-"`
 	TwoFactorSecret         *string    `json:"-"`
 	TwoFactorRecoveryCodes  *string    `json:"-"`

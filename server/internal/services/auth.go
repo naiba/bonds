@@ -61,6 +61,14 @@ func (s *AuthService) isEmailVerificationRequired() bool {
 	return smtpHost != ""
 }
 
+// passwordAuthEnabled 读取实例的“密码登录”开关，没有设置服务时按开启处理。
+func (s *AuthService) passwordAuthEnabled() bool {
+	if s.settings == nil {
+		return true
+	}
+	return s.settings.GetBool("auth.password.enabled", true)
+}
+
 func (s *AuthService) sendVerificationEmail(user *models.User) {
 	if s.mailer == nil || s.settings == nil {
 		return
@@ -154,7 +162,13 @@ func (s *AuthService) Register(req dto.RegisterRequest, locale string) (*dto.Aut
 	if isFirstUser || !s.isEmailVerificationRequired() {
 		now := time.Now()
 		user.EmailVerifiedAt = &now
-		s.db.Model(&user).Update("email_verified_at", now)
+		// 跳过验证只是放行功能，不代表邮箱归属被证明过（见 User.EmailOwnershipUnproven）。
+		// 第一个用户是部署实例的人，沿用原来的处理。
+		user.EmailOwnershipUnproven = !isFirstUser
+		s.db.Model(&user).Updates(map[string]interface{}{
+			"email_verified_at":        now,
+			"email_ownership_unproven": user.EmailOwnershipUnproven,
+		})
 	} else {
 		s.sendVerificationEmail(&user)
 	}
@@ -324,6 +338,7 @@ func (s *AuthService) VerifyEmail(token string) (*dto.UserResponse, error) {
 	s.db.Model(&user).Updates(map[string]interface{}{
 		"email_verified_at":        now,
 		"email_verification_token": nil,
+		"email_ownership_unproven": false,
 	})
 	user.EmailVerifiedAt = &now
 	return toUserResponse(&user), nil

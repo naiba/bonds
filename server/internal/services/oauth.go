@@ -103,8 +103,16 @@ func (s *OAuthService) FindOrCreateUser(provider, providerUserID, email string, 
 			Email:    &email,
 			Token:    "",
 		}
+		ownershipUnproven := existingUser.EmailVerifiedAt == nil || existingUser.EmailOwnershipUnproven
+		if ownershipUnproven && !s.mustTakeOverUnprovenAccount(&existingUser) {
+			// 账号的主人可能是正常用户（邮箱验证功能上线前注册的老账号、不发验证
+			// 邮件的实例上注册的账号），也可能是抢注者，两者无法区分。这里既不自动
+			// 绑定也不作废凭据，让用户走“登录已有账号后手动绑定”：正常用户用密码
+			// 登录一次即可，抢注者的密码则换不来真正所有者的第三方身份。
+			return nil, linkInfo, ErrOAuthAccountNotLinked
+		}
 		err := s.db.Transaction(func(tx *gorm.DB) error {
-			if existingUser.EmailVerifiedAt == nil {
+			if ownershipUnproven {
 				if err := revokeCredentialsOfUnverifiedAccount(tx, &existingUser); err != nil {
 					return err
 				}
@@ -243,6 +251,21 @@ func (s *OAuthService) LinkOAuthToUser(linkToken, userID string) (*dto.AuthRespo
 	if err := s.db.Create(&newToken).Error; err != nil {
 		return nil, err
 	}
+	// 用户已经用本地凭据登录，又出示了提供方确认过的同一个邮箱：归属从此有了证明，
+	// 以后其他提供方按这个邮箱登录时可以自动绑定。
+	if info.EmailVerified && strings.EqualFold(strings.TrimSpace(user.Email), strings.TrimSpace(info.Email)) {
+		proof := map[string]interface{}{"email_ownership_unproven": false}
+		if user.EmailVerifiedAt == nil {
+			proof["email_verified_at"] = time.Now()
+			proof["email_verification_token"] = nil
+		}
+		if err := s.db.Model(&models.User{}).Where("id = ?", user.ID).Updates(proof).Error; err != nil {
+			return nil, err
+		}
+		if err := s.db.First(&user, "id = ?", user.ID).Error; err != nil {
+			return nil, err
+		}
+	}
 
 	return s.generateAuthResponse(&user)
 }
@@ -274,7 +297,7 @@ func (s *OAuthService) LinkOAuthAndRegister(linkToken string, req dto.OAuthLinkR
 	if info.EmailVerified && strings.EqualFold(strings.TrimSpace(req.Email), strings.TrimSpace(info.Email)) {
 		now := time.Now()
 		if err := s.db.Model(&models.User{}).Where("id = ?", authResp.User.ID).
-			Updates(map[string]interface{}{"email_verified_at": now, "email_verification_token": nil}).Error; err != nil {
+			Updates(map[string]interface{}{"email_verified_at": now, "email_verification_token": nil, "email_ownership_unproven": false}).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -308,6 +331,19 @@ func (s *OAuthService) authResponseAfterProviderLogin(user *models.User) (*dto.A
 	return s.generateAuthResponse(user)
 }
 
+// mustTakeOverUnprovenAccount 判断一个邮箱归属未被证明的账号能否直接交给提供方
+// 确认过的邮箱所有者（作废旧凭据后绑定）。只在手动绑定走不通、或账号本来就被
+// 邮箱验证挡着用不了的时候这样做：
+//   - 邮箱未验证且实例要求验证：账号的功能已被拦住，作废凭据不会让正常用户损失什么；
+//   - 实例关闭了密码登录：用户没有办法“先登录再绑定”。
+func (s *OAuthService) mustTakeOverUnprovenAccount(user *models.User) bool {
+	auth := s.authService()
+	if !auth.passwordAuthEnabled() {
+		return true
+	}
+	return user.EmailVerifiedAt == nil && auth.isEmailVerificationRequired()
+}
+
 // revokeCredentialsOfUnverifiedAccount 在把一个“邮箱从未验证过”的本地账号交给
 // 提供方确认过的邮箱所有者之前，作废这个账号此前的全部凭据。
 // 任何人都能拿别人的邮箱注册：不作废的话，抢注者设的密码在真正的所有者通过
@@ -318,6 +354,7 @@ func revokeCredentialsOfUnverifiedAccount(tx *gorm.DB, user *models.User) error 
 	if err := tx.Model(&models.User{}).Where("id = ?", user.ID).Updates(map[string]interface{}{
 		"email_verified_at":         verifiedNow,
 		"email_verification_token":  nil,
+		"email_ownership_unproven":  false,
 		"password":                  nil,
 		"two_factor_secret":         nil,
 		"two_factor_recovery_codes": nil,
@@ -330,6 +367,11 @@ func revokeCredentialsOfUnverifiedAccount(tx *gorm.DB, user *models.User) error 
 		return err
 	}
 	if err := tx.Where("user_id = ?", user.ID).Delete(&models.WebAuthnCredential{}).Error; err != nil {
+		return err
+	}
+	// 已绑定的第三方身份同样是登录凭据：抢注者可以先把自己的第三方账号绑到这个
+	// 账号上，只清密码的话，他之后仍能用那个身份直接登录进来。
+	if err := tx.Where("user_id = ?", user.ID).Delete(&models.UserToken{}).Error; err != nil {
 		return err
 	}
 	return tx.First(user, "id = ?", user.ID).Error

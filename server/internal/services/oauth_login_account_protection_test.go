@@ -46,8 +46,8 @@ func TestFindOrCreateUser_AsksForSecondFactorWhenAccountHasTwoFactor(t *testing.
 // marked verified, so the password chosen by the first registrant has to stop
 // working, together with every session and token created with it.
 func TestFindOrCreateUser_LinkingUnverifiedAccountRevokesItsEarlierCredentials(t *testing.T) {
-	svc := setupOAuthTest(t)
-	authSvc := NewAuthService(svc.db, svc.jwt)
+	svc, _ := setupOAuthTestRequiringEmailVerification(t)
+	authSvc := svc.authService()
 	registered, err := authSvc.Register(dto.RegisterRequest{FirstName: "Not", LastName: "Owner", Email: "victim@example.com", Password: "registrant-password"}, "en")
 	if err != nil {
 		t.Fatalf("Register: %v", err)

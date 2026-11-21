@@ -146,7 +146,7 @@ func (s *CredentialActionService) ConfirmEmailChange(raw string) error {
 		if err := tx.Select("email").First(&user, "id = ?", action.UserID).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&models.User{}).Where("id = ?", action.UserID).Updates(map[string]interface{}{"email": action.TargetEmail, "email_verified_at": now, "auth_version": gorm.Expr("auth_version + 1")}).Error; err != nil {
+		if err := tx.Model(&models.User{}).Where("id = ?", action.UserID).Updates(map[string]interface{}{"email": action.TargetEmail, "email_verified_at": now, "email_ownership_unproven": false, "auth_version": gorm.Expr("auth_version + 1")}).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&models.UserNotificationChannel{}).Where("user_id = ? AND type = ? AND LOWER(content) = LOWER(?)", action.UserID, "email", user.Email).Update("content", action.TargetEmail).Error; err != nil {
@@ -182,7 +182,7 @@ func (s *CredentialActionService) Complete(raw, password string) error {
 			return ErrInvalidPasswordAction
 		}
 		if err := tx.Model(&models.User{}).Where("id = ?", action.UserID).
-			Updates(map[string]interface{}{"password": string(hashed), "auth_version": gorm.Expr("auth_version + 1"), "email_verified_at": now}).Error; err != nil {
+			Updates(map[string]interface{}{"password": string(hashed), "auth_version": gorm.Expr("auth_version + 1"), "email_verified_at": now, "email_ownership_unproven": false}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("user_id = ? AND purpose IN ? AND used_at IS NULL", action.UserID, []string{"password_setup", "password_reset"}).Delete(&models.AuthActionToken{}).Error; err != nil {
