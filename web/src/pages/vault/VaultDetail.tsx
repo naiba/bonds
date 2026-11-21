@@ -1642,7 +1642,7 @@ function UpcomingRemindersWidget({ vaultId }: { vaultId: string }) {
                 >
                   {/* 使用用户日期格式偏好，而非硬编码 M/D 格式（fix #65） */}
                   {r.month && r.day
-                    ? formatShortDate(
+                    ? formatShortDateOnly(
                         `2000-${String(r.month).padStart(2, "0")}-${String(r.day).padStart(2, "0")}`,
                         dateFormats,
                       )

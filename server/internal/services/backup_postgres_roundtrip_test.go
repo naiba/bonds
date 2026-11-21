@@ -43,6 +43,14 @@ type postgresRoundTripDatabase struct {
 // works on whole databases, so the per-test schema used elsewhere is not enough.
 func newPostgresRoundTripDatabase(t *testing.T) *postgresRoundTripDatabase {
 	t.Helper()
+	return newPostgresRoundTripDatabaseInSchema(t, "")
+}
+
+// newPostgresRoundTripDatabaseInSchema puts the application's tables into the
+// named schema through the database's search_path, the way a deployment that
+// shares a database does. An empty name keeps them in public.
+func newPostgresRoundTripDatabaseInSchema(t *testing.T, schema string) *postgresRoundTripDatabase {
+	t.Helper()
 	adminDSN := os.Getenv(testutil.PostgresDSNEnv)
 	if adminDSN == "" {
 		t.Skip("needs a PostgreSQL server: set " + testutil.PostgresDSNEnv)
@@ -61,6 +69,11 @@ func newPostgresRoundTripDatabase(t *testing.T) *postgresRoundTripDatabase {
 	if err := admin.Exec("CREATE DATABASE " + name).Error; err != nil {
 		t.Fatalf("create database %s: %v", name, err)
 	}
+	if schema != "" {
+		if err := admin.Exec("ALTER DATABASE " + name + " SET search_path = " + schema).Error; err != nil {
+			t.Fatalf("set search_path of %s: %v", name, err)
+		}
+	}
 	parsed.Path = "/" + name
 	dsn := parsed.String()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
@@ -76,6 +89,11 @@ func newPostgresRoundTripDatabase(t *testing.T) *postgresRoundTripDatabase {
 			sqlDB.Close()
 		}
 	})
+	if schema != "" {
+		if err := db.Exec("CREATE SCHEMA " + schema).Error; err != nil {
+			t.Fatalf("create schema %s: %v", schema, err)
+		}
+	}
 	if err := database.AutoMigrate(db); err != nil {
 		t.Fatalf("migrate %s: %v", name, err)
 	}
@@ -310,6 +328,58 @@ func TestBackupRestore_restoresLegacyDumpCompletelyOnPostgres(t *testing.T) {
 // psql wait for ever and the restore request never returned.
 func TestBackupRestore_givesUpWhenTablesStayLockedOnPostgres(t *testing.T) {
 	target := newPostgresRoundTripDatabase(t)
+	seed := target.seed(t)
+	created, err := target.backup.Create()
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+	previousTimeout := postgresRestoreLockTimeout
+	t.Cleanup(func() { postgresRestoreLockTimeout = previousTimeout })
+	postgresRestoreLockTimeout = "1s"
+
+	sqlDB, err := target.db.DB()
+	if err != nil {
+		t.Fatalf("sql.DB: %v", err)
+	}
+	lockHolder, err := sqlDB.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("begin lock-holding transaction: %v", err)
+	}
+	releaseLock := sync.OnceFunc(func() { _ = lockHolder.Rollback() })
+	t.Cleanup(releaseLock)
+	if _, err := lockHolder.Exec("LOCK TABLE contacts IN ACCESS SHARE MODE"); err != nil {
+		t.Fatalf("lock contacts: %v", err)
+	}
+
+	restored := make(chan error, 1)
+	go func() { restored <- target.backup.Restore(created.Filename) }()
+
+	select {
+	case err := <-restored:
+		if err == nil {
+			t.Fatal("Restore() reported success although a table was locked the whole time")
+		}
+	case <-time.After(15 * time.Second):
+		releaseLock()
+		<-restored
+		t.Fatal("Restore() was still waiting for the table lock after 15s")
+	}
+	releaseLock()
+	if got := target.countRows(t, &models.Contact{}, "id = ?", seed.contactID); got != 1 {
+		t.Errorf("contact rows after the abandoned restore = %d, want 1", got)
+	}
+}
+
+// The locks are taken up front because every dump starts by switching the lock
+// timeout off. Looking for the tables only in public found none when the
+// database's search_path keeps them in another schema, and the restore waited
+// on the locked table for ever again.
+func TestBackupRestore_givesUpWhenTablesOutsidePublicStayLockedOnPostgres(t *testing.T) {
+	target := newPostgresRoundTripDatabaseInSchema(t, "bonds_app")
+	var tableSchema string
+	if err := target.db.Raw("SELECT schemaname FROM pg_tables WHERE tablename = 'contacts'").Scan(&tableSchema).Error; err != nil || tableSchema != "bonds_app" {
+		t.Fatalf("test setup: contacts lives in schema %q (err = %v), want bonds_app", tableSchema, err)
+	}
 	seed := target.seed(t)
 	created, err := target.backup.Create()
 	if err != nil {

@@ -38,7 +38,8 @@ import type {
   QuickFactGroup,
   UpdateQuickFactRequest,
 } from "@/api";
-import { formatDate, useDateFormat } from "@/utils/dateFormat";
+import { useDateFormat } from "@/utils/dateFormat";
+import { formatDateOnly } from "@/utils/dateOnlyInput";
 import type { NormalizedFeedSource } from "@/utils/feedSourceLink";
 import {
   invalidateFeedQueries,
@@ -361,7 +362,9 @@ export default function QuickFactsModule({
 
   function formatQuickFactDate(value: string | undefined) {
     if (!value) return "";
-    return formatDate(`${value}T00:00:00`, { ...dateFormat, tz: undefined });
+    // The value is a calendar date. Parsing it as local midnight and converting
+    // to UTC showed the previous day everywhere east of UTC.
+    return formatDateOnly(value, dateFormat);
   }
 
   function downloadUrl(fileId: number) {

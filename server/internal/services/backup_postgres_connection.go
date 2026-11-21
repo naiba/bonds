@@ -26,15 +26,22 @@ BEGIN
   END LOOP;
 END $$`
 
-// lockOwnedPublicTablesSQL takes the exclusive locks the restore needs up front,
+// lockOwnedTablesSQL takes the exclusive locks the restore needs up front,
 // while lock_timeout is still in force. It has to happen before the dump runs:
 // every pg_dump script starts with "SET lock_timeout = 0", so a timeout set
 // beforehand no longer applies to the DROP statements inside the dump.
-const lockOwnedPublicTablesSQL = `DO $$
+//
+// 表不一定在 public 里：数据库或角色的 search_path 可以把它们放进别的 schema。
+// 导出文件覆盖整个库，所以这里锁当前角色在所有用户 schema 里拥有的表；只看 public
+// 的话，表在别处时一张也锁不到，恢复又会回到无限期等锁。
+const lockOwnedTablesSQL = `DO $$
 DECLARE owned record;
 BEGIN
-  FOR owned IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user LOOP
-    EXECUTE format('LOCK TABLE public.%I IN ACCESS EXCLUSIVE MODE', owned.tablename);
+  FOR owned IN
+    SELECT schemaname, tablename FROM pg_tables
+    WHERE tableowner = current_user AND schemaname <> 'information_schema' AND schemaname NOT LIKE 'pg\_%'
+  LOOP
+    EXECUTE format('LOCK TABLE %I.%I IN ACCESS EXCLUSIVE MODE', owned.schemaname, owned.tablename);
   END LOOP;
 END $$`
 

@@ -31,6 +31,12 @@ import { api } from "@/api";
 import type { Loan, APIError, Currency, PersonalizeItem } from "@/api";
 import { useTranslation } from "react-i18next";
 import { useDateFormat, formatDate } from "@/utils/dateFormat";
+import {
+  dateInputToTimestamp,
+  formatDateOnly,
+  isDateOnlyTimestamp,
+  parseDateOnly,
+} from "@/utils/dateOnlyInput";
 import dayjs from "dayjs";
 import type { Dayjs } from "dayjs";
 import type { NormalizedFeedSource } from "@/utils/feedSourceLink";
@@ -196,7 +202,12 @@ export default function LoansModule({
     if (category === "item") {
       request.item_name = values.item_name?.trim();
       request.quantity = values.quantity;
-      request.due_at = values.due_at ? values.due_at.toISOString() : undefined;
+      // The due date is a calendar date. toISOString() saved the picker's value
+      // as an instant, time of day included: picked in the morning east of UTC
+      // it is still the previous day in UTC, and that is the day it was shown as.
+      request.due_at = values.due_at
+        ? dateInputToTimestamp(values.due_at.format("YYYY-MM-DD"))
+        : undefined;
       return request;
     }
 
@@ -230,7 +241,11 @@ export default function LoansModule({
       currency_id: loan.currency_id ?? defaultCurrencyId,
       item_name: loan.item_name,
       quantity: loan.quantity ?? 1,
-      due_at: loan.due_at ? dayjs(loan.due_at) : null,
+      due_at: loan.due_at
+        ? isDateOnlyTimestamp(loan.due_at)
+          ? (parseDateOnly(loan.due_at) ?? null)
+          : dayjs(loan.due_at)
+        : null,
     });
     setOpen(true);
   }
@@ -263,7 +278,11 @@ export default function LoansModule({
       if (loan.due_at)
         parts.push(
           t("modules.loans.due_at", {
-            date: formatDate(loan.due_at, dateFormats),
+            // Rows saved before due dates became calendar dates carry a time
+            // of day and are shown as the instants they are.
+            date: isDateOnlyTimestamp(loan.due_at)
+              ? formatDateOnly(loan.due_at, dateFormats)
+              : formatDate(loan.due_at, dateFormats),
           }),
         );
       if (loan.returned_at)

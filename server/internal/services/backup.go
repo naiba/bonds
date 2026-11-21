@@ -494,7 +494,7 @@ func (s *BackupService) restorePostgres(tmpDir string) error {
 	args := []string{
 		"--dbname=" + connection, "-v", "ON_ERROR_STOP=1", "--single-transaction",
 		"-c", "SET lock_timeout = '" + postgresRestoreLockTimeout + "'",
-		"-c", lockOwnedPublicTablesSQL,
+		"-c", lockOwnedTablesSQL,
 	}
 	if !cleanDump {
 		// 旧版本生成的备份不带 DROP 语句，而恢复的目标库里表都已存在。

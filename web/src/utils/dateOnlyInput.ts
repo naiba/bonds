@@ -45,3 +45,14 @@ export function formatShortDateOnly(
 ): string {
   return parseDateOnly(value)?.format(variants.short) ?? "";
 }
+
+/**
+ * Whether a stored timestamp is a calendar date (exactly midnight UTC) rather
+ * than an instant. Fields that used to save the picker's value as an instant
+ * keep rows with a time of day; those must go on being shown as instants.
+ */
+export function isDateOnlyTimestamp(value?: string): boolean {
+  if (!value) return false;
+  const milliseconds = Date.parse(value);
+  return !Number.isNaN(milliseconds) && milliseconds % 86_400_000 === 0;
+}
