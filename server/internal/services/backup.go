@@ -18,6 +18,7 @@ import (
 
 	sqlite3 "github.com/mattn/go-sqlite3"
 	"github.com/naiba/bonds/internal/config"
+	"github.com/naiba/bonds/internal/database"
 	"github.com/naiba/bonds/internal/dto"
 	"gorm.io/gorm"
 )
@@ -340,6 +341,13 @@ func (s *BackupService) Restore(filename string) error {
 		return err
 	}
 
+	// 备份里的库结构属于生成它的那个版本。恢复旧版本的备份后必须立刻把结构升到当前
+	// 版本：否则之后新增的列和表都不存在，凡是用到它们的请求都会报错，直到有人重启服务。
+	// 放在数据和附件都恢复完之后，这一步失败时数据本身已经完整，重启会再迁移一次。
+	if err := database.AutoMigrate(s.db); err != nil {
+		return fmt.Errorf("migrate restored database to the current schema: %w", err)
+	}
+
 	return nil
 }
 
@@ -483,7 +491,11 @@ func (s *BackupService) restorePostgres(tmpDir string) error {
 	// 没恢复的导入也会报成功，随后 Restore 还会照常清空并替换上传目录。
 	// --single-transaction 让失败的恢复整体回滚，数据库保持原样。
 	connection, passwordEnvironment := postgresClientConnection(s.cfg.Database.DSN)
-	args := []string{"--dbname=" + connection, "-v", "ON_ERROR_STOP=1", "--single-transaction"}
+	args := []string{
+		"--dbname=" + connection, "-v", "ON_ERROR_STOP=1", "--single-transaction",
+		"-c", "SET lock_timeout = '" + postgresRestoreLockTimeout + "'",
+		"-c", lockOwnedPublicTablesSQL,
+	}
 	if !cleanDump {
 		// 旧版本生成的备份不带 DROP 语句，而恢复的目标库里表都已存在。
 		// 实测（PostgreSQL 18）直接灌这种导出文件从来就恢复不完整：CREATE 全部报“已存在”，

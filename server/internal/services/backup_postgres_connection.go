@@ -8,6 +8,11 @@ import (
 
 var postgresKeywordPassword = regexp.MustCompile(`(^|\s)password\s*=\s*('(?:[^'\\]|\\.)*'|[^\s']\S*)\s*`)
 
+// postgresRestoreLockTimeout 限定恢复时等待表锁的时间。恢复要在一个事务里删表重建，
+// 需要独占锁：别的会话只要有一个事务一直开着，psql 就会无限期等下去，恢复请求永不返回。
+// 超时后整个事务回滚，数据库保持原样。
+var postgresRestoreLockTimeout = "60s"
+
 // dropOwnedPublicTablesSQL removes the tables and sequences the connecting
 // role owns in the public schema, leaving objects of other owners alone.
 const dropOwnedPublicTablesSQL = `DO $$
@@ -18,6 +23,18 @@ BEGIN
   END LOOP;
   FOR owned IN SELECT sequencename FROM pg_sequences WHERE schemaname = 'public' AND sequenceowner = current_user LOOP
     EXECUTE format('DROP SEQUENCE IF EXISTS public.%I CASCADE', owned.sequencename);
+  END LOOP;
+END $$`
+
+// lockOwnedPublicTablesSQL takes the exclusive locks the restore needs up front,
+// while lock_timeout is still in force. It has to happen before the dump runs:
+// every pg_dump script starts with "SET lock_timeout = 0", so a timeout set
+// beforehand no longer applies to the DROP statements inside the dump.
+const lockOwnedPublicTablesSQL = `DO $$
+DECLARE owned record;
+BEGIN
+  FOR owned IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user LOOP
+    EXECUTE format('LOCK TABLE public.%I IN ACCESS EXCLUSIVE MODE', owned.tablename);
   END LOOP;
 END $$`
 

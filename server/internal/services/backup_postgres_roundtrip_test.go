@@ -2,6 +2,7 @@ package services
 
 import (
 	"archive/zip"
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,8 +11,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/naiba/bonds/internal/config"
 	"github.com/naiba/bonds/internal/database"
@@ -299,5 +302,52 @@ func TestBackupRestore_restoresLegacyDumpCompletelyOnPostgres(t *testing.T) {
 				t.Fatalf("create journal after restore: journal = %+v, err = %v", journal, err)
 			}
 		})
+	}
+}
+
+// The restore drops and recreates tables inside one transaction, which needs
+// exclusive locks. A session that keeps a transaction open on any of them made
+// psql wait for ever and the restore request never returned.
+func TestBackupRestore_givesUpWhenTablesStayLockedOnPostgres(t *testing.T) {
+	target := newPostgresRoundTripDatabase(t)
+	seed := target.seed(t)
+	created, err := target.backup.Create()
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+	previousTimeout := postgresRestoreLockTimeout
+	t.Cleanup(func() { postgresRestoreLockTimeout = previousTimeout })
+	postgresRestoreLockTimeout = "1s"
+
+	sqlDB, err := target.db.DB()
+	if err != nil {
+		t.Fatalf("sql.DB: %v", err)
+	}
+	lockHolder, err := sqlDB.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("begin lock-holding transaction: %v", err)
+	}
+	releaseLock := sync.OnceFunc(func() { _ = lockHolder.Rollback() })
+	t.Cleanup(releaseLock)
+	if _, err := lockHolder.Exec("LOCK TABLE contacts IN ACCESS SHARE MODE"); err != nil {
+		t.Fatalf("lock contacts: %v", err)
+	}
+
+	restored := make(chan error, 1)
+	go func() { restored <- target.backup.Restore(created.Filename) }()
+
+	select {
+	case err := <-restored:
+		if err == nil {
+			t.Fatal("Restore() reported success although a table was locked the whole time")
+		}
+	case <-time.After(15 * time.Second):
+		releaseLock()
+		<-restored
+		t.Fatal("Restore() was still waiting for the table lock after 15s")
+	}
+	releaseLock()
+	if got := target.countRows(t, &models.Contact{}, "id = ?", seed.contactID); got != 1 {
+		t.Errorf("contact rows after the abandoned restore = %d, want 1", got)
 	}
 }

@@ -112,3 +112,47 @@ func TestBackupRestore_restoresSQLiteDatabaseOpenedWithDSNParameters(t *testing.
 		t.Fatalf("restore created a stray file named after the full DSN (stat err = %v)", err)
 	}
 }
+
+// A backup taken by an older release has that release's schema. Restoring it
+// puts the old schema under the running, newer server: columns added since are
+// missing and every query that touches them fails until someone restarts the
+// server. The restore has to bring the schema up to date itself.
+func TestBackupRestore_upgradesSchemaOfBackupFromOlderVersion(t *testing.T) {
+	svc, db := newLiveSQLiteBackupService(t, "")
+	authSvc := NewAuthService(db, testutil.TestJWTConfig())
+	if _, err := authSvc.Register(dto.RegisterRequest{
+		FirstName: "Backup", LastName: "Owner", Email: "backup-owner@example.com", Password: "password123",
+	}, "en"); err != nil {
+		t.Fatalf("register owner: %v", err)
+	}
+	// Make the database look like an older release, back it up, then return
+	// to the current schema.
+	if err := db.Exec("ALTER TABLE users DROP COLUMN task_view").Error; err != nil {
+		t.Fatalf("drop a column to simulate an older schema: %v", err)
+	}
+	olderVersionBackup, err := svc.Create()
+	if err != nil {
+		t.Fatalf("Create() error: %v", err)
+	}
+	if err := database.AutoMigrate(db); err != nil {
+		t.Fatalf("migrate back to the current schema: %v", err)
+	}
+	if !db.Migrator().HasColumn(&models.User{}, "task_view") {
+		t.Fatal("test setup: the current schema should have users.task_view")
+	}
+
+	if err := svc.Restore(olderVersionBackup.Filename); err != nil {
+		t.Fatalf("Restore() error: %v", err)
+	}
+
+	if !db.Migrator().HasColumn(&models.User{}, "task_view") {
+		t.Fatal("users.task_view is missing after restoring a backup from an older version")
+	}
+	var owner models.User
+	if err := db.Where("email = ?", "backup-owner@example.com").First(&owner).Error; err != nil {
+		t.Fatalf("read the restored user with the current model: %v", err)
+	}
+	if err := db.Model(&owner).Update("task_view", "board").Error; err != nil {
+		t.Fatalf("write a column added after the backup was taken: %v", err)
+	}
+}
